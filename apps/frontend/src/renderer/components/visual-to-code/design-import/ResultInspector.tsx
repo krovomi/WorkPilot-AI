@@ -5,6 +5,7 @@ import type { DesignStep } from "../../../lib/design-import-steps";
 import { useDesignToCodeStore } from "../../../stores/design-to-code-store";
 import { useProjectStore } from "../../../stores/project-store";
 import { GeneratedReviewBanner } from "../../generated-review/GeneratedReviewBanner";
+import { IterationPanel, percent } from "./IterationPanel";
 
 const ACCENT: Record<DesignStep, string> = {
 	vision: "var(--di-vision)",
@@ -48,7 +49,8 @@ function FilesView({ files, accent }: { files: FileEntry[]; accent: string }) {
 	const { t } = useTranslation("designToCode");
 	const selected = useDesignToCodeStore((s) => s.selectedFilePath);
 	const selectFile = useDesignToCodeStore((s) => s.selectFile);
-	const [copied, setCopied] = useState<string | null>(null);
+	// The last copy: its file and whether the clipboard took it.
+	const [copied, setCopied] = useState<{ path: string; ok: boolean } | null>(null);
 	const current = files.find((f) => f.path === selected) ?? files[0];
 
 	const groups = new Map<string, FileEntry[]>();
@@ -58,14 +60,16 @@ function FilesView({ files, accent }: { files: FileEntry[]; accent: string }) {
 	}
 
 	const copy = async (file: FileEntry) => {
+		let ok = true;
 		try {
 			await navigator.clipboard.writeText(file.content);
-			setCopied(file.path);
-			setTimeout(() => setCopied(null), 1600);
 		} catch {
-			/* clipboard refused: nothing to show */
+			ok = false;
 		}
+		setCopied({ path: file.path, ok });
+		setTimeout(() => setCopied(null), 1600);
 	};
+	const copyState = copied?.path === current?.path ? copied : null;
 
 	return (
 		<div className="di-card di-files" style={{ ["--di-accent" as string]: accent }}>
@@ -104,12 +108,8 @@ function FilesView({ files, accent }: { files: FileEntry[]; accent: string }) {
 							{current.path}
 						</span>
 						<button type="button" className="di-btn ml-auto" onClick={() => copy(current)}>
-							{copied === current.path ? (
-								<Check className="h-3 w-3" />
-							) : (
-								<Copy className="h-3 w-3" />
-							)}
-							{t(copied === current.path ? "code.copied" : "code.copy")}
+							{copyState?.ok ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+							{t(copyState ? (copyState.ok ? "code.copied" : "code.copyFailed") : "code.copy")}
 						</button>
 					</div>
 					<pre data-testid="design-code-view">{current.content}</pre>
@@ -192,6 +192,18 @@ export function ResultInspector() {
 					<div className="di-kicker mt-5 mb-2" style={{ ["--di-accent" as string]: "var(--di-faint)" }}>
 						{t("inspector.journal")}
 					</div>
+					{live.loop && (
+						<div className="di-muted mt-3 text-xs" data-testid="design-loop-live">
+							{t("loop.live", {
+								iteration: live.loop.iteration,
+								max: live.loop.max_iterations,
+								stage: t(`loop.stage.${live.loop.stage}`),
+							})}
+							{live.loop.score !== null && (
+								<span className="di-faint ml-2">{t("loop.score", { score: percent(live.loop.score) })}</span>
+							)}
+						</div>
+					)}
 					<ul className="di-journal">
 						{journal.map((entry) => (
 							<li key={`${entry.phase}-${entry.at}`}>
@@ -358,7 +370,12 @@ export function ResultInspector() {
 			break;
 		default:
 			title = t("inspector.codeTitle", { count: codeFiles.length });
-			body = <FilesView files={codeFiles} accent="var(--di-code)" />;
+			body = (
+				<>
+					{result.render_loop && <IterationPanel loop={result.render_loop} />}
+					<FilesView files={codeFiles} accent="var(--di-code)" />
+				</>
+			);
 	}
 
 	return (

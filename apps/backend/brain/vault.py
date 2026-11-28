@@ -15,13 +15,22 @@ import re
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from .graph import BrainGraph, rebuild
 from .home import KINDS, MARKER, brain_dir, graph_path, is_brain, kind_dir
 from .images import DEFAULT_MAX_IMAGES, iter_images
 from .memories import refresh_bridges, remember, write_digest
-from .notes import Note, inside, iter_notes, now_iso, read_note, slugify, write_note
+from .notes import (
+    Note,
+    inside,
+    iter_notes,
+    listed,
+    now_iso,
+    read_note,
+    slugify,
+    write_note,
+)
 from .sync import (
     SyncResult,
     ensure_repo,
@@ -33,9 +42,17 @@ from .sync import (
 )
 from .tasks import build_note_id
 
+if TYPE_CHECKING:
+    from .lifecycle.scopes import Audience
+
 __all__ = ["Brain", "SEED_DIR"]
 
 SEED_DIR = Path(__file__).resolve().parent / "seed"
+
+_WITHHELD = (
+    "Note non vérifiée : son dernier commit n'est signé par aucune clé de "
+    "confiance du projet, son contenu n'est pas donné aux agents."
+)
 
 _README = """# WorkPilot Brain
 
@@ -144,9 +161,10 @@ class Brain:
             for folder in KINDS.values():
                 (self.root / folder).mkdir(exist_ok=True)
         if fresh:
+            # A fresh folder held nothing (or only the ``.git`` of a clone),
+            # and nothing above writes these two names: no note is overwritten.
             for name, text in (("README.md", _README), ("AGENTS.md", _AGENTS_MD)):
-                if not (self.root / name).exists():
-                    (self.root / name).write_text(text, encoding="utf-8")
+                (self.root / name).write_text(text, encoding="utf-8")
         marker = self.root / MARKER
         if not marker.exists():
             marker.parent.mkdir(parents=True, exist_ok=True)
@@ -215,6 +233,8 @@ class Brain:
 
     def before_read(self) -> SyncResult | None:
         result = pull_if_stale(self.root) if _auto("BRAIN_AUTO_PULL") else None
+        if result is not None:
+            self._review_pull(result)
         if (result and result.pulled) or self.graph_is_stale():
             self._refresh()
         return result
@@ -232,10 +252,28 @@ class Brain:
         """
         refresh_bridges(self.root)
         result = sync(self.root, message, push=push)
+        self._review_pull(result)
         if result.pulled or self.graph_is_stale():
             self._refresh()
             refresh_bridges(self.root)
         return result
+
+    def _review_pull(self, result: SyncResult) -> None:
+        """Contradictions the pull brought into a project memory: settled by
+        the safe rules or queued for a person (`lifecycle.arbitration`). What
+        an automatic rule archived is committed by the next sync; a pair
+        queued is announced to the team when the project opted in."""
+        if not (result.pulled and (result.received or result.conflicts)):
+            return
+        from .lifecycle import announce
+        from .lifecycle.arbitration import review_pull
+
+        result.memory_conflicts = review_pull(
+            self.root, result.received, result.conflicts
+        )
+        # What is queued here, said on the project's channels when it asked
+        # (`lifecycle.announce`), off the caller's thread.
+        announce.start(self.root)
 
     # -- write -------------------------------------------------------------
 
@@ -298,18 +336,18 @@ class Brain:
         meta["title"] = title
         meta.setdefault("created", now_iso())
         meta["updated"] = now_iso()
-        merged_tags = list(dict.fromkeys([*(meta.get("tags") or []), *(tags or [])]))
+        merged_tags = list(dict.fromkeys([*listed(meta.get("tags")), *(tags or [])]))
         if merged_tags:
             meta["tags"] = merged_tags
         if task:
             # The Kanban task this note was learned on (`runtime.task_ref`):
             # what the task panel's brain card lists.
-            tasks = list(meta.get("tasks") or [])
+            tasks = listed(meta.get("tasks"))
             if task not in tasks:
                 tasks.append(task)
             meta["tasks"] = tasks
         if agent:
-            agents = list(meta.get("agents") or [])
+            agents = listed(meta.get("agents"))
             if agent not in agents:
                 agents.append(agent)
             meta["agents"] = agents
@@ -378,28 +416,43 @@ class Brain:
     def graph(self) -> BrainGraph:
         return BrainGraph.load(self.root)
 
-    def recall(self, query: str, limit: int = 5) -> dict[str, Any]:
+    def recall(
+        self,
+        query: str,
+        limit: int = 5,
+        *,
+        audience: Audience | None = None,
+        include_unverified: bool = False,
+    ) -> dict[str, Any]:
         """Levels 1 and 2 of graph-first recall: graph hits, then their frontmatter.
 
         Level 3 — the body — is `read`, a separate call, because deciding which
-        file deserves opening is the whole point of the first two.
+        file deserves opening is the whole point of the first two. With an
+        *audience* (`lifecycle.scopes.Audience`, an agent's build), a note
+        scoped elsewhere is left out (`lifecycle.scopes.recalled`).
+
+        A project note no trusted key signed (`lifecycle.provenance`) is left
+        out — what recall answers goes to agents — unless a person asks
+        (``include_unverified``): it is then marked ``verified: False``.
         """
         self.before_read()
-        hits = self.graph().query(query, limit=limit)
+        # Asked for more when some may be left out, so that the limit still fills.
+        wanted = limit if audience is None else max(limit * 4, 20)
+        hits = self.graph().query(query, limit=wanted)
         level = "graph"
         if not hits:
-            hits = self._index_search(query, limit)
+            hits = self._index_search(query, wanted)
             level = "index"
+        hits = self._signed_only(hits, include_unverified)
+        kept: list[dict[str, Any]] = []
         for hit in hits:
-            source = hit.get("source_file")
-            # An image hit carries its text in ``match``; its bytes have no
-            # frontmatter to read.
-            if (
-                source
-                and str(source).endswith(".md")
-                and inside(self.root, source).is_file()
-            ):
-                meta = read_note(self.root, source).meta
+            if len(kept) >= limit:
+                break
+            meta = self._meta_of(hit.get("source_file"))
+            if not _recalled(meta, audience):
+                continue
+            kept.append(hit)
+            if meta is not None:
                 hit["frontmatter"] = {
                     k: meta[k]
                     for k in (
@@ -410,15 +463,56 @@ class Brain:
                         "agents",
                         "updated",
                         "description",
+                        "applies_to",
                     )
                     if k in meta
                 }
         return {
             "query": query,
             "level": level,
-            "hits": hits,
+            "hits": kept,
             "next": "brain_read_note(path) sur le source_file utile — seulement si ceci ne suffit pas",
         }
+
+    def _signed_only(
+        self, hits: list[dict[str, Any]], include_unverified: bool
+    ) -> list[dict[str, Any]]:
+        from .lifecycle.provenance import unverified_among
+
+        sources = [str(h["source_file"]) for h in hits if h.get("source_file")]
+        hidden = unverified_among(self.root, sources)
+        if not hidden:
+            return hits
+        if not include_unverified:
+            return [h for h in hits if str(h.get("source_file") or "") not in hidden]
+        for hit in hits:
+            if str(hit.get("source_file") or "") in hidden:
+                hit["verified"] = False
+        return hits
+
+    def _meta_of(self, source: Any) -> dict[str, Any] | None:
+        """The frontmatter of a note hit; ``None`` for anything else. An image
+        hit carries its text in ``match``; its bytes have no frontmatter."""
+        if not (
+            source
+            and str(source).endswith(".md")
+            and inside(self.root, source).is_file()
+        ):
+            return None
+        return read_note(self.root, source).meta
+
+    def recalled(
+        self, hits: list[dict[str, Any]], audience: Audience | None, limit: int
+    ) -> list[dict[str, Any]]:
+        """The first *limit* graph *hits* an agent recalling for *audience*
+        gets (`lifecycle.scopes.recalled`), each note's scope read from its file."""
+        kept: list[dict[str, Any]] = []
+        for hit in hits:
+            if len(kept) >= limit:
+                break
+            if _recalled(self._meta_of(hit.get("source_file")), audience):
+                kept.append(hit)
+        return kept
 
     def _index_search(self, query: str, limit: int) -> list[dict[str, Any]]:
         """Fallback: words anywhere in the body, reported as path + matching line only."""
@@ -448,7 +542,10 @@ class Brain:
                 break
         return out
 
-    def read(self, rel: str) -> dict[str, Any]:
+    def read(self, rel: str, *, include_unverified: bool = False) -> dict[str, Any]:
+        """One note. A project note no trusted key signed is withheld — its
+        text and frontmatter are a stranger's until a teammate's key vouches
+        for them — unless a person asks (``include_unverified``)."""
         self.before_read()
         path = Path(rel)
         if path.is_absolute() or ".." in path.parts:
@@ -456,7 +553,23 @@ class Brain:
         if path.suffix != ".md":
             path = path.with_suffix(".md")
         note = read_note(self.root, path)
-        return {"path": note.rel, "frontmatter": note.meta, "body": note.body}
+        from .lifecycle.provenance import unverified_among
+
+        if not unverified_among(self.root, [note.rel]):
+            return {"path": note.rel, "frontmatter": note.meta, "body": note.body}
+        if include_unverified:
+            return {
+                "path": note.rel,
+                "frontmatter": note.meta,
+                "body": note.body,
+                "verified": False,
+            }
+        return {
+            "path": note.rel,
+            "frontmatter": {},
+            "body": _WITHHELD,
+            "verified": False,
+        }
 
     def status(self) -> dict[str, Any]:
         counts: dict[str, int] = {}
@@ -475,3 +588,12 @@ class Brain:
             "autoPull": _auto("BRAIN_AUTO_PULL"),
             "autoPush": _auto("BRAIN_AUTO_PUSH"),
         }
+
+
+def _recalled(meta: dict[str, Any] | None, audience: Audience | None) -> bool:
+    """Whether a hit with this frontmatter is recalled for *audience*."""
+    if audience is None or meta is None:
+        return True
+    from .lifecycle import scopes
+
+    return scopes.recalled(meta.get("applies_to"), audience)

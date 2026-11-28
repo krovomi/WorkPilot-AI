@@ -24,8 +24,8 @@ metadata:
     - test-driven-development
   workpilot:
     pack: hermes
-    version: 0.1.0
-    content_sha256: a5961afd328e8e44128e9d00a37796c1a9008717e5ac72e4faeacff2265c2d0a
+    version: 0.3.0
+    content_sha256: 55754ed6e0512adcdec40fc747956108549d5e12e9f1303f72db6a0e38094298
 ---
 
 # Simplify Code — Parallel Review & Cleanup
@@ -114,7 +114,7 @@ knows what actually ran.
 Give **every** reviewer the **complete diff** (not fragments — cross-file
 issues hide in the gaps) plus the absolute repo path so they can search the
 wider codebase. Each reviewer gets `terminal`, `file`, and `search`
-toolsets (so they can `git`, `read_file`, and `search_files`/grep).
+toolsets (so they can `git`, `read_file`, and `search_files`).
 
 Tell each reviewer to:
 - Search the existing codebase for evidence (don't reason from the diff alone).
@@ -143,7 +143,7 @@ Pass these four goals (drop any the user's focus excludes):
 **Reviewer 1 — Code Reuse**
 > Review this diff for code that duplicates functionality already in the
 > codebase. Search utility modules, shared helpers, and adjacent files
-> (use search_files / grep) for existing functions, constants, or patterns
+> (use search_files) for existing functions, constants, or patterns
 > the new code could call instead of reimplementing. Flag: new functions
 > that duplicate existing ones; hand-rolled logic that an existing utility
 > already does (manual string/path manipulation, custom env checks, ad-hoc
@@ -265,7 +265,7 @@ Wait for all four to return (batch mode returns them together).
   may truncate.
 - **Over-trusting dead code tools.** `knip`, `ts-prune`, and `depcheck` flag
   exports that ARE used dynamically (string-based imports, reflection). Always
-  grep for the symbol name before removing — a clean tool report is not proof.
+  `search_files` for the symbol name before removing — a clean tool report is not proof.
 - **Renaming without checking public contracts.** Export names, API route
   paths, DB column names, and config keys are contracts — even if the name is
   bad, renaming breaks consumers. Tag public-contract changes as RISKY; never

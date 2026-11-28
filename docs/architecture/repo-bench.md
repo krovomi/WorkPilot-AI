@@ -1,3 +1,11 @@
+---
+feature: Banc de rejeu
+summary: >-
+  Cartes terminées rejouées par moteur depuis le commit d'avant, jugées par les tests du commit
+  d'arrivée (F2P/P2P) ; recommande par type de carte le moteur le moins cher proche du meilleur,
+  jamais appliqué seul ; une règle candidate est mesurée sans et avec elle.
+---
+
 # Banc de rejeu sur le dépôt (`bench`)
 
 Formula Lab estimait le coût et la réussite de chaque provider × modèle × effort à partir de

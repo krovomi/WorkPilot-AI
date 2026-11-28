@@ -8,16 +8,24 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import {
+	normalizeCodeMode,
+	type PhaseCodeMode,
+} from "../../../shared/utils/code-mode";
+import {
 	ENGINE_PHASES,
 	type EnginePhase,
 	type EngineTrio,
+	engineProviders,
 	isUniformEngine,
 	seedEngine,
 	type TaskEngine,
 } from "../../../shared/utils/task-engine";
+import type { AiAccountPins } from "../../../shared/types/ai-accounts";
 import { useConfiguredProviders } from "../../hooks/useConfiguredProviders";
+import { AiAccountPinsEditor } from "../ai-account-pins/AiAccountPinsEditor";
 import { useSettingsStore } from "../../stores/settings-store";
 import { EngineTrioPicker } from "./EngineTrioPicker";
+import { PhaseCodeModePicker } from "./PhaseCodeModePicker";
 
 interface TaskEngineEditorProps {
 	engine: TaskEngine;
@@ -28,6 +36,20 @@ interface TaskEngineEditorProps {
 	onChange: Dispatch<SetStateAction<TaskEngine>>;
 	idPrefix: string;
 	disabled?: boolean;
+	/**
+	 * This task's code mode per phase (`phaseCodeMode`). Given with its
+	 * setter, each phase offers its own mode while Settings' switch is not off.
+	 */
+	phaseCodeMode?: PhaseCodeMode;
+	onPhaseCodeModeChange?: (next: PhaseCodeMode) => void;
+	/**
+	 * The AI account this card pins per provider (`aiAccounts`). Given with
+	 * its setter, each provider of the engine that has a choice offers one.
+	 */
+	accounts?: AiAccountPins;
+	onAccountsChange?: (next: AiAccountPins | undefined) => void;
+	/** The project's pins, shown as what the card inherits. */
+	inheritedAccounts?: AiAccountPins;
 }
 
 /**
@@ -48,11 +70,20 @@ export function TaskEngineEditor({
 	onChange,
 	idPrefix,
 	disabled = false,
+	phaseCodeMode,
+	onPhaseCodeModeChange,
+	accounts,
+	onAccountsChange,
+	inheritedAccounts,
 }: TaskEngineEditorProps) {
 	const { t } = useTranslation(["tasks", "settings"]);
 	const settings = useSettingsStore((s) => s.settings);
 	const { providers, loading } = useConfiguredProviders();
 	const uniform = isUniformEngine(engine);
+	const codeModeOffered =
+		phaseCodeMode !== undefined &&
+		onPhaseCodeModeChange !== undefined &&
+		normalizeCodeMode(settings?.codeMode) !== "off";
 	const [advanced, setAdvanced] = useState(!uniform);
 
 	// A task whose phases were already set apart opens on them.
@@ -158,9 +189,30 @@ export function TaskEngineEditor({
 								idPrefix={`${idPrefix}-${phase}`}
 								disabled={disabled}
 							/>
+							{codeModeOffered && (
+								<PhaseCodeModePicker
+									phase={phase}
+									value={phaseCodeMode}
+									onChange={onPhaseCodeModeChange}
+									idPrefix={`${idPrefix}-${phase}`}
+									disabled={disabled}
+								/>
+							)}
 						</div>
 					))}
 				</div>
+			)}
+
+			{onAccountsChange && (
+				<AiAccountPinsEditor
+					providers={engineProviders(engine)}
+					value={accounts}
+					onChange={onAccountsChange}
+					inherited={inheritedAccounts}
+					scope="card"
+					idPrefix={idPrefix}
+					disabled={disabled}
+				/>
 			)}
 		</div>
 	);

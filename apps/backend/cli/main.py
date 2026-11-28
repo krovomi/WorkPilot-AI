@@ -6,6 +6,7 @@ Command-line interface for the WorkPilot AI autonomous coding framework.
 """
 
 import argparse
+import json
 import os
 import sys
 from pathlib import Path
@@ -58,16 +59,6 @@ from .workspace_commands import (
     handle_merge_command,
     handle_review_command,
 )
-
-# Ensure parent directory is in path for imports
-_PARENT_DIR = Path(__file__).parent.parent
-if str(_PARENT_DIR) not in sys.path:
-    sys.path.insert(0, str(_PARENT_DIR))
-
-# Ensure project root is in path for src.connectors imports (e.g. src.connectors.llm_config)
-_PROJECT_ROOT = _PARENT_DIR.parent.parent
-if str(_PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(_PROJECT_ROOT))
 
 
 def parse_args(argv=None) -> argparse.Namespace:
@@ -184,6 +175,15 @@ Environment Variables:
         metavar="TEXT",
         default=None,
         help="Send a message to the task while it runs: the next session receives it",
+    )
+    build_group.add_argument(
+        "--subtask",
+        metavar="SUBTASK_ID",
+        default=None,
+        help=(
+            "Build only this subtask of the plan, in --project-dir, without QA: "
+            "what a swarm wave runs in each subtask's worktree"
+        ),
     )
     # Outside the exclusive group: it goes with --steer.
     parser.add_argument(
@@ -798,8 +798,6 @@ def _run_cli(argv=None, jev_run=None) -> None:
             project_dir, spec_dir.name, base_branch=args.base_branch
         )
         # Output as JSON for the UI to parse
-        import json
-
         print(json.dumps(result))
         return
 
@@ -820,6 +818,15 @@ def _run_cli(argv=None, jev_run=None) -> None:
 
     if args.discard:
         handle_discard_command(project_dir, spec_dir.name)
+        return
+
+    if args.subtask is not None:
+        from .subtask_command import handle_subtask_command
+
+        if not handle_subtask_command(
+            project_dir, spec_dir, model, args.subtask, verbose=args.verbose
+        ):
+            sys.exit(1)
         return
 
     if args.steer is not None:

@@ -12,12 +12,20 @@
  * The handler still receives the value as sent: several key their state by
  * the project path string, so the check does not rewrite it.
  *
+ * A server project (server mode) has no folder of its own here: its views
+ * name it by its mirror, the folder the main made for it under the profile
+ * (`server-projects.ts`), and the handlers that serve a server project send
+ * its work to the server from that name. So the mirror itself, and only it,
+ * passes too; a handler that has nothing to do on a server still refuses it,
+ * since the mirror is not a registered project.
+ *
  * `ipc-path-policy.test.ts` reads every handler's parameters and fails when
  * one named like a directory (`projectPath`, `projectDir`, `worktreePath`,
  * `specDir`…) is missing here: a new handler is covered by adding its line.
  */
 
 import type { IpcMain } from "electron";
+import { serverProjectAtPath } from "../server-projects";
 import { resolveInProject } from "./renderer-path";
 
 /** Channel → positions (after the event) of its directory arguments. */
@@ -33,14 +41,25 @@ export const DIRECTORY_ARGS: Readonly<Record<string, readonly number[]>> = {
 	"browserAgent:getDashboard": [0],
 	"browserAgent:listBaselines": [0],
 	"browserAgent:navigate": [0],
+	"browserAgent:recordAssist": [0],
+	"browserAgent:recordExport": [0],
+	"browserAgent:recordReshoot": [0],
+	"browserAgent:recordReshootApply": [0],
+	"browserAgent:recordRun": [0],
+	"browserAgent:recordStart": [0],
 	"browserAgent:runTests": [0],
 	"browserAgent:setBaseline": [0],
 	"changelog:readLocalImage": [0],
 	"cicdTriggers:cancelRun": [0],
 	"cicdTriggers:getConfig": [0],
+	"cicdTriggers:getFigures": [0],
+	"cicdTriggers:getLinks": [0],
 	"cicdTriggers:getRunStatus": [0],
 	"cicdTriggers:listRuns": [0],
+	"cicdTriggers:reviewVerdict": [0],
+	"cicdTriggers:rollback": [0],
 	"cicdTriggers:setConfig": [0],
+	"cicdTriggers:setLinks": [0],
 	"cicdTriggers:trigger": [0],
 	"contextMesh:registerProject": [0],
 	"contextMesh:unregisterProject": [0],
@@ -50,6 +69,7 @@ export const DIRECTORY_ARGS: Readonly<Record<string, readonly number[]>> = {
 	"costs:setBudget": [0],
 	"crossLangTranslation:clearHistory": [0],
 	"crossLangTranslation:getHistory": [0],
+	"dashboard:compare": [0],
 	"dashboard:getSnapshot": [0],
 	"dictation:start": [2],
 	"fileExplorer:list": [0],
@@ -66,8 +86,6 @@ export const DIRECTORY_ARGS: Readonly<Record<string, readonly number[]>> = {
 	"git:setRemote": [0],
 	"github:addRemote": [0],
 	"github:detectRepo": [0],
-	"gitlab:addRemote": [0],
-	"gitlab:detectProject": [0],
 	"learningLoop:deletePattern": [0],
 	"learningLoop:getPatterns": [0],
 	"learningLoop:getSummary": [0],
@@ -78,7 +96,10 @@ export const DIRECTORY_ARGS: Readonly<Record<string, readonly number[]>> = {
 	"learningLoop:dismissLesson": [0],
 	"mcpPins:list": [0],
 	"mcpPins:approve": [0],
+	"liveCompanion:getSuggestions": [0],
+	"liveCompanion:getTakeovers": [0],
 	"liveCompanion:start": [0],
+	"selfHealing:bisect": [0],
 	"selfHealing:cancelOperation": [0],
 	"selfHealing:cicd:config": [0],
 	"selfHealing:cicd:disable": [0],
@@ -103,7 +124,6 @@ export const DIRECTORY_ARGS: Readonly<Record<string, readonly number[]>> = {
 	"task:worktreeOpenInTerminal": [0],
 	"task:worktreeReadFile": [0],
 	"task:worktreeWriteFile": [0],
-	"terminal:clearSessions": [0],
 	"terminal:getSessionDates": [0],
 	"terminal:getSessions": [0],
 	"terminal:getSessionsForDate": [1],
@@ -136,6 +156,14 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 	);
 }
 
+/** A registered project, a picked folder, or a server project's mirror. */
+function directoryAllowed(value: unknown): boolean {
+	return (
+		resolveInProject(value, "directory") !== null ||
+		serverProjectAtPath(value) !== undefined
+	);
+}
+
 /**
  * Whether `args` (the handler's arguments, event excluded) may reach the
  * handler of `channel`. An absent optional argument is let through: the
@@ -145,14 +173,14 @@ export function argsAllowed(channel: string, args: readonly unknown[]): boolean 
 	for (const index of DIRECTORY_ARGS[channel] ?? []) {
 		const value = args[index];
 		if (value === undefined || value === null || value === "") continue;
-		if (!resolveInProject(value, "directory")) return false;
+		if (!directoryAllowed(value)) return false;
 	}
 	for (const value of args) {
 		if (!isPlainObject(value)) continue;
 		for (const key of DIRECTORY_KEYS) {
 			const dir = value[key];
 			if (dir === undefined || dir === null || dir === "") continue;
-			if (!resolveInProject(dir, "directory")) return false;
+			if (!directoryAllowed(dir)) return false;
 		}
 	}
 	return true;

@@ -1,6 +1,13 @@
 /** Shared formatting + colour helpers for the Formula Lab. */
 
+import { providerRegistry } from "../../../shared/services/providerRegistry";
 import type { Formula } from "../../stores/formula-matrix-store";
+
+/** A provider's name as the Settings show it, else the id itself. */
+export function providerName(provider: string): string {
+	const id = provider === "claude" ? "anthropic" : provider;
+	return providerRegistry.getProvider(id)?.label ?? provider;
+}
 
 /**
  * USD → EUR conversion rate. The pricing catalog is denominated in USD (that is
@@ -67,21 +74,19 @@ export function providerColor(provider: string): string {
 
 export const EFFORT_ORDER = ["none", "low", "medium", "high", "ultrathink"] as const;
 
-export function effortLabel(effort: string): string {
-	switch (effort) {
-		case "none":
-			return "None";
-		case "low":
-			return "Low";
-		case "medium":
-			return "Med";
-		case "high":
-			return "High";
-		case "ultrathink":
-			return "Ultra";
-		default:
-			return effort;
-	}
+/** Translation key of each known effort level; other values are shown as-is. */
+const EFFORT_KEYS: Record<string, string> = {
+	none: "formulaLab:effort.none",
+	low: "formulaLab:effort.low",
+	medium: "formulaLab:effort.medium",
+	high: "formulaLab:effort.high",
+	ultrathink: "formulaLab:effort.ultrathink",
+};
+
+/** Short, translated label of an effort level ("Med", "Moyen"…). */
+export function effortLabel(effort: string, t: (key: string) => string): string {
+	const key = EFFORT_KEYS[effort];
+	return key ? t(key) : effort;
 }
 
 /** Short model label: strip a redundant vendor prefix for compact chips. */
@@ -91,19 +96,4 @@ export function shortModel(model: string): string {
 		.replace(/^meta\./, "")
 		.replace(/^claude-/, "")
 		.replace(/-\d{8}$/, "");
-}
-
-export function tierLabel(tier: string): string {
-	switch (tier) {
-		case "flagship":
-			return "Flagship";
-		case "mid":
-			return "Mid";
-		case "small":
-			return "Small";
-		case "local":
-			return "Local";
-		default:
-			return tier;
-	}
 }

@@ -1,3 +1,4 @@
+import { type ApiProvider, getProviderLabel } from "@shared/utils/provider-detection";
 import { Eye } from "lucide-react";
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -37,15 +38,22 @@ export function UsageLensSelector() {
 	const [tooltipOpen, setTooltipOpen] = useState(false);
 	const tooltipSuppressed = useRef(false);
 
+	// A provider the settings do not list (yet) still gets its proper name:
+	// the lens is the only place the header names it. "unknown" is a word,
+	// so it is translated rather than taken from the English label table.
+	const fallbackLabel = (name: string) =>
+		name === "unknown"
+			? t("common:usage.providerUnknown")
+			: (getProviderLabel(name as ApiProvider) ?? name);
 	const labelOf = (name: string) =>
-		providers.find((p) => p.name === name)?.label ?? name;
+		providers.find((p) => p.name === name)?.label ?? fallbackLabel(name);
 	// Running providers first: they are the ones a person looks for here.
 	const ordered = [
 		...providers.filter((p) => runningProviders.includes(p.name)),
 		...providers.filter((p) => !runningProviders.includes(p.name)),
 	];
 	if (usageProviderChoice && !providers.some((p) => p.name === usageProviderChoice)) {
-		ordered.push({ name: usageProviderChoice, label: usageProviderChoice });
+		ordered.push({ name: usageProviderChoice, label: fallbackLabel(usageProviderChoice) });
 	}
 
 	return (

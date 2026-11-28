@@ -150,6 +150,7 @@ class OpenCodeCliAgentClient(CliSubprocessAgentClient):
     """Run an agent turn through ``opencode run --format json``."""
 
     cli_label = "OpenCode CLI"
+    hands_mcp_servers = True
 
     def __init__(
         self,
@@ -178,6 +179,18 @@ class OpenCodeCliAgentClient(CliSubprocessAgentClient):
 
     def _resolve_executable(self) -> str | None:
         return self._executable or find_executable("opencode")
+
+    def _subprocess_env(self) -> dict[str, str]:
+        """The approved custom MCP servers in OpenCode's inline configuration."""
+        from core.cli_mcp import OPENCODE_CONFIG_ENV, opencode_config_content
+
+        env = super()._subprocess_env()
+        content = opencode_config_content(
+            self._mcp_servers or [], env.get(OPENCODE_CONFIG_ENV)
+        )
+        if content:
+            env[OPENCODE_CONFIG_ENV] = content
+        return env
 
     async def receive_response(self) -> AsyncIterator[AgentMessage]:
         prompt = self._take_prompt()
@@ -209,6 +222,7 @@ class OpenCodeCliAgentClient(CliSubprocessAgentClient):
             raise OpenCodeCliError(
                 "OpenCode CLI is not installed or is not available on PATH."
             )
+        await self.custom_mcp_servers()
         try:
             logical = build_opencode_run_args(
                 executable=executable,
@@ -216,7 +230,13 @@ class OpenCodeCliAgentClient(CliSubprocessAgentClient):
                 session_id=self.session_id,
                 agent=self.agent,
             )
-            command = build_windows_command(logical[0], logical[1:])
+            # In the task's microVM the command is a Linux one, never a
+            # Windows launcher (`cli_microvm`).
+            command = (
+                logical
+                if self.runs_in_microvm()
+                else build_windows_command(logical[0], logical[1:])
+            )
             process = await self._spawn(command, prompt.encode("utf-8"))
         except (OSError, RuntimeError, ValueError) as error:
             raise _opencode_error(error) from error

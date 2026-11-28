@@ -324,6 +324,52 @@ describe("AUTOBUILD_SOURCE_ENV handlers", () => {
 		expect((await saveSettings({ gitPath: "git" })).success).toBe(true);
 	});
 
+	it("saves the swarm setting it can read, and refuses one the panel never offers", async () => {
+		const { saveSettings } = await register();
+		const settingsFile = path.join(env.userData, "settings.json");
+		const swarm = {
+			enabled: true,
+			maxParallelAgents: 3,
+			failFast: false,
+			maxRetriesPerSubtask: 1,
+		};
+
+		expect((await saveSettings({ swarm })).success).toBe(true);
+		expect(JSON.parse(readFileSync(settingsFile, "utf-8")).swarm).toEqual(swarm);
+		const before = readFileSync(settingsFile, "utf-8");
+
+		const result = await saveSettings({
+			swarm: { ...swarm, maxParallelAgents: 64 },
+		});
+
+		expect(result.success).toBe(false);
+		expect(result.error).toContain("swarm-invalid-settings");
+		expect(readFileSync(settingsFile, "utf-8")).toBe(before);
+	});
+
+	it("bounds the agent safety settings before saving them", async () => {
+		const { saveSettings } = await register();
+		const { readSettingsFile } = await import("../settings-utils");
+		await saveSettings({
+			agentSafety: { sandbox: { mode: "restricted", allowedPaths: ["/etc", "src"] } },
+		});
+		expect(readSettingsFile()?.agentSafety).toMatchObject({
+			sandbox: { mode: "restricted", allowedPaths: ["src"] },
+			anomaly: { pauseBelow: 40 },
+		});
+	});
+
+	it("turns the express lane on only for a true boolean", async () => {
+		const { saveSettings } = await register();
+		const { readSettingsFile } = await import("../settings-utils");
+		await saveSettings({ expressLane: true });
+		expect(readSettingsFile()?.expressLane).toBe(true);
+		for (const odd of ["true", 1, { on: true }, null]) {
+			await saveSettings({ expressLane: odd });
+			expect(readSettingsFile()?.expressLane).toBe(false);
+		}
+	});
+
 	it("refuses a backend folder in the temporary folder, and writes nothing", async () => {
 		const { saveSettings } = await register();
 		const settingsFile = path.join(env.userData, "settings.json");

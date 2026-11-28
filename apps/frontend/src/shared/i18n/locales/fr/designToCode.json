@@ -59,7 +59,10 @@
 			"projectReady_one": "prêt · {{count}} fichier à écrire",
 			"projectReady_other": "prêt · {{count}} fichiers à écrire",
 			"projectWritten_one": "{{count}} fichier en revue",
-			"projectWritten_other": "{{count}} fichiers en revue"
+			"projectWritten_other": "{{count}} fichiers en revue",
+			"codeLoop": "itération {{iteration}}/{{max}}",
+			"codeLoopDone_one": "{{score}} % de correspondance · {{count}} itération",
+			"codeLoopDone_other": "{{score}} % de correspondance · {{count}} itérations"
 		}
 	},
 	"steps": {
@@ -78,7 +81,8 @@
 		},
 		"code": {
 			"kicker": "Code",
-			"title": "Générer les composants"
+			"title": "Générer les composants",
+			"toggle": "Rendre, comparer et corriger le code"
 		},
 		"tests": {
 			"kicker": "Tests visuels",
@@ -190,14 +194,16 @@
 		"visual_test_generation": "Tests visuels",
 		"figma_sync": "Synchronisation Figma",
 		"complete": "Terminé",
-		"error": "Erreur"
+		"error": "Erreur",
+		"render_loop": "Boucle de rendu"
 	},
 	"errors": {
 		"missingInput": "Ajoutez une image ou un lien Figma."
 	},
 	"code": {
 		"copy": "Copier",
-		"copied": "Copié"
+		"copied": "Copié",
+		"copyFailed": "Copie refusée"
 	},
 	"composer": {
 		"target": "Cible",
@@ -215,6 +221,7 @@
 		"taskCreated": "Tâche créée",
 		"creatingTask": "Création…",
 		"createTask": "Créer une tâche Kanban",
+		"taskFailed": "La tâche n'a pas pu être créée. Réessayez.",
 		"regenerate": "Régénérer",
 		"written_one": "{{count}} fichier en revue",
 		"written_other": "{{count}} fichiers en revue",
@@ -233,5 +240,160 @@
 		"components": "Composants reconnus",
 		"palette": "Palette",
 		"files": "Fichiers générés"
+	},
+	"loop": {
+		"title": "Boucle de rendu",
+		"kicker": "Rendre · comparer · corriger",
+		"status": {
+			"converged": "Convergé : {{score}} % de correspondance",
+			"max_iterations": "Arrêté au nombre maximal d'itérations : {{score}} % de correspondance",
+			"budget": "Budget de temps épuisé : {{score}} % de correspondance",
+			"stalled": "Plus de progrès : {{score}} % de correspondance",
+			"failed": "Arrêté sur une erreur : {{score}} % de correspondance",
+			"skipped": "La boucle de rendu n'a pas tourné",
+			"budget_tokens": "Budget en jetons épuisé : {{score}} % de correspondance",
+			"budget_cost": "Budget en coût épuisé : {{score}} % de correspondance"
+		},
+		"reason": {
+			"no_model": "Aucun modèle n'a répondu à la génération : il n'y a rien de réel à corriger.",
+			"no_files": "Aucun fichier n'a été généré.",
+			"unsupported_target": "Le design ne se compare pas pixel par pixel (SVG ou image illisible).",
+			"no_vision_route": "Le fournisseur {{provider}} n'a pas de modèle vision ici. Choisissez Claude, OpenAI, Copilot, Gemini ou un modèle vision local d'Ollama.",
+			"no_credentials": "Le fournisseur {{provider}} n'a ni clé ni connexion dans cette exécution.",
+			"model_without_vision": "{{model}} ne lit pas les images (catalogue des modèles). Choisissez un modèle vision.",
+			"local_unavailable": "Le modèle vision local {{model}} n'est pas disponible : {{detail}}.",
+			"no_preview": "Le modèle n'a pas fourni de miroir HTML statique à rendre.",
+			"no_browser": "Aucun navigateur headless n'a pu démarrer ici : installez le Chromium de Playwright.",
+			"no_playwright": "Playwright n'est pas installé dans l'environnement du backend.",
+			"load_failed": "La page générée ne s'est pas chargée dans le navigateur."
+		},
+		"mirror": "Rendu à partir d'un miroir HTML statique des fichiers générés, que le modèle tient à jour avec le code ; les composants eux-mêmes ne sont pas rendus.",
+		"target": "Cible",
+		"render": "Rendu",
+		"diff": "Carte des écarts",
+		"iteration": "v{{index}}",
+		"generated": "généré",
+		"kept": "retenu",
+		"score": "{{score}} %",
+		"iterationsLabel": "Itérations",
+		"issues": "Écarts",
+		"noIssues": "Aucun écart trouvé.",
+		"issueStatus": {
+			"resolved": "résolu",
+			"open": "en cours",
+			"abandoned": "abandonné"
+		},
+		"issue": {
+			"color": "{{region}} : fond {{render}} au lieu de {{target}}",
+			"offset": "{{region}} : contenu décalé de {{px}} px ({{axis}})",
+			"size": "{{region}} : {{axis}} décalé de {{px}} px",
+			"structure": "{{region}} : la mise en page ou les formes diffèrent"
+		},
+		"edits_one": "{{count}} modification appliquée",
+		"edits_other": "{{count}} modifications appliquées",
+		"noEdits": "aucune modification applicable",
+		"missingFonts": "Polices absentes sur cette machine, remplacées dans le rendu : {{fonts}}",
+		"masked": "Zones ignorées (contenu dynamique) : {{zones}}",
+		"live": "Itération {{iteration}}/{{max}} : {{stage}}",
+		"stage": {
+			"render": "rendu",
+			"correct": "correction",
+			"responsive": "passe responsive",
+			"states": "passe survol et focus",
+			"fix_passes": "correction d'après les passes"
+		},
+		"axis": {
+			"x": "horizontal",
+			"y": "vertical",
+			"width": "largeur",
+			"height": "hauteur"
+		},
+		"spend": {
+			"tokens": "{{tokens}} jetons sur {{max}}",
+			"tokensEstimated": "environ {{tokens}} jetons sur {{max}} (estimés : le provider n'en a donné aucun)",
+			"cost": "{{cost}} $ sur {{max}} $ (catalogue des prix)",
+			"flatRate": "aucun coût par jeton (forfait ou modèle local)",
+			"unknownCost": "coût inconnu : le catalogue des prix n'a pas de prix pour ce modèle",
+			"costUnchecked": "le budget en coût n'a pas pu être vérifié"
+		},
+		"responsive": {
+			"title": "Passe responsive",
+			"mobile": "Mobile",
+			"tablet": "Tablette",
+			"desktop": "Bureau",
+			"size": "{{width}} × {{height}}",
+			"compared": "comparé à la maquette : {{score}} %",
+			"notCompared": "pas de maquette à cette largeur : contrôlé seul",
+			"clean": "Ni débordement, ni texte coupé, ni chevauchement.",
+			"overflow": "La page dépasse l'écran de {{px}} px",
+			"outside": "{{label}} dépasse le bord droit",
+			"clipped": "{{label}} : texte coupé par sa boîte",
+			"overlap": "{{a}} chevauche {{b}}"
+		},
+		"states": {
+			"title": "Survol et focus ({{limit}} premiers éléments interactifs)",
+			"noElements": "Aucun élément interactif à l'écran.",
+			"summary": "Sans survol visible : {{hover}} · sans focus visible : {{focus}} · non atteints au clavier : {{unreached}}",
+			"rest": "Au repos",
+			"hover": "Survol",
+			"focus": "Focus",
+			"visible": "change à l'écran",
+			"none_hover": "aucun style de survol",
+			"none_focus": "aucun focus visible (WCAG 2.4.7)",
+			"unreached": "non atteint"
+		},
+		"drawnMasks_one": "{{count}} zone tracée sur la maquette exclue du score",
+		"drawnMasks_other": "{{count}} zones tracées sur la maquette exclues du score",
+		"passFix": {
+			"title": "Correction d'après les passes",
+			"nothing_to_fix": "Les passes n'ont rien trouvé à corriger.",
+			"budget_tokens": "Non faite : le budget en jetons est épuisé.",
+			"budget_cost": "Non faite : le budget en coût est épuisé.",
+			"failed": "La correction n'a pas pu être faite.",
+			"no_edits": "Le modèle n'a proposé aucune modification applicable.",
+			"regressed": "Écartée : la page s'éloignait de la maquette ({{score}} % au lieu de {{scoreBefore}} %).",
+			"no_gain": "Écartée : il reste {{after}} problèmes sur {{before}}.",
+			"kept": "Gardée : il reste {{after}} problèmes sur {{before}} ; {{score}} % à la taille de la maquette."
+		}
+	},
+	"loopOptions": {
+		"button": "Boucle",
+		"summary": "{{iterations}} × {{threshold}} %",
+		"maxIterations": "Itérations",
+		"threshold": "Seuil",
+		"maxTokens": "Budget en jetons",
+		"maxCostUsd": "Budget en coût",
+		"iterationsValue_one": "{{count}} correction",
+		"iterationsValue_other": "{{count}} corrections",
+		"tokensValue": "{{value}} k jetons",
+		"costValue": "{{value}} $",
+		"budgetHint": "Le budget en coût s'applique quand le catalogue des prix connaît le modèle ; le backend garde chaque valeur dans ses bornes.",
+		"responsive": "Passe responsive (mobile, tablette, bureau)",
+		"states": "Captures survol et focus",
+		"fixPasses": "Corriger d'après les passes (une fois, gardé si cela aide)"
+	},
+	"masks": {
+		"draw": "Masquer une zone",
+		"drawing": "Glissez sur la maquette",
+		"hint": "Les zones tracées sont exclues du score de la boucle de rendu : dates, photos, données en direct.",
+		"count_one": "{{count}} zone masquée (au plus {{max}})",
+		"count_other": "{{count}} zones masquées (au plus {{max}})",
+		"clear": "Effacer les zones",
+		"remove": "Retirer la zone {{index}}"
+	},
+	"figures": {
+		"kicker": "Boucle de rendu sur ce projet",
+		"loops_one": "{{count}} boucle, {{converged}} convergée",
+		"loops_other": "{{count}} boucles, {{converged}} convergées",
+		"averageScore": "Score moyen retenu : {{score}} %",
+		"averageIterations": "Corrections moyennes pour converger : {{value}}",
+		"noConvergence": "Aucune boucle n'a encore convergé.",
+		"accepted_one": "Écrit sans retouche : {{kept}} sur {{count}} écriture",
+		"accepted_other": "Écrit sans retouche : {{kept}} sur {{count}} écritures",
+		"noneDecided": "Aucune écriture n'a encore atteint le projet.",
+		"pending_one": "{{count}} encore sur sa branche de revue",
+		"pending_other": "{{count}} encore sur leur branche de revue",
+		"approximation": "Approximatif : chaque fichier est comparé à son empreinte au moment de l'écriture ; une modification faite plus tard pour une autre raison compte comme une retouche, une carte abandonnée aussi.",
+		"local": "Gardé dans le dossier .workpilot de ce projet, sur cet ordinateur seulement."
 	}
 }

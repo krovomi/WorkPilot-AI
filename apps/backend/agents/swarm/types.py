@@ -23,6 +23,8 @@ class SwarmPhase(str, Enum):
     MERGING_WAVE = "merging_wave"
     COMPLETE = "complete"
     FAILED = "failed"
+    #: Stopped before a wave or a retry: the task paused, or its policy said stop.
+    PAUSED = "paused"
 
 
 class SubtaskState(str, Enum):
@@ -44,10 +46,7 @@ class SwarmConfig:
     max_parallel_agents: int = 4
     fail_fast: bool = False
     max_retries_per_subtask: int = 2
-    merge_after_each_wave: bool = True
     profile_distribution: str = "round_robin"  # round_robin | least_loaded | dedicated
-    enable_ai_merge: bool = True
-    dry_run: bool = False
     # Hard cap on a single subtask's subprocess. Without this, a wedged child
     # (network hang, infinite loop) blocks asyncio.gather and stalls the
     # entire swarm; cancel_all() only fires on explicit cancel. Default 30
@@ -59,25 +58,9 @@ class SwarmConfig:
             "max_parallel_agents": self.max_parallel_agents,
             "fail_fast": self.fail_fast,
             "max_retries_per_subtask": self.max_retries_per_subtask,
-            "merge_after_each_wave": self.merge_after_each_wave,
             "profile_distribution": self.profile_distribution,
-            "enable_ai_merge": self.enable_ai_merge,
-            "dry_run": self.dry_run,
             "subtask_timeout_seconds": self.subtask_timeout_seconds,
         }
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> SwarmConfig:
-        return cls(
-            max_parallel_agents=data.get("max_parallel_agents", 4),
-            fail_fast=data.get("fail_fast", False),
-            max_retries_per_subtask=data.get("max_retries_per_subtask", 2),
-            merge_after_each_wave=data.get("merge_after_each_wave", True),
-            profile_distribution=data.get("profile_distribution", "round_robin"),
-            enable_ai_merge=data.get("enable_ai_merge", True),
-            dry_run=data.get("dry_run", False),
-            subtask_timeout_seconds=data.get("subtask_timeout_seconds", 30 * 60.0),
-        )
 
 
 @dataclass
@@ -98,11 +81,6 @@ class SubtaskNode:
     started_at: float | None = None
     completed_at: float | None = None
     process_pid: int | None = None
-
-    @property
-    def all_files(self) -> set[str]:
-        """All files this subtask touches (modify + create)."""
-        return set(self.files_to_modify) | set(self.files_to_create)
 
     @property
     def duration_seconds(self) -> float | None:

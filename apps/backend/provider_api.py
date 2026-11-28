@@ -50,6 +50,8 @@ from urllib.parse import urlparse
 import httpx
 from fastapi import APIRouter, Body, Depends, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
+from foundation.loopback_host import LoopbackHostOnly
+from gateway_providers import GATEWAYS, KEY_CHECK_URLS, gateway_env_config
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
@@ -64,8 +66,6 @@ except ImportError:  # pragma: no cover - alternate package layout
 PROVIDER_CONFIG_NOT_FOUND = "Provider config not found"
 API_KEY_VALIDATION_FAILED_INVALID = "API key validation failed: invalid key"
 API_KEY_VALIDATION_FAILED_ERROR = "API key validation failed: {e}"
-HOOK_NOT_FOUND = "Hook not found"
-TEMPLATE_NOT_FOUND = "Template not found"
 GITHUB_CLI_AUTH_SUCCESS = "Logged in to github.com"
 API_MODELS_ENDPOINT = "/v1/models"
 
@@ -316,12 +316,8 @@ _ALLOWED_ORIGINS = [
     "file://",  # Electron file:// protocol
 ]
 
-# There used to be an `allow_origin_regex` of
-# ``^https?://(localhost|127\.0\.0\.1)(:\d+)?$`` here. Combined with
-# ``allow_credentials=True`` that trusted *any* page served from *any* local port — so
-# any other local dev server, or a page a user happened to open from a local static
-# server, could make credentialed calls to this API. The explicit list above already
-# covers the ports WorkPilot itself uses; anything else must be opted into deliberately.
+# No `allow_origin_regex` for any local port: with credentials it trusted every page of
+# every local server. The list covers WorkPilot's ports; others are opted into.
 _EXTRA_ORIGINS = [
     origin.strip()
     for origin in os.environ.get("WORKPILOT_EXTRA_CORS_ORIGINS", "").split(",")
@@ -350,6 +346,8 @@ app.add_middleware(
         "X-WorkPilot-Org",  # server mode: the org a request acts in, checked server-side
     ],
 )
+if not _SERVER_MODE_ACTIVE:  # the local API answers only what is addressed to it
+    app.add_middleware(LoopbackHostOnly, extra_origins=_EXTRA_ORIGINS)
 
 
 def _get_anthropic_token() -> str | None:
@@ -436,6 +434,8 @@ def get_env_provider_config(name: str) -> dict | None:
         model_id = default_model.model_id if default_model else "grok-4.3"
         return {"api_key": os.getenv("GROK_API_KEY"), "model": model_id}
 
+    if name in GATEWAYS:  # OpenRouter, Hugging Face (gateway_providers.py)
+        return gateway_env_config(name, get_default(name))
     # Meta (LLaMA) — via Together AI or Replicate
     if name == "meta" and os.getenv("META_API_KEY"):
         default_model = get_default("meta")
@@ -961,18 +961,10 @@ async def test_provider_api_key(request: Request, provider: str, payload: dict):
             set_validated(provider, api_key, False)
             return {"success": False, "error": _safe_error_message(e)}
 
-    # --- Mistral AI ---
-    if provider == "mistral":
+    # --- Mistral, DeepSeek, Meta (Together AI), Cursor: Bearer on /v1/models ---
+    if provider in ("mistral", "deepseek", "meta", "cursor"):
         try:
-            url = _authorized_base_url("mistral", base_url) + API_MODELS_ENDPOINT
-            return await _test_bearer(url, api_key, provider)
-        except ValueError as e:
-            return {"success": False, "error": _safe_error_message(e)}
-
-    # --- DeepSeek ---
-    if provider == "deepseek":
-        try:
-            url = _authorized_base_url("deepseek", base_url) + API_MODELS_ENDPOINT
+            url = _authorized_base_url(provider, base_url) + API_MODELS_ENDPOINT
             return await _test_bearer(url, api_key, provider)
         except ValueError as e:
             return {"success": False, "error": _safe_error_message(e)}
@@ -985,37 +977,13 @@ async def test_provider_api_key(request: Request, provider: str, payload: dict):
         except ValueError as e:
             return {"success": False, "error": _safe_error_message(e)}
 
-    # --- Meta (via Together AI / Replicate — OpenAI-compatible) ---
-    if provider == "meta":
-        try:
-            url = _authorized_base_url("meta", base_url) + API_MODELS_ENDPOINT
-            return await _test_bearer(url, api_key, provider)
-        except ValueError as e:
-            return {"success": False, "error": _safe_error_message(e)}
-
-    # --- Cursor ---
-    if provider == "cursor":
-        try:
-            url = _authorized_base_url("cursor", base_url) + API_MODELS_ENDPOINT
-            return await _test_bearer(url, api_key, provider)
-        except ValueError as e:
-            return {"success": False, "error": _safe_error_message(e)}
-
+    if provider in GATEWAYS:  # their /models answers any key: ask the account
+        return await _test_bearer(KEY_CHECK_URLS[provider], api_key, provider)
     # --- Windsurf (Codeium) ---
     if provider == "windsurf":
         oauth_token = payload.get("oauth_token") or payload.get("api_key")
         if not oauth_token:
             return {"success": False, "error": "OAuth token required for Windsurf"}
-        try:
-            from integrations.windsurf_mcp import get_windsurf_mcp
-
-            mcp = await get_windsurf_mcp()
-            status = await mcp.check_status()
-            if status.get("connected", False):
-                set_validated(provider, oauth_token, True)
-                return {"success": True, "method": "MCP"}
-        except Exception as mcp_error:
-            logging.warning(f"MCP test failed, trying direct API: {mcp_error}")
         try:
             safe_url = (
                 _validate_url_ssrf("windsurf", "https://server.codeium.com")
@@ -1254,7 +1222,7 @@ def get_effort_plan(provider: str = "", model: str = ""):
 # auth_style: how the API key is presented to the provider.
 #   "bearer"     → Authorization: Bearer <key>
 #   "x-api-key"  → x-api-key: <key>  (Anthropic-style)
-#   "query"      → appended as ?key=<key> (Google-style)
+#   "x-goog-api-key" → x-goog-api-key: <key>  (Google-style)
 # ok_statuses: status codes that count as a valid key (some providers return 403/404
 #   on the models endpoint even with a valid key — that still proves auth worked).
 _VALIDATION_SPECS: dict[str, dict[str, Any]] = {
@@ -1282,7 +1250,7 @@ _VALIDATION_SPECS: dict[str, dict[str, Any]] = {
     },
     "google": {
         "url": "https://generativelanguage.googleapis.com" + API_MODELS_ENDPOINT,
-        "auth_style": "query",
+        "auth_style": "x-goog-api-key",
         "ok_statuses": (200,),
     },
     "windsurf": {
@@ -1300,6 +1268,10 @@ _VALIDATION_SPECS: dict[str, dict[str, Any]] = {
         "auth_style": "bearer",
         "ok_statuses": (200,),
     },
+    **{
+        p: {"url": u, "auth_style": "bearer", "ok_statuses": (200,)}
+        for p, u in KEY_CHECK_URLS.items()
+    },
 }
 
 
@@ -1312,22 +1284,18 @@ async def _validate_key_http(provider: str, api_key: str, spec: dict[str, Any]) 
     auth_style = spec["auth_style"]
     ok_statuses = spec["ok_statuses"]
     headers: dict[str, str] = dict(spec.get("extra_headers", {}))
-    params: dict[str, str] = {}
 
     if auth_style == "bearer":
         headers["Authorization"] = f"Bearer {api_key}"
     elif auth_style == "x-api-key":
         headers["x-api-key"] = api_key
-    elif auth_style == "query":
-        # Pass the key as a real query parameter so httpx percent-encodes it.
-        # Interpolating it into the URL string lets a crafted key inject extra
-        # query/fragment components (CodeQL py/partial-ssrf); the host stays the
-        # provider's hardcoded endpoint either way.
-        params["key"] = api_key
+    elif auth_style == "x-goog-api-key":
+        # A header, not ``?key=``: a URL ends up in error messages and logs.
+        headers["x-goog-api-key"] = api_key
 
     try:
         async with httpx.AsyncClient(timeout=DEFAULT_HTTP_TIMEOUT) as client:
-            resp = await client.get(url, headers=headers, params=params, timeout=10)
+            resp = await client.get(url, headers=headers, timeout=10)
         if resp.status_code not in ok_statuses:
             set_validated(provider, api_key, False)
             raise HTTPException(
@@ -1547,7 +1515,7 @@ async def get_provider_usage(provider: str):
                     "fetched_at": usage_data.get("fetched_at"),
                     "copilotUsageDetails": {
                         "scope": "personal-quotas",
-                        "plan": usage_data.get("plan"),
+                        **{key: usage_data.get(key) for key in ("plan", "sku")},
                         "organization": usage_data.get("organization"),
                         "premiumRequestsUsed": premium.get("used", 0),
                         "premiumRequestsEntitlement": premium.get("entitlement", 0),
@@ -1600,31 +1568,6 @@ async def get_provider_usage(provider: str):
         except Exception as e:
             return {
                 "error": f"Erreur lors de la récupération des métriques Copilot: {_safe_error_message(e)}"
-            }
-    elif provider == "anthropic" or provider == "claude":
-        try:
-            from core.anthropic_usage import get_anthropic_usage_metrics
-
-            usage_data = get_anthropic_usage_metrics()
-
-            # Formater les données pour le frontend
-            if "error" in usage_data:
-                return usage_data
-
-            return {
-                "provider": "anthropic",
-                "available": True,
-                "usage": usage_data.get("usage", {}),
-                "fetched_at": usage_data.get("fetched_at"),
-                "providerName": "anthropic",
-            }
-        except ImportError as e:
-            return {
-                "error": f"Module Anthropic usage non disponible: {_safe_error_message(e)}"
-            }
-        except Exception as e:
-            return {
-                "error": f"Erreur lors de la récupération des métriques Anthropic: {_safe_error_message(e)}"
             }
     elif provider == "windsurf":
         # Windsurf (Codeium) — multi-strategy auth for GetTeamCreditBalance
@@ -1709,26 +1652,6 @@ async def get_provider_usage(provider: str):
 # Every route of `providers_router` is declared above this line.
 _mount(providers_router, "providers")
 
-
-# --- Analytics API (prefer real DB implementation, fall back to minimal stub) ---
-try:
-    from analytics.database import init_database as _init_analytics_db
-
-    _init_analytics_db()
-    from analytics.api_simple import router as analytics_router
-
-    _mount(analytics_router, "analytics")
-except Exception as e:
-    logging.getLogger(__name__).warning(
-        "Could not load real analytics router (%s), falling back to minimal stub",
-        e,
-    )
-    try:
-        from analytics.api_minimal import router as analytics_router
-
-        _mount(analytics_router, "analytics")
-    except ImportError as e2:
-        logging.getLogger(__name__).warning("Could not import analytics router: %s", e2)
 
 # --- Mission Control API ---
 try:
@@ -1938,14 +1861,6 @@ try:
 except ImportError as e:
     print(f"Warning: Could not import rtk router: {e}")
 
-# --- Watermarks API (is the generated-file cleaner working, and what it stripped) ---
-try:
-    from watermarks.api import router as watermarks_router
-
-    _mount(watermarks_router, "watermarks")
-except ImportError as e:
-    print(f"Warning: Could not import watermarks router: {e}")
-
 # --- Shared board and features (server mode: cards, roadmap..., by project_id) ---
 try:
     from shared_features import mount_all as mount_shared_project_routers
@@ -2004,14 +1919,6 @@ try:
 except ImportError as e:
     print(f"Warning: Could not import github api router: {e}")
 
-# --- System Status API (extracted from this file) ---
-try:
-    from system_status.api import router as system_status_router
-
-    _mount(system_status_router, "system_status")
-except ImportError as e:
-    print(f"Warning: Could not import system_status router: {e}")
-
 # --- Dashboard + Sessions API (extracted from this file) ---
 try:
     from dashboard.api import router as dashboard_router
@@ -2019,14 +1926,6 @@ try:
     _mount(dashboard_router, "dashboard")
 except ImportError as e:
     print(f"Warning: Could not import dashboard router: {e}")
-
-# --- Agent feature endpoints (extracted from this file) ---
-try:
-    from agent_endpoints.api import router as agent_endpoints_router
-
-    _mount(agent_endpoints_router, "agent_endpoints")
-except ImportError as e:
-    print(f"Warning: Could not import agent_endpoints router: {e}")
 
 # --- Event-Driven Hooks System API (extracted from this file) ---
 try:

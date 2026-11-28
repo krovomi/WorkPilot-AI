@@ -18,6 +18,9 @@ The tools are the recall ladder and the write path, nothing else:
 | `brain_write_note`, `brain_remember` | write, then commit / pull / push |
 | `brain_sync`, `brain_status` | pull + push now; where the brain is and how fresh |
 
+``brain_recall`` and ``query_graph`` leave out a memory scoped to another
+branch or team than the build's (`RECALL_TOOLS`, `lifecycle.scopes.recalled`).
+
 The ``instructions`` field of ``initialize`` carries the rules of use, so an
 agent that was never bridged still learns them the moment it connects.
 """
@@ -36,6 +39,7 @@ from typing import Any
 from foundation.paging import FOOTER_RESERVE, page_lines, render_page
 
 from .home import digest_path
+from .lifecycle import scopes
 from .memories import instructions as list_instructions
 from .vault import Brain
 
@@ -56,6 +60,11 @@ SERVER_INSTRUCTIONS = (
 )
 
 _STR = {"type": "string"}
+
+RECALL_TOOLS = ("brain_recall", "query_graph")
+"""The tools that leave out a note scoped to another branch or team
+(`lifecycle.scopes.recalled`). ``get_node`` and ``brain_read_note`` open what
+the agent names."""
 
 #: The most of a note or a skill one call returns. A longer one comes a page at
 #: a time, followed by the offset that reads on (`foundation.paging`): an
@@ -205,12 +214,24 @@ TOOLS: list[dict[str, Any]] = [
 
 
 def _skills(brain: Brain, name: str | None) -> Any:
+    """The brain's skills, or one's text. A skill no key of the vault's
+    trusted list signed (`lifecycle.provenance`) is neither listed nor served:
+    an agent follows a skill as it follows an instruction."""
+    from .lifecycle.provenance import unverified_among
+
     base = brain.root / "skills"
     if not name:
-        return sorted(p.parent.name for p in base.glob("*/SKILL.md"))
+        found = {
+            p.parent.name: p.relative_to(brain.root).as_posix()
+            for p in base.glob("*/SKILL.md")
+        }
+        hidden = unverified_among(brain.root, found.values())
+        return sorted(n for n, rel in found.items() if rel not in hidden)
     path = base / Path(name).name / "SKILL.md"
     if not path.is_file():
         raise ValueError(f"no skill named {name!r} in the brain")
+    if unverified_among(brain.root, [path.relative_to(brain.root).as_posix()]):
+        raise ValueError(f"the skill {name!r} is not signed by a trusted key")
     return path.read_text(encoding="utf-8")
 
 
@@ -230,7 +251,12 @@ what an agent writes during a build shows up on that task's card."""
 
 
 def _line_arg(value: Any) -> int | None:
-    """A line number or count sent by a model, or None when absent or unreadable."""
+    """A line number or count sent by a model, or None when absent or unreadable.
+
+    Models send ``null``, ``true`` or ``{}`` for an argument they mean to leave
+    out; read with ``int()``, those failed the whole call (``null`` even
+    outside the tool errors, as an internal error of the server).
+    """
     if isinstance(value, bool):
         return None
     try:
@@ -254,6 +280,33 @@ def _trusted_default() -> bool:
     return os.environ.get(ORIGIN_ENV, "").strip().lower() != "workpilot"
 
 
+def _signed_nodes(brain: Brain, found: Any) -> Any:
+    """A graph answer without the nodes of notes no trusted key signed: their
+    titles are a stranger's words until a teammate's key vouches for them
+    (`lifecycle.provenance`). A path between nodes is ids only, and stays."""
+    from .lifecycle.provenance import unverified_among
+
+    graph = brain.graph()
+
+    def source(node_id: Any) -> str:
+        return str((graph.nodes.get(str(node_id)) or {}).get("source_file") or "")
+
+    if isinstance(found, list) and all(isinstance(n, dict) for n in found):
+        hidden = unverified_among(brain.root, [source(n.get("id")) for n in found])
+        return [n for n in found if source(n.get("id")) not in hidden]
+    if isinstance(found, dict):
+        near = found.get("neighbors") or []
+        ids = [found.get("id"), *(n.get("id") for n in near)]
+        hidden = unverified_among(brain.root, [source(i) for i in ids])
+        if source(found.get("id")) in hidden:
+            return None
+        return {
+            **found,
+            "neighbors": [n for n in near if source(n.get("id")) not in hidden],
+        }
+    return found
+
+
 def _call(
     brain: Brain,
     name: str,
@@ -262,17 +315,22 @@ def _call(
     trusted: bool | None = None,
     task: str | None = None,
     max_chars: int | None = None,
+    audience: scopes.Audience | None = None,
 ) -> Any:
     if trusted is None:
         trusted = _trusted_default()
+
+    def recalling() -> scopes.Audience:
+        # The build WorkPilot started this server for, else the folder an
+        # agent of the person's started it in (`scopes.audience`).
+        return audience if audience is not None else scopes.audience(".")
+
     if max_chars is None:
         max_chars = read_max_chars()
     if task is None:
         task = os.environ.get(TASK_ENV, "").strip() or None
     graph_tools: dict[str, Callable[[], Any]] = {
-        "query_graph": lambda: brain.graph().query(
-            args["query"], limit=int(args.get("limit", 8))
-        ),
+        "query_graph": lambda: _query_graph(brain, args, recalling()),
         "get_node": lambda: brain.graph().get_node(args["id"]),
         "shortest_path": lambda: brain.graph().shortest_path(
             args["source"], args["target"]
@@ -280,9 +338,11 @@ def _call(
     }
     if name in graph_tools:
         brain.before_read()
-        return graph_tools[name]()
+        return _signed_nodes(brain, graph_tools[name]())
     if name == "brain_recall":
-        return brain.recall(args["query"], limit=int(args.get("limit", 5)))
+        return brain.recall(
+            args["query"], limit=_line_arg(args.get("limit")) or 5, audience=recalling()
+        )
     if name == "brain_read_note":
         note = brain.read(args["path"])
         return {**note, "body": _page(note["body"], args, max_chars)}
@@ -291,7 +351,7 @@ def _call(
         who = args.get("agent")
         return [
             {**item.to_dict(), "yours": bool(who and who in item.agents)}
-            for item in list_instructions(brain.root)
+            for item in list_instructions(brain.root, signed_only=True)
         ]
     if name == "brain_skill":
         brain.before_read()
@@ -321,6 +381,16 @@ def _call(
     if name == "brain_status":
         return brain.status()
     raise KeyError(name)
+
+
+def _query_graph(
+    brain: Brain, args: dict[str, Any], audience: scopes.Audience
+) -> list[dict[str, Any]]:
+    """``query_graph``, less the notes scoped away from *audience* and those no
+    trusted key signed; asked for more first, so that the limit still fills."""
+    limit = _line_arg(args.get("limit")) or 8
+    hits = brain.graph().query(args["query"], limit=max(limit * 4, 20))
+    return brain.recalled(_signed_nodes(brain, hits), audience, limit)
 
 
 def _result(msg_id: Any, result: Any) -> dict[str, Any]:

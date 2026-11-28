@@ -12,7 +12,7 @@ fallback, and ``GET /providers/models/catalog/ollama`` answered 500:
 
 The same ``payload.get(key, [])`` pattern (a default that only applies when the
 key is *missing*, not when it is ``null``) was in every catalog fetcher and in
-the two other readers of Ollama's model list. httpx and urllib are faked: no
+the Ollama model detector. httpx and urllib are faked: no
 server is contacted.
 """
 
@@ -22,8 +22,6 @@ import httpx
 import ollama_model_detector as det
 import provider_models_catalog as cat
 import pytest
-
-from apps.backend.scheduling import local_model_manager as lmm
 
 
 class _Resp:
@@ -239,25 +237,3 @@ def test_model_is_installed_with_null_tags(monkeypatch):
     )
 
     assert det.model_is_installed("http://localhost:11434", "llama3.3") is False
-
-
-def test_local_model_manager_with_null_lists(monkeypatch):
-    monkeypatch.setattr(
-        lmm,
-        "_fetch_json",
-        lambda url, **kw: (
-            {"version": "0.12.0"} if url.endswith("/api/version") else {"models": None}
-        ),
-    )
-    manager = lmm.LocalModelManager()
-
-    assert manager._list_ollama_models() == []
-    assert manager._check_ollama().models_loaded == 0
-
-
-def test_lm_studio_manager_with_null_list(monkeypatch):
-    monkeypatch.setattr(lmm, "_fetch_json", lambda url, **kw: {"data": None})
-    manager = lmm.LocalModelManager()
-
-    assert manager._list_lmstudio_models() == []
-    assert manager._check_lmstudio().models_loaded == 0

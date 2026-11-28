@@ -120,6 +120,10 @@
 		"description": "Nous Research's agent, which learns outside WorkPilot. What it learns reaches the review queue, which you answer from a task panel.",
 		"pending_one": "{{count}} skill waiting for your review in a task panel.",
 		"pending_other": "{{count}} skills waiting for your review in a task panel.",
-		"docs": "{{name}} documentation"
+		"docs": "{{name}} documentation",
+		"docsFailed": "The link did not open: {{error}}"
+	},
+	"errors": {
+		"backendUnreachable": "The local WorkPilot backend did not answer. Start it (or restart the app), then refresh."
 	}
 }

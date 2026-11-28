@@ -355,13 +355,26 @@ class MCPToolManager:
             # (read, write[, get_session_id])
             read, write = transport[0], transport[1]
         else:  # command / stdio
+            from core.mcp_confinement import confined_launch  # noqa: PLC0415
             from mcp import StdioServerParameters  # noqa: PLC0415
-            from mcp.client.stdio import stdio_client  # noqa: PLC0415
+            from mcp.client.stdio import (  # noqa: PLC0415
+                get_default_environment,
+                stdio_client,
+            )
 
+            # A confined server starts under the OS sandbox, or not at all.
+            launch = confined_launch(
+                cfg, cfg["command"], cfg.get("args", []) or [], self._project_dir
+            )
+            if launch is None:
+                raise RuntimeError("it must run confined and cannot be")
+            # The server's environment is built, not inherited: the MCP SDK's
+            # short default list (PATH, HOME, user, terminal; the system
+            # folders on Windows) plus the entry's own `env`.
             params = StdioServerParameters(
-                command=cfg["command"],
-                args=cfg.get("args", []) or [],
-                env={**os.environ, **(cfg.get("env") or {})},
+                command=launch[0],
+                args=launch[1],
+                env={**get_default_environment(), **(cfg.get("env") or {})},
             )
             read, write = await self._stack.enter_async_context(stdio_client(params))
 
@@ -449,6 +462,8 @@ _SDK_SERVER_FIELDS = (
     "env",
     "url",
     "headers",
+    # A confined server's side session is confined too.
+    "confine",
 )
 
 
@@ -463,7 +478,9 @@ def _sdk_tool_result(response: Any) -> dict[str, Any]:
 
 
 def make_app_view_hook(
-    spec_dir: str | Path, servers: list[dict[str, Any]]
+    spec_dir: str | Path,
+    servers: list[dict[str, Any]],
+    project_dir: str | Path | None = None,
 ) -> Callable[..., Awaitable[dict[str, Any]]]:
     """A PostToolUse hook that keeps MCP App views on the Claude Agent SDK path (IA4).
 
@@ -477,7 +494,8 @@ def make_app_view_hook(
     The side session is a second start of the server: it lists tools and
     reads a resource, never calls a tool. It never changes the result the
     agent reads (the hook returns nothing), it is bounded by
-    `APP_VIEW_CAPTURE_TIMEOUT`, and a server that fails is skipped.
+    `APP_VIEW_CAPTURE_TIMEOUT`, and a server that fails is skipped. A
+    confined server starts confined to ``project_dir``; without it, not at all.
     """
     configs = {
         _server_id(cfg, index): {k: cfg[k] for k in _SDK_SERVER_FIELDS if k in cfg}
@@ -488,7 +506,10 @@ def make_app_view_hook(
 
     async def _capture(sid: str, name: str, arguments: Any, result: Any) -> None:
         async with MCPToolManager(
-            None, [configs[sid]], spec_dir=spec_dir, pin=False
+            str(project_dir) if project_dir else None,
+            [configs[sid]],
+            spec_dir=spec_dir,
+            pin=False,
         ) as mcp:
             if not mcp.connected():
                 return

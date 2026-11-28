@@ -53,11 +53,9 @@ interface ProjectState {
 	closeProjectTab: (projectId: string) => void;
 	setActiveProject: (projectId: string | null) => void;
 	reorderTabs: (fromIndex: number, toIndex: number) => void;
-	restoreTabState: () => void;
 
 	// Selectors
 	getSelectedProject: () => Project | undefined;
-	getOpenProjects: () => Project[];
 	getActiveProject: () => Project | undefined;
 	getProjectTabs: () => Project[];
 }
@@ -108,6 +106,19 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 			localStorage.setItem(LAST_SELECTED_PROJECT_KEY, projectId);
 		} else {
 			localStorage.removeItem(LAST_SELECTED_PROJECT_KEY);
+		}
+		// Selecting a project that has a tab brings that tab forward: the views
+		// read either id, and two different ids showed one project's tab over
+		// another project's data.
+		const state = get();
+		if (
+			projectId &&
+			projectId !== state.activeProjectId &&
+			state.openProjectIds.includes(projectId)
+		) {
+			set({ selectedProjectId: projectId, activeProjectId: projectId });
+			saveTabStateToMain();
+			return;
 		}
 		set({ selectedProjectId: projectId });
 	},
@@ -171,6 +182,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 				tabOrder: newTabOrder,
 				activeProjectId: projectId,
 			});
+			// The new tab is the project every view shows (see selectProject).
+			get().selectProject(projectId);
 
 			// Save to main process (debounced)
 			saveTabStateToMain();
@@ -199,6 +212,12 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 			tabOrder: newTabOrder,
 			activeProjectId: newActiveProjectId,
 		});
+		// Closing the shown tab hands the views to the tab now shown: views that
+		// read `selectedProjectId` kept showing the closed project (its pull
+		// requests under another project's tab).
+		if (newActiveProjectId !== state.activeProjectId) {
+			get().selectProject(newActiveProjectId);
+		}
 
 		// Save to main process (debounced)
 		saveTabStateToMain();
@@ -223,22 +242,13 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 		saveTabStateToMain();
 	},
 
-	restoreTabState: () => {
-		// This is now handled by loadTabStateFromMain() called during loadProjects()
-	},
-
 	// Original selectors
 	getSelectedProject: () => {
 		const state = get();
 		return state.projects.find((p) => p.id === state.selectedProjectId);
 	},
 
-	// New selectors for tab functionality
-	getOpenProjects: () => {
-		const state = get();
-		return state.projects.filter((p) => state.openProjectIds.includes(p.id));
-	},
-
+	// Selectors for tab functionality
 	getActiveProject: () => {
 		const state = get();
 		return state.projects.find((p) => p.id === state.activeProjectId);
@@ -355,28 +365,22 @@ export async function loadProjects(): Promise<void> {
 		}
 		if (result.success && result.data) {
 			store.setProjects(result.data);
-			// Restore selected project from localStorage if available, fallback to activeProjectId from tab state
+			// The restored active tab is the selected project; the last selection
+			// saved on this machine only counts when no tab is active.
+			const restoredActiveId = useProjectStore.getState().activeProjectId;
 			const lastSelectedProjectId = localStorage.getItem(
 				LAST_SELECTED_PROJECT_KEY,
 			);
-			if (lastSelectedProjectId) {
-				const lastSelectedProject = result.data.find(
-					(p) => p.id === lastSelectedProjectId,
-				);
-				if (lastSelectedProject) {
-					store.selectProject(lastSelectedProjectId);
-				}
-			} else {
-				// localStorage is empty (e.g. fresh userData directory) — fall back to tab state activeProjectId
-				const activeProjectId = useProjectStore.getState().activeProjectId;
-				if (activeProjectId) {
-					const activeProject = result.data.find(
-						(p) => p.id === activeProjectId,
-					);
-					if (activeProject) {
-						store.selectProject(activeProjectId);
-					}
-				}
+			if (
+				restoredActiveId &&
+				result.data.some((p) => p.id === restoredActiveId)
+			) {
+				store.selectProject(restoredActiveId);
+			} else if (
+				lastSelectedProjectId &&
+				result.data.some((p) => p.id === lastSelectedProjectId)
+			) {
+				store.selectProject(lastSelectedProjectId);
 			}
 		} else if (!result.success) {
 			store.setError(result.error || "Erreur lors du chargement des projets.");
@@ -437,8 +441,8 @@ export async function removeProject(projectId: string): Promise<boolean> {
 		const result = await window.electronAPI.removeProject(projectId);
 		if (result.success) {
 			store.removeProject(projectId);
-			// Also close the tab if it's open
-			if (store.openProjectIds.includes(projectId)) {
+			// Also close the tab if it's open (read now, not before the await)
+			if (useProjectStore.getState().openProjectIds.includes(projectId)) {
 				store.closeProjectTab(projectId);
 			}
 			return true;
@@ -456,18 +460,19 @@ export async function renameProject(
 	projectId: string,
 	name: string,
 ): Promise<boolean> {
-	const store = useProjectStore.getState();
 	const trimmed = name.trim();
 	if (!trimmed) return false;
 
 	try {
 		const result = await window.electronAPI.renameProject(projectId, trimmed);
 		if (result.success && result.data) {
-			store.setProjects(
-				store.projects.map((p) =>
+			// Read the list after the await: one taken before it would put back
+			// a project removed (or drop one added) while the rename was in flight.
+			useProjectStore.setState((state) => ({
+				projects: state.projects.map((p) =>
 					p.id === projectId ? { ...p, name: trimmed } : p,
 				),
-			);
+			}));
 			return true;
 		}
 		return false;

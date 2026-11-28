@@ -9,7 +9,7 @@
 		"backendUnreachable": "Backend unreachable. Is the backend running on port 9000?",
 		"noData": "No data yet — run the analysis to see results.",
 		"required": "Required",
-		"invalidNumber": "Invalid number",
+		"pickerFailed": "The file dialog could not open.",
 		"invalidPath": "Invalid path",
 		"selectAtLeastOne": "Select at least one option",
 		"tooLong": "Text too long (limit: {{max}} characters)",
@@ -29,6 +29,13 @@
 			"backendUnreachable": "Backend unreachable. Is the backend running on port 9000?",
 			"timeout": "Timed out — the backend did not respond in time.",
 			"unknown": "Backend error: {{message}}"
+		},
+		"severity": {
+			"critical": "critical",
+			"high": "high",
+			"medium": "medium",
+			"low": "low",
+			"none": "none"
 		}
 	},
 	"longevity": {
@@ -47,14 +54,24 @@
 		"directionDegrading": "degrading",
 		"riskiest": "Riskiest files",
 		"items": "items",
-		"cost": "cost"
+		"cost": "cost",
+		"signals": {
+			"todo_fixme": "TODO / FIXME",
+			"long_function": "Long functions",
+			"deep_complexity": "Deep nesting",
+			"duplication": "Duplication",
+			"stale_deps": "Outdated dependencies",
+			"low_coverage": "Low test coverage",
+			"vulnerabilities": "Known vulnerabilities",
+			"trend": "Debt trend"
+		},
+		"gradeValue": "Grade {{grade}}"
 	},
 	"agentHealth": {
 		"title": "Agent Health",
-		"subtitle": "Reliability score per agent over its recent history",
+		"subtitle": "Reliability of each agent, per provider and model, read from the project's Kanban tasks",
 		"refresh": "Refresh scores",
-		"reset": "Reset history",
-		"noAgents": "No agent runs recorded yet.",
+		"noAgents": "No finished phase in this project's tasks yet.",
 		"successRate": "Success rate",
 		"errorRate": "Error rate",
 		"retryRate": "Retry rate",
@@ -67,15 +84,34 @@
 		"statusHealthy": "healthy",
 		"statusDegraded": "degraded",
 		"statusFailing": "failing",
-		"statusBurnedOut": "burned out"
+		"statusBurnedOut": "burned out",
+		"actionLabels": {
+			"none": "none",
+			"throttle": "Slow down dispatch",
+			"reduce_parallelism": "Reduce parallelism",
+			"retrain_prompt": "Refresh the prompt examples",
+			"rotate_model": "Try another model",
+			"alert_operator": "Needs your attention"
+		},
+		"noProject": "Open a project: agent health is read from its Kanban tasks.",
+		"source_one": "Read from {{count}} task of the project (finished planning, coding and QA).",
+		"source_other": "Read from {{count}} tasks of the project (finished planning, coding and QA).",
+		"unknownModel": "model not named in the logs",
+		"pendingTitle": "Not enough phases for a score yet ({{min}} needed):",
+		"pendingRuns_one": "{{count}} phase",
+		"pendingRuns_other": "{{count}} phases",
+		"roles": {
+			"planner": "Planner",
+			"coder": "Coder",
+			"qa": "QA"
+		}
 	},
 	"modelRouter": {
 		"title": "Adaptive Model Routing",
 		"subtitle": "Pick the cheapest model that probably works for this task",
 		"prompt": "Task prompt",
 		"promptPlaceholder": "e.g. rename foo to bar",
-		"hint": "Task class hint (optional)",
-		"hintPlaceholder": "e.g. trivial, architecture, review",
+		"hint": "Task type",
 		"availableProviders": "Available providers",
 		"providersPlaceholder": "Select providers to compare",
 		"providerAnthropic": "Anthropic",
@@ -93,6 +129,38 @@
 		"validation": {
 			"promptRequired": "Enter a prompt to route",
 			"providersRequired": "Pick at least one provider"
+		},
+		"tiers": {
+			"budget": "Budget",
+			"balanced": "Balanced",
+			"premium": "Premium"
+		},
+		"taskClasses": {
+			"trivial": "trivial change",
+			"simple_edit": "simple edit",
+			"multi_file": "multi-file change",
+			"architecture": "architecture",
+			"review": "review",
+			"planning": "planning",
+			"ideation": "ideation",
+			"documentation": "documentation"
+		},
+		"tierFor": "{{tier}} tier for a {{task}}",
+		"providerDeepseek": "DeepSeek",
+		"providerGrok": "Grok (xAI)",
+		"providerOpenrouter": "OpenRouter",
+		"providerHuggingface": "Hugging Face",
+		"providerCopilot": "GitHub Copilot",
+		"hintAuto": "Inferred from the prompt",
+		"removeProvider": "Remove {{provider}}",
+		"noModel": "no model to suggest",
+		"reasons": {
+			"local": "{{provider}} runs locally: no per-token cost.",
+			"subscription": "{{provider}} is billed by subscription: no per-token cost.",
+			"noModel": "No catalog model for {{providers}}: this provider picks its own.",
+			"fallback": "No available provider has a known price: fallback model.",
+			"bench": "Replay bench: {{resolved}}/{{judged}} cards resolved.",
+			"passedOver": "Passed over on replay bench evidence: {{models}}."
 		}
 	},
 	"domainAgents": {
@@ -113,6 +181,61 @@
 		"validation": {
 			"domainRequired": "Select a domain",
 			"noDomainsLoaded": "No domains available — check the backend connection."
+		},
+		"domains": {
+			"generic": {
+				"label": "Generic",
+				"description": "No domain assumptions: neutral defaults."
+			},
+			"ecommerce": {
+				"label": "E-commerce",
+				"description": "Storefront, cart, checkout, inventory, payment."
+			},
+			"fintech": {
+				"label": "Fintech",
+				"description": "Payments, ledgers, transfers, regulated workflows."
+			},
+			"healthcare": {
+				"label": "Healthcare",
+				"description": "EHR, PHI, HIPAA-aware data flows."
+			},
+			"gaming": {
+				"label": "Gaming",
+				"description": "Realtime multiplayer, anti-cheat, telemetry."
+			},
+			"iot": {
+				"label": "IoT",
+				"description": "Embedded devices, intermittent connectivity, OTA updates."
+			},
+			"govtech": {
+				"label": "GovTech",
+				"description": "Public-sector workflows: accessibility, audit, FOIA-readiness."
+			},
+			"education": {
+				"label": "Education",
+				"description": "Edtech: minor users, FERPA-aware, classroom workflows."
+			},
+			"saas": {
+				"label": "SaaS / B2B",
+				"description": "Multi-tenant SaaS with billing, RBAC, audit."
+			},
+			"data_pipeline": {
+				"label": "Data Pipeline",
+				"description": "ETL, batch jobs, data quality."
+			}
+		},
+		"promptNote": "These guardrails are injected verbatim (in English) into the agent prompt.",
+		"libraries": "Suggested libraries for this project",
+		"librariesFor": "{{language}}: {{libraries}}",
+		"project": {
+			"current": "Domain applied to this project: {{domain}}",
+			"none": "No domain applied to this project: tasks get no domain addendum.",
+			"languages": "Detected stacks: {{languages}}",
+			"noLanguages": "No stack detected: libraries for every stack are listed.",
+			"effect": "Once applied, the domain is saved in .workpilot/domain.json and every Kanban task of the project receives its guidance (planning, coding, QA). A spec that names its own domain keeps it.",
+			"apply": "Apply to this project",
+			"clear": "Remove from project",
+			"noProject": "Open a project to apply a domain to its tasks; the preview below stays available."
 		}
 	},
 	"cicdAnomaly": {
@@ -125,11 +248,70 @@
 		"recurring": "Recurring across builds",
 		"recommendations": "Suggested fixes",
 		"hasCritical": "Critical issues present",
-		"line": "line",
 		"validation": {
-			"logRequired": "Paste a non-empty log",
-			"logTooLarge": "Log too large (limit: {{max}} characters)"
-		}
+			"logRequired": "Paste a non-empty log"
+		},
+		"kinds": {
+			"timeout": "Timeout",
+			"oom": "Out of memory",
+			"dependency_conflict": "Dependency conflict",
+			"network_failure": "Network failure",
+			"disk_full": "Disk full",
+			"rate_limited": "Rate limited",
+			"auth_failure": "Authentication failure",
+			"infrastructure_flake": "Infrastructure flake",
+			"slow_build": "Slow build"
+		},
+		"fixes": {
+			"job_timeout": "Raise the job's timeout-minutes or split the job into smaller ones.",
+			"dotnet_test_hang": "Run dotnet test with --blame-hang-timeout to get a dump of the hanging test.",
+			"build_lock_wait": "Another build holds the cache lock (Cargo, Gradle): give each job its own cache dir.",
+			"step_timeout": "Increase the job timeout or split into smaller steps.",
+			"silent_step": "Add a heartbeat log or kill on inactivity.",
+			"node_heap": "Set NODE_OPTIONS=--max-old-space-size=… or shard the build.",
+			"jvm_heap": "Bump the JVM heap (-Xmx, org.gradle.jvmargs) or split tests into shards.",
+			"dotnet_memory": "Lower MSBuild parallelism (-m:1) or use a runner with more memory.",
+			"php_memory": "Raise memory_limit (COMPOSER_MEMORY_LIMIT=-1 for Composer).",
+			"process_killed": "The compiler or test process ran out of memory: lower the parallel jobs or use a bigger runner.",
+			"runner_memory": "Bump the runner memory or split the workload.",
+			"npm_peer": "Pin the conflicting peer dep, or use --legacy-peer-deps as a temporary patch.",
+			"nuget_conflict": "Reference the package version NuGet asks for directly, or use Central Package Management.",
+			"nuget_missing": "The package or version is not on the configured feeds: check nuget.config and the version.",
+			"jvm_convergence": "Align the versions with dependencyManagement (Maven) or a platform/constraints block (Gradle).",
+			"jvm_resolve": "Check the repositories block and the version; refresh with --refresh-dependencies.",
+			"cargo_conflict": "Relax the version requirement in Cargo.toml or run cargo update -p <crate>.",
+			"composer_conflict": "Run composer why-not <package> <version> and relax the constraint that blocks it.",
+			"pub_conflict": "Run flutter pub outdated and relax the constraint pub names in pubspec.yaml.",
+			"pip_conflict": "Pin the shared dependency to a version both packages accept (pip install --dry-run shows it).",
+			"bundler_conflict": "Run bundle update <gem> or relax its version in the Gemfile.",
+			"spm_conflict": "Relax the version rule in Package.swift or reset the package cache (swift package reset).",
+			"go_checksum": "go.sum disagrees with the module proxy: run go mod tidy and check GOPROXY / GONOSUMDB.",
+			"resolver_failed": "Inspect the resolver output; pin transitives in the lockfile.",
+			"single_version": "Pin the offending dep at a single version across the workspace.",
+			"lockfile_audit": "Audit lockfile for ambiguous transitives.",
+			"nuget_feed": "The NuGet feed did not answer: retry, or check the feed URL and its credentials.",
+			"registry_download": "The package registry did not answer: retry with backoff, or cache the packages between runs.",
+			"dns": "Add DNS retry / cache the resolution at runner start.",
+			"connection": "Wrap the network call in a retry-with-backoff; check upstream status.",
+			"tls": "Check the registry's TLS cert / clock skew on the runner.",
+			"disk_cleanup": "Add a `df -h` step + cleanup of /tmp + docker prune before the failing step.",
+			"docker_pull_limit": "Log in to the registry before pulling, or mirror the image.",
+			"backoff": "Add backoff + jitter; or authenticate to a higher-quota tier.",
+			"ssh_key": "Refresh the SSH key or PAT used by the runner.",
+			"ci_token": "Rotate the CI token; ensure the secret is exposed to the failing job.",
+			"docker_daemon": "Restart docker / use a fresh runner image.",
+			"runner_lost": "Mark the runner as offline; switch to a healthy pool.",
+			"preempted": "The runner was preempted; mark the build as retryable."
+		},
+		"stacksNote": "Recognises failures from npm, pnpm, NuGet/.NET, Maven, Gradle, Cargo, Composer, pub (Flutter), Go, pip, Bundler, SwiftPM, Docker and CI runners. Paste several builds to see what recurs.",
+		"buildLabel": "Build {{n}}",
+		"addLog": "Add another build's log",
+		"addLogHint": "Several builds bring out the failures that recur.",
+		"removeLog": "Remove",
+		"noSignal": "No known failure in this log.",
+		"recurringBadge": "recurs",
+		"lineAt": "line {{line}}",
+		"lineIn": "{{label}}, line {{line}}"
 	},
 	"license": {
 		"title": "License Governance",
@@ -145,7 +327,55 @@
 		"dependencies": "Dependencies",
 		"colPackage": "Package",
 		"colCategory": "Category",
-		"colRemediation": "Remediation"
+		"colRemediation": "Remediation",
+		"categories": {
+			"permissive": "Permissive",
+			"weak_copyleft": "Weak copyleft",
+			"strong_copyleft": "Strong copyleft",
+			"network_copyleft": "Network copyleft (AGPL)",
+			"public_domain": "Public domain",
+			"commercial": "Commercial",
+			"unknown": "Unknown"
+		},
+		"remediations": {
+			"permissive": "—",
+			"weak_copyleft": "Acceptable if linked dynamically; review legal exposure.",
+			"strong_copyleft": "Replace with a permissive alternative or wall it off behind an IPC boundary.",
+			"network_copyleft": "AGPL contaminates SaaS deployments: find an MIT/Apache replacement.",
+			"public_domain": "—",
+			"commercial": "Confirm a paid licence covers your usage; track renewals.",
+			"unknown": "Look up the upstream licence and add it to the policy."
+		},
+		"colLicense": "Licence",
+		"toCheck": "To check",
+		"toCheckBadge": "Licences to check",
+		"toCheckTitle_one": "{{count}} dependency whose licence was not found",
+		"toCheckTitle_other": "{{count}} dependencies whose licence was not found",
+		"askRegistries": "Ask the public registries",
+		"askRegistriesHint": "For licences no lock file or installed package gives (deps.dev, npm, PyPI, Packagist, RubyGems, pub.dev). Never under a strict offline policy.",
+		"offlineNote": "The registries were not asked (option off or strict offline policy): install the dependencies or allow the registries to resolve the rest.",
+		"noManifest": "No dependency manifest found (package.json, requirements.txt, pyproject.toml, *.csproj, pom.xml, build.gradle, Cargo.toml, go.mod, composer, Gemfile.lock, pubspec.lock).",
+		"ecosystems": {
+			"npm": "npm",
+			"pypi": "PyPI",
+			"cargo": "Cargo",
+			"go": "Go",
+			"nuget": "NuGet",
+			"maven": "Maven / Gradle",
+			"composer": "Composer",
+			"rubygems": "RubyGems",
+			"pub": "pub (Dart)"
+		},
+		"sources": {
+			"manifest_one": "{{count}} from a lock file",
+			"manifest_other": "{{count}} from a lock file",
+			"installed_one": "{{count}} from the installed package",
+			"installed_other": "{{count}} from the installed packages",
+			"registry_one": "{{count}} from a public registry",
+			"registry_other": "{{count}} from public registries",
+			"override_one": "{{count}} set by hand",
+			"override_other": "{{count}} set by hand"
+		}
 	},
 	"archDrift": {
 		"title": "Architecture Drift Detection",
@@ -156,28 +386,134 @@
 		"severity": "Severity",
 		"newViolations": "New violations",
 		"resolvedViolations": "Resolved",
-		"persistentViolations": "Persistent"
+		"persistentViolations": "Persistent",
+		"statusApproved": "Compliant",
+		"statusRejected": "Violations found",
+		"configSource": {
+			"explicit": "Rules read from the project architecture config.",
+			"inferred": "Rules inferred from the detected stack (no architecture config in the project).",
+			"none": "No rule could be inferred for this project: nothing was checked."
+		},
+		"layers": {
+			"domain": "Domain",
+			"application": "Application",
+			"infrastructure": "Infrastructure",
+			"presentation": "Presentation"
+		},
+		"layerRule": "The “{{source}}” layer must not depend on the “{{target}}” layer.",
+		"ruleIds": {
+			"domain_framework": "The domain must not depend on any persistence or web framework."
+		},
+		"languagesNote": "Imports are read for .NET (C#, F#, VB and project references), Java, Kotlin, Scala, Go, PHP, Rust, Dart/Flutter, Swift, Python and JavaScript/TypeScript. Without a rules file, the Domain, Application, Infrastructure and Presentation layers are inferred from folders and projects.",
+		"violationTypes": {
+			"layer_violation": "Layer violation",
+			"circular_dependency": "Circular dependency",
+			"forbidden_import": "Forbidden import",
+			"bounded_context": "Bounded context crossed",
+			"architecture_reviewer": "AI review finding",
+			"ai_review_error": "AI review failed"
+		},
+		"violationsTitle": "Violations",
+		"warningsTitle": "Warnings",
+		"noBaseline": "No baseline saved yet: save one first, then compare.",
+		"baselineSaved": "Baseline saved ({{count}} findings).",
+		"filesAnalyzed": "{{count}} files analysed"
 	},
 	"genTests": {
-		"title": "Generational Testing",
-		"subtitle": "Snapshot test results and compare across generations",
-		"label": "Generation label",
-		"junitXml": "JUnit XML",
-		"capture": "Capture generation",
-		"baseline": "Baseline label",
-		"current": "Current run JUnit XML",
-		"compare": "Compare",
+		"title": "Generational Tests",
+		"subtitle": "Keep one run of your tests as a reference, then compare later runs to it: regressions, vanished tests, slowdowns, new failures.",
+		"source": {
+			"heading": "Results to read",
+			"run": "Run the project's tests",
+			"report": "Import or paste a report"
+		},
+		"detecting": "Looking for the project's test command…",
+		"noCommand": "No test command was detected in this project (or this .NET project has no test project). Import a report produced elsewhere, by CI for example.",
+		"useReport": "Import a report",
+		"command": "Test command",
+		"willRun": "Command run:",
+		"report": {
+			"import": "Import a file…",
+			"paste": "Or paste a test report here",
+			"formats": "Formats read: JUnit XML, TRX (.NET), Jest or Vitest JSON, go test -json, cargo test output, dart/flutter test JSON, RSpec JSON. The format is recognised from the content."
+		},
+		"label": "Generation name",
+		"capture": "Capture a generation",
+		"captureRun": "Run and capture",
+		"captureReport": "Capture this report",
+		"baseline": "Baseline generation",
+		"noBaseline": "Capture a generation first to compare against it.",
+		"compare": "Compare with a generation",
+		"compareRun": "Run and compare",
+		"compareReport": "Compare this report",
+		"runningSuite": "Running the project's tests…",
+		"readingReport": "Reading the report…",
+		"cancel": "Stop",
+		"lastRun": "Last run: {{command}}",
+		"lastReport": "Last report read: {{format}}",
 		"generations": "Stored generations",
+		"emptyTitle": "No generation yet",
+		"emptyHint": "Capture the current state of the tests before a refactoring or an upgrade.",
+		"fromRun": "run of {{command}}",
+		"fromReport": "{{format}} report",
+		"delete": "Delete generation {{label}}",
+		"counts": {
+			"passed_one": "{{count}} passed",
+			"passed_other": "{{count}} passed",
+			"failed_one": "{{count}} failed",
+			"failed_other": "{{count}} failed",
+			"skipped_one": "{{count}} skipped",
+			"skipped_other": "{{count}} skipped"
+		},
+		"resultTitle": "Compared with {{baseline}}",
+		"noChange": "No difference: every test that passed in the baseline still passes, with no slowdown.",
 		"regressions": "Regressions",
 		"slowdowns": "Slowdowns",
 		"newFailures": "New failures",
 		"vanished": "Vanished tests",
 		"added": "New tests",
+		"formats": {
+			"junit": "JUnit XML",
+			"trx": "TRX (.NET)",
+			"jest": "Jest / Vitest JSON",
+			"go": "go test -json",
+			"cargo": "cargo test",
+			"dart": "Dart / Flutter JSON",
+			"rspec": "RSpec JSON"
+		},
 		"validation": {
-			"labelRequired": "Enter a generation label",
-			"junitRequired": "Paste JUnit XML content",
-			"junitInvalid": "Content does not look like valid JUnit XML",
-			"baselineRequired": "Enter an existing baseline label"
+			"labelInvalid": "Letters, digits, dot, dash and underscore only, starting with a letter or a digit.",
+			"labelTaken": "A generation already has this name: capturing will replace it."
+		},
+		"errors": {
+			"report": {
+				"empty": "The report is empty.",
+				"too_large": "The report is larger than 5 MB.",
+				"invalid_xml": "The report is not valid XML.",
+				"unknown_format": "This content is not a test report of a known format.",
+				"no_tests": "The report holds no test.",
+				"unreadable": "The file could not be read."
+			},
+			"run": {
+				"no_command": "No test command was detected for this project.",
+				"no_dotnet_tests": "This .NET project has no test project (xUnit, NUnit, MSTest, TUnit).",
+				"start_failed": "The test command could not start.",
+				"timed_out": "The tests ran longer than 30 minutes and were stopped.",
+				"no_tests": "The command ended without running any test.",
+				"no_results": "The command produced no test result (build error or missing tool?).",
+				"no_baseline": "This baseline generation no longer exists.",
+				"busy": "A run is already in progress.",
+				"invalid": "Generation name refused.",
+				"runner_failed": "The run stopped without a result.",
+				"not_a_directory": "The project folder cannot be found."
+			}
+		},
+		"kinds": {
+			"vanished": "vanished",
+			"regressed": "regressed",
+			"slowed_down": "slowed down",
+			"new_failure": "new failure",
+			"added": "added"
 		}
 	},
 	"i18nScaler": {
@@ -191,6 +527,7 @@
 		"sourceLocaleCustom": "Other (manual entry)…",
 		"sourceLocaleCustomPlaceholder": "e.g. pt-BR",
 		"sourceLocaleCustomLabel": "Custom locale code",
+		"sourceLocaleCustomCancel": "Back to the list of locales",
 		"strategy": "Placeholder strategy",
 		"runReport": "Run report",
 		"scannedDir": "Read from {{dir}}",
@@ -220,7 +557,22 @@
 		"editorEmpty": "Load the translations to browse and edit them.",
 		"detectedTitle": "Found in this project",
 		"detectedMeta_one": "{{locales}} · {{count}} namespace",
-		"detectedMeta_other": "{{locales}} · {{count}} namespaces"
+		"detectedMeta_other": "{{locales}} · {{count}} namespaces",
+		"useProject": "Analyse the whole open project",
+		"formatsNote": "Reads i18next JSON, otherwise every stack's catalogs: RESX, Android, iOS, gettext, ARB, XLIFF, .properties, Rails, Laravel. The editor changes JSON only.",
+		"formatsRead": "Catalogs read: {{formats}}. They cannot be changed in the editor, which writes JSON only.",
+		"formats": {
+			"json": "JSON",
+			"arb": "ARB (Flutter)",
+			"resx": "RESX (.NET)",
+			"android": "strings.xml (Android)",
+			"strings": ".strings (iOS, macOS)",
+			"xliff": "XLIFF (Angular)",
+			"gettext": "gettext (.po)",
+			"properties": ".properties (Java, Kotlin)",
+			"yaml": "YAML (Rails)",
+			"php": "PHP (Laravel)"
+		}
 	},
 	"i18nEditor": {
 		"searchNamespaces": "Filter namespaces",
@@ -286,34 +638,25 @@
 		"title": "Cognitive Context Optimizer",
 		"subtitle": "Pack the right files into the token budget for your task",
 		"prompt": "Task prompt",
-		"candidateFiles": "Candidate files (one per line)",
-		"candidateFilesPlaceholder": "/abs/path/file1.py\n/abs/path/file2.py",
+		"candidateFiles": "Project files",
 		"tokenBudget": "Token budget",
 		"optimize": "Optimize",
 		"included": "Included",
-		"truncated": "Truncated",
+		"truncated": "Excerpt",
 		"skipped": "Skipped",
 		"fillRatio": "Fill ratio",
-		"colFile": "File",
-		"colScore": "Score",
-		"colTokens": "Tokens",
-		"colTruncated": "Truncated",
 		"addFiles": "Add files…",
-		"addManually": "Add manually",
-		"manualPathPlaceholder": "/abs/path/file.py",
+		"addManually": "Path relative to the project",
+		"manualPathPlaceholder": "src/Orders/OrderService.cs",
 		"add": "Add",
 		"removeFile": "Remove this file",
 		"clearFiles": "Clear all",
-		"noFiles": "No files yet — click \"Add files…\" to pick some.",
-		"fileCount": "{{count}} file(s) selected",
+		"noFiles": "No file chosen: WorkPilot will propose the project sources closest to the task.",
 		"validation": {
 			"promptRequired": "Enter a prompt",
-			"filesRequired": "Provide at least one file",
 			"budgetTooSmall": "Budget must be ≥ 100 tokens",
-			"budgetTooLarge": "Budget must be ≤ 1,000,000 tokens",
-			"duplicatePath": "This file is already in the list",
-			"pathNotAbsolute": "Path must be absolute",
-			"pathTooLong": "Path too long (limit: {{max}} characters)"
+			"budgetTooLarge": "Budget must be ≤ 200,000 tokens",
+			"duplicatePath": "This file is already in the list"
 		},
 		"estimatedCost": "Estimated cost",
 		"costFor": "for {{provider}} / {{model}}",
@@ -321,13 +664,31 @@
 		"costFlatRate": "Flat-rate seat licence — no per-token cost",
 		"costUnknown": "Pricing unknown for this model",
 		"costNoModel": "No model configured in settings",
-		"outputRatio": "Output / input ratio"
+		"outputRatio": "Output / input ratio",
+		"fileCount_one": "{{count}} file chosen",
+		"fileCount_other": "{{count}} files chosen",
+		"discovered_one": "{{count}} project source examined (no file chosen).",
+		"discovered_other": "{{count}} project sources examined (no file chosen).",
+		"keywords": "Keywords read in the task: {{list}}",
+		"copy": "Copy the context",
+		"copied": "Context copied",
+		"copyFailed": "The clipboard refused the copy.",
+		"refusedTitle": "Files not read",
+		"refused": {
+			"outside": "outside the project",
+			"missing": "not found",
+			"binary": "binary file",
+			"too_large": "too large"
+		},
+		"noneIncluded": "No file could be included.",
+		"scoreTokens": "score {{score}} · {{included}}/{{full}} tokens",
+		"skippedList": "Over budget: {{list}}"
 	},
 	"audit": {
 		"title": "Audit Trail",
 		"subtitle": "Tamper-evident replay of every agent decision",
 		"storageDir": "Trail storage directory",
-		"storageDirPlaceholder": ".workpilot/audit",
+		"storageDirPlaceholder": ".workpilot/audit-trail",
 		"trailName": "Trail name",
 		"correlationId": "Correlation ID",
 		"correlationIdPlaceholder": "spec-001",
@@ -338,17 +699,34 @@
 		"tampered": "Chain has been tampered with",
 		"eventsChecked": "events checked",
 		"replayLabel": "Replay",
+		"brokenAt": "The chain breaks at event #{{sequence}}.",
+		"noEvents": "This trail holds no event yet.",
+		"noReplayEvents": "No event carries this correlation ID.",
 		"validation": {
 			"storageDirRequired": "Enter a storage directory",
 			"trailNameRequired": "Enter a trail name",
 			"correlationIdRequired": "Enter a correlation ID"
-		}
+		},
+		"kinds": {
+			"agent_invoked": "Agent started",
+			"agent_completed": "Agent finished",
+			"agent_failed": "Agent failed",
+			"agent_paused": "Agent paused",
+			"decision_made": "Decision",
+			"approval_given": "Approval given",
+			"approval_revoked": "Approval revoked",
+			"file_changed": "File changed",
+			"policy_violated": "Policy violated",
+			"user_action": "User action",
+			"system_event": "System event"
+		},
+		"actor": "Actor",
+		"correlation": "Correlation"
 	},
 	"pair": {
 		"title": "Real-time Pair Programming",
-		"subtitle": "Multi-user collaborative sessions with live operations",
+		"subtitle": "A room on the open project: chat, a shared file and an AI participant",
 		"roomId": "Room ID",
-		"createRoom": "Create room",
 		"joinRoom": "Join room",
 		"leave": "Leave",
 		"yourName": "Your display name",
@@ -365,9 +743,37 @@
 		"validation": {
 			"roomIdRequired": "Enter a room ID",
 			"roomIdInvalid": "Invalid room ID (letters, digits, _ and -, 1–64 chars)",
-			"nameRequired": "Enter your display name",
-			"messageEmpty": "Message is empty",
-			"messageTooLong": "Message too long (limit: {{max}} characters)"
+			"nameRequired": "Enter your display name"
+		},
+		"opKinds": {
+			"edit": "edit",
+			"cursor": "cursor",
+			"chat": "chat",
+			"suggestion": "suggestion",
+			"join": "joined",
+			"leave": "left",
+			"role_change": "role change"
+		},
+		"localNotice": "This room lives on this computer: only WorkPilot windows open here can join it. The AI participant answers with the provider and model chosen for Advanced features (top right). On a server project, the whole team already has a chat in the Kanban: write @ai there and your AI answers everyone.",
+		"offline": "Offline",
+		"aiName": "WorkPilot AI",
+		"inviteAi": "Invite the AI",
+		"aiInRoom": "The AI is in the room",
+		"file": "Room file",
+		"noFile": "No file: the AI only reads the conversation.",
+		"filePath": "File path, relative to the project",
+		"filePlaceholder": "src/Orders/OrderService.cs",
+		"setFile": "Work on this file",
+		"pickFile": "Choose…",
+		"noOps": "Nothing yet.",
+		"suggestionFor": "Proposal for {{file}} (nothing is written to disk)",
+		"aiThinking": "The AI is preparing its answer…",
+		"chatPlaceholderAi": "Write to the room: the AI will answer",
+		"aiErrors": {
+			"room": "The room did not answer: the AI could not read or write.",
+			"unavailable": "The provider did not answer. Check the provider chosen for Advanced features.",
+			"empty": "The provider returned an empty answer.",
+			"invalid": "Invalid room or project."
 		}
 	},
 	"hubDescription": "Twelve advanced tools in one place: codebase longevity, agent health, model routing, domain agents, CI/CD anomalies, licenses, architecture drift, generated tests, i18n at scale, cognitive context, audit trail and pair programming."

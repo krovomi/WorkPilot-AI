@@ -17,7 +17,13 @@ import type {
 	Project,
 	ProjectSettings as ProjectSettingsType,
 } from "../../../shared/types";
+import {
+	AI_ACCOUNT_PROVIDERS,
+	AI_LOGIN_PROVIDERS,
+	CLAUDE_ACCOUNT_PROVIDER,
+} from "../../../shared/types/ai-accounts";
 import { useProviderModelCatalog } from "../../hooks/useProviderModelCatalog";
+import { AiAccountPinsEditor } from "../ai-account-pins/AiAccountPinsEditor";
 import { cn } from "../../lib/utils";
 import { useSettingsStore } from "../../stores/settings-store";
 import {
@@ -27,14 +33,18 @@ import {
 	isGitIdentityComplete,
 } from "../git-identity/GitIdentityFields";
 import { useProviderContext } from "../ProviderContext";
-import { AutoSplitSettings } from "./AutoSplitSettings";
-import { CrossReviewSettings } from "./CrossReviewSettings";
 import { RepositorySection } from "./RepositorySection";
+import { SettingsGroup, SwitchRow } from "./SettingsGroup";
+import { WorkflowSettings } from "./WorkflowSettings";
 import { WorktreeRecipeSection } from "./WorktreeRecipeSection";
 import { Button } from "../ui/button";
-import { Label } from "../ui/label";
 import { Separator } from "../ui/separator";
-import { Switch } from "../ui/switch";
+
+/**
+ * Every provider a project can pin an account for: Claude, the API-key ones
+ * (OpenAI with its Codex CLI sign-ins), then the other CLIs' sign-ins.
+ */
+const PROJECT_PIN_PROVIDERS = [CLAUDE_ACCOUNT_PROVIDER, ...AI_ACCOUNT_PROVIDERS, ...AI_LOGIN_PROVIDERS];
 
 interface GeneralSettingsProps {
 	readonly project: Project;
@@ -70,8 +80,8 @@ export function GeneralSettings({
 
 	// Resolve the active agent profile + its flagship for a read-only summary.
 	// The actual model picker lives in Settings → Agent (AgentProfileSettings).
-	const appSettings = useSettingsStore((s) => s.settings);
-	const selectedProfileId = appSettings.selectedAgentProfile || "auto";
+	const selectedProfileId =
+		useSettingsStore((s) => s.settings.selectedAgentProfile) || "auto";
 	const selectedProfile =
 		DEFAULT_AGENT_PROFILES.find((p) => p.id === selectedProfileId) ||
 		DEFAULT_AGENT_PROFILES[0];
@@ -95,6 +105,17 @@ export function GeneralSettings({
 	const [identity, setIdentity] = useState<GitIdentityDraft>(EMPTY_GIT_IDENTITY);
 	const blockerKey =
 		repairableBlocker === "not-a-git-repo" ? "notGitRepo" : "noCommits";
+
+	// From the latest settings, so that two changes before a render both stay.
+	const setProject = (patch: Partial<ProjectSettingsType>) =>
+		setSettings((previous) => ({ ...previous, ...patch }));
+	const setNotification = (
+		patch: Partial<ProjectSettingsType["notifications"]>,
+	) =>
+		setSettings((previous) => ({
+			...previous,
+			notifications: { ...previous.notifications, ...patch },
+		}));
 
 	const handleOpenAgentSettings = () => {
 		globalThis.dispatchEvent(
@@ -288,11 +309,10 @@ export function GeneralSettings({
 				<>
 					<Separator />
 
-					{/* Agent Settings */}
-					<section className="space-y-4">
-						<h3 className="text-sm font-semibold text-foreground">
-							{t("projectSections.agentConfiguration.title")}
-						</h3>
+					<SettingsGroup
+						title={t("projectSections.agentConfiguration.title")}
+						description={t("projectSections.general.groups.agent.description")}
+					>
 						<button
 							type="button"
 							onClick={handleOpenAgentSettings}
@@ -306,88 +326,35 @@ export function GeneralSettings({
 							<div className="space-y-0.5">
 								<p className="text-sm font-medium text-foreground">
 									{t("projectSections.agentConfiguration.summary", {
-										defaultValue: "Profil : {{profile}} · Modèle phare : {{model}}",
 										profile: selectedProfile.name,
 										model: flagshipLabel || "—",
 									})}
 								</p>
 								<p className="text-xs text-muted-foreground">
-									{t("projectSections.agentConfiguration.managedInSettings", {
-										defaultValue:
-											"Géré dans Paramètres → Agent. Cliquez pour modifier.",
-									})}
+									{t("projectSections.agentConfiguration.managedInSettings")}
 								</p>
 							</div>
 							<ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
 						</button>
-						<div className="flex items-center justify-between pt-2">
-							<div className="space-y-0.5">
-								<Label className="font-normal text-foreground">
-									{t("projectSections.general.useClaudeMd")}
-								</Label>
-								<p className="text-xs text-muted-foreground">
-									{t("projectSections.general.useClaudeMdDescription")}
-								</p>
-							</div>
-							<Switch
-								checked={settings.useClaudeMd ?? true}
-								onCheckedChange={(checked) =>
-									setSettings({ ...settings, useClaudeMd: checked })
-								}
-							/>
-						</div>
-						<div className="flex items-center justify-between pt-2">
-							<div className="space-y-0.5">
-								<Label className="font-normal text-foreground">
-									{t("projectSections.general.tddMode")}
-								</Label>
-								<p className="text-xs text-muted-foreground">
-									{t("projectSections.general.tddModeDescription")}
-								</p>
-							</div>
-							<Switch
-								checked={settings.tddMode ?? false}
-								onCheckedChange={(checked) =>
-									setSettings({ ...settings, tddMode: checked })
-								}
-							/>
-						</div>
-						<div className="flex items-center justify-between pt-2">
-							<div className="space-y-0.5">
-								<Label className="font-normal text-foreground">
-									{t("projectSections.general.verifyLoop")}
-								</Label>
-								<p className="text-xs text-muted-foreground">
-									{t("projectSections.general.verifyLoopDescription")}
-								</p>
-							</div>
-							<Switch
-								checked={settings.verifyLoop ?? true}
-								onCheckedChange={(checked) =>
-									setSettings({ ...settings, verifyLoop: checked })
-								}
-							/>
-						</div>
-						<div className="flex items-center justify-between pt-2">
-							<div className="space-y-0.5">
-								<Label htmlFor="spec-by-example" className="font-normal text-foreground">
-									{t("projectSections.general.specByExample")}
-								</Label>
-								<p className="text-xs text-muted-foreground">
-									{t("projectSections.general.specByExampleDescription")}
-								</p>
-							</div>
-							<Switch
-								id="spec-by-example"
-								checked={settings.specByExample ?? false}
-								onCheckedChange={(checked) =>
-									setSettings({ ...settings, specByExample: checked })
-								}
-							/>
-						</div>
-						<AutoSplitSettings settings={settings} setSettings={setSettings} />
-						<CrossReviewSettings settings={settings} setSettings={setSettings} />
-					</section>
+						<SwitchRow
+							id="use-claude-md"
+							label={t("projectSections.general.useClaudeMd")}
+							description={t("projectSections.general.useClaudeMdDescription")}
+							checked={settings.useClaudeMd ?? true}
+							onCheckedChange={(checked) => setProject({ useClaudeMd: checked })}
+						/>
+						<AiAccountPinsEditor
+							providers={PROJECT_PIN_PROVIDERS}
+							value={settings.aiAccounts}
+							onChange={(aiAccounts) => setProject({ aiAccounts })}
+							scope="project"
+							idPrefix="project"
+						/>
+					</SettingsGroup>
+
+					<Separator />
+
+					<WorkflowSettings settings={settings} setSettings={setSettings} />
 
 					<Separator />
 
@@ -395,82 +362,32 @@ export function GeneralSettings({
 
 					<Separator />
 
-					{/* Notifications */}
-					<section className="space-y-4">
-						<h3 className="text-sm font-semibold text-foreground">
-							{t("notifications.title")}
-						</h3>
-						<div className="space-y-4">
-							<div className="flex items-center justify-between">
-								<Label className="font-normal text-foreground">
-									{t("notifications.onTaskComplete")}
-								</Label>
-								<Switch
-									checked={settings.notifications.onTaskComplete}
-									onCheckedChange={(checked) =>
-										setSettings({
-											...settings,
-											notifications: {
-												...settings.notifications,
-												onTaskComplete: checked,
-											},
-										})
-									}
-								/>
-							</div>
-							<div className="flex items-center justify-between">
-								<Label className="font-normal text-foreground">
-									{t("notifications.onTaskFailed")}
-								</Label>
-								<Switch
-									checked={settings.notifications.onTaskFailed}
-									onCheckedChange={(checked) =>
-										setSettings({
-											...settings,
-											notifications: {
-												...settings.notifications,
-												onTaskFailed: checked,
-											},
-										})
-									}
-								/>
-							</div>
-							<div className="flex items-center justify-between">
-								<Label className="font-normal text-foreground">
-									{t("notifications.onReviewNeeded")}
-								</Label>
-								<Switch
-									checked={settings.notifications.onReviewNeeded}
-									onCheckedChange={(checked) =>
-										setSettings({
-											...settings,
-											notifications: {
-												...settings.notifications,
-												onReviewNeeded: checked,
-											},
-										})
-									}
-								/>
-							</div>
-							<div className="flex items-center justify-between">
-								<Label className="font-normal text-foreground">
-									{t("notifications.sound")}
-								</Label>
-								<Switch
-									checked={settings.notifications.sound}
-									onCheckedChange={(checked) =>
-										setSettings({
-											...settings,
-											notifications: {
-												...settings.notifications,
-												sound: checked,
-											},
-										})
-									}
-								/>
-							</div>
-						</div>
-					</section>
+					<SettingsGroup title={t("notifications.title")}>
+						<SwitchRow
+							id="notify-task-complete"
+							label={t("notifications.onTaskComplete")}
+							checked={settings.notifications.onTaskComplete}
+							onCheckedChange={(checked) => setNotification({ onTaskComplete: checked })}
+						/>
+						<SwitchRow
+							id="notify-task-failed"
+							label={t("notifications.onTaskFailed")}
+							checked={settings.notifications.onTaskFailed}
+							onCheckedChange={(checked) => setNotification({ onTaskFailed: checked })}
+						/>
+						<SwitchRow
+							id="notify-review-needed"
+							label={t("notifications.onReviewNeeded")}
+							checked={settings.notifications.onReviewNeeded}
+							onCheckedChange={(checked) => setNotification({ onReviewNeeded: checked })}
+						/>
+						<SwitchRow
+							id="notify-sound"
+							label={t("notifications.sound")}
+							checked={settings.notifications.sound}
+							onCheckedChange={(checked) => setNotification({ sound: checked })}
+						/>
+					</SettingsGroup>
 				</>
 			)}
 		</>

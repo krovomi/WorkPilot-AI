@@ -1,0 +1,503 @@
+/** @vitest-environment jsdom */
+/**
+ * The "Fonctions avancées" panels show the values the backend sends (domain
+ * tags, severities, licence categories, violation types…) in the app's
+ * language. They used to print the backend's English as is, so a French UI
+ * listed "Generic", "Healthcare", "unknown", "approved".
+ */
+import "@testing-library/jest-dom/vitest";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import i18n from "../../../../shared/i18n";
+import {
+	useAgentHealthStore,
+	useArchDriftStore,
+	useCicdAnomalyStore,
+	useCogContextStore,
+	useDomainAgentsStore,
+	useI18nScalerStore,
+	useLicenseStore,
+	usePairRealtimeStore,
+	useModelRouterStore,
+} from "../../../stores/phase35-stores";
+import { AgentHealthPanel } from "../AgentHealthPanel";
+import { ArchDriftPanel } from "../ArchDriftPanel";
+import { CicdAnomalyPanel } from "../CicdAnomalyPanel";
+import { CogContextPanel } from "../CogContextPanel";
+import { DomainAgentsPanel } from "../DomainAgentsPanel";
+import { I18nScalerPanel } from "../I18nScalerPanel";
+import { LicensePanel } from "../LicensePanel";
+import { PairProgrammingPanel } from "../PairProgrammingPanel";
+import { ModelRouterPanel } from "../ModelRouterPanel";
+
+const DOMAINS = [
+	{ tag: "generic", label: "Generic", description: "No domain assumptions — neutral defaults." },
+	{ tag: "healthcare", label: "Healthcare", description: "EHR, PHI, HIPAA-aware data flows." },
+	{ tag: "data_pipeline", label: "Data Pipeline", description: "ETL, batch jobs, data quality." },
+];
+
+beforeEach(async () => {
+	await i18n.changeLanguage("fr");
+	(globalThis as unknown as { electronAPI: unknown }).electronAPI = {
+		listDomains: vi.fn().mockResolvedValue({ success: true, domains: DOMAINS }),
+	};
+});
+
+afterEach(() => {
+	cleanup();
+	useDomainAgentsStore.setState({
+		domains: [],
+		bundle: null,
+		phase: "idle",
+		error: null,
+		projectPath: null,
+		projectDomain: null,
+		projectLanguages: [],
+	});
+	useCicdAnomalyStore.setState({ signals: [], report: null, phase: "idle", error: null });
+	useAgentHealthStore.setState({ health: null, projectPath: null, phase: "idle", error: null });
+	useLicenseStore.setState({ report: null, online: null, phase: "idle", error: null });
+	usePairRealtimeStore.setState({ currentRoom: null, ops: [], isStreaming: false, aiError: null });
+	useCogContextStore.setState({ context: null, phase: "idle", error: null });
+	useI18nScalerStore.setState({ report: null, formats: [], scannedDir: null, phase: "idle", error: null });
+	useModelRouterStore.setState({ chosen: null, comparison: null, phase: "idle", error: null });
+	useArchDriftStore.setState({
+		scanReport: null,
+		driftReport: null,
+		configSource: null,
+		baselineCount: null,
+		phase: "idle",
+		error: null,
+	});
+});
+
+describe("Fonctions avancées in French", () => {
+	it("names every domain in French, with its description", async () => {
+		render(<DomainAgentsPanel />);
+		expect(await screen.findByRole("option", { name: "Générique" })).toBeInTheDocument();
+		expect(screen.getByRole("option", { name: "Santé" })).toBeInTheDocument();
+		expect(screen.getByRole("option", { name: "Pipeline de données" })).toBeInTheDocument();
+		expect(screen.queryByRole("option", { name: "Healthcare" })).not.toBeInTheDocument();
+		expect(screen.getByText(/Aucune hypothèse de domaine/)).toBeInTheDocument();
+	});
+
+	it("shows the project's domain and stacks, and applies the chosen domain to the project", async () => {
+		const setProjectDomain = vi.fn().mockResolvedValue({ success: true, domain: "data_pipeline" });
+		const api = (globalThis as unknown as { electronAPI: Record<string, unknown> }).electronAPI;
+		api.getProjectDomain = vi
+			.fn()
+			.mockResolvedValue({ success: true, domain: "healthcare", languages: ["c#", "go"] });
+		api.setProjectDomain = setProjectDomain;
+		render(<DomainAgentsPanel projectPath="/work/shop" />);
+		expect(await screen.findByText("Domaine appliqué à ce projet : Santé")).toBeInTheDocument();
+		expect(screen.getByText("Stacks détectées : c#, go")).toBeInTheDocument();
+		await screen.findByRole("option", { name: "Santé" });
+		const apply = screen.getByRole("button", { name: "Appliquer à ce projet" });
+		const domainSelect = screen.getByRole("combobox", { name: "Domaine" }) as HTMLSelectElement;
+		await waitFor(() => expect(domainSelect.value).toBe("healthcare"));
+		expect(apply).toBeDisabled();
+		fireEvent.change(domainSelect, { target: { value: "data_pipeline" } });
+		expect(apply).toBeEnabled();
+		fireEvent.click(apply);
+		await waitFor(() => expect(setProjectDomain).toHaveBeenCalledWith("/work/shop", "data_pipeline"));
+		expect(
+			await screen.findByText("Domaine appliqué à ce projet : Pipeline de données"),
+		).toBeInTheDocument();
+	});
+
+	it("scores agents from the project's tasks, by role and model, and lists those without enough phases", async () => {
+		const scoreProjectAgentHealth = vi.fn().mockResolvedValue({
+			success: true,
+			tasks_read: 4,
+			min_runs: 3,
+			scores: [
+				{
+					agent_name: "coder:anthropic:claude-sonnet-5-5",
+					role: "coder",
+					provider: "anthropic",
+					model: "claude-sonnet-5-5",
+					score: 52,
+					status: "failing",
+					success_rate: 0.5,
+					error_rate: 0.5,
+					retry_rate: 0.25,
+					slowness_ratio: 1,
+					trend: "degrading",
+					runs_in_window: 4,
+					actions: ["reduce_parallelism"],
+					diagnostics: {},
+				},
+			],
+			pending: [{ agent_name: "qa:-:-", role: "qa", provider: "", model: "", runs: 1 }],
+		});
+		(globalThis as unknown as { electronAPI: Record<string, unknown> }).electronAPI.scoreProjectAgentHealth =
+			scoreProjectAgentHealth;
+		render(<AgentHealthPanel projectPath="/work/api" />);
+		expect(await screen.findByText("Codeur")).toBeInTheDocument();
+		expect(scoreProjectAgentHealth).toHaveBeenCalledWith("/work/api");
+		expect(screen.getByText("anthropic · claude-sonnet-5-5")).toBeInTheDocument();
+		expect(screen.getByText("défaillant")).toBeInTheDocument();
+		expect(screen.getByText("Réduire le parallélisme")).toBeInTheDocument();
+		expect(screen.getByText(/Lu dans 4 tâches du projet/)).toBeInTheDocument();
+		expect(screen.getByText(/il en faut 3/)).toBeInTheDocument();
+		expect(screen.getByText("QA")).toBeInTheDocument();
+		expect(screen.getByText("modèle non indiqué dans les logs")).toBeInTheDocument();
+		expect(screen.getByText("1 phase")).toBeInTheDocument();
+	});
+
+	it("asks for a project instead of showing an empty monitor", () => {
+		render(<AgentHealthPanel />);
+		expect(screen.getByText(/Ouvrez un projet/)).toBeInTheDocument();
+	});
+
+	it("translates a CI signal's kind and severity", () => {
+		useCicdAnomalyStore.setState({
+			signals: [
+				{
+					kind: "dependency_conflict",
+					severity: "high",
+					matching_line: "npm ERR! ERESOLVE unable to resolve dependency tree",
+					line_number: 12,
+					suggested_fix: "Pin the conflicting peer dep.",
+					log_label: "",
+				},
+			],
+		});
+		render(<CicdAnomalyPanel />);
+		expect(screen.getByText("Conflit de dépendances")).toBeInTheDocument();
+		expect(screen.getByText("élevée")).toBeInTheDocument();
+		expect(screen.queryByText("dependency_conflict")).not.toBeInTheDocument();
+	});
+
+	it("names the other stacks' catalogs it read and offers the open project as the folder", () => {
+		useI18nScalerStore.setState({
+			phase: "ok",
+			report: { source_locale: "en", diffs: [], coverage: [] },
+			scannedDir: "/work/shop",
+			redirectedFrom: null,
+			formats: ["resx", "android"],
+		});
+		render(<I18nScalerPanel projectPath="/work/shop" />);
+		expect(
+			screen.getByText(/Catalogues lus : RESX \(\.NET\), strings\.xml \(Android\)/),
+		).toBeInTheDocument();
+		expect(screen.getByRole("button", { name: "Analyser tout le projet ouvert" })).toBeInTheDocument();
+	});
+
+	it("words each CI fix in French from its id and shows the fixes that recur across builds", async () => {
+		const signal = {
+			kind: "dependency_conflict",
+			severity: "high" as const,
+			matching_line: "error NU1605: Detected package downgrade: Serilog from 4.0.0 to 3.1.1",
+			line_number: 7,
+			suggested_fix: "Reference the package version NuGet asks for directly.",
+			fix_id: "nuget_conflict",
+			log_label: "Build 1",
+		};
+		const analyseCicdLogs = vi.fn().mockResolvedValue({
+			success: true,
+			report: {
+				signals: [signal, { ...signal, log_label: "Build 2" }],
+				recurring_kinds: ["dependency_conflict"],
+				summary: { samples: 2, total_signals: 2, by_kind: {}, by_severity: {} },
+				fix_recommendations: ["[recurring] Reference the package version NuGet asks for directly."],
+				recommendations: [
+					{
+						kind: "dependency_conflict",
+						fix_id: "nuget_conflict",
+						suggested_fix: signal.suggested_fix,
+						recurring: true,
+					},
+				],
+				has_critical: false,
+			},
+		});
+		(globalThis as unknown as { electronAPI: Record<string, unknown> }).electronAPI.analyseCicdLogs =
+			analyseCicdLogs;
+		render(<CicdAnomalyPanel />);
+		fireEvent.change(screen.getByLabelText("Contenu du log"), { target: { value: "log one" } });
+		fireEvent.click(screen.getByRole("button", { name: "Ajouter le log d'un autre build" }));
+		fireEvent.change(screen.getByLabelText("Build 2"), { target: { value: "log two" } });
+		fireEvent.click(screen.getByRole("button", { name: "Scanner" }));
+		expect(await screen.findByText("revient")).toBeInTheDocument();
+		expect(analyseCicdLogs).toHaveBeenCalledWith([
+			{ label: "Build 1", text: "log one" },
+			{ label: "Build 2", text: "log two" },
+		]);
+		expect(screen.getAllByText(/Référencez directement la version que NuGet demande/)).toHaveLength(3);
+		expect(screen.getByText("Build 2, ligne 7")).toBeInTheDocument();
+		expect(screen.queryByText(/Reference the package version/)).not.toBeInTheDocument();
+	});
+
+	it("translates a licence conflict's category and remediation", () => {
+		useLicenseStore.setState({
+			report: {
+				dependencies: [{ name: "left-pad", version: "1.0.0", ecosystem: "npm", declared_license: null }],
+				conflicts: [
+					{
+						dependency: { name: "left-pad", version: "1.0.0", ecosystem: "npm", declared_license: null },
+						category: "unknown",
+						reason: "License None (category=unknown) is not in the project's allowed set.",
+						remediation: "Look up the upstream licence and add it to the policy.",
+					},
+				],
+				by_category: { unknown: 1 },
+				summary: {},
+				passed: false,
+			},
+		} as never);
+		render(<LicensePanel projectPath="/p" />);
+		expect(screen.getByText("Inconnue")).toBeInTheDocument();
+		expect(screen.getByText(/Chercher la licence en amont/)).toBeInTheDocument();
+		expect(screen.queryByText(/Look up the upstream/)).not.toBeInTheDocument();
+	});
+
+	it("keeps licences it could not find apart from real conflicts", () => {
+		const dep = (name: string, licence: string | null) => ({
+			name,
+			version: "1.0.0",
+			ecosystem: "nuget",
+			declared_license: licence,
+		});
+		useLicenseStore.setState({
+			online: false,
+			report: {
+				dependencies: [
+					{ ...dep("MediatR", "Apache-2.0"), is_direct: true, license_source: "installed" },
+					{ ...dep("Internal.Lib", null), is_direct: true, license_source: "" },
+				],
+				conflicts: [
+					{ dependency: dep("Internal.Lib", null), category: "unknown", reason: "", remediation: "" },
+				],
+				by_category: { permissive: 1, unknown: 1 },
+				summary: { by_ecosystem: { nuget: 2 }, by_source: { installed: 1 }, unresolved: 1 },
+				passed: false,
+			},
+		});
+		render(<LicensePanel projectPath="/p" />);
+		// Nothing breaks the policy: only one licence is left to check.
+		expect(screen.getByText("Licences à vérifier")).toBeInTheDocument();
+		expect(screen.queryByText("Conflits trouvés")).not.toBeInTheDocument();
+		expect(screen.getByText("1 dépendance dont la licence est introuvable")).toBeInTheDocument();
+		expect(screen.getByText("1 lue dans le paquet installé")).toBeInTheDocument();
+		expect(screen.getByText(/Les registres n’ont pas été interrogés/)).toBeInTheDocument();
+	});
+
+	it("shows the architecture verdict in French and lists each violation", () => {
+		useArchDriftStore.setState({
+			configSource: "inferred",
+			scanReport: {
+				status: "rejected",
+				violations: [
+					{
+						type: "layer_violation",
+						severity: "error",
+						file: "src/Api/Controllers/OrderController.cs",
+						line: 7,
+						import_target: "Shop.Infrastructure.Persistence",
+						rule: "api -> infrastructure",
+						description: "Layer 'api' cannot import from 'infrastructure'",
+					},
+				],
+				warnings: [],
+				violation_count: 1,
+				warning_count: 0,
+				summary: "",
+				files_analyzed: 42,
+			},
+		});
+		render(<ArchDriftPanel projectPath="/p" />);
+		expect(screen.getByText("Violations trouvées")).toBeInTheDocument();
+		expect(screen.queryByText("rejected")).not.toBeInTheDocument();
+		expect(screen.getByText("Violation de couche")).toBeInTheDocument();
+		expect(screen.getByText("src/Api/Controllers/OrderController.cs:7")).toBeInTheDocument();
+		expect(screen.getByText(/Règles déduites de la stack détectée/)).toBeInTheDocument();
+		expect(screen.getByText("42 fichiers analysés")).toBeInTheDocument();
+	});
+
+	it("words layer and domain rules in French from the backend's structured fields", () => {
+		useArchDriftStore.setState({
+			configSource: "inferred",
+			scanReport: {
+				status: "approved",
+				violations: [],
+				warnings: [
+					{
+						type: "layer_violation",
+						severity: "warning",
+						file: "src/Shop.Domain/Order.cs",
+						line: 2,
+						import_target: "Shop.Infrastructure.Persistence",
+						rule: "Layer 'domain' cannot import from 'infrastructure'",
+						source_layer: "domain",
+						target_layer: "infrastructure",
+					},
+					{
+						type: "forbidden_import",
+						severity: "warning",
+						file: "src/Shop.Domain/User.cs",
+						line: 3,
+						import_target: "Microsoft.EntityFrameworkCore",
+						rule: "The domain layer must not depend on a persistence or web framework",
+						rule_id: "domain_framework",
+					},
+				],
+				violation_count: 0,
+				warning_count: 2,
+				summary: "",
+			},
+		});
+		render(<ArchDriftPanel projectPath="/p" />);
+		expect(
+			screen.getByText("La couche « Domaine » ne doit pas dépendre de la couche « Infrastructure »."),
+		).toBeInTheDocument();
+		expect(
+			screen.getByText("Le domaine ne doit dépendre d’aucun framework de persistance ou web."),
+		).toBeInTheDocument();
+		expect(screen.queryByText(/cannot import/)).not.toBeInTheDocument();
+		expect(screen.getByText(/Imports lus pour \.NET/)).toBeInTheDocument();
+	});
+
+	it("says there is no baseline instead of showing an empty drift", () => {
+		useArchDriftStore.setState({
+			driftReport: {
+				has_baseline: false,
+				severity: "none",
+				new_violations: [],
+				resolved_violations: [],
+				persistent_violations: [],
+				summary: {},
+			},
+		});
+		render(<ArchDriftPanel projectPath="/p" />);
+		expect(screen.getByText(/Aucune référence enregistrée/)).toBeInTheDocument();
+		expect(screen.queryByText("Nouvelles violations")).not.toBeInTheDocument();
+	});
+	it("shows a pair room in French, with the AI's proposal and roles", () => {
+		usePairRealtimeStore.setState({
+			isStreaming: true,
+			subscribe: () => Promise.resolve(),
+			currentRoom: {
+				room_id: "pair",
+				created_at: 0,
+				participants: [
+					{ user_id: "ana", display_name: "Ana", role: "driver", joined_at: 0, last_seen: 0 },
+					{
+						user_id: "workpilot-ai",
+						display_name: "WorkPilot IA",
+						role: "ai",
+						joined_at: 0,
+						last_seen: 0,
+					},
+				],
+				op_count: 2,
+				last_op_sequence: 2,
+				closed: false,
+			},
+			ops: [
+				{
+					op_id: "1",
+					sequence: 1,
+					kind: "cursor",
+					actor: "ana",
+					timestamp: 0,
+					payload: { file_path: "src/Orders.cs" },
+				},
+				{
+					op_id: "2",
+					sequence: 2,
+					kind: "suggestion",
+					actor: "workpilot-ai",
+					timestamp: 0,
+					payload: { file_path: "src/Orders.cs", suggestion: "class Orders {}" },
+				},
+			],
+			aiError: "unavailable",
+		});
+		render(<PairProgrammingPanel projectPath="/work/shop" />);
+		expect(screen.getByText(/Pilote/)).toBeInTheDocument();
+		expect(screen.getByRole("button", { name: /L'IA est dans la salle/ })).toBeDisabled();
+		expect(screen.getByText(/Proposition pour src\/Orders.cs/)).toBeInTheDocument();
+		expect(screen.getByText(/Le fournisseur n'a pas répondu/)).toBeInTheDocument();
+		expect(screen.getByText(/Cette salle vit sur cet ordinateur/)).toBeInTheDocument();
+	});
+
+	it("asks for a project before optimizing a context", () => {
+		render(<CogContextPanel />);
+		expect(screen.queryByRole("button", { name: "Optimiser" })).not.toBeInTheDocument();
+	});
+
+	it("lists the files it refused to read, in French, and the sources it proposed", () => {
+		useCogContextStore.setState({
+			phase: "ok",
+			context: {
+				slices: [
+					{
+						file_path: "src/Orders/OrderService.cs",
+						content: "public class OrderService {}",
+						full_size_tokens: 900,
+						included_tokens: 120,
+						truncated: true,
+						relevance: {
+							file_path: "src/Orders/OrderService.cs",
+							score: 1.5,
+							keyword_hits: 2,
+							path_score: 0.5,
+							explicit_mention: false,
+							recency_score: 0,
+							breakdown: {},
+						},
+					},
+				],
+				token_budget: 8000,
+				tokens_used: 120,
+				files_skipped: [],
+				summary: { candidates: 12, keywords_detected: ["order", "total"] },
+				discovered: true,
+				refused: [{ path: "/etc/hosts", reason: "outside" }],
+			},
+		});
+		render(<CogContextPanel projectPath="/work/shop" />);
+		expect(screen.getByText("Fichiers non lus")).toBeInTheDocument();
+		expect(screen.getByText(/hors du projet/)).toBeInTheDocument();
+		expect(screen.getByText("Extrait")).toBeInTheDocument();
+		expect(screen.getByText(/12 sources du projet examinées/)).toBeInTheDocument();
+		expect(screen.getByText(/Mots-clés lus dans la tâche : order, total/)).toBeInTheDocument();
+		expect(screen.getByRole("button", { name: /Copier le contexte/ })).toBeInTheDocument();
+	});
+
+
+	it("words the router's reason in French and says when a provider has no model", () => {
+		useModelRouterStore.setState({
+			chosen: {
+				provider: "copilot",
+				model: "claude-haiku-4.5",
+				task_class: "trivial",
+				tier: "budget",
+				estimated_cost_usd: 0,
+				reason: "subscription provider copilot (no per-token price)",
+				reason_code: "unpriced_provider",
+				reason_params: { provider: "copilot", billing: "subscription" },
+			},
+			comparison: {
+				budget: {
+					provider: "opencode",
+					model: "",
+					task_class: "trivial",
+					tier: "budget",
+					estimated_cost_usd: 0,
+					reason: "no model of the available providers in the catalog",
+					reason_code: "no_model",
+					reason_params: { provider: "opencode", providers: ["opencode"] },
+				},
+			},
+		});
+		render(<ModelRouterPanel />);
+		expect(
+			screen.getByText(/GitHub Copilot est facturé à l’abonnement : aucun coût par token\./),
+		).toBeInTheDocument();
+		expect(screen.queryByText(/no per-token price/)).not.toBeInTheDocument();
+		expect(screen.getByText("aucun modèle à proposer")).toBeInTheDocument();
+		expect(screen.getByRole("option", { name: "Déduit du prompt" })).toBeInTheDocument();
+	});
+});

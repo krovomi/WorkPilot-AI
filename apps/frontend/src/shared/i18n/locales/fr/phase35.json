@@ -9,7 +9,7 @@
 		"backendUnreachable": "Backend inaccessible. Le backend tourne-t-il sur le port 9000 ?",
 		"noData": "Aucune donnée — lancez l'analyse pour voir les résultats.",
 		"required": "Champ requis",
-		"invalidNumber": "Nombre invalide",
+		"pickerFailed": "La boîte de dialogue des fichiers n’a pas pu s’ouvrir.",
 		"invalidPath": "Chemin invalide",
 		"selectAtLeastOne": "Sélectionnez au moins une option",
 		"tooLong": "Texte trop long (limite : {{max}} caractères)",
@@ -18,7 +18,7 @@
 		"selected": "{{count}} sélectionné(s)",
 		"none": "Aucun",
 		"status": "Statut",
-		"violations": "violations",
+		"violations": "violation(s)",
 		"warnings": "avertissements",
 		"backendErrors": {
 			"projectPathInvalid": "Chemin de projet invalide : {{path}}",
@@ -29,6 +29,13 @@
 			"backendUnreachable": "Backend inaccessible. Le backend tourne-t-il sur le port 9000 ?",
 			"timeout": "Délai dépassé — le backend n'a pas répondu à temps.",
 			"unknown": "Erreur backend : {{message}}"
+		},
+		"severity": {
+			"critical": "critique",
+			"high": "élevée",
+			"medium": "moyenne",
+			"low": "faible",
+			"none": "aucune"
 		}
 	},
 	"longevity": {
@@ -47,17 +54,27 @@
 		"directionDegrading": "dégradation",
 		"riskiest": "Fichiers les plus à risque",
 		"items": "éléments",
-		"cost": "coût"
+		"cost": "coût",
+		"signals": {
+			"todo_fixme": "TODO / FIXME",
+			"long_function": "Fonctions longues",
+			"deep_complexity": "Imbrication profonde",
+			"duplication": "Duplication",
+			"stale_deps": "Dépendances obsolètes",
+			"low_coverage": "Couverture de tests faible",
+			"vulnerabilities": "Vulnérabilités connues",
+			"trend": "Tendance de la dette"
+		},
+		"gradeValue": "Note {{grade}}"
 	},
 	"agentHealth": {
 		"title": "Santé des Agents",
-		"subtitle": "Score de fiabilité par agent sur l'historique récent",
+		"subtitle": "Fiabilité de chaque agent, par provider et modèle, lue dans les tâches Kanban du projet",
 		"refresh": "Actualiser",
-		"reset": "Réinitialiser l'historique",
-		"noAgents": "Aucune exécution d'agent enregistrée pour l'instant.",
+		"noAgents": "Aucune phase terminée dans les tâches de ce projet pour l'instant.",
 		"successRate": "Taux de succès",
 		"errorRate": "Taux d'erreur",
-		"retryRate": "Taux de retry",
+		"retryRate": "Taux de relance",
 		"slowness": "Ratio de lenteur",
 		"runs": "exécutions",
 		"actions": "Actions recommandées",
@@ -67,15 +84,34 @@
 		"statusHealthy": "sain",
 		"statusDegraded": "dégradé",
 		"statusFailing": "défaillant",
-		"statusBurnedOut": "épuisé"
+		"statusBurnedOut": "épuisé",
+		"actionLabels": {
+			"none": "aucune",
+			"throttle": "Ralentir les lancements",
+			"reduce_parallelism": "Réduire le parallélisme",
+			"retrain_prompt": "Revoir les exemples du prompt",
+			"rotate_model": "Essayer un autre modèle",
+			"alert_operator": "Demande votre attention"
+		},
+		"noProject": "Ouvrez un projet : la santé des agents se lit dans ses tâches Kanban.",
+		"source_one": "Lu dans {{count}} tâche du projet (planification, code et QA terminés).",
+		"source_other": "Lu dans {{count}} tâches du projet (planification, code et QA terminés).",
+		"unknownModel": "modèle non indiqué dans les logs",
+		"pendingTitle": "Pas encore assez de phases pour un score (il en faut {{min}}) :",
+		"pendingRuns_one": "{{count}} phase",
+		"pendingRuns_other": "{{count}} phases",
+		"roles": {
+			"planner": "Planificateur",
+			"coder": "Codeur",
+			"qa": "QA"
+		}
 	},
 	"modelRouter": {
 		"title": "Routage Adaptatif de Modèles",
 		"subtitle": "Choisit le modèle le moins cher qui devrait fonctionner pour cette tâche",
 		"prompt": "Prompt de la tâche",
 		"promptPlaceholder": "ex : renommer foo en bar",
-		"hint": "Indice de classe (optionnel)",
-		"hintPlaceholder": "ex : trivial, architecture, review",
+		"hint": "Type de tâche",
 		"availableProviders": "Providers disponibles",
 		"providersPlaceholder": "Sélectionnez les providers à comparer",
 		"providerAnthropic": "Anthropic",
@@ -83,7 +119,7 @@
 		"providerGoogle": "Google",
 		"providerMistral": "Mistral",
 		"providerOllama": "Ollama (local)",
-		"compare": "Comparer entre tiers",
+		"compare": "Comparer les niveaux",
 		"chosen": "Modèle choisi",
 		"estimatedCost": "Coût estimé (USD)",
 		"reason": "Raison",
@@ -93,6 +129,38 @@
 		"validation": {
 			"promptRequired": "Saisissez un prompt à router",
 			"providersRequired": "Choisissez au moins un provider"
+		},
+		"tiers": {
+			"budget": "Économique",
+			"balanced": "Équilibré",
+			"premium": "Premium"
+		},
+		"taskClasses": {
+			"trivial": "modification triviale",
+			"simple_edit": "modification simple",
+			"multi_file": "modification multi-fichiers",
+			"architecture": "architecture",
+			"review": "relecture",
+			"planning": "planification",
+			"ideation": "idéation",
+			"documentation": "documentation"
+		},
+		"tierFor": "Niveau {{tier}} pour une {{task}}",
+		"providerDeepseek": "DeepSeek",
+		"providerGrok": "Grok (xAI)",
+		"providerOpenrouter": "OpenRouter",
+		"providerHuggingface": "Hugging Face",
+		"providerCopilot": "GitHub Copilot",
+		"hintAuto": "Déduit du prompt",
+		"removeProvider": "Retirer {{provider}}",
+		"noModel": "aucun modèle à proposer",
+		"reasons": {
+			"local": "{{provider}} tourne en local : aucun coût par token.",
+			"subscription": "{{provider}} est facturé à l’abonnement : aucun coût par token.",
+			"noModel": "Aucun modèle du catalogue pour {{providers}} : ce provider choisit le sien.",
+			"fallback": "Aucun provider disponible n’a de prix connu : modèle de repli.",
+			"bench": "Banc de rejeu : {{resolved}}/{{judged}} cartes résolues.",
+			"passedOver": "Écartés d’après le banc de rejeu : {{models}}."
 		}
 	},
 	"domainAgents": {
@@ -104,7 +172,7 @@
 		"rolePlanner": "Planificateur",
 		"roleReviewer": "Relecteur",
 		"roleDocumenter": "Documenteur",
-		"build": "Construire le bundle",
+		"build": "Générer les consignes",
 		"guardrails": "Garde-fous",
 		"requiredSkills": "Compétences requises",
 		"forbidden": "Patterns interdits",
@@ -113,6 +181,61 @@
 		"validation": {
 			"domainRequired": "Sélectionnez un domaine",
 			"noDomainsLoaded": "Aucun domaine disponible — vérifiez la connexion au backend."
+		},
+		"domains": {
+			"generic": {
+				"label": "Générique",
+				"description": "Aucune hypothèse de domaine : réglages neutres."
+			},
+			"ecommerce": {
+				"label": "E-commerce",
+				"description": "Boutique, panier, paiement, stock, encaissement."
+			},
+			"fintech": {
+				"label": "Fintech",
+				"description": "Paiements, grands livres, virements, processus réglementés."
+			},
+			"healthcare": {
+				"label": "Santé",
+				"description": "Dossiers patients, données de santé, flux conformes HIPAA / RGPD santé."
+			},
+			"gaming": {
+				"label": "Jeu vidéo",
+				"description": "Multijoueur temps réel, anti-triche, télémétrie."
+			},
+			"iot": {
+				"label": "IoT",
+				"description": "Objets embarqués, connexion intermittente, mises à jour à distance (OTA)."
+			},
+			"govtech": {
+				"label": "Secteur public",
+				"description": "Démarches publiques : accessibilité, audit, transparence administrative."
+			},
+			"education": {
+				"label": "Éducation",
+				"description": "Edtech : utilisateurs mineurs, données scolaires protégées, usages en classe."
+			},
+			"saas": {
+				"label": "SaaS / B2B",
+				"description": "SaaS multi-locataire avec facturation, rôles et audit."
+			},
+			"data_pipeline": {
+				"label": "Pipeline de données",
+				"description": "ETL, traitements par lots, qualité des données."
+			}
+		},
+		"promptNote": "Ces garde-fous sont injectés tels quels (en anglais) dans le prompt de l’agent.",
+		"libraries": "Bibliothèques conseillées pour ce projet",
+		"librariesFor": "{{language}} : {{libraries}}",
+		"project": {
+			"current": "Domaine appliqué à ce projet : {{domain}}",
+			"none": "Aucun domaine appliqué à ce projet : les tâches n'ont pas d'addendum de domaine.",
+			"languages": "Stacks détectées : {{languages}}",
+			"noLanguages": "Aucune stack détectée : les bibliothèques de toutes les stacks sont listées.",
+			"effect": "Appliqué, le domaine est enregistré dans .workpilot/domain.json et chaque tâche Kanban du projet reçoit ses consignes (planification, code, QA). Une spec qui nomme son propre domaine garde le sien.",
+			"apply": "Appliquer à ce projet",
+			"clear": "Retirer du projet",
+			"noProject": "Ouvrez un projet pour appliquer un domaine à ses tâches ; l'aperçu ci-dessous reste disponible."
 		}
 	},
 	"cicdAnomaly": {
@@ -125,11 +248,70 @@
 		"recurring": "Récurrents entre builds",
 		"recommendations": "Correctifs suggérés",
 		"hasCritical": "Problèmes critiques présents",
-		"line": "ligne",
 		"validation": {
-			"logRequired": "Collez un log non vide",
-			"logTooLarge": "Log trop volumineux (limite : {{max}} caractères)"
-		}
+			"logRequired": "Collez un log non vide"
+		},
+		"kinds": {
+			"timeout": "Délai dépassé",
+			"oom": "Mémoire saturée",
+			"dependency_conflict": "Conflit de dépendances",
+			"network_failure": "Panne réseau",
+			"disk_full": "Disque plein",
+			"rate_limited": "Limite de requêtes atteinte",
+			"auth_failure": "Échec d'authentification",
+			"infrastructure_flake": "Instabilité de l'infrastructure",
+			"slow_build": "Build lent"
+		},
+		"fixes": {
+			"job_timeout": "Augmentez le timeout-minutes du job ou découpez-le en jobs plus petits.",
+			"dotnet_test_hang": "Relancez dotnet test avec --blame-hang-timeout pour obtenir un dump du test bloqué.",
+			"build_lock_wait": "Un autre build tient le verrou du cache (Cargo, Gradle) : donnez à chaque job son propre dossier de cache.",
+			"step_timeout": "Augmentez le délai de l'étape ou découpez-la en étapes plus petites.",
+			"silent_step": "Ajoutez un log de vie régulier, ou arrêtez l'étape après une période sans sortie.",
+			"node_heap": "Fixez NODE_OPTIONS=--max-old-space-size=… ou découpez le build.",
+			"jvm_heap": "Augmentez le tas de la JVM (-Xmx, org.gradle.jvmargs) ou répartissez les tests en lots.",
+			"dotnet_memory": "Réduisez le parallélisme de MSBuild (-m:1) ou prenez un runner avec plus de mémoire.",
+			"php_memory": "Augmentez memory_limit (COMPOSER_MEMORY_LIMIT=-1 pour Composer).",
+			"process_killed": "Le compilateur ou les tests ont manqué de mémoire : réduisez les jobs parallèles ou prenez un runner plus gros.",
+			"runner_memory": "Augmentez la mémoire du runner ou découpez le travail.",
+			"npm_peer": "Épinglez la dépendance pair en conflit, ou utilisez --legacy-peer-deps en attendant.",
+			"nuget_conflict": "Référencez directement la version que NuGet demande, ou passez à la gestion centralisée des paquets.",
+			"nuget_missing": "Le paquet ou sa version n'est sur aucun flux configuré : vérifiez nuget.config et la version.",
+			"jvm_convergence": "Alignez les versions avec dependencyManagement (Maven) ou un bloc platform/constraints (Gradle).",
+			"jvm_resolve": "Vérifiez le bloc repositories et la version ; rafraîchissez avec --refresh-dependencies.",
+			"cargo_conflict": "Assouplissez la contrainte de version dans Cargo.toml ou lancez cargo update -p <crate>.",
+			"composer_conflict": "Lancez composer why-not <paquet> <version> et assouplissez la contrainte qui bloque.",
+			"pub_conflict": "Lancez flutter pub outdated et assouplissez la contrainte que pub cite dans pubspec.yaml.",
+			"pip_conflict": "Épinglez la dépendance commune sur une version acceptée par les deux paquets (pip install --dry-run l'indique).",
+			"bundler_conflict": "Lancez bundle update <gem> ou assouplissez sa version dans le Gemfile.",
+			"spm_conflict": "Assouplissez la règle de version dans Package.swift ou videz le cache des paquets (swift package reset).",
+			"go_checksum": "go.sum ne correspond pas au proxy de modules : lancez go mod tidy et vérifiez GOPROXY / GONOSUMDB.",
+			"resolver_failed": "Lisez la sortie du résolveur ; épinglez les dépendances transitives dans le lockfile.",
+			"single_version": "Épinglez la dépendance fautive sur une seule version dans tout l'espace de travail.",
+			"lockfile_audit": "Vérifiez le lockfile pour des dépendances transitives ambiguës.",
+			"nuget_feed": "Le flux NuGet n'a pas répondu : relancez, ou vérifiez l'URL du flux et ses identifiants.",
+			"registry_download": "Le registre de paquets n'a pas répondu : relancez avec un délai croissant, ou mettez les paquets en cache entre les runs.",
+			"dns": "Ajoutez une relance DNS ou mettez la résolution en cache au démarrage du runner.",
+			"connection": "Relancez l'appel réseau avec un délai croissant ; vérifiez l'état du service distant.",
+			"tls": "Vérifiez le certificat TLS du registre et l'horloge du runner.",
+			"disk_cleanup": "Ajoutez une étape df -h, puis videz /tmp et lancez docker prune avant l'étape qui échoue.",
+			"docker_pull_limit": "Connectez-vous au registre avant le pull, ou utilisez un miroir de l'image.",
+			"backoff": "Ajoutez un délai croissant avec aléa, ou authentifiez-vous pour un quota plus élevé.",
+			"ssh_key": "Renouvelez la clé SSH ou le jeton d'accès utilisé par le runner.",
+			"ci_token": "Renouvelez le jeton de CI et vérifiez que le secret est bien exposé au job qui échoue.",
+			"docker_daemon": "Redémarrez Docker ou utilisez une image de runner neuve.",
+			"runner_lost": "Retirez ce runner et passez sur un pool sain.",
+			"preempted": "Le runner a été préempté : marquez le build comme relançable."
+		},
+		"stacksNote": "Reconnaît les échecs de npm, pnpm, NuGet/.NET, Maven, Gradle, Cargo, Composer, pub (Flutter), Go, pip, Bundler, SwiftPM, Docker et des runners de CI. Collez plusieurs builds pour voir ce qui revient.",
+		"buildLabel": "Build {{n}}",
+		"addLog": "Ajouter le log d'un autre build",
+		"addLogHint": "Plusieurs builds font ressortir les échecs qui reviennent.",
+		"removeLog": "Retirer",
+		"noSignal": "Aucun échec connu dans ce log.",
+		"recurringBadge": "revient",
+		"lineAt": "ligne {{line}}",
+		"lineIn": "{{label}}, ligne {{line}}"
 	},
 	"license": {
 		"title": "Gouvernance des Licences",
@@ -145,39 +327,193 @@
 		"dependencies": "Dépendances",
 		"colPackage": "Paquet",
 		"colCategory": "Catégorie",
-		"colRemediation": "Remédiation"
+		"colRemediation": "Remédiation",
+		"categories": {
+			"permissive": "Permissive",
+			"weak_copyleft": "Copyleft faible",
+			"strong_copyleft": "Copyleft fort",
+			"network_copyleft": "Copyleft réseau (AGPL)",
+			"public_domain": "Domaine public",
+			"commercial": "Commerciale",
+			"unknown": "Inconnue"
+		},
+		"remediations": {
+			"permissive": "—",
+			"weak_copyleft": "Acceptable en liaison dynamique ; faire vérifier le risque juridique.",
+			"strong_copyleft": "Remplacer par une alternative permissive ou l’isoler derrière une frontière de processus.",
+			"network_copyleft": "L’AGPL contamine un déploiement SaaS : trouver un remplaçant MIT ou Apache.",
+			"public_domain": "—",
+			"commercial": "Vérifier qu’une licence payante couvre votre usage et suivre les renouvellements.",
+			"unknown": "Chercher la licence en amont et l’ajouter à la politique."
+		},
+		"colLicense": "Licence",
+		"toCheck": "À vérifier",
+		"toCheckBadge": "Licences à vérifier",
+		"toCheckTitle_one": "{{count}} dépendance dont la licence est introuvable",
+		"toCheckTitle_other": "{{count}} dépendances dont la licence est introuvable",
+		"askRegistries": "Interroger les registres publics",
+		"askRegistriesHint": "Pour les licences qu’aucun fichier de verrouillage ni paquet installé ne donne (deps.dev, npm, PyPI, Packagist, RubyGems, pub.dev). Jamais sous une politique hors-ligne stricte.",
+		"offlineNote": "Les registres n’ont pas été interrogés (option désactivée ou politique hors-ligne stricte) : installez les dépendances ou autorisez les registres pour résoudre le reste.",
+		"noManifest": "Aucun manifeste de dépendances trouvé (package.json, requirements.txt, pyproject.toml, *.csproj, pom.xml, build.gradle, Cargo.toml, go.mod, composer, Gemfile.lock, pubspec.lock).",
+		"ecosystems": {
+			"npm": "npm",
+			"pypi": "PyPI",
+			"cargo": "Cargo",
+			"go": "Go",
+			"nuget": "NuGet",
+			"maven": "Maven / Gradle",
+			"composer": "Composer",
+			"rubygems": "RubyGems",
+			"pub": "pub (Dart)"
+		},
+		"sources": {
+			"manifest_one": "{{count}} lue dans un fichier de verrouillage",
+			"manifest_other": "{{count}} lues dans un fichier de verrouillage",
+			"installed_one": "{{count}} lue dans le paquet installé",
+			"installed_other": "{{count}} lues dans les paquets installés",
+			"registry_one": "{{count}} venue d’un registre public",
+			"registry_other": "{{count}} venues des registres publics",
+			"override_one": "{{count}} fixée à la main",
+			"override_other": "{{count}} fixées à la main"
+		}
 	},
 	"archDrift": {
 		"title": "Détection de Dérive Architecturale",
-		"subtitle": "Suivre la dérive architecturale depuis une baseline",
+		"subtitle": "Suivre la dérive de l'architecture par rapport à une référence",
 		"scan": "Scanner",
-		"saveBaseline": "Sauver la baseline",
+		"saveBaseline": "Enregistrer la référence",
 		"compare": "Comparer la dérive",
 		"severity": "Sévérité",
 		"newViolations": "Nouvelles violations",
 		"resolvedViolations": "Résolues",
-		"persistentViolations": "Persistantes"
+		"persistentViolations": "Persistantes",
+		"statusApproved": "Conforme",
+		"statusRejected": "Violations trouvées",
+		"configSource": {
+			"explicit": "Règles lues dans la configuration d’architecture du projet.",
+			"inferred": "Règles déduites de la stack détectée (aucune configuration d’architecture dans le projet).",
+			"none": "Aucune règle n’a pu être déduite pour ce projet : rien n’a été vérifié."
+		},
+		"layers": {
+			"domain": "Domaine",
+			"application": "Application",
+			"infrastructure": "Infrastructure",
+			"presentation": "Présentation"
+		},
+		"layerRule": "La couche « {{source}} » ne doit pas dépendre de la couche « {{target}} ».",
+		"ruleIds": {
+			"domain_framework": "Le domaine ne doit dépendre d’aucun framework de persistance ou web."
+		},
+		"languagesNote": "Imports lus pour .NET (C#, F#, VB et références de projets), Java, Kotlin, Scala, Go, PHP, Rust, Dart/Flutter, Swift, Python et JavaScript/TypeScript. Sans fichier de règles, les couches Domaine, Application, Infrastructure et Présentation sont déduites des dossiers et des projets.",
+		"violationTypes": {
+			"layer_violation": "Violation de couche",
+			"circular_dependency": "Dépendance circulaire",
+			"forbidden_import": "Import interdit",
+			"bounded_context": "Contexte borné franchi",
+			"architecture_reviewer": "Remarque de la revue IA",
+			"ai_review_error": "Échec de la revue IA"
+		},
+		"violationsTitle": "Violations",
+		"warningsTitle": "Avertissements",
+		"noBaseline": "Aucune référence enregistrée : enregistrez-en une, puis comparez.",
+		"baselineSaved": "Référence enregistrée ({{count}} constats).",
+		"filesAnalyzed": "{{count}} fichiers analysés"
 	},
 	"genTests": {
-		"title": "Tests Générationnels",
-		"subtitle": "Snapshot des résultats de tests + comparaison entre générations",
-		"label": "Label de la génération",
-		"junitXml": "JUnit XML",
-		"capture": "Capturer la génération",
-		"baseline": "Label de la baseline",
-		"current": "JUnit XML du run courant",
-		"compare": "Comparer",
+		"title": "Tests générationnels",
+		"subtitle": "Gardez une exécution de vos tests comme référence, puis comparez-y les suivantes : régressions, tests disparus, ralentissements, nouveaux échecs.",
+		"source": {
+			"heading": "Résultats à lire",
+			"run": "Lancer les tests du projet",
+			"report": "Importer ou coller un rapport"
+		},
+		"detecting": "Recherche de la commande de test du projet…",
+		"noCommand": "Aucune commande de test n'a été détectée dans ce projet (ou ce projet .NET n'a pas de projet de test). Importez un rapport produit ailleurs, par exemple par la CI.",
+		"useReport": "Importer un rapport",
+		"command": "Commande de test",
+		"willRun": "Commande lancée :",
+		"report": {
+			"import": "Importer un fichier…",
+			"paste": "Ou collez ici le contenu d'un rapport de tests",
+			"formats": "Formats lus : JUnit XML, TRX (.NET), JSON de Jest ou Vitest, go test -json, sortie de cargo test, JSON de dart/flutter test, JSON de RSpec. Le format est reconnu au contenu."
+		},
+		"label": "Nom de la génération",
+		"capture": "Capturer une génération",
+		"captureRun": "Lancer et capturer",
+		"captureReport": "Capturer ce rapport",
+		"baseline": "Génération de référence",
+		"noBaseline": "Capturez d'abord une génération pour pouvoir comparer.",
+		"compare": "Comparer à une génération",
+		"compareRun": "Lancer et comparer",
+		"compareReport": "Comparer ce rapport",
+		"runningSuite": "Exécution des tests du projet…",
+		"readingReport": "Lecture du rapport…",
+		"cancel": "Arrêter",
+		"lastRun": "Dernière exécution : {{command}}",
+		"lastReport": "Dernier rapport lu : {{format}}",
 		"generations": "Générations stockées",
+		"emptyTitle": "Aucune génération",
+		"emptyHint": "Capturez l'état actuel des tests avant un refactoring ou une montée de version.",
+		"fromRun": "exécution de {{command}}",
+		"fromReport": "rapport {{format}}",
+		"delete": "Supprimer la génération {{label}}",
+		"counts": {
+			"passed_one": "{{count}} réussi",
+			"passed_other": "{{count}} réussis",
+			"failed_one": "{{count}} en échec",
+			"failed_other": "{{count}} en échec",
+			"skipped_one": "{{count}} ignoré",
+			"skipped_other": "{{count}} ignorés"
+		},
+		"resultTitle": "Comparaison avec {{baseline}}",
+		"noChange": "Aucune différence : chaque test réussi de la référence réussit encore, sans ralentissement.",
 		"regressions": "Régressions",
 		"slowdowns": "Ralentissements",
 		"newFailures": "Nouveaux échecs",
 		"vanished": "Tests disparus",
 		"added": "Nouveaux tests",
+		"formats": {
+			"junit": "JUnit XML",
+			"trx": "TRX (.NET)",
+			"jest": "Jest / Vitest JSON",
+			"go": "go test -json",
+			"cargo": "cargo test",
+			"dart": "Dart / Flutter JSON",
+			"rspec": "RSpec JSON"
+		},
 		"validation": {
-			"labelRequired": "Saisissez un label de génération",
-			"junitRequired": "Collez un contenu JUnit XML",
-			"junitInvalid": "Le contenu ne ressemble pas à du XML JUnit valide",
-			"baselineRequired": "Saisissez un label de baseline existant"
+			"labelInvalid": "Lettres, chiffres, point, tiret et souligné seulement, en commençant par une lettre ou un chiffre.",
+			"labelTaken": "Une génération porte déjà ce nom : la capturer la remplacera."
+		},
+		"errors": {
+			"report": {
+				"empty": "Le rapport est vide.",
+				"too_large": "Le rapport dépasse 5 Mo.",
+				"invalid_xml": "Le rapport n'est pas un XML valide.",
+				"unknown_format": "Ce contenu n'est pas un rapport de tests d'un format reconnu.",
+				"no_tests": "Le rapport ne contient aucun test.",
+				"unreadable": "Le fichier n'a pas pu être lu."
+			},
+			"run": {
+				"no_command": "Aucune commande de test détectée pour ce projet.",
+				"no_dotnet_tests": "Ce projet .NET n'a pas de projet de test (xUnit, NUnit, MSTest, TUnit).",
+				"start_failed": "La commande de test n'a pas pu démarrer.",
+				"timed_out": "Les tests ont dépassé 30 minutes et ont été arrêtés.",
+				"no_tests": "La commande s'est terminée sans lancer aucun test.",
+				"no_results": "La commande n'a produit aucun résultat de test (erreur de build ou outil manquant ?).",
+				"no_baseline": "Cette génération de référence n'existe plus.",
+				"busy": "Une exécution est déjà en cours.",
+				"invalid": "Nom de génération refusé.",
+				"runner_failed": "L'exécution s'est arrêtée sans résultat.",
+				"not_a_directory": "Le dossier du projet est introuvable."
+			}
+		},
+		"kinds": {
+			"vanished": "disparu",
+			"regressed": "régressé",
+			"slowed_down": "ralenti",
+			"new_failure": "nouvel échec",
+			"added": "ajouté"
 		}
 	},
 	"i18nScaler": {
@@ -191,6 +527,7 @@
 		"sourceLocaleCustom": "Autre (saisie manuelle)…",
 		"sourceLocaleCustomPlaceholder": "ex : pt-BR",
 		"sourceLocaleCustomLabel": "Code locale personnalisé",
+		"sourceLocaleCustomCancel": "Revenir à la liste des langues",
 		"strategy": "Stratégie de placeholder",
 		"runReport": "Lancer le rapport",
 		"scannedDir": "Lu depuis {{dir}}",
@@ -220,7 +557,22 @@
 		"editorEmpty": "Chargez les traductions pour les parcourir et les modifier.",
 		"detectedTitle": "Trouvés dans ce projet",
 		"detectedMeta_one": "{{locales}} · {{count}} namespace",
-		"detectedMeta_other": "{{locales}} · {{count}} namespaces"
+		"detectedMeta_other": "{{locales}} · {{count}} namespaces",
+		"useProject": "Analyser tout le projet ouvert",
+		"formatsNote": "Lit l'i18next JSON, et sinon les catalogues de toutes les stacks : RESX, Android, iOS, gettext, ARB, XLIFF, .properties, Rails, Laravel. L'éditeur ne modifie que le JSON.",
+		"formatsRead": "Catalogues lus : {{formats}}. Ils ne sont pas modifiables dans l'éditeur, qui n'écrit que du JSON.",
+		"formats": {
+			"json": "JSON",
+			"arb": "ARB (Flutter)",
+			"resx": "RESX (.NET)",
+			"android": "strings.xml (Android)",
+			"strings": ".strings (iOS, macOS)",
+			"xliff": "XLIFF (Angular)",
+			"gettext": "gettext (.po)",
+			"properties": ".properties (Java, Kotlin)",
+			"yaml": "YAML (Rails)",
+			"php": "PHP (Laravel)"
+		}
 	},
 	"i18nEditor": {
 		"searchNamespaces": "Filtrer les namespaces",
@@ -286,34 +638,25 @@
 		"title": "Optimiseur de Contexte Cognitif",
 		"subtitle": "Sélectionne les bons fichiers pour le budget tokens de la tâche",
 		"prompt": "Prompt de la tâche",
-		"candidateFiles": "Fichiers candidats (un par ligne)",
-		"candidateFilesPlaceholder": "/chemin/absolu/fichier1.py\n/chemin/absolu/fichier2.py",
+		"candidateFiles": "Fichiers du projet",
 		"tokenBudget": "Budget tokens",
 		"optimize": "Optimiser",
 		"included": "Inclus",
-		"truncated": "Tronqué",
+		"truncated": "Extrait",
 		"skipped": "Ignoré",
 		"fillRatio": "Taux de remplissage",
-		"colFile": "Fichier",
-		"colScore": "Score",
-		"colTokens": "Tokens",
-		"colTruncated": "Tronqué",
 		"addFiles": "Ajouter des fichiers…",
-		"addManually": "Ajouter manuellement",
-		"manualPathPlaceholder": "/chemin/absolu/fichier.py",
+		"addManually": "Chemin relatif au projet",
+		"manualPathPlaceholder": "src/Orders/OrderService.cs",
 		"add": "Ajouter",
 		"removeFile": "Retirer ce fichier",
 		"clearFiles": "Tout vider",
-		"noFiles": "Aucun fichier — cliquez sur « Ajouter des fichiers… » pour en sélectionner.",
-		"fileCount": "{{count}} fichier(s) sélectionné(s)",
+		"noFiles": "Aucun fichier choisi : WorkPilot proposera les sources du projet les plus proches de la tâche.",
 		"validation": {
 			"promptRequired": "Saisissez un prompt",
-			"filesRequired": "Indiquez au moins un fichier",
 			"budgetTooSmall": "Le budget doit être ≥ 100 tokens",
-			"budgetTooLarge": "Le budget doit être ≤ 1 000 000 tokens",
-			"duplicatePath": "Ce fichier est déjà dans la liste",
-			"pathNotAbsolute": "Le chemin doit être absolu",
-			"pathTooLong": "Chemin trop long (limite : {{max}} caractères)"
+			"budgetTooLarge": "Le budget doit être ≤ 200 000 tokens",
+			"duplicatePath": "Ce fichier est déjà dans la liste"
 		},
 		"estimatedCost": "Coût estimé",
 		"costFor": "pour {{provider}} / {{model}}",
@@ -321,35 +664,70 @@
 		"costFlatRate": "Modèle facturé à l'abonnement — pas de coût au token",
 		"costUnknown": "Tarif inconnu pour ce modèle",
 		"costNoModel": "Aucun modèle configuré dans les paramètres",
-		"outputRatio": "Ratio sortie/entrée"
+		"outputRatio": "Ratio sortie/entrée",
+		"fileCount_one": "{{count}} fichier choisi",
+		"fileCount_other": "{{count}} fichiers choisis",
+		"discovered_one": "{{count}} source du projet examinée (aucun fichier choisi).",
+		"discovered_other": "{{count}} sources du projet examinées (aucun fichier choisi).",
+		"keywords": "Mots-clés lus dans la tâche : {{list}}",
+		"copy": "Copier le contexte",
+		"copied": "Contexte copié",
+		"copyFailed": "Le presse-papiers a refusé la copie.",
+		"refusedTitle": "Fichiers non lus",
+		"refused": {
+			"outside": "hors du projet",
+			"missing": "introuvable",
+			"binary": "fichier binaire",
+			"too_large": "trop volumineux"
+		},
+		"noneIncluded": "Aucun fichier n'a pu être inclus.",
+		"scoreTokens": "score {{score}} · {{included}}/{{full}} tokens",
+		"skippedList": "Hors budget : {{list}}"
 	},
 	"audit": {
 		"title": "Piste d'Audit",
-		"subtitle": "Replay infalsifiable de chaque décision d'agent",
+		"subtitle": "Rejeu infalsifiable de chaque décision d'agent",
 		"storageDir": "Répertoire de stockage",
-		"storageDirPlaceholder": ".workpilot/audit",
-		"trailName": "Nom du trail",
+		"storageDirPlaceholder": ".workpilot/audit-trail",
+		"trailName": "Nom de la piste",
 		"correlationId": "ID de corrélation",
 		"correlationIdPlaceholder": "spec-001",
-		"replay": "Replay",
+		"replay": "Rejouer",
 		"verify": "Vérifier l'intégrité",
 		"events": "Événements",
 		"intact": "Chaîne intacte",
 		"tampered": "Chaîne falsifiée",
 		"eventsChecked": "événements vérifiés",
-		"replayLabel": "Replay",
+		"replayLabel": "Rejeu",
+		"brokenAt": "La chaîne est rompue à l’événement n° {{sequence}}.",
+		"noEvents": "Cette piste ne contient encore aucun événement.",
+		"noReplayEvents": "Aucun événement ne porte cet identifiant de corrélation.",
 		"validation": {
 			"storageDirRequired": "Renseignez un répertoire de stockage",
-			"trailNameRequired": "Renseignez un nom de trail",
+			"trailNameRequired": "Renseignez un nom de piste",
 			"correlationIdRequired": "Renseignez un ID de corrélation"
-		}
+		},
+		"kinds": {
+			"agent_invoked": "Agent lancé",
+			"agent_completed": "Agent terminé",
+			"agent_failed": "Agent en échec",
+			"agent_paused": "Agent en pause",
+			"decision_made": "Décision",
+			"approval_given": "Approbation donnée",
+			"approval_revoked": "Approbation retirée",
+			"file_changed": "Fichier modifié",
+			"policy_violated": "Politique enfreinte",
+			"user_action": "Action utilisateur",
+			"system_event": "Événement système"
+		},
+		"actor": "Acteur",
+		"correlation": "Corrélation"
 	},
 	"pair": {
 		"title": "Pair Programming Temps Réel",
-		"subtitle": "Sessions collaboratives multi-utilisateurs avec opérations live",
-		"roomId": "ID de la room",
-		"createRoom": "Créer la room",
-		"joinRoom": "Rejoindre la room",
+		"subtitle": "Une salle sur le projet ouvert : chat, fichier partagé et participant IA",
+		"roomId": "ID de la salle",
+		"joinRoom": "Rejoindre la salle",
 		"leave": "Quitter",
 		"yourName": "Votre nom",
 		"role": "Rôle",
@@ -360,14 +738,42 @@
 		"send": "Envoyer",
 		"participants": "Participants",
 		"recentOps": "Opérations récentes",
-		"streaming": "Live",
-		"roomLabel": "room",
+		"streaming": "En direct",
+		"roomLabel": "salle",
 		"validation": {
-			"roomIdRequired": "Saisissez un ID de room",
-			"roomIdInvalid": "ID de room invalide (lettres, chiffres, _ et -, 1–64 caractères)",
-			"nameRequired": "Saisissez votre nom",
-			"messageEmpty": "Le message est vide",
-			"messageTooLong": "Message trop long (limite : {{max}} caractères)"
+			"roomIdRequired": "Saisissez un ID de salle",
+			"roomIdInvalid": "ID de salle invalide (lettres, chiffres, _ et -, 1–64 caractères)",
+			"nameRequired": "Saisissez votre nom"
+		},
+		"opKinds": {
+			"edit": "modification",
+			"cursor": "curseur",
+			"chat": "message",
+			"suggestion": "suggestion",
+			"join": "arrivée",
+			"leave": "départ",
+			"role_change": "changement de rôle"
+		},
+		"localNotice": "Cette salle vit sur cet ordinateur : seules les fenêtres de WorkPilot ouvertes ici peuvent la rejoindre. Le participant IA répond avec le fournisseur et le modèle choisis pour les Fonctions avancées (en haut à droite). Sur un projet du serveur, toute l'équipe a déjà un chat dans le Kanban : écrivez-y @ia et votre IA répond à tous.",
+		"offline": "Hors ligne",
+		"aiName": "WorkPilot IA",
+		"inviteAi": "Inviter l'IA",
+		"aiInRoom": "L'IA est dans la salle",
+		"file": "Fichier de la salle",
+		"noFile": "Aucun fichier : l'IA ne lit que la conversation.",
+		"filePath": "Chemin du fichier, relatif au projet",
+		"filePlaceholder": "src/Orders/OrderService.cs",
+		"setFile": "Travailler sur ce fichier",
+		"pickFile": "Choisir…",
+		"noOps": "Rien pour l'instant.",
+		"suggestionFor": "Proposition pour {{file}} (rien n'est écrit sur le disque)",
+		"aiThinking": "L'IA prépare sa réponse…",
+		"chatPlaceholderAi": "Écrivez à la salle : l'IA répondra",
+		"aiErrors": {
+			"room": "La salle n'a pas répondu : l'IA n'a pas pu lire ni écrire.",
+			"unavailable": "Le fournisseur n'a pas répondu. Vérifiez le fournisseur choisi pour les Fonctions avancées.",
+			"empty": "Le fournisseur a renvoyé une réponse vide.",
+			"invalid": "Salle ou projet invalide."
 		}
 	},
 	"hubDescription": "Douze outils avancés au même endroit : longévité du code, santé des agents, routage des modèles, agents de domaine, anomalies CI/CD, licences, dérive d’architecture, tests générés, i18n à grande échelle, contexte cognitif, piste d’audit et pair programming."

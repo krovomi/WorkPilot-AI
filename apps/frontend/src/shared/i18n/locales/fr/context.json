@@ -1,7 +1,8 @@
 {
 	"tabs": {
 		"projectIndex": "Index du Projet",
-		"memories": "Mémoires"
+		"memories": "Mémoires",
+		"lifecycle": "Cycle de vie"
 	},
 	"projectIndex": {
 		"title": "Structure du Projet",
@@ -138,5 +139,205 @@
 		"health": "Santé : {{checks}}",
 		"metrics": "Métriques :",
 		"unknownType": "inconnu"
+	},
+	"lifecycle": {
+		"description": "Chaque décision sur la mémoire du projet, les mémoires oubliées que tu peux restaurer, et les conflits de synchronisation à trancher",
+		"refresh": "Actualiser",
+		"error": "Impossible de lire le cycle de vie de la mémoire : {{error}}",
+		"serverProject": "La mémoire de ce projet est son propre cerveau, sur le serveur. Aucune synchronisation d'un coéquipier ne l'alimente : il n'y a donc pas de conflit entre notes à trancher ici.",
+		"pins": "{{count}} / {{limit}} épinglées",
+		"entry": "{{action}} {{actor}} — {{reason}}",
+		"conflicts": {
+			"title": "À trancher",
+			"empty": "Aucun conflit en attente.",
+			"keep": "Garder celle-ci",
+			"writeCanonical": "Écrire la note canonique",
+			"canonicalPlaceholder": "Ce que l'équipe suit désormais",
+			"save": "Enregistrer la note canonique",
+			"cancel": "Annuler",
+			"dismiss": "Pas un conflit",
+			"ask": "Demander au modèle",
+			"asking": "Question en cours…",
+			"opinionTitle": "L'avis du modèle (c'est toi qui décides)",
+			"useDraft": "Partir de ce brouillon",
+			"sideA": "Déjà ici",
+			"sideB": "Reçue",
+			"pinned": "Épinglée",
+			"updated": "Mise à jour le {{date}}",
+			"confidence": "Confiance {{value}}",
+			"agents": "Écrite par {{agents}}",
+			"signal": {
+				"value": "Deux valeurs pour le même réglage",
+				"recommendation": "Recommandations opposées",
+				"negation": "L'une dit de le faire, l'autre non",
+				"textual": "Modifiée sur deux machines",
+				"reopened": "Une décision antérieure a été annulée"
+			},
+			"verdict": {
+				"contradiction": "Elles se contredisent",
+				"complementary": "Elles se complètent",
+				"duplicate": "Elles disent la même chose"
+			},
+			"prefer": {
+				"a": "préfère la note déjà ici",
+				"b": "préfère la note reçue",
+				"none": "pas de préférence"
+			},
+			"escalated": "Tranché le {{date}} {{actor}}, et de nouveau contredit : un mainteneur tranche.",
+			"waitingMaintainer": "En attente d'un mainteneur : {{names}}.",
+			"foundBy": {
+				"embeddings": "Trouvé par le sens (modèle local)"
+			}
+		},
+		"trash": {
+			"title": "Oubliées récemment",
+			"empty": "Rien d'oublié.",
+			"restore": "Restaurer",
+			"until": "Restaurable jusqu'au {{date}}",
+			"expiring": "{{count}} mémoires oubliées seront supprimées dans les 7 jours : restaure celles qui comptent encore.",
+			"restored": "Mémoire restaurée.",
+			"contradicts": "Mémoire restaurée, mais elle contredit {{count}} mémoire(s) actuelle(s) : vérifie avant de t'y fier."
+		},
+		"journal": {
+			"title": "Journal",
+			"empty": "Aucune décision enregistrée pour l'instant."
+		},
+		"actions": {
+			"pin": "Épingler",
+			"unpin": "Désépingler",
+			"pinnedBadge": "Épinglée",
+			"forget": "Oublier",
+			"forgetReason": "Pourquoi (facultatif)",
+			"confirmForget": "L'oublier",
+			"forgetHint": "Une mémoire oubliée reste restaurable depuis l'onglet Cycle de vie pendant la durée de rétention.",
+			"history": "Historique",
+			"hideHistory": "Masquer l'historique",
+			"scope": "Portée",
+			"scopePlaceholder": "Où elle s'applique : un module (apps/billing/), team:nom ou branch:nom ; vide : partout",
+			"saveScope": "Enregistrer",
+			"scopeBadge": "S'applique à {{scope}}"
+		},
+		"action": {
+			"create": "Créée",
+			"update": "Mise à jour",
+			"forget": "Oubliée",
+			"restore": "Restaurée",
+			"purge": "Supprimée définitivement",
+			"pin": "Épinglée",
+			"unpin": "Désépinglée",
+			"protect": "Gardée (épinglée)",
+			"merge": "Fusionnée",
+			"archive": "Archivée",
+			"resolve": "Conflit tranché",
+			"conflict": "Conflit détecté",
+			"designate": "Mainteneurs désignés",
+			"notify": "Conflit annoncé à l'équipe"
+		},
+		"actor": {
+			"user": "par toi",
+			"agent": "par un agent",
+			"agentType": "par l'agent {{type}}",
+			"sync": "par la synchronisation",
+			"learning-loop": "par le learning loop",
+			"lifecycle": "par la règle de rétention",
+			"person": "par {{name}}"
+		},
+		"reason": {
+			"recorded": "enregistrée",
+			"edited": "son texte a changé",
+			"user-request": "à la demande d'une personne",
+			"pattern-retired": "retirée automatiquement",
+			"similar-merged": "un pattern similaire y a été fusionné",
+			"retention-expired": "durée de rétention écoulée",
+			"pinned-protected": "une suppression automatique a été refusée : elle est épinglée",
+			"restored": "restaurée depuis la corbeille",
+			"pinned": "protégée des suppressions automatiques",
+			"unpinned": "n'est plus protégée",
+			"pinned-wins": "la version épinglée l'emporte",
+			"higher-confidence": "le pattern le plus sûr l'emporte",
+			"more-recent": "la note bien plus récente l'emporte",
+			"same-statement": "les deux versions disaient la même chose",
+			"contradiction-detected": "contredit une autre mémoire",
+			"textual-conflict": "modifiée sur deux machines",
+			"person-chose": "une personne a choisi",
+			"person-wrote": "une personne a écrit la note canonique",
+			"not-a-conflict": "une personne a dit que ce n'était pas un conflit",
+			"undone": "une décision automatique a été annulée",
+			"unmerged": "séparée de la note dans laquelle elle avait été fusionnée",
+			"escalated": "contredite à nouveau peu après une décision",
+			"maintainers-changed": "les mainteneurs ont changé",
+			"scoped": "l'endroit où elle s'applique a changé",
+			"conflict-announced": "annoncé sur les canaux du projet",
+			"signers-changed": "les signataires de confiance ont changé"
+		},
+		"errors": {
+			"failed": "l'action a échoué",
+			"invalid": "requête invalide",
+			"not-found": "cette mémoire n'existe plus",
+			"pin-limit": "limite d'épingles atteinte (50 par projet)",
+			"pinned": "cette mémoire est épinglée",
+			"exists": "une mémoire du même nom existe à nouveau",
+			"expired": "la durée de rétention est écoulée",
+			"stale": "déjà tranché ailleurs",
+			"no-brain": "pas encore de cerveau partagé",
+			"project-not-found": "projet introuvable",
+			"server-project": "indisponible pour un projet du serveur",
+			"no-runtime": "aucun modèle disponible",
+			"provider-refused": "le fournisseur a refusé (mode hors-ligne ?)",
+			"no-answer": "le modèle n'a rien donné d'exploitable",
+			"server-mode": "indisponible en mode serveur",
+			"not-revertible": "cette décision ne peut plus être annulée",
+			"maintainer-only": "seul un mainteneur tranche ce conflit"
+		},
+		"undo": {
+			"last": "Annuler la dernière décision automatique (dans l'heure)",
+			"undo": "Annuler",
+			"unmerge": "Séparer",
+			"done": "Décision annulée.",
+			"queued": "Décision annulée : les deux mémoires vous attendent dans « À trancher »."
+		},
+		"metrics": {
+			"title": "Comportement du cycle de vie",
+			"restores": "{{count}} mémoires restaurées cette semaine",
+			"automaticForgets": "{{count}} retirées automatiquement cette semaine",
+			"pinRate": "{{rate}} % épinglées ({{pinned}} sur {{live}})",
+			"conflicts": "{{count}} conflits en 30 jours : {{auto}} réglés par les règles, {{resolved}} par une personne",
+			"resolution": "{{hours}} h en moyenne avant qu'une personne tranche",
+			"views": "{{count}} historiques ouverts sur cet ordinateur",
+			"tooAggressive": "Beaucoup de mémoires ont été restaurées cette semaine : les retraits automatiques sont peut-être trop agressifs.",
+			"consensus": "{{count}} notes de consensus écrites en 30 jours, {{live}} toujours en usage"
+		},
+		"maintainers": {
+			"list": "Mainteneurs : {{names}}",
+			"none": "Aucun mainteneur : n'importe qui tranche un conflit qui oscille.",
+			"edit": "Modifier",
+			"placeholder": "Noms ou e-mails, séparés par des virgules",
+			"save": "Enregistrer",
+			"cancel": "Annuler",
+			"scoped": "Pour {{scope}} : {{names}}",
+			"addScope": "Ajouter une liste pour une portée",
+			"scopePlaceholder": "Module, team:nom ou branch:nom"
+		},
+		"decisions": {
+			"title": "Décisions"
+		},
+		"signers": {
+			"title": "Signataires de confiance",
+			"none": "Aucun signataire de confiance : toutes les notes vont aux agents, comme avant.",
+			"list": "De confiance : {{names}}",
+			"edit": "Modifier la liste",
+			"save": "Enregistrer",
+			"cancel": "Annuler",
+			"placeholder": "Une par ligne : nom ssh-ed25519 AAAA… ou nom empreinte GPG",
+			"hint": "Une note synchronisée par un coéquipier ne va aux agents que si son dernier commit est signé par l'une de ces clés (la clé SSH ou GPG avec laquelle son git signe déjà ses commits).",
+			"maintainerOnly": "Seul un mainteneur modifie cette liste.",
+			"unverified_one": "{{count}} mémoire n'est pas vérifiée : lisible ici, tenue hors des prompts des agents.",
+			"unverified_other": "{{count}} mémoires ne sont pas vérifiées : lisibles ici, tenues hors des prompts des agents.",
+			"rejected_one": "{{count}} modification de cette liste n'est signée par aucune clé listée : elle est ignorée.",
+			"rejected_other": "{{count}} modifications de cette liste ne sont signées par aucune clé listée : elles sont ignorées.",
+			"notSigning": "Cette machine ne signe pas ses commits : une fois synchronisées, les notes écrites ici ne sont pas vérifiées pour l'équipe. Active la signature des commits dans git (commit.gpgsign).",
+			"badge": "Non vérifiée",
+			"badgeHint": "Sa dernière modification n'est signée par aucune clé de confiance : tenue hors des prompts des agents."
+		}
 	}
 }

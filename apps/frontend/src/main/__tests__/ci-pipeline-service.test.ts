@@ -11,17 +11,27 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Project, Task, TaskStatus } from "../../shared/types";
 
 const fetchLatestRun = vi.fn();
+const fetchCommitRun = vi.fn();
 const tasks: Task[] = [];
 const projects: Project[] = [];
 const recordTaskOutcome = vi.fn();
 const handleUiEvent = vi.fn();
 const resetForNewRun = vi.fn();
+const refreshGreenCards = vi.fn();
+const rerunQaReview = vi.fn();
+vi.mock("../suite-placement/base-refresh", () => ({
+	refreshGreenCards: (...args: unknown[]) => refreshGreenCards(...args),
+}));
+vi.mock("../suite-placement/qa-rerun", () => ({
+	rerunQaReview: (...args: unknown[]) => rerunQaReview(...args),
+}));
 
 vi.mock("../ci-pipeline-providers", () => ({
 	resolvePipelineProvider: async () => ({
 		id: "github",
 		label: "GitHub Actions",
 		fetchLatestRun,
+		fetchCommitRun,
 		fetchRunErrors: async () => ["error TS2322 in src/app.ts"],
 	}),
 }));
@@ -100,6 +110,7 @@ beforeEach(() => {
 		settings: {},
 	} as unknown as Project);
 	fetchLatestRun.mockReset();
+	fetchCommitRun.mockReset();
 	recordTaskOutcome.mockReset();
 	handleUiEvent.mockReset();
 	resetForNewRun.mockReset();
@@ -136,6 +147,8 @@ describe("red build", () => {
 			{ type: "USER_RESUMED" },
 			expect.anything(),
 			expect.anything(),
+			// The app's own repair loop, not a person: in the status history.
+			"system",
 		);
 		expect(startTaskExecution).toHaveBeenCalledTimes(1);
 	});
@@ -251,5 +264,63 @@ describe("green build", () => {
 
 		expect(readPlanFile().status).toBe("human_review");
 		expect(statusChanges()).toEqual([]);
+	});
+});
+
+describe("a task's suite sent to the CI", () => {
+	const SHA = "e".repeat(40);
+	const suite = {
+		state: "pending",
+		branch: `workpilot/${SPEC}`,
+		sha: SHA,
+		pushedAt: "2026-11-22T10:00:00.000Z",
+	};
+
+	it("is judged on its pushed commit, not on the branch's latest run", async () => {
+		setTask("human_review");
+		writePlan({ status: "human_review", phases: [], ciSuite: suite });
+		fetchCommitRun.mockResolvedValue({ state: "succeeded", runId: 7, webUrl: "https://ci/7" });
+		const { ciPipelineService } = await loadService();
+
+		await ciPipelineService.refreshTask("t1");
+
+		expect(fetchCommitRun).toHaveBeenCalledWith(`workpilot/${SPEC}`, SHA);
+		expect(fetchLatestRun).not.toHaveBeenCalled();
+		expect(readPlanFile().ciSuite).toMatchObject({ state: "passed", webUrl: "https://ci/7" });
+		expect(ciPipelineService.getStatus("t1")?.state).toBe("succeeded");
+	});
+
+	it("a red commit goes down the « Build rouge » path", async () => {
+		setTask("human_review");
+		writePlan({ status: "human_review", phases: [], ciSuite: suite });
+		fetchCommitRun.mockResolvedValue({ state: "failed", runId: 8 });
+		const { ciPipelineService } = await loadService();
+
+		await ciPipelineService.refreshTask("t1");
+
+		// The red path writes BUILD_FAILURE.md and starts the repair, whose
+		// next approved build pushes again.
+		expect(readPlanFile().ciSuite).toMatchObject({ state: "failed" });
+		expect(readPlanFile().statusBeforeBuildFailed).toBe("human_review");
+		expect(startTaskExecution).toHaveBeenCalledTimes(1);
+	});
+});
+
+describe("after a merge", () => {
+	it("refreshes the other green cards, through the CI when it is followed", async () => {
+		setTask("human_review");
+		refreshGreenCards.mockReset().mockResolvedValue({ [SPEC]: "ci" });
+		rerunQaReview.mockReset().mockResolvedValue(true);
+		const { ciPipelineService } = await loadService();
+
+		const outcomes = await ciPipelineService.refreshAfterMerge(projects[0], "t0");
+
+		expect(outcomes).toEqual({ [SPEC]: "ci" });
+		const [project, list, merged, deps] = refreshGreenCards.mock.calls[0];
+		expect([project, list, merged]).toEqual([projects[0], tasks, "t0"]);
+		expect(deps.ciFollowed(projects[0])).toBe(true);
+		expect(deps.baseOf(projects[0], tasks[0])).toMatch(/^[\w./-]+$/);
+		await deps.rerunQa(tasks[0], projects[0]);
+		expect(rerunQaReview).toHaveBeenCalledWith(tasks[0], projects[0], expect.anything(), expect.any(Function));
 	});
 });

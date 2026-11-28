@@ -67,7 +67,11 @@ DRIVER_SCRIPT = Path(__file__).parent / "uia" / "driver.ps1"
 ACTIONS = ("click", "fill", "toggle", "select", "expand", "collapse")
 _REF = re.compile(r"^e\d{1,5}$")
 _CONTROL = re.compile(r"[\x00-\x1f\x7f]")
-_START_SECONDS = 60.0
+#: Until the helper's first line, `{"starting":true}`: only Windows PowerShell
+#: starting its engine, since driver.ps1 says it before reading helper.ps1. A
+#: cold, loaded machine (a CI runner starting the app under test at the same
+#: time) went past 60 s there.
+_START_SECONDS = 120.0
 #: Loading UI Automation and compiling the helper's C# the first time on a
 #: machine (driver.ps1 caches the assembly afterwards). A cold Windows machine
 #: took more than the start budget: the helper says it is starting, then

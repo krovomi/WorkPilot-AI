@@ -15,7 +15,7 @@ import type {
 import { getAppLanguage } from "../../app-language";
 import { getToolPath } from "../../cli-tool-manager";
 import { killProcessGracefully } from "../../platform";
-import { readProjectEnv } from "../../project-env-file";
+import { readProjectForgeEnv } from "../../forge/forge-credentials";
 import { parsePythonCommand } from "../../python-detector";
 import {
 	getConfiguredPythonPath,
@@ -50,7 +50,7 @@ import { GIT_BRANCH_REGEX } from "./worktree-git-refs";
 export function loadProjectEnvForSubprocess(
 	project: { path: string; autoBuildPath?: string | null },
 ): Record<string, string> {
-	return readProjectEnv(project);
+	return readProjectForgeEnv(project);
 }
 
 // Maximum PR title length (GitHub's limit is 256 characters)
@@ -213,7 +213,7 @@ export async function updateTaskStatusAfterPRCreation(
 
 	// Await status persistence to ensure completion before resolving
 	try {
-		const persisted = await persistPlanStatus(planPath, "done");
+		const persisted = await persistPlanStatus(planPath, "done", undefined, "user");
 		result.mainProjectStatus = persisted;
 		debug("Main project status persisted to done:", persisted);
 	} catch (err) {
@@ -553,7 +553,8 @@ export async function withRetry<T>(
 	// Ensure at least one attempt is made (clamp to minimum of 1)
 	const maxRetries = Math.max(1, rawMaxRetries);
 
-	for (let attempt = 1; attempt <= maxRetries; attempt++) {
+	// Each pass returns or, on the last attempt, throws: the loop has no exit.
+	for (let attempt = 1; ; attempt++) {
 		try {
 			return await operation();
 		} catch (error) {
@@ -575,7 +576,4 @@ export async function withRetry<T>(
 			await new Promise((r) => setTimeout(r, baseDelayMs * 2 ** (attempt - 1)));
 		}
 	}
-
-	// This should never be reached, but TypeScript needs it
-	throw new Error("Retry loop exited unexpectedly");
 }

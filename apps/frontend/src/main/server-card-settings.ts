@@ -35,10 +35,37 @@ export interface ServerCardSettings {
 	blockedBy?: string[] | null;
 	/** The mark of a phone-app setup card (`mobile-setup.ts`). */
 	mobileBootstrap?: TaskMetadata["mobileBootstrap"] | null;
+	/** A card set aside (« Abandonnée »), when, why, and the task it points to. */
+	abandoned?: boolean | null;
+	abandonedAt?: string | null;
+	abandonedReason?: string | null;
+	abandonedResolution?: string | null;
+	abandonedLink?: string | null;
+	/** The « Bloquée » flag, why and since when (`shared/utils/task-flag.ts`). */
+	flagged?: boolean | null;
+	flaggedReason?: string | null;
+	flaggedAt?: string | null;
+	/** The card's sub-project (Kanban lanes, `renderer/lib/kanban-lanes.ts`). */
+	area?: string | null;
+	/** The sprint the card is planned in (`shared/types/sprint.ts`). */
+	sprintId?: string | null;
+	/** The card's labels (`shared/utils/task-labels.ts`). */
+	labels?: string[] | null;
 }
 
 /** Metadata fields the server stores as they are given (`shared_board/settings.py`). */
-const LIST_KEYS = ["mobileTargets", "blockedBy"] as const;
+const LIST_KEYS = ["mobileTargets", "blockedBy", "labels"] as const;
+/** The abandon and flag fields (`task-lifecycle.ts`, `task-flag.ts`), resuming or lifting clears them; the sub-project. */
+const OPTIONAL_TEXT_KEYS = [
+	"abandonedAt",
+	"abandonedReason",
+	"abandonedResolution",
+	"abandonedLink",
+	"flaggedReason",
+	"flaggedAt",
+	"area",
+	"sprintId",
+] as const;
 
 interface CardRef {
 	project: { id: string };
@@ -84,6 +111,11 @@ export function settingsFromMetadata(
 	}
 	if ("mobileBootstrap" in metadata) {
 		settings.mobileBootstrap = metadata.mobileBootstrap ?? null;
+	}
+	if ("abandoned" in metadata) settings.abandoned = metadata.abandoned ?? null;
+	if ("flagged" in metadata) settings.flagged = metadata.flagged ?? null;
+	for (const key of OPTIONAL_TEXT_KEYS) {
+		if (key in metadata) settings[key] = metadata[key] || null;
 	}
 	return Object.keys(settings).length > 0 ? settings : null;
 }

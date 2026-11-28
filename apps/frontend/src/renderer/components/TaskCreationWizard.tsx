@@ -25,10 +25,14 @@ import { useTranslation } from "react-i18next";
 import {
 	buildEngineMetadata,
 	defaultEngineProvider,
+	engineProviders,
 	seedEngine,
 	type TaskEngine,
 } from "../../shared/utils/task-engine";
+import type { AiAccountPins } from "../../shared/types/ai-accounts";
+import { pinsForProviders } from "../../shared/utils/ai-account-pins";
 import { TaskEngineEditor } from "./task-engine/TaskEngineEditor";
+import { type PhaseCodeMode, phaseCodeModeMetadata } from "../../shared/utils/code-mode";
 import {
 	DEFAULT_AGENT_PROFILES,
 	DEFAULT_PHASE_MODELS,
@@ -45,6 +49,7 @@ import type {
 	ContextPolicy,
 	TaskMetadata,
 	TaskPriority,
+	TestPlacementMode,
 	ThinkingLevel,
 } from "../../shared/types";
 import type { MobilePlatform } from "../../shared/types/mobile";
@@ -96,6 +101,7 @@ import {
 	autoSplitCeilingFor,
 	kindFromCategory,
 } from "../../shared/utils/task-split";
+import { placementModeOf } from "./suite-placement/suite-hold";
 
 interface TaskCreationWizardProps {
 	projectId: string;
@@ -134,8 +140,6 @@ export function TaskCreationWizard({
 	const [isLoadingBranches, setIsLoadingBranches] = useState(false);
 	const [baseBranch, setBaseBranch] = useState<string>(PROJECT_DEFAULT_BRANCH);
 	const [projectDefaultBranch, setProjectDefaultBranch] = useState<string>("");
-	// Worktree isolation - default to true for safety
-	const [useWorktree, setUseWorktree] = useState(true);
 
 	// Get project path from project store
 	const projects = useProjectStore((state) => state.projects);
@@ -160,6 +164,13 @@ export function TaskCreationWizard({
 		[settings, projectProvider],
 	);
 	const [engine, setEngine] = useState<TaskEngine>(seedTaskEngine);
+	const [phaseCodeMode, setPhaseCodeMode] = useState<PhaseCodeMode>({});
+	// The AI account the card pins per provider (absent = the project's, else the default).
+	const [aiAccounts, setAiAccounts] = useState<AiAccountPins | undefined>(undefined);
+	const projectAiAccounts = useMemo(
+		() => projects.find((p) => p.id === projectId)?.settings?.aiAccounts,
+		[projects, projectId],
+	);
 	// Read through a ref by the open/reset effect below: a Settings change
 	// while the dialog is open must not reset the form the person is filling.
 	const seedTaskEngineRef = useRef(seedTaskEngine);
@@ -224,6 +235,8 @@ export function TaskCreationWizard({
 	// TDD override (per-task) - default false (inherit project setting)
 	const [tddMode, setTddMode] = useState(false);
 	const [verifyLoop, setVerifyLoop] = useState(true);
+	// Where the long suites run; undefined keeps the project's choice.
+	const [testPlacement, setTestPlacement] = useState<TestPlacementMode | undefined>();
 	// The automatic split: on, at the project's ceiling, unless the task says.
 	const [autoSplit, setAutoSplit] = useState<AutoSplitValue>(
 		DEFAULT_AUTO_SPLIT_VALUE,
@@ -294,11 +307,13 @@ export function TaskCreationWizard({
 						DEFAULT_PHASE_THINKING,
 				);
 				setEngine(draft.engine ?? seedTaskEngineRef.current());
+				setAiAccounts(undefined);
 				setImages(draft.images);
 				setReferencedFiles(draft.referencedFiles ?? []);
 				setRequireReviewBeforeCoding(draft.requireReviewBeforeCoding ?? false);
 				setTddMode(draft.tddMode ?? false);
 				setVerifyLoop(draft.verifyLoop ?? true);
+				setTestPlacement(placementModeOf(draft.testPlacement));
 				setAutoSplit(draft.autoSplit ?? DEFAULT_AUTO_SPLIT_VALUE);
 				setVerifyWindow(draft.verifyWindow ?? "");
 				setVerifyScenario(draft.verifyScenario ?? "");
@@ -341,6 +356,8 @@ export function TaskCreationWizard({
 						DEFAULT_PHASE_THINKING,
 				);
 				setEngine(seedTaskEngineRef.current());
+				setPhaseCodeMode({});
+				setAiAccounts(undefined);
 				setImages([]);
 				setReferencedFiles([]);
 				setRequireReviewBeforeCoding(false);
@@ -348,7 +365,6 @@ export function TaskCreationWizard({
 				setAcceptanceCriteria(ensureAtLeastOne([]));
 				setExtraNote("");
 				setBaseBranch(PROJECT_DEFAULT_BRANCH);
-				setUseWorktree(true);
 				setIsDraftRestored(false);
 				setShowClassification(false);
 				setShowFileExplorer(false);
@@ -439,6 +455,7 @@ export function TaskCreationWizard({
 			requireReviewBeforeCoding,
 			tddMode,
 			verifyLoop,
+			testPlacement,
 			autoSplit,
 			verifyWindow,
 			verifyScenario,
@@ -467,6 +484,7 @@ export function TaskCreationWizard({
 			requireReviewBeforeCoding,
 			tddMode,
 			verifyLoop,
+			testPlacement,
 			autoSplit,
 			verifyWindow,
 			verifyScenario,
@@ -665,6 +683,10 @@ export function TaskCreationWizard({
 			// The task owns its engine from the start: every phase's provider,
 			// model and effort, locked so nothing global replaces them later.
 			Object.assign(metadata, buildEngineMetadata(engine));
+			Object.assign(metadata, phaseCodeModeMetadata(phaseCodeMode));
+			// The card's account pins, for the providers its engine uses.
+			const pins = pinsForProviders(aiAccounts, engineProviders(engine));
+			if (pins) metadata.aiAccounts = pins;
 			if (images.length > 0) metadata.attachedImages = images;
 			if (allReferencedFiles.length > 0)
 				metadata.referencedFiles = allReferencedFiles;
@@ -672,6 +694,7 @@ export function TaskCreationWizard({
 			if (tddMode) metadata.tddMode = true;
 			// Only an explicit "off" is stored: absent means the project default.
 			if (!verifyLoop) metadata.verifyLoop = false;
+			if (testPlacement) metadata.testPlacement = testPlacement;
 			const split = autoSplitMetadata(autoSplit);
 			if (split.noSplit) metadata.noSplit = true;
 			if (split.splitMaxLines !== undefined) metadata.splitMaxLines = split.splitMaxLines;
@@ -694,8 +717,6 @@ export function TaskCreationWizard({
 			} else if (baseBranch) {
 				metadata.baseBranch = baseBranch;
 			}
-			// Pass worktree preference - false means use --direct mode
-			if (!useWorktree) metadata.useWorktree = false;
 			// Set useLocalBranch when user explicitly selects a local branch
 			// This preserves gitignored files (.env, configs) by not switching to origin
 			if (isSelectedBranchLocal) metadata.useLocalBranch = true;
@@ -757,15 +778,16 @@ export function TaskCreationWizard({
 				DEFAULT_PHASE_THINKING,
 		);
 		setEngine(seedTaskEngine());
+		setAiAccounts(undefined);
 		setImages([]);
 		setReferencedFiles([]);
 		setRequireReviewBeforeCoding(false);
 		setAutoSplit(DEFAULT_AUTO_SPLIT_VALUE);
+		setTestPlacement(undefined);
 		setContextPolicy({ ...DEFAULT_CONTEXT_POLICY });
 		setAcceptanceCriteria(ensureAtLeastOne([]));
 		setExtraNote("");
 		setBaseBranch(PROJECT_DEFAULT_BRANCH);
-		setUseWorktree(true);
 		setError(null);
 		setShowClassification(false);
 		setShowFileExplorer(false);
@@ -945,6 +967,11 @@ export function TaskCreationWizard({
 							engine={engine}
 							onChange={setEngine}
 							idPrefix="new-task-engine"
+							phaseCodeMode={phaseCodeMode}
+							onPhaseCodeModeChange={setPhaseCodeMode}
+							accounts={aiAccounts}
+							onAccountsChange={setAiAccounts}
+							inheritedAccounts={projectAiAccounts}
 							disabled={isCreating}
 						/>
 					}
@@ -988,6 +1015,8 @@ export function TaskCreationWizard({
 					autoSplitProjectDisabled={projectAutoSplit?.enabled === false}
 					verifyLoop={verifyLoop}
 					onVerifyLoopChange={setVerifyLoop}
+					testPlacement={testPlacement}
+					onTestPlacementChange={setTestPlacement}
 					verifyWindow={verifyWindow}
 					onVerifyWindowChange={setVerifyWindow}
 					verifyScenario={verifyScenario}

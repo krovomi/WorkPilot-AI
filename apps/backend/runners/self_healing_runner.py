@@ -15,6 +15,7 @@ Subcommands:
   fix         Trigger fix for a specific incident
   dismiss     Dismiss an incident
   retry       Retry a failed incident
+  bisect      Find the first bad commit of a CI/CD incident
   cancel      Cancel an in-progress operation
   config      Save mode configuration
   connect     Connect a production monitoring source
@@ -42,6 +43,19 @@ def _print_reason(operation) -> None:
         print(f"   {operation.incident.error_message}")
 
 
+def _print_outcome(operation) -> bool:
+    """Say where the incident's fix is: its card on the board, or why none."""
+    if operation.success:
+        print(
+            f"📋 Fix card {operation.incident.fix_card} filed: its build fixes the "
+            "incident in a worktree, then waits for your review."
+        )
+        return True
+    print("❌ No fix card was filed. The incident needs manual review.")
+    _print_reason(operation)
+    return False
+
+
 class SelfHealingRunner:
     """Runner for the Self-Healing Codebase + Incident Responder."""
 
@@ -63,11 +77,13 @@ class SelfHealingRunner:
 
         config = self._load_config()
         cicd_cfg = config.get("cicd", {})
+        production_cfg = config.get("production", {})
         proactive_cfg = config.get("proactive", {})
         return IncidentResponderOrchestrator(
             project_dir=self.project_dir,
             auto_fix=cicd_cfg.get("autoFixEnabled", True),
-            auto_create_pr=cicd_cfg.get("autoCreatePR", True),
+            auto_fix_production=production_cfg.get("autoFix", False) is True,
+            auto_bisect=cicd_cfg.get("autoBisect", True) is not False,
             risk_threshold=float(proactive_cfg.get("riskThreshold", 40.0)),
         )
 
@@ -77,8 +93,11 @@ class SelfHealingRunner:
         branch: str,
         test_output: str | None = None,
         ci_log_url: str | None = None,
+        good_sha: str | None = None,
     ) -> bool:
         """Run CI/CD healing for a test failure."""
+        from self_healing.cicd.green import head_sha, record_green
+
         orchestrator = self._get_orchestrator()
 
         # If no test output provided, run tests to get it
@@ -87,6 +106,8 @@ class SelfHealingRunner:
             passed, output, failing = await orchestrator.cicd.run_tests()
             if passed:
                 print("✅ All tests passing. No healing needed.")
+                # The commit a later bisect starts from (#375).
+                record_green(self.project_dir, branch, head_sha(self.project_dir))
                 return True  # This is appropriate - no healing needed when tests pass
             test_output = output
             print(f"❌ {len(failing)} test(s) failing. Starting healing pipeline...")
@@ -96,18 +117,14 @@ class SelfHealingRunner:
             branch=branch,
             test_output=test_output,
             ci_log_url=ci_log_url,
+            **({"good_sha": good_sha} if good_sha else {}),
         )
+        source_data = getattr(operation.incident, "source_data", None) or {}
+        bisect = source_data.get("bisect")
+        if isinstance(bisect, dict) and bisect.get("status") == "found":
+            print(f"🔎 First bad commit: {bisect['first_bad']}")
 
-        if operation.success:
-            print(
-                f"✅ Healing complete! Fix applied in branch: {operation.incident.fix_branch}"
-            )
-            if operation.incident.fix_pr_url:
-                print(f"   PR: {operation.incident.fix_pr_url}")
-            return True
-        print("❌ No fix applied. The incident needs manual review.")
-        _print_reason(operation)
-        return False
+        return _print_outcome(operation)
 
     async def run_production(
         self,
@@ -116,9 +133,12 @@ class SelfHealingRunner:
         error_message: str,
         stack_trace: str = "",
         occurrence_count: int = 1,
+        external_id: str = "",
+        release: str = "",
     ) -> bool:
         """Handle a production incident."""
         from self_healing.incident_responder import IncidentSource
+        from self_healing.incident_responder.orchestrator import GROUPED_STEP
 
         orchestrator = self._get_orchestrator()
 
@@ -130,24 +150,28 @@ class SelfHealingRunner:
             )
             return False
 
+        error_data: dict = {
+            "error_type": error_type,
+            "error_message": error_message,
+            "stack_trace": stack_trace,
+            "occurrence_count": occurrence_count,
+        }
+        # How the same bug is recognised from one report to the next (#372).
+        if external_id:
+            error_data["external_id"] = external_id
+        if release:
+            error_data["release"] = release
         operation = await orchestrator.handle_production_incident(
-            source=incident_source,
-            error_data={
-                "error_type": error_type,
-                "error_message": error_message,
-                "stack_trace": stack_trace,
-                "occurrence_count": occurrence_count,
-            },
+            source=incident_source, error_data=error_data
         )
 
-        if operation.success:
-            print(
-                f"✅ Incident resolved! Fix in branch: {operation.incident.fix_branch}"
-            )
+        steps = getattr(operation, "steps", None) or []
+        if steps and steps[0].name == GROUPED_STEP:
+            print(f"🔗 Grouped with incident {operation.incident.id}")
+            print(f"   {steps[0].detail}")
             return True
-        print("❌ No fix applied. The incident needs manual review.")
-        _print_reason(operation)
-        return False
+
+        return _print_outcome(operation)
 
     async def run_proactive(
         self, risk_threshold: float = 40.0, top_n: int = 10, json_output: bool = False
@@ -323,6 +347,45 @@ class SelfHealingRunner:
             )
         )
         return operation.success
+
+    async def run_bisect(self, incident_id: str, good_sha: str | None = None) -> bool:
+        """Bisect a CI/CD incident, streaming one JSON line per tested commit."""
+        from self_healing.cicd.triggers import is_commit_sha
+
+        if good_sha and not is_commit_sha(good_sha):
+            print(json.dumps({"step": "failed", "error": "invalid commit id"}))
+            return False
+        orchestrator = self._get_orchestrator()
+
+        def on_step(step, tested: int) -> None:
+            print(
+                json.dumps(
+                    {"step": "bisect", "incident_id": incident_id, "tested": tested}
+                    | step.to_dict()
+                ),
+                flush=True,
+            )
+
+        print(json.dumps({"step": "bisecting", "incident_id": incident_id}), flush=True)
+        result = await orchestrator.bisect_incident(incident_id, good_sha, on_step)
+        if result is None:
+            print(
+                json.dumps(
+                    {"step": "failed", "error": f"No CI/CD incident {incident_id}"}
+                )
+            )
+            return False
+        print(
+            json.dumps(
+                {
+                    "step": "complete",
+                    "incident_id": incident_id,
+                    "bisect": result.to_dict(),
+                }
+            ),
+            flush=True,
+        )
+        return True
 
     def run_dismiss(self, incident_id: str) -> bool:
         """Dismiss an incident (mark as resolved without fixing)."""
@@ -541,6 +604,9 @@ def main():
     )
     cicd_parser.add_argument("--ci-log-url", help="URL to CI pipeline logs")
     cicd_parser.add_argument(
+        "--good", help="Last commit known green (hex id), the start of a bisect"
+    )
+    cicd_parser.add_argument(
         "--capture",
         help="Screenshot or saved log of the failed pipeline, read by local OCR "
         "(secrets masked, prompt injections refused) instead of --test-output",
@@ -560,6 +626,12 @@ def main():
     prod_parser.add_argument("--stack-trace", default="", help="Stack trace")
     prod_parser.add_argument(
         "--occurrences", type=int, default=1, help="Occurrence count"
+    )
+    prod_parser.add_argument(
+        "--external-id", default="", help="The monitoring tool's id for this issue"
+    )
+    prod_parser.add_argument(
+        "--release", default="", help="Service version the error was seen in"
     )
 
     # Proactive subcommand
@@ -614,6 +686,13 @@ def main():
         "--incident-id", required=True, help="Incident ID to retry"
     )
 
+    # Bisect subcommand
+    bisect_parser = subparsers.add_parser(
+        "bisect", help="Find the first bad commit of a CI/CD incident"
+    )
+    bisect_parser.add_argument("--incident-id", required=True, help="Incident ID")
+    bisect_parser.add_argument("--good", help="Last commit known green (hex id)")
+
     # Cancel subcommand
     cancel_parser = subparsers.add_parser(
         "cancel", help="Cancel an in-progress operation"
@@ -640,7 +719,10 @@ def main():
         "--source", required=True, help="Source name (sentry, datadog, etc.)"
     )
     connect_parser.add_argument(
-        "--config", required=True, dest="config_json", help="JSON source configuration"
+        "--config",
+        required=True,
+        dest="config_json",
+        help="JSON source configuration, or - to read it from stdin",
     )
 
     # Disconnect subcommand
@@ -689,6 +771,7 @@ def _dispatch(
                 branch=args.branch,
                 test_output=test_output,
                 ci_log_url=args.ci_log_url,
+                good_sha=args.good,
             )
         )
     if cmd == "production":
@@ -699,6 +782,8 @@ def _dispatch(
                 error_message=args.error_message,
                 stack_trace=args.stack_trace,
                 occurrence_count=args.occurrences,
+                external_id=args.external_id,
+                release=args.release,
             )
         )
     if cmd == "proactive":
@@ -717,6 +802,10 @@ def _dispatch(
         return runner.run_operations()
     if cmd == "fix":
         return asyncio.run(runner.run_fix(incident_id=args.incident_id))
+    if cmd == "bisect":
+        return asyncio.run(
+            runner.run_bisect(incident_id=args.incident_id, good_sha=args.good)
+        )
     if cmd == "dismiss":
         return runner.run_dismiss(incident_id=args.incident_id)
     if cmd == "retry":
@@ -726,8 +815,10 @@ def _dispatch(
     if cmd == "config":
         return runner.run_config(mode=args.mode, data_json=args.data)
     if cmd == "connect":
+        # "-" reads the configuration from stdin, so a key stays off the command line.
+        config_json = sys.stdin.read() if args.config_json == "-" else args.config_json
         return asyncio.run(
-            runner.run_connect(source=args.source, config_json=args.config_json)
+            runner.run_connect(source=args.source, config_json=config_json)
         )
     if cmd == "disconnect":
         return asyncio.run(runner.run_disconnect(source=args.source))

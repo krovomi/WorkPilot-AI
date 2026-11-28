@@ -1,3 +1,10 @@
+---
+feature: Release Train
+summary: >-
+  Lance les commandes du fichier approuvé (empreinte gardée hors du projet) par vagues ; santé et
+  smoke entre services, clic par service en prod, rollback en cascade.
+---
+
 # Release Train
 
 Issue #362. The "Release Coordinator" page (Planning). Code:
@@ -27,6 +34,7 @@ field is checked:
 - Placeholders are `{environment}`, `{version}`, `{previous_version}` and `{service}` only. Their values must match `[\w.+-]{1,80}`, so nothing a shell or `cmd.exe` reads as syntax gets in.
 - `path` stays inside the project. A service's default folder is the one where its manifest was found (any stack, `manifests.py`).
 - `pass_env` names the project variables a service's commands receive.
+- `exposure` (`artifact`, `fail_on`, `timeout`) names the build output a service ships, a path inside its folder, for REA's static audit ([rea.md](rea.md)). It is not a command: nothing in it runs.
 
 A deployment run by CI is a command too: `gh workflow run`, `glab ci run` or
 `az pipelines run`, followed by `gh run watch --exit-status` in `smoke`. Any
@@ -70,7 +78,7 @@ lock whose process is gone is taken over, and the step it was on becomes
 For each service, in order:
 
 1. **Confirmation.** A service waits for a click when its environment is marked `production: true`, when it is `external: true` (the person confirms it is ready, and no command runs), or when the run is an express deploy.
-2. **Steps.** `deploy`, then `health`, then `smoke`. A step that fails stops the run.
+2. **Steps.** `exposure` when the file declares it, then `deploy`, then `health`, then `smoke`. A step that fails stops the run. `exposure` runs the pinned REA (`audit-release-exposure`) on the artifact, never the artifact itself: a check exposed at `fail_on` (`high` by default) or above fails it, `unknown` and `not_assessed` never do, and an artifact that is missing or REA unable to run is an error. Under the project's strict offline policy only an installed REA runs. A service stopped at `exposure` never deployed, so a rollback skips its rollback command.
 3. **Flags.** A flag goes on once every service it names has shipped.
 
 A command runs without a shell (S4), in the service's folder, in its own

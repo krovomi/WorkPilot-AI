@@ -11,6 +11,7 @@ import type {
 	Task,
 	TaskDraft,
 	TaskMetadata,
+	TaskOrderColumn,
 	TaskOrderState,
 	TaskPipelineStatus,
 	TaskStatus,
@@ -19,12 +20,14 @@ import { CARD_EDIT_CONFLICT } from "../../shared/types/team-room";
 import { isSubtaskDone } from "../../shared/progress";
 import { debugLog, debugWarn } from "../../shared/utils/debug-logger";
 import {
+	type AbandonChoice,
 	buildAbandonMetadata,
 	buildResumeMetadata,
 } from "../../shared/utils/task-lifecycle";
 import { extractSubtaskFiles } from "../../shared/utils/subtask-files";
 import { subtaskBlockFields } from "../../shared/utils/subtask-unblock";
 import { isMeaningfulFeatureTitle } from "../../shared/utils/task-title";
+import { readyToStart } from "../lib/start-readiness";
 
 interface TaskState {
 	tasks: Task[];
@@ -63,14 +66,14 @@ interface TaskState {
 	// Task order actions for kanban drag-and-drop reordering
 	setTaskOrder: (order: TaskOrderState) => void;
 	reorderTasksInColumn: (
-		status: TaskStatus,
+		status: TaskOrderColumn,
 		activeId: string,
 		overId: string,
 	) => void;
 	moveTaskToColumnTop: (
 		taskId: string,
-		targetStatus: TaskStatus,
-		sourceStatus?: TaskStatus,
+		targetStatus: TaskOrderColumn,
+		sourceStatus?: TaskOrderColumn,
 	) => void;
 	loadTaskOrder: (projectId: string) => void;
 	saveTaskOrder: (projectId: string) => boolean;
@@ -273,18 +276,15 @@ function getTaskOrderKey(projectId: string): string {
 /**
  * Create an empty task order state with all status columns
  */
+const TASK_ORDER_COLUMNS: readonly TaskOrderColumn[] = [
+	"backlog", "queue", "in_progress", "ai_review", "human_review", "failed",
+	"build_failed", "pr_created", "done", "abandoned", "error",
+];
+
 function createEmptyTaskOrder(): TaskOrderState {
-	return {
-		backlog: [],
-		queue: [],
-		in_progress: [],
-		ai_review: [],
-		human_review: [],
-		build_failed: [],
-		done: [],
-		pr_created: [],
-		error: [],
-	};
+	const order: Partial<Record<TaskOrderColumn, string[]>> = {};
+	for (const column of TASK_ORDER_COLUMNS) order[column] = [];
+	return order as TaskOrderState;
 }
 
 export const useTaskStore = create<TaskState>((set, get) => ({
@@ -851,35 +851,12 @@ export const useTaskStore = create<TaskState>((set, get) => ({
 		const validateAndMergeOrder = (
 			parsed: Record<string, unknown>,
 		): TaskOrderState => {
-			const emptyOrder = createEmptyTaskOrder();
-
-			return {
-				backlog: isValidColumnArray(parsed.backlog)
-					? parsed.backlog
-					: emptyOrder.backlog,
-				queue: isValidColumnArray(parsed.queue)
-					? parsed.queue
-					: emptyOrder.queue,
-				in_progress: isValidColumnArray(parsed.in_progress)
-					? parsed.in_progress
-					: emptyOrder.in_progress,
-				ai_review: isValidColumnArray(parsed.ai_review)
-					? parsed.ai_review
-					: emptyOrder.ai_review,
-				human_review: isValidColumnArray(parsed.human_review)
-					? parsed.human_review
-					: emptyOrder.human_review,
-				build_failed: isValidColumnArray(parsed.build_failed)
-					? parsed.build_failed
-					: emptyOrder.build_failed,
-				done: isValidColumnArray(parsed.done) ? parsed.done : emptyOrder.done,
-				pr_created: isValidColumnArray(parsed.pr_created)
-					? parsed.pr_created
-					: emptyOrder.pr_created,
-				error: isValidColumnArray(parsed.error)
-					? parsed.error
-					: emptyOrder.error,
-			};
+			const order: Partial<Record<TaskOrderColumn, string[]>> = {};
+			for (const c of TASK_ORDER_COLUMNS) {
+				const value = parsed[c];
+				order[c] = isValidColumnArray(value) ? value : [];
+			}
+			return order as TaskOrderState;
 		};
 
 		// Helper function to handle parsed data
@@ -1136,6 +1113,8 @@ export async function submitReview(
  */
 export interface PersistStatusResult {
 	success: boolean;
+	/** The pre-analysis held the card back: its dialog says why, no error to show. */
+	held?: boolean;
 	worktreeExists?: boolean;
 	worktreePath?: string;
 	error?: string;
@@ -1148,16 +1127,20 @@ export interface PersistStatusResult {
 export async function persistTaskStatus(
 	taskId: string,
 	status: TaskStatus,
-	options?: { forceCleanup?: boolean; skipPrCreation?: boolean },
+	options?: { forceCleanup?: boolean; skipPrCreation?: boolean; skipReadiness?: boolean },
 ): Promise<PersistStatusResult> {
 	const store = useTaskStore.getState();
+	const { skipReadiness, ...forwarded } = options ?? {};
 
 	try {
+		// A first start goes through the pre-analysis (lib/start-readiness.ts).
+		const task = status === "in_progress" && !skipReadiness ? store.tasks.find((t) => t.id === taskId) : undefined;
+		if (task && !(await readyToStart(task))) return { success: false, held: true };
 		// Persist to file first (don't optimistically update for 'done' status)
 		const result = await globalThis.electronAPI.updateTaskStatus(
 			taskId,
 			status,
-			options,
+			options && skipReadiness !== undefined ? forwarded : options,
 		);
 
 		if (!result.success) {
@@ -1347,7 +1330,7 @@ export async function deleteTask(
  */
 export async function abandonTask(
 	taskId: string,
-	reason?: string,
+	choice?: AbandonChoice | string,
 ): Promise<{ success: boolean; error?: string }> {
 	const store = useTaskStore.getState();
 	const task = store.tasks.find((t) => t.id === taskId || t.specId === taskId);
@@ -1363,7 +1346,7 @@ export async function abandonTask(
 	}
 
 	try {
-		const patch = buildAbandonMetadata(reason);
+		const patch = buildAbandonMetadata(choice);
 		const result = await globalThis.electronAPI.updateTask(taskId, {
 			metadata: patch,
 		});
@@ -1438,6 +1421,9 @@ export async function restoreTask(
 	taskId: string,
 ): Promise<{ success: boolean; error?: string }> {
 	try {
+		// The backup only lived in memory for BACKUP_EXPIRY_MS; nothing else
+		// expires it, so drop the old ones before looking.
+		cleanupExpiredBackups();
 		const backup = deletedTasksBackup.get(taskId);
 		if (!backup) {
 			return { success: false, error: "Task backup not found or expired" };
@@ -1484,16 +1470,6 @@ export async function restoreTask(
 }
 
 /**
- * Get backed up task for undo functionality
- */
-export function getDeletedTaskBackup(
-	taskId: string,
-): { task: Task; timestamp: number } | undefined {
-	cleanupExpiredBackups();
-	return deletedTasksBackup.get(taskId);
-}
-
-/**
  * Delete multiple tasks
  * Permanently removes tasks from the project
  */
@@ -1505,6 +1481,7 @@ export async function deleteTasks(
 
 	try {
 		// Create backups before deletion
+		cleanupExpiredBackups();
 		const now = Date.now();
 		for (const taskId of taskIds) {
 			const task = store.tasks.find(
@@ -1658,14 +1635,6 @@ export function clearDraft(projectId: string): void {
 }
 
 /**
- * Check if a draft exists for a project
- */
-export function hasDraft(projectId: string): boolean {
-	const key = getDraftKey(projectId);
-	return localStorage.getItem(key) !== null;
-}
-
-/**
  * Check if a draft has any meaningful content (title, description, or images)
  */
 export function isDraftEmpty(draft: TaskDraft | null): boolean {
@@ -1681,19 +1650,6 @@ export function isDraftEmpty(draft: TaskDraft | null): boolean {
 		!draft.acceptanceCriteria?.length &&
 		!draft.extraNote?.trim()
 	);
-}
-
-// ============================================
-// GitHub Issue Linking Helpers
-// ============================================
-
-/**
- * Find a task by GitHub issue number
- * Used to check if a task already exists for a GitHub issue
- */
-export function getTaskByGitHubIssue(issueNumber: number): Task | undefined {
-	const store = useTaskStore.getState();
-	return store.tasks.find((t) => t.metadata?.githubIssueNumber === issueNumber);
 }
 
 // ============================================
@@ -1727,14 +1683,6 @@ export function isIncompleteHumanReview(task: Task): boolean {
 
 	// If 0 completed subtasks, this task crashed before implementation
 	return completedSubtasks === 0;
-}
-
-/**
- * Get the count of completed subtasks for a task
- */
-export function getCompletedSubtaskCount(task: Task): number {
-	if (!task.subtasks || task.subtasks.length === 0) return 0;
-	return task.subtasks.filter((s) => s.status === "completed").length;
 }
 
 /**

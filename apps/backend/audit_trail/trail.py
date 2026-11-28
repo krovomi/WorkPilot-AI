@@ -262,9 +262,11 @@ class AuditTrail:
 
         # Round-trip through JSON early so we fail fast if the payload
         # isn't serialisable. We use the strict encoder here (no `default=`
-        # fallback) to catch sets, custom objects, etc.
+        # fallback) to catch sets, custom objects, etc. — and no NaN or
+        # infinity, which Python writes as bare `NaN`: not JSON, so the line
+        # could no longer be answered to the panel nor exported.
         try:
-            json.dumps(clean_payload, sort_keys=True)
+            json.dumps(clean_payload, sort_keys=True, allow_nan=False)
         except (TypeError, ValueError) as e:
             raise ValueError(f"payload is not JSON-serialisable: {e}") from e
 

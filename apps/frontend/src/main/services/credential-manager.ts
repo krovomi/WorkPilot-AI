@@ -5,17 +5,45 @@
  * Fournit une interface unifiée pour le frontend via IPC
  */
 
-import { execFile } from "node:child_process";
+import { exec, execFile } from "node:child_process";
 import { EventEmitter } from "node:events";
+import { existsSync } from "node:fs";
+import { readFile } from "node:fs/promises";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { promisify } from "node:util";
+import type { ClaudeProfile } from "../../shared/types/agent";
 import type { ProfilesFile } from "../../shared/types/profile";
 import { detectProvider } from "../../shared/utils/provider-detection";
+import { getClaudeProfileManager } from "../claude-profile-manager";
 import { readSettingsFile, writeSettingsFile } from "../settings-utils";
 import { findExecutable } from "../env-utils";
 import { isMacOS, isWindows } from "../platform";
 import { loadProfilesFile, saveProfilesFile } from "../utils/profile-manager";
+import {
+	gatewayKeyCheck,
+	NON_CLAUDE_PROVIDERS,
+	PROVIDER_BASE_URL_ENV_VARS,
+	PROVIDER_KEY_ENV_VARS,
+	providerPageEnv,
+} from "./provider-settings-keys";
+import { loadBetterSqlite } from "./windsurf-sqlite";
+import { defaultAccountKey, settingsApiKey } from "../ai-accounts/ai-account-key";
+import { loginAccountEnv } from "../ai-accounts/login-accounts";
+import { defaultAccountEnv } from "../ai-accounts/account-env";
 
 const execFileAsync = promisify(execFile);
+
+/**
+ * `<base>/v1/models` for an OpenAI-compatible API. A profile's base URL may
+ * already end in `/v1` (the presets in `shared/constants/api-profiles.ts` do):
+ * appending another `/v1` asked for `/v1/v1/models`, a 404, and the connection
+ * test failed for every preset profile.
+ */
+function modelsUrl(baseUrl: string | undefined, fallback: string): string {
+	const root = (baseUrl?.trim() || fallback).replace(/\/+$/, "");
+	return `${root.replace(/\/v1$/, "")}/v1/models`;
+}
 
 export async function checkCodexCliLoginStatus(): Promise<boolean> {
 	const codexPath = findExecutable("codex");
@@ -170,13 +198,14 @@ export class CredentialManager extends EventEmitter {
 	/**
 	 * Charger les profils depuis profiles.json
 	 */
-	private async loadProfiles(): Promise<void> {
-		this.profiles = await loadProfilesFile();
+	private async loadProfiles(): Promise<ProfilesFile> {
+		const profiles = await loadProfilesFile();
+		this.profiles = profiles;
 
 		// Déterminer le credential actif basé sur le profil actif
-		if (this.profiles?.activeProfileId) {
-			const activeProfile = this.profiles.profiles.find(
-				(p) => p.id === this.profiles?.activeProfileId,
+		if (profiles.activeProfileId) {
+			const activeProfile = profiles.profiles.find(
+				(p) => p.id === profiles.activeProfileId,
 			);
 			if (activeProfile) {
 				this.activeCredential = {
@@ -191,7 +220,7 @@ export class CredentialManager extends EventEmitter {
 					isActive: true,
 					lastValidated: Date.now(),
 				};
-				return;
+				return profiles;
 			}
 		}
 
@@ -233,6 +262,7 @@ export class CredentialManager extends EventEmitter {
 		} catch {
 			// settings file not available — no restoration needed
 		}
+		return profiles;
 	}
 
 	/**
@@ -278,18 +308,16 @@ export class CredentialManager extends EventEmitter {
 		try {
 			if (type === "api_key" && profileId) {
 				// Mode API Key - utiliser le profil spécifié
-				if (!this.profiles) await this.loadProfiles();
+				const profiles = this.profiles ?? (await this.loadProfiles());
 
-				const profile = this.profiles?.profiles.find((p) => p.id === profileId);
+				const profile = profiles.profiles.find((p) => p.id === profileId);
 				if (!profile) {
 					throw new Error(`Profile ${profileId} not found`);
 				}
 
 				// Mettre à jour le profil actif dans profiles.json
-				if (this.profiles) {
-					this.profiles.activeProfileId = profileId;
-					await saveProfilesFile(this.profiles);
-				}
+				profiles.activeProfileId = profileId;
+				await saveProfilesFile(profiles);
 
 				// Mettre à jour le credential actif
 				this.activeCredential = {
@@ -306,12 +334,9 @@ export class CredentialManager extends EventEmitter {
 				};
 			} else if (type === "oauth") {
 				// Mode OAuth - désactiver le profil actif
-				if (!this.profiles) await this.loadProfiles();
-
-				if (this.profiles) {
-					this.profiles.activeProfileId = null;
-					await saveProfilesFile(this.profiles);
-				}
+				const profiles = this.profiles ?? (await this.loadProfiles());
+				profiles.activeProfileId = null;
+				await saveProfilesFile(profiles);
 
 				this.activeCredential = {
 					provider,
@@ -382,10 +407,7 @@ export class CredentialManager extends EventEmitter {
 		try {
 			// Cas spécial pour Copilot - utilise GitHub CLI auth
 			if (provider === "copilot") {
-				const { exec } = require("node:child_process");
-				const { promisify } = require("node:util");
 				const execAsync = promisify(exec);
-
 				try {
 					// Tester si GitHub CLI est installé
 					const { stdout: version } = await execAsync("gh --version", {
@@ -541,22 +563,21 @@ export class CredentialManager extends EventEmitter {
 			}
 
 			// Pour les autres providers (openai, mistral, google, deepseek, grok, ollama, etc.)
+			// Source 0: the default account of Settings → AI accounts (its own endpoint).
 			// Source 1: Chercher un profil API dans profiles.json (Custom Endpoints)
-			let apiKey: string | undefined;
+			let apiKey: string | undefined = defaultAccountKey(provider);
 			let baseUrl: string | undefined;
 			let profileName: string | undefined;
-			let _source = "";
-
+			if (apiKey) profileName = provider;
 			try {
 				const profilesFile = await loadProfilesFile();
 				const apiProfile = profilesFile.profiles.find((p) => {
 					return detectProvider(p.baseUrl) === provider;
 				});
-				if (apiProfile?.apiKey && !isPlaceholderApiKey(apiProfile.apiKey)) {
+				if (!apiKey && apiProfile?.apiKey && !isPlaceholderApiKey(apiProfile.apiKey)) {
 					apiKey = apiProfile.apiKey;
 					baseUrl = apiProfile.baseUrl;
 					profileName = apiProfile.name;
-					_source = `API profile (${profileName || "unnamed"})`;
 				}
 			} catch {
 				// profiles.json not available
@@ -566,33 +587,8 @@ export class CredentialManager extends EventEmitter {
 			// Try multiple possible settings keys for each provider
 			if (!apiKey) {
 				try {
-					const settings = readSettingsFile();
-					const globalKeyOptions: Record<string, string[]> = {
-						openai: ["globalOpenAIApiKey"],
-						google: ["globalGoogleDeepMindApiKey", "globalGoogleApiKey"],
-						gemini: ["globalGoogleApiKey", "globalGoogleDeepMindApiKey"],
-						mistral: ["globalMistralApiKey"],
-						deepseek: ["globalDeepSeekApiKey"],
-						grok: ["globalGrokApiKey"],
-						meta: ["globalMetaApiKey"],
-						aws: ["globalAWSApiKey"],
-						cursor: ["globalCursorApiKey"],
-					};
-					const settingsKeys = globalKeyOptions[provider] || [];
-					if (settings) {
-						for (const settingsKey of settingsKeys) {
-							// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-							const globalKey = (settings as any)[settingsKey] as
-								| string
-								| undefined;
-							if (globalKey?.trim()) {
-								apiKey = globalKey.trim();
-								profileName = provider;
-								_source = `global settings (${settingsKey})`;
-								break;
-							}
-						}
-					}
+					apiKey = settingsApiKey(provider, readSettingsFile()) || undefined;
+					if (apiKey) profileName = provider;
 				} catch {
 					// settings file not available
 				}
@@ -607,7 +603,6 @@ export class CredentialManager extends EventEmitter {
 				apiKey = this.activeCredential.credentials.apiKey;
 				baseUrl = this.activeCredential.credentials.baseUrl;
 				profileName = this.activeCredential.credentials.profileName;
-				_source = "active credential";
 			}
 
 			if (!apiKey) {
@@ -617,39 +612,23 @@ export class CredentialManager extends EventEmitter {
 				};
 			}
 
-			// Debug: log which source provided the key (mask most of the key for security)
-			const _maskedKey =
-				apiKey.length > 8 ? `${apiKey.substring(0, 8)}...` : "***";
-
 			// Tester la connexion avec le endpoint approprié pour chaque provider
-			try {
-				const testResult = await this.testApiKeyConnection(
-					provider,
-					apiKey,
-					baseUrl,
-				);
-				if (testResult.success) {
-					return {
-						success: true,
-						message: `${provider} connection successful`,
-						details: {
-							method: "API Key",
-							profileName: profileName || provider,
-							...testResult.details,
-						},
-					};
-				} else {
-					return testResult;
-				}
-			} catch (testError) {
-				return {
-					success: false,
-					message:
-						testError instanceof Error
-							? testError.message
-							: `${provider} connection test failed`,
-				};
-			}
+			// (testApiKeyConnection never rejects: a failure is its answer).
+			const testResult = await this.testApiKeyConnection(
+				provider,
+				apiKey,
+				baseUrl,
+			);
+			if (!testResult.success) return testResult;
+			return {
+				success: true,
+				message: `${provider} connection successful`,
+				details: {
+					method: "API Key",
+					profileName: profileName || provider,
+					...testResult.details,
+				},
+			};
 		} catch (error) {
 			console.error(`[CredentialManager] Test failed for ${provider}:`, error);
 			return {
@@ -703,15 +682,12 @@ export class CredentialManager extends EventEmitter {
 			}
 
 			// Source 3: Try auto-detecting from local Windsurf IDE
+			// (detectWindsurfLocalToken never rejects: it answers success: false.)
 			if (!serviceKey) {
-				try {
-					const detected = await detectWindsurfLocalToken();
-					if (detected.success && detected.apiKey) {
-						serviceKey = detected.apiKey;
-						source = "local IDE detection";
-					}
-				} catch {
-					// Detection failed
+				const detected = await detectWindsurfLocalToken();
+				if (detected.success && detected.apiKey) {
+					serviceKey = detected.apiKey;
+					source = "local IDE detection";
 				}
 			}
 
@@ -747,28 +723,27 @@ export class CredentialManager extends EventEmitter {
 				}
 			}
 
-			// Strategy 2: Bearer header (works for personal sk-ws- keys and SSO/JWT tokens)
-			// Also retry on 400 (bad request) — GetTeamCreditBalance returns 400 for personal sk-ws- keys
-			if (!resp?.ok) {
-				resp = await fetch(
-					"https://server.codeium.com/api/v1/GetTeamCreditBalance",
-					{
-						method: "POST",
-						headers: {
-							"Content-Type": "application/json",
-							Authorization: `Bearer ${serviceKey}`,
-						},
-						body: "{}",
-						signal: AbortSignal.timeout(10000),
+			// Strategy 2: Bearer header (works for personal sk-ws- keys and SSO/JWT tokens).
+			// Reached for a JWT, or after strategy 1 was refused (GetTeamCreditBalance
+			// answers 400 to a personal sk-ws- key sent in the body).
+			resp = await fetch(
+				"https://server.codeium.com/api/v1/GetTeamCreditBalance",
+				{
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+						Authorization: `Bearer ${serviceKey}`,
 					},
-				);
-				if (resp.ok) {
-					return {
-						success: true,
-						message: "Windsurf connection successful",
-						details: { method: "Bearer", source, authType: "api_key" },
-					};
-				}
+					body: "{}",
+					signal: AbortSignal.timeout(10000),
+				},
+			);
+			if (resp.ok) {
+				return {
+					success: true,
+					message: "Windsurf connection successful",
+					details: { method: "Bearer", source, authType: "api_key" },
+				};
 			}
 
 			// Strategy 3: GetUser endpoint (SSO fallback — works for personal tokens)
@@ -800,24 +775,17 @@ export class CredentialManager extends EventEmitter {
 			// For personal sk-ws- keys, these team/enterprise endpoints may always return 4xx.
 			// Trust the local IDE state.vscdb as the source of truth instead.
 			if (source !== "local IDE detection") {
-				try {
-					const detected = await detectWindsurfLocalToken();
-					if (detected.success && detected.apiKey) {
-						return {
-							success: true,
-							message: "Windsurf token verified from local IDE",
-							details: {
-								method: "local IDE",
-								source: "local IDE detection",
-								authType: "sso",
-							},
-						};
-					}
-				} catch (e) {
-					console.warn(
-						"[CredentialManager] Windsurf local IDE detection failed:",
-						e,
-					);
+				const detected = await detectWindsurfLocalToken();
+				if (detected.success && detected.apiKey) {
+					return {
+						success: true,
+						message: "Windsurf token verified from local IDE",
+						details: {
+							method: "local IDE",
+							source: "local IDE detection",
+							authType: "sso",
+						},
+					};
 				}
 			}
 
@@ -849,7 +817,7 @@ export class CredentialManager extends EventEmitter {
 	 * Tester la connexion API pour un provider donné avec une clé API
 	 * Utilise les endpoints spécifiques à chaque provider pour valider la connexion.
 	 */
-	private async testApiKeyConnection(
+	async testApiKeyConnection(
 		provider: string,
 		apiKey: string,
 		baseUrl?: string,
@@ -858,39 +826,35 @@ export class CredentialManager extends EventEmitter {
 		try {
 			let response: Response;
 			const timeout = AbortSignal.timeout(10000);
+			const gatewayCheck = gatewayKeyCheck(provider, apiKey, timeout);
 
-			switch (provider) {
+			if (gatewayCheck) response = await gatewayCheck;
+			else switch (provider) {
 				case "openai":
-					response = await fetch(
-						`${baseUrl || "https://api.openai.com"}/v1/models`,
-						{
-							headers: { Authorization: `Bearer ${apiKey}` },
-							signal: timeout,
-						},
-					);
+					response = await fetch(modelsUrl(baseUrl, "https://api.openai.com"), {
+						headers: { Authorization: `Bearer ${apiKey}` },
+						signal: timeout,
+					});
 					break;
 
 				case "google":
 				case "gemini":
-					response = await fetch(
-						`https://generativelanguage.googleapis.com/v1/models?key=${apiKey}`,
-						{ signal: timeout },
-					);
+					response = await fetch("https://generativelanguage.googleapis.com/v1/models", {
+						headers: { "x-goog-api-key": apiKey },
+						signal: timeout,
+					});
 					break;
 
 				case "mistral":
-					response = await fetch(
-						`${baseUrl || "https://api.mistral.ai"}/v1/models`,
-						{
-							headers: { Authorization: `Bearer ${apiKey}` },
-							signal: timeout,
-						},
-					);
+					response = await fetch(modelsUrl(baseUrl, "https://api.mistral.ai"), {
+						headers: { Authorization: `Bearer ${apiKey}` },
+						signal: timeout,
+					});
 					break;
 
 				case "deepseek":
 					response = await fetch(
-						`${baseUrl || "https://api.deepseek.com"}/v1/models`,
+						modelsUrl(baseUrl, "https://api.deepseek.com"),
 						{
 							headers: { Authorization: `Bearer ${apiKey}` },
 							signal: timeout,
@@ -903,15 +867,6 @@ export class CredentialManager extends EventEmitter {
 						headers: { Authorization: `Bearer ${apiKey}` },
 						signal: timeout,
 					});
-					break;
-
-				case "ollama":
-					response = await fetch(
-						`${baseUrl || "http://localhost:11434"}/api/tags`,
-						{
-							signal: timeout,
-						},
-					);
 					break;
 
 				default:
@@ -968,125 +923,113 @@ export class CredentialManager extends EventEmitter {
 		isAuthenticated: boolean;
 		profileName?: string;
 	}> {
+		// Each source below catches its own failure and moves on to the next.
+		// Source 0: Check app's Claude Profile Manager (primary source)
+		// This checks ~/.claude-profiles/{profileId}/.credentials.json and Keychain
 		try {
-			// Source 0: Check app's Claude Profile Manager (primary source)
-			// This checks ~/.claude-profiles/{profileId}/.credentials.json and Keychain
+			const profileManager = getClaudeProfileManager();
+			// Undefined at runtime when the manager holds no profile yet.
+			const activeProfile = profileManager.getActiveProfile() as
+				| ClaudeProfile
+				| undefined;
+			if (activeProfile && profileManager.hasValidAuth(activeProfile.id)) {
+				return {
+					isAuthenticated: true,
+					profileName:
+						activeProfile.email || activeProfile.name || "Claude OAuth",
+				};
+			}
+			// Also check all profiles, not just active. (This called a
+			// `getProfiles()` the manager does not have, so a signed-in profile
+			// that was not the active one was never found.)
+			for (const profile of profileManager.getSettings().profiles) {
+				if (profileManager.hasValidAuth(profile.id)) {
+					return {
+						isAuthenticated: true,
+						profileName: profile.email || profile.name || "Claude OAuth",
+					};
+				}
+			}
+		} catch {
+			// Profile manager not initialized yet
+		}
+
+		// Source 1: Check Claude CLI profiles — try multiple paths (Windows + Unix)
+		const candidatePaths = [
+			// Windows: %APPDATA%\claude\profiles.json
+			process.env.APPDATA
+				? join(process.env.APPDATA, "claude", "profiles.json")
+				: null,
+			// Unix/macOS: ~/.config/claude/profiles.json
+			join(homedir(), ".config", "claude", "profiles.json"),
+			// Also check Claude Code config
+			process.env.APPDATA
+				? join(process.env.APPDATA, "claude-code", "profiles.json")
+				: null,
+			join(homedir(), ".config", "claude-code", "profiles.json"),
+		].filter(Boolean) as string[];
+
+		for (const configPath of candidatePaths) {
 			try {
-				const {
-					getClaudeProfileManager,
-				} = require("../claude-profile-manager");
-				const profileManager = getClaudeProfileManager();
-				if (profileManager) {
-					const activeProfile = profileManager.getActiveProfile();
-					if (activeProfile && profileManager.hasValidAuth(activeProfile.id)) {
+				const profilesData = await readFile(configPath, "utf-8");
+				const profiles = JSON.parse(profilesData);
+
+				if (profiles.profiles && Array.isArray(profiles.profiles)) {
+					const oauthProfile = profiles.profiles.find(
+						(profile: { isAuthenticated?: boolean }) =>
+							profile.isAuthenticated === true,
+					);
+
+					if (oauthProfile) {
 						return {
 							isAuthenticated: true,
-							profileName:
-								activeProfile.email || activeProfile.name || "Claude OAuth",
+							profileName: oauthProfile.name,
 						};
 					}
-					// Also check all profiles, not just active
-					const allProfiles = profileManager.getProfiles?.() || [];
-					for (const profile of allProfiles) {
-						if (profileManager.hasValidAuth(profile.id)) {
-							return {
-								isAuthenticated: true,
-								profileName: profile.email || profile.name || "Claude OAuth",
-							};
-						}
-					}
 				}
 			} catch {
-				// Profile manager not initialized yet
+				// This path doesn't exist, try next
 			}
-
-			const fs = require("node:fs").promises;
-			const path = require("node:path");
-			const os = require("node:os");
-
-			// Source 1: Check Claude CLI profiles — try multiple paths (Windows + Unix)
-			const candidatePaths = [
-				// Windows: %APPDATA%\claude\profiles.json
-				process.env.APPDATA
-					? path.join(process.env.APPDATA, "claude", "profiles.json")
-					: null,
-				// Unix/macOS: ~/.config/claude/profiles.json
-				path.join(os.homedir(), ".config", "claude", "profiles.json"),
-				// Also check Claude Code config
-				process.env.APPDATA
-					? path.join(process.env.APPDATA, "claude-code", "profiles.json")
-					: null,
-				path.join(os.homedir(), ".config", "claude-code", "profiles.json"),
-			].filter(Boolean) as string[];
-
-			for (const configPath of candidatePaths) {
-				try {
-					const profilesData = await fs.readFile(configPath, "utf-8");
-					const profiles = JSON.parse(profilesData);
-
-					if (profiles.profiles && Array.isArray(profiles.profiles)) {
-						const oauthProfile = profiles.profiles.find(
-							(profile: { isAuthenticated?: boolean }) =>
-								profile.isAuthenticated === true,
-						);
-
-						if (oauthProfile) {
-							return {
-								isAuthenticated: true,
-								profileName: oauthProfile.name,
-							};
-						}
-					}
-				} catch {
-					// This path doesn't exist, try next
-				}
-			}
-
-			// Source 2: Check app's own profiles.json for Anthropic API profile
-			try {
-				const profilesFile = await loadProfilesFile();
-				const anthropicProfile = profilesFile.profiles.find((p) => {
-					const detected = detectProvider(p.baseUrl);
-					return detected === "anthropic";
-				});
-				if (
-					anthropicProfile?.apiKey &&
-					!isPlaceholderApiKey(anthropicProfile.apiKey)
-				) {
-					return {
-						isAuthenticated: true,
-						profileName: anthropicProfile.name || "Anthropic (API Key)",
-					};
-				}
-			} catch {
-				// profiles.json not available
-			}
-
-			// Source 3: Check global settings for globalAnthropicApiKey
-			try {
-				const settings = readSettingsFile();
-				// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-				const anthropicKey = (settings as any)?.globalAnthropicApiKey as
-					| string
-					| undefined;
-				if (anthropicKey?.trim()) {
-					return {
-						isAuthenticated: true,
-						profileName: "Anthropic (API Key)",
-					};
-				}
-			} catch {
-				// settings not available
-			}
-
-			return { isAuthenticated: false };
-		} catch (error) {
-			console.warn(
-				"[CredentialManager] Failed to check Claude OAuth status:",
-				error,
-			);
-			return { isAuthenticated: false };
 		}
+
+		// Source 2: Check app's own profiles.json for Anthropic API profile
+		try {
+			const profilesFile = await loadProfilesFile();
+			const anthropicProfile = profilesFile.profiles.find((p) => {
+				const detected = detectProvider(p.baseUrl);
+				return detected === "anthropic";
+			});
+			if (
+				anthropicProfile?.apiKey &&
+				!isPlaceholderApiKey(anthropicProfile.apiKey)
+			) {
+				return {
+					isAuthenticated: true,
+					profileName: anthropicProfile.name || "Anthropic (API Key)",
+				};
+			}
+		} catch {
+			// profiles.json not available
+		}
+
+		// Source 3: Check global settings for globalAnthropicApiKey
+		try {
+			const settings = readSettingsFile();
+			// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
+			const anthropicKey = (settings as any)?.globalAnthropicApiKey as
+				| string
+				| undefined;
+			if (anthropicKey?.trim()) {
+				return {
+					isAuthenticated: true,
+					profileName: "Anthropic (API Key)",
+				};
+			}
+		} catch {
+			// settings not available
+		}
+
+		return { isAuthenticated: false };
 	}
 
 	/**
@@ -1161,18 +1104,15 @@ export class CredentialManager extends EventEmitter {
 			}
 
 			// Source 3: Auto-detect from local Windsurf IDE (SSO enterprise users)
+			// (detectWindsurfLocalToken never rejects: it answers success: false.)
 			if (!serviceKey) {
-				try {
-					const detected = await detectWindsurfLocalToken();
-					if (detected.success && detected.apiKey) {
-						serviceKey = detected.apiKey;
-						profileName = detected.userName
-							? `Windsurf (${detected.userName})`
-							: "Windsurf (SSO)";
-						profileId = "windsurf-sso";
-					}
-				} catch {
-					// Detection failed
+				const detected = await detectWindsurfLocalToken();
+				if (detected.success && detected.apiKey) {
+					serviceKey = detected.apiKey;
+					profileName = detected.userName
+						? `Windsurf (${detected.userName})`
+						: "Windsurf (SSO)";
+					profileId = "windsurf-sso";
 				}
 			}
 
@@ -1365,8 +1305,10 @@ export class CredentialManager extends EventEmitter {
 				const apiKey = this.activeCredential.credentials.apiKey!;
 				const baseUrl = this.activeCredential.credentials.baseUrl || "";
 				let response: Response;
+				const gatewayCheck = gatewayKeyCheck(provider, apiKey);
 
-				switch (provider) {
+				if (gatewayCheck) response = await gatewayCheck;
+				else switch (provider) {
 					case "anthropic":
 					case "claude":
 						response = await fetch(
@@ -1381,36 +1323,27 @@ export class CredentialManager extends EventEmitter {
 						break;
 
 					case "openai":
-						response = await fetch(
-							`${baseUrl || "https://api.openai.com"}/v1/models`,
-							{
-								headers: { Authorization: `Bearer ${apiKey}` },
-							},
-						);
+						response = await fetch(modelsUrl(baseUrl, "https://api.openai.com"), {
+							headers: { Authorization: `Bearer ${apiKey}` },
+						});
 						break;
 
 					case "google":
-						response = await fetch(
-							`https://generativelanguage.googleapis.com/v1/models?key=${apiKey}`,
-						);
+						response = await fetch("https://generativelanguage.googleapis.com/v1/models", {
+							headers: { "x-goog-api-key": apiKey },
+						});
 						break;
 
 					case "mistral":
-						response = await fetch(
-							`${baseUrl || "https://api.mistral.ai"}/v1/models`,
-							{
-								headers: { Authorization: `Bearer ${apiKey}` },
-							},
-						);
+						response = await fetch(modelsUrl(baseUrl, "https://api.mistral.ai"), {
+							headers: { Authorization: `Bearer ${apiKey}` },
+						});
 						break;
 
 					case "deepseek":
-						response = await fetch(
-							`${baseUrl || "https://api.deepseek.com"}/v1/models`,
-							{
-								headers: { Authorization: `Bearer ${apiKey}` },
-							},
-						);
+						response = await fetch(modelsUrl(baseUrl, "https://api.deepseek.com"), {
+							headers: { Authorization: `Bearer ${apiKey}` },
+						});
 						break;
 
 					case "grok":
@@ -1440,15 +1373,13 @@ export class CredentialManager extends EventEmitter {
 				}
 
 				return isValid;
-			} else if (this.activeCredential.type === "oauth") {
-				return true;
 			}
+			// OAuth: the provider's own sign-in holds the credential.
+			return true;
 		} catch (error) {
 			console.error("[CredentialManager] Credential validation failed:", error);
 			return false;
 		}
-
-		return false;
 	}
 
 	/**
@@ -1461,14 +1392,13 @@ export class CredentialManager extends EventEmitter {
 	 *   dernier profil chargé. Absent, le comportement est inchangé.
 	 */
 	getEnvironmentVariables(providerOverride?: string): Record<string, string> {
-		const env = this.buildEnvironmentVariables(providerOverride);
-
+		// A blank choice is no choice: it must not hide settings.selectedProvider.
 		const requested = (providerOverride ?? "").trim().toLowerCase();
+		// Settings → AI accounts: each CLI's default folder, and the default AWS pair or Cursor/Windsurf key.
+		const env = { ...this.buildEnvironmentVariables(requested || undefined), ...loginAccountEnv() };
+		Object.assign(env, defaultAccountEnv(requested || env.SELECTED_LLM_PROVIDER));
 		if (!requested) return env;
-
-		// `anthropic` et `claude` sont le même fournisseur pour le backend.
-		const canonical = requested === "anthropic" ? "claude" : requested;
-
+		const canonical = requested === "anthropic" ? "claude" : requested; // même fournisseur
 		// Le choix de la page est la réponse. La construction ci-dessus a pu
 		// retomber sur le credential actif (un profil OpenAI, un SSO Windsurf…)
 		// dont le nom n'a rien à voir avec ce qui a été demandé.
@@ -1512,19 +1442,7 @@ export class CredentialManager extends EventEmitter {
 				selectedProviderOverride ??
 				(settings?.selectedProvider as string | undefined)
 			)?.toLowerCase();
-			const nonClaudeProviders = [
-				"copilot",
-				"openai",
-				"google",
-				"ollama",
-				"meta",
-				"mistral",
-				"deepseek",
-				"grok",
-				"aws",
-				"custom",
-			];
-			if (selectedProvider && nonClaudeProviders.includes(selectedProvider)) {
+			if (selectedProvider && NON_CLAUDE_PROVIDERS.includes(selectedProvider)) {
 				// The active credential from profiles.json may be a Claude profile —
 				// still force SELECTED_LLM_PROVIDER so the backend routes to the right client.
 				env.SELECTED_LLM_PROVIDER = selectedProvider;
@@ -1548,39 +1466,9 @@ export class CredentialManager extends EventEmitter {
 				// The activeCredential may be type:'oauth' (set by PROVIDER_SELECT handler)
 				// which bypasses the switch statement below — so we must inject the key here.
 				// Source priority: profiles.json → globalXxxApiKey in settings.json
-				const globalKeyMap: Record<string, string[]> = {
-					openai: ["globalOpenAIApiKey"],
-					google: ["globalGoogleDeepMindApiKey", "globalGoogleApiKey"],
-					gemini: ["globalGoogleApiKey", "globalGoogleDeepMindApiKey"],
-					mistral: ["globalMistralApiKey"],
-					deepseek: ["globalDeepSeekApiKey"],
-					grok: ["globalGrokApiKey"],
-					meta: ["globalMetaApiKey"],
-					aws: ["globalAWSApiKey"],
-					windsurf: ["globalWindsurfApiKey"],
-				};
-				const envVarMap: Record<string, string> = {
-					openai: "OPENAI_API_KEY",
-					google: "GOOGLE_API_KEY",
-					gemini: "GOOGLE_API_KEY",
-					mistral: "MISTRAL_API_KEY",
-					deepseek: "DEEPSEEK_API_KEY",
-					grok: "GROK_API_KEY",
-					meta: "META_API_KEY",
-					aws: "AWS_ACCESS_KEY_ID",
-					windsurf: "WINDSURF_API_KEY",
-				};
-				const baseUrlMap: Record<string, string> = {
-					openai: "OPENAI_BASE_URL",
-					mistral: "MISTRAL_BASE_URL",
-					deepseek: "DEEPSEEK_BASE_URL",
-					grok: "GROK_BASE_URL",
-					meta: "META_BASE_URL",
-					aws: "AWS_BEDROCK_ENDPOINT",
-				};
-
 				// Check profiles.json first (most specific), then global settings
-				let apiKey = "";
+				// The default account (Settings → AI accounts) first, on its own endpoint.
+				let apiKey = defaultAccountKey(selectedProvider) ?? "";
 				let baseUrl = "";
 				try {
 					const profiles = this.profiles;
@@ -1595,7 +1483,7 @@ export class CredentialManager extends EventEmitter {
 							return false;
 						}
 					});
-					if (profile?.apiKey) {
+					if (!apiKey && profile?.apiKey) {
 						apiKey = profile.apiKey;
 						baseUrl = profile?.baseUrl ?? "";
 					}
@@ -1603,22 +1491,13 @@ export class CredentialManager extends EventEmitter {
 					/* profiles.json not available */
 				}
 
-				if (!apiKey) {
-					for (const key of globalKeyMap[selectedProvider] ?? []) {
-						// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-						const val = (settings as any)?.[key] as string | undefined;
-						if (val?.trim()) {
-							apiKey = val.trim();
-							break;
-						}
-					}
-				}
+				if (!apiKey) apiKey = settingsApiKey(selectedProvider, settings);
 
 				// Note: Codex CLI OAuth tokens are NOT used as fallback — they require
 				// specific OpenAI scopes that the ChatGPT OAuth flow does not grant.
 				// Users must provide a real API key (sk-...) from platform.openai.com.
 
-				const envVar = envVarMap[selectedProvider];
+				const envVar = PROVIDER_KEY_ENV_VARS[selectedProvider];
 				if (
 					envVar &&
 					apiKey &&
@@ -1626,7 +1505,7 @@ export class CredentialManager extends EventEmitter {
 				) {
 					env[envVar] = apiKey;
 				}
-				const baseUrlVar = baseUrlMap[selectedProvider];
+				const baseUrlVar = PROVIDER_BASE_URL_ENV_VARS[selectedProvider];
 				if (baseUrlVar && baseUrl) env[baseUrlVar] = baseUrl;
 
 				// Ollama / local LLM: inject base URL if configured.
@@ -1642,17 +1521,10 @@ export class CredentialManager extends EventEmitter {
 						| string
 						| undefined;
 					if (ollamaUrl?.trim()) env.OLLAMA_BASE_URL = ollamaUrl.trim();
-					// The model the user picked (incl. HF-discovered ids like
-					// "hf.co/org/model") is stored under `globalOllamaModel`. Inject it
-					// so the backend asks the local server for THIS model instead of
-					// falling back to the registry default ("llama3.3"). LOCAL_LLM_MODEL
-					// is the generic alias consumed by the same backend resolution.
-					const ollamaModel = s?.globalOllamaModel as string | undefined;
-					if (ollamaModel?.trim()) {
-						env.OLLAMA_MODEL = ollamaModel.trim();
-						env.LOCAL_LLM_MODEL = ollamaModel.trim();
-					}
 				}
+				// The provider page's model (an Ollama tag, `hf.co/org/model`, a
+				// gateway id; else the registry's) and a gateway's routing options.
+				Object.assign(env, providerPageEnv(selectedProvider, settings));
 
 				return Object.fromEntries(
 					Object.entries(env).filter(([_, value]) => value.trim() !== ""),
@@ -1679,7 +1551,6 @@ export class CredentialManager extends EventEmitter {
 			// For SSO/OAuth type: no WINDSURF_API_KEY needed — backend discovers it
 			// from the running Windsurf IDE via state.vscdb
 
-			// Filtrer les valeurs vides
 			return Object.fromEntries(
 				Object.entries(env).filter(([_, value]) => value.trim() !== ""),
 			);
@@ -1774,6 +1645,12 @@ export class CredentialManager extends EventEmitter {
 				if (baseUrl) env.META_BASE_URL = baseUrl;
 				break;
 
+			case "openrouter":
+			case "huggingface":
+				env[PROVIDER_KEY_ENV_VARS[provider]] = apiKey;
+				if (baseUrl) env[PROVIDER_BASE_URL_ENV_VARS[provider]] = baseUrl;
+				break;
+
 			case "aws":
 				env.AWS_ACCESS_KEY_ID = apiKey;
 				if (baseUrl) env.AWS_BEDROCK_ENDPOINT = baseUrl;
@@ -1783,11 +1660,7 @@ export class CredentialManager extends EventEmitter {
 				if (baseUrl) env.OLLAMA_BASE_URL = baseUrl;
 				break;
 
-			case "windsurf":
-				env.WINDSURF_API_KEY = apiKey;
-				if (baseUrl) env.WINDSURF_BASE_URL = baseUrl;
-				break;
-
+			// windsurf never gets here: the branch above returned for it.
 			case "cursor":
 				env.CURSOR_API_KEY = apiKey;
 				if (baseUrl) env.CURSOR_BASE_URL = baseUrl;
@@ -1823,6 +1696,20 @@ export class CredentialManager extends EventEmitter {
 export const credentialManager = new CredentialManager();
 
 /**
+ * The Windsurf IDE's state database, where it keeps its sign-in and its plan
+ * cache: `%APPDATA%` on Windows, `~/Library/Application Support` on macOS,
+ * `~/.config` elsewhere.
+ */
+function windsurfStateDbPath(): string {
+	const tail = ["Windsurf", "User", "globalStorage", "state.vscdb"];
+	if (isWindows()) return join(process.env.APPDATA || "", ...tail);
+	if (isMacOS()) {
+		return join(process.env.HOME || "", "Library", "Application Support", ...tail);
+	}
+	return join(process.env.HOME || "", ".config", ...tail);
+}
+
+/**
  * Helper function to read a key from Windsurf's ItemTable database.
  * Returns the value as a string or null if not found/error.
  */
@@ -1842,6 +1729,9 @@ function readWindsurfKey(
 		return null;
 	}
 }
+
+const WINDSURF_KEY_LISTING =
+	"SELECT key FROM ItemTable WHERE key LIKE '%windsurf%' OR key LIKE '%codeium%' OR key LIKE '%auth%' ORDER BY key";
 
 /**
  * Detect Windsurf API key from local IDE installation.
@@ -1865,220 +1755,171 @@ export async function detectWindsurfLocalToken(): Promise<{
 	userName?: string;
 	error?: string;
 }> {
-	try {
-		const path = await import("node:path");
-		const fs = await import("node:fs");
-
-		// Determine the state.vscdb path based on platform
-		let dbPath: string;
-		if (isWindows()) {
-			dbPath = path.join(
-				process.env.APPDATA || "",
-				"Windsurf",
-				"User",
-				"globalStorage",
-				"state.vscdb",
-			);
-		} else if (isMacOS()) {
-			dbPath = path.join(
-				process.env.HOME || "",
-				"Library",
-				"Application Support",
-				"Windsurf",
-				"User",
-				"globalStorage",
-				"state.vscdb",
-			);
-		} else {
-			// Linux
-			dbPath = path.join(
-				process.env.HOME || "",
-				".config",
-				"Windsurf",
-				"User",
-				"globalStorage",
-				"state.vscdb",
-			);
-		}
-
-		if (!fs.existsSync(dbPath)) {
-			return {
-				success: false,
-				error: "Windsurf IDE not found. Install Windsurf and sign in first.",
-			};
-		}
-
-		// Use better-sqlite3 — pure Node.js, no Python dependency
-		let Database: typeof import("better-sqlite3");
-		try {
-			Database = require("better-sqlite3");
-			// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-		} catch (e: any) {
-			return {
-				success: false,
-				error: `better-sqlite3 module not available: ${e.message}`,
-			};
-		}
-
-		let db: import("better-sqlite3").Database;
-		try {
-			db = new Database(dbPath, { readonly: true, fileMustExist: true });
-			// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-		} catch (e: any) {
-			return {
-				success: false,
-				error: `Could not open Windsurf database: ${e.message}`,
-			};
-		}
-
-		try {
-			let apiKey: string | undefined;
-			let userName: string | undefined;
-
-			// Strategy 1: Standard auth — windsurfAuthStatus JSON blob with apiKey field
-			const authStatusRaw = readWindsurfKey(db, "windsurfAuthStatus");
-			if (authStatusRaw) {
-				try {
-					const authData = JSON.parse(authStatusRaw);
-					if (authData.apiKey) {
-						apiKey = authData.apiKey;
-					}
-					// SSO enterprise: the token may be stored as accessToken or token instead of apiKey
-					if (!apiKey && authData.accessToken) {
-						apiKey = authData.accessToken;
-					}
-					if (!apiKey && authData.token) {
-						apiKey = authData.token;
-					}
-					// Extract user info from authStatus if available
-					if (authData.userName) userName = authData.userName;
-					if (authData.email)
-						userName = userName
-							? `${userName} (${authData.email})`
-							: authData.email;
-					if (authData.name) userName = userName || authData.name;
-				} catch {
-					// Not valid JSON — treat as raw token string
-					if (
-						authStatusRaw.startsWith("sk-") ||
-						authStatusRaw.startsWith("eyJ")
-					) {
-						apiKey = authStatusRaw;
-					}
-				}
-			}
-
-			// Strategy 2: SSO enterprise fallback keys
-			if (!apiKey) {
-				// Try windsurf.authToken (used by some SSO enterprise setups)
-				const authToken = readWindsurfKey(db, "windsurf.authToken");
-				if (authToken) {
-					try {
-						const parsed = JSON.parse(authToken);
-						apiKey =
-							parsed.apiKey || parsed.accessToken || parsed.token || parsed.key;
-					} catch {
-						if (
-							authToken.startsWith("sk-") ||
-							authToken.startsWith("eyJ") ||
-							authToken.length > 40
-						) {
-							apiKey = authToken;
-						}
-					}
-				}
-			}
-
-			if (!apiKey) {
-				// Try codeium.apiKey (direct key storage)
-				const codeiumKey = readWindsurfKey(db, "codeium.apiKey");
-				if (codeiumKey && codeiumKey.length > 10) {
-					apiKey = codeiumKey;
-				}
-			}
-
-			if (!apiKey) {
-				// Try service-auth/windsurf key pattern (SSO token exchange result)
-				const serviceAuth = readWindsurfKey(db, "service-auth/windsurf");
-				if (serviceAuth) {
-					try {
-						const parsed = JSON.parse(serviceAuth);
-						apiKey = parsed.apiKey || parsed.accessToken || parsed.token;
-					} catch {
-						if (serviceAuth.length > 40) apiKey = serviceAuth;
-					}
-				}
-			}
-
-			// Resolve user name from a separate key if not already found
-			if (!userName) {
-				const authUserRaw = readWindsurfKey(
-					db,
-					"codeium.windsurf-windsurf_auth",
-				);
-				if (authUserRaw) {
-					try {
-						const parsed = JSON.parse(authUserRaw);
-						userName =
-							parsed.name || parsed.userName || parsed.email || authUserRaw;
-					} catch {
-						userName = authUserRaw;
-					}
-				}
-			}
-
-			db.close();
-
-			if (apiKey) {
-				return { success: true, apiKey, userName: userName || undefined };
-			}
-
-			// If we found nothing, list available keys for debugging (SSO troubleshooting)
-			let debugInfo = "";
-			try {
-				const reopenedDb = new Database(dbPath, {
-					readonly: true,
-					fileMustExist: true,
-				});
-				const rows = reopenedDb
-					.prepare(
-						"SELECT key FROM ItemTable WHERE key LIKE '%windsurf%' OR key LIKE '%codeium%' OR key LIKE '%auth%' ORDER BY key",
-					)
-					.all() as { key: string }[];
-				reopenedDb.close();
-
-				if (rows.length > 0) {
-					debugInfo = ` Found ${rows.length} related keys: ${rows.map((r) => r.key).join(", ")}`;
-				}
-			} catch {
-				/* ignore debug errors */
-			}
-
-			return {
-				success: false,
-				error: `No API key found in Windsurf auth data. Sign in to Windsurf IDE first.${debugInfo}`,
-			};
-
-			// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-		} catch (queryError: any) {
-			try {
-				db.close();
-			} catch {
-				/* ignore */
-			}
-			return {
-				success: false,
-				error: `Error querying Windsurf database: ${queryError.message}`,
-			};
-		}
-
-		// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-	} catch (error: any) {
+	// Never rejects: every failure is an answer with success: false.
+	const dbPath = windsurfStateDbPath();
+	if (!existsSync(dbPath)) {
 		return {
 			success: false,
-			error: error.message || "Unknown error detecting Windsurf token",
+			error: "Windsurf IDE not found. Install Windsurf and sign in first.",
 		};
 	}
+
+	// Use better-sqlite3 — pure Node.js, no Python dependency
+	let Database: typeof import("better-sqlite3");
+	try {
+		Database = loadBetterSqlite();
+		// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
+	} catch (e: any) {
+		return {
+			success: false,
+			error: `better-sqlite3 module not available: ${e.message}`,
+		};
+	}
+
+	let db: import("better-sqlite3").Database;
+	try {
+		db = new Database(dbPath, { readonly: true, fileMustExist: true });
+		// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
+	} catch (e: any) {
+		return {
+			success: false,
+			error: `Could not open Windsurf database: ${e.message}`,
+		};
+	}
+
+	try {
+		let apiKey: string | undefined;
+		let userName: string | undefined;
+
+		// Strategy 1: Standard auth — windsurfAuthStatus JSON blob with apiKey field
+		const authStatusRaw = readWindsurfKey(db, "windsurfAuthStatus");
+		if (authStatusRaw) {
+			try {
+				const authData = JSON.parse(authStatusRaw);
+				if (authData.apiKey) {
+					apiKey = authData.apiKey;
+				}
+				// SSO enterprise: the token may be stored as accessToken or token instead of apiKey
+				if (!apiKey && authData.accessToken) {
+					apiKey = authData.accessToken;
+				}
+				if (!apiKey && authData.token) {
+					apiKey = authData.token;
+				}
+				// Extract user info from authStatus if available
+				if (authData.userName) userName = authData.userName;
+				if (authData.email)
+					userName = userName
+						? `${userName} (${authData.email})`
+						: authData.email;
+				if (authData.name) userName = userName || authData.name;
+			} catch {
+				// Not valid JSON — treat as raw token string
+				if (
+					authStatusRaw.startsWith("sk-") ||
+					authStatusRaw.startsWith("eyJ")
+				) {
+					apiKey = authStatusRaw;
+				}
+			}
+		}
+
+		// Strategy 2: SSO enterprise fallback keys
+		if (!apiKey) {
+			// Try windsurf.authToken (used by some SSO enterprise setups)
+			const authToken = readWindsurfKey(db, "windsurf.authToken");
+			if (authToken) {
+				try {
+					const parsed = JSON.parse(authToken);
+					apiKey =
+						parsed.apiKey || parsed.accessToken || parsed.token || parsed.key;
+				} catch {
+					if (
+						authToken.startsWith("sk-") ||
+						authToken.startsWith("eyJ") ||
+						authToken.length > 40
+					) {
+						apiKey = authToken;
+					}
+				}
+			}
+		}
+
+		if (!apiKey) {
+			// Try codeium.apiKey (direct key storage)
+			const codeiumKey = readWindsurfKey(db, "codeium.apiKey");
+			if (codeiumKey && codeiumKey.length > 10) {
+				apiKey = codeiumKey;
+			}
+		}
+
+		if (!apiKey) {
+			// Try service-auth/windsurf key pattern (SSO token exchange result)
+			const serviceAuth = readWindsurfKey(db, "service-auth/windsurf");
+			if (serviceAuth) {
+				try {
+					const parsed = JSON.parse(serviceAuth);
+					apiKey = parsed.apiKey || parsed.accessToken || parsed.token;
+				} catch {
+					if (serviceAuth.length > 40) apiKey = serviceAuth;
+				}
+			}
+		}
+
+		// Resolve user name from a separate key if not already found
+		if (!userName) {
+			const authUserRaw = readWindsurfKey(
+				db,
+				"codeium.windsurf-windsurf_auth",
+			);
+			if (authUserRaw) {
+				try {
+					const parsed = JSON.parse(authUserRaw);
+					userName =
+						parsed.name || parsed.userName || parsed.email || authUserRaw;
+				} catch {
+					userName = authUserRaw;
+				}
+			}
+		}
+
+		if (apiKey) {
+			db.close();
+			return { success: true, apiKey, userName: userName || undefined };
+		}
+
+		// If we found nothing, list available keys for debugging (SSO troubleshooting),
+		// on the handle still open: a second one, left open when its query failed,
+		// kept the file locked on Windows.
+		let debugInfo = "";
+		try {
+			const rows = db.prepare(WINDSURF_KEY_LISTING).all() as { key: string }[];
+			if (rows.length > 0) {
+				debugInfo = ` Found ${rows.length} related keys: ${rows.map((r) => r.key).join(", ")}`;
+			}
+		} catch {
+			/* ignore debug errors */
+		}
+		db.close();
+
+		return {
+			success: false,
+			error: `No API key found in Windsurf auth data. Sign in to Windsurf IDE first.${debugInfo}`,
+		};
+
+		// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
+	} catch (queryError: any) {
+		try {
+			db.close();
+		} catch {
+			/* ignore */
+		}
+		return {
+			success: false,
+			error: `Error querying Windsurf database: ${queryError.message}`,
+		};
+	}
+
 }
 
 /**
@@ -2152,117 +1993,110 @@ function extractBillingCycleFromProtobuf(protoB64: string): {
 	usedFlowActions: number;
 	weeklyWindowStartSeconds: number; // Field 17 - used for stale detection only
 } | null {
-	try {
-		const data = Buffer.from(protoB64, "base64");
-		let pos = 0;
+	// Never throws: decodeVarint stops at the end of the buffer.
+	const data = Buffer.from(protoB64, "base64");
+	let pos = 0;
 
-		// Find field 13 in root message
-		while (pos < data.length) {
-			const [tag, newPos] = decodeVarint(data, pos);
-			const fieldNum = tag >> 3;
-			const wireType = tag & 0x7;
-			pos = newPos;
+	// Find field 13 in root message
+	while (pos < data.length) {
+		const [tag, newPos] = decodeVarint(data, pos);
+		const fieldNum = tag >> 3;
+		const wireType = tag & 0x7;
+		pos = newPos;
 
-			if (wireType === 0) {
-				// varint — skip
-				const [, p] = decodeVarint(data, pos);
-				pos = p;
-			} else if (wireType === 2) {
-				// length-delimited
-				const [length, p] = decodeVarint(data, pos);
-				pos = p;
-				if (fieldNum === 13) {
-					// Parse the plan sub-message
-					const sub = data.subarray(pos, pos + length);
-					let sp = 0;
-					let startSeconds = 0;
-					let endSeconds = 0;
-					let totalMessages = 0;
-					let totalFlowActions = 0;
-					let usedMessages = 0;
-					let usedFlowActions = 0;
-					// Fields 17/18 are plain varint timestamps. Field 17 is the current billing cycle start.
-					// Field 18 is a weekly usage window end, NOT the billing cycle end.
-					// We prefer field 17 over field 2 for startSeconds, but keep field 3 for endSeconds.
-					let cycleStartSeconds = 0;
+		if (wireType === 0) {
+			// varint — skip
+			const [, p] = decodeVarint(data, pos);
+			pos = p;
+		} else if (wireType === 2) {
+			// length-delimited
+			const [length, p] = decodeVarint(data, pos);
+			pos = p;
+			if (fieldNum === 13) {
+				// Parse the plan sub-message
+				const sub = data.subarray(pos, pos + length);
+				let sp = 0;
+				let startSeconds = 0;
+				let endSeconds = 0;
+				let totalMessages = 0;
+				let totalFlowActions = 0;
+				let usedMessages = 0;
+				let usedFlowActions = 0;
+				// Fields 17/18 are plain varint timestamps. Field 17 is the current billing cycle start.
+				// Field 18 is a weekly usage window end, NOT the billing cycle end.
+				// We prefer field 17 over field 2 for startSeconds, but keep field 3 for endSeconds.
+				let cycleStartSeconds = 0;
 
-					while (sp < sub.length) {
-						const [stag, sp2] = decodeVarint(sub, sp);
-						const sfn = stag >> 3;
-						const swt = stag & 0x7;
-						sp = sp2;
+				while (sp < sub.length) {
+					const [stag, sp2] = decodeVarint(sub, sp);
+					const sfn = stag >> 3;
+					const swt = stag & 0x7;
+					sp = sp2;
 
-						if (swt === 0) {
-							const [sv, sp3] = decodeVarint(sub, sp);
-							sp = sp3;
-							if (sfn === 6) usedMessages = sv;
-							if (sfn === 7) usedFlowActions = sv;
-							if (sfn === 8) totalMessages = sv;
-							if (sfn === 9) totalFlowActions = sv;
-							if (sfn === 17) cycleStartSeconds = sv;
-						} else if (swt === 2) {
-							const [sl, sp3] = decodeVarint(sub, sp);
-							sp = sp3;
-							const sv = sub.subarray(sp, sp + sl);
-							sp += sl;
+					if (swt === 0) {
+						const [sv, sp3] = decodeVarint(sub, sp);
+						sp = sp3;
+						if (sfn === 6) usedMessages = sv;
+						if (sfn === 7) usedFlowActions = sv;
+						if (sfn === 8) totalMessages = sv;
+						if (sfn === 9) totalFlowActions = sv;
+						if (sfn === 17) cycleStartSeconds = sv;
+					} else if (swt === 2) {
+						const [sl, sp3] = decodeVarint(sub, sp);
+						sp = sp3;
+						const sv = sub.subarray(sp, sp + sl);
+						sp += sl;
 
-							// Sub-fields 2 and 3 contain nested messages with a varint at field 1
-							if ((sfn === 2 || sfn === 3) && sl > 0) {
-								try {
-									const [innerTag, ip2] = decodeVarint(sv, 0);
-									const innerFn = innerTag >> 3;
-									const innerWt = innerTag & 0x7;
-									if (innerFn === 1 && innerWt === 0) {
-										const [ts] = decodeVarint(sv, ip2);
-										if (sfn === 2) startSeconds = ts;
-										if (sfn === 3) endSeconds = ts;
-									}
-								} catch {
-									/* skip malformed */
-								}
+						// Sub-fields 2 and 3 contain nested messages with a varint at field 1
+						if ((sfn === 2 || sfn === 3) && sl > 0) {
+							const [innerTag, ip2] = decodeVarint(sv, 0);
+							const innerFn = innerTag >> 3;
+							const innerWt = innerTag & 0x7;
+							if (innerFn === 1 && innerWt === 0) {
+								const [ts] = decodeVarint(sv, ip2);
+								if (sfn === 2) startSeconds = ts;
+								if (sfn === 3) endSeconds = ts;
 							}
-						} else if (swt === 5) {
-							sp += 4;
-						} else if (swt === 1) {
-							sp += 8;
-						} else {
-							break;
 						}
+					} else if (swt === 5) {
+						sp += 4;
+					} else if (swt === 1) {
+						sp += 8;
+					} else {
+						break;
 					}
-
-					// Prefer field 17 (current billing cycle start) over field 2 (plan activation).
-					// Field 2 can be a plan activation date that doesn't advance with each billing
-					// period, causing stale detection to fail. Keep field 3 for endSeconds.
-					if (cycleStartSeconds > 0 && cycleStartSeconds >= startSeconds) {
-						startSeconds = cycleStartSeconds;
-					}
-
-					if (startSeconds > 0 && endSeconds > 0) {
-						return {
-							startSeconds,
-							endSeconds,
-							totalMessages,
-							totalFlowActions,
-							usedMessages,
-							usedFlowActions,
-							weeklyWindowStartSeconds: cycleStartSeconds,
-						};
-					}
-					return null;
 				}
-				pos += length;
-			} else if (wireType === 5) {
-				pos += 4;
-			} else if (wireType === 1) {
-				pos += 8;
-			} else {
-				break;
+
+				// Prefer field 17 (current billing cycle start) over field 2 (plan activation).
+				// Field 2 can be a plan activation date that doesn't advance with each billing
+				// period, causing stale detection to fail. Keep field 3 for endSeconds.
+				if (cycleStartSeconds > 0 && cycleStartSeconds >= startSeconds) {
+					startSeconds = cycleStartSeconds;
+				}
+
+				if (startSeconds > 0 && endSeconds > 0) {
+					return {
+						startSeconds,
+						endSeconds,
+						totalMessages,
+						totalFlowActions,
+						usedMessages,
+						usedFlowActions,
+						weeklyWindowStartSeconds: cycleStartSeconds,
+					};
+				}
+				return null;
 			}
+			pos += length;
+		} else if (wireType === 5) {
+			pos += 4;
+		} else if (wireType === 1) {
+			pos += 8;
+		} else {
+			break;
 		}
-		return null;
-	} catch {
-		return null;
 	}
+	return null;
 }
 
 export async function readWindsurfCachedPlanInfo(): Promise<{
@@ -2271,206 +2105,166 @@ export async function readWindsurfCachedPlanInfo(): Promise<{
 	userName?: string;
 	error?: string;
 }> {
+	// Never rejects: every failure is an answer with success: false.
+	const dbPath = windsurfStateDbPath();
+	if (!existsSync(dbPath)) {
+		return { success: false, error: "Windsurf IDE not installed" };
+	}
+
+	let Database: typeof import("better-sqlite3");
 	try {
-		const path = await import("node:path");
-		const fs = await import("node:fs");
-
-		// Determine the state.vscdb path based on platform
-		let dbPath: string;
-		if (isWindows()) {
-			dbPath = path.join(
-				process.env.APPDATA || "",
-				"Windsurf",
-				"User",
-				"globalStorage",
-				"state.vscdb",
-			);
-		} else if (isMacOS()) {
-			dbPath = path.join(
-				process.env.HOME || "",
-				"Library",
-				"Application Support",
-				"Windsurf",
-				"User",
-				"globalStorage",
-				"state.vscdb",
-			);
-		} else {
-			dbPath = path.join(
-				process.env.HOME || "",
-				".config",
-				"Windsurf",
-				"User",
-				"globalStorage",
-				"state.vscdb",
-			);
-		}
-
-		if (!fs.existsSync(dbPath)) {
-			return { success: false, error: "Windsurf IDE not installed" };
-		}
-
-		let Database: typeof import("better-sqlite3");
-		try {
-			Database = require("better-sqlite3");
-			// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-		} catch (e: any) {
-			return {
-				success: false,
-				error: `better-sqlite3 not available: ${e.message}`,
-			};
-		}
-
-		let db: import("better-sqlite3").Database;
-		try {
-			db = new Database(dbPath, { readonly: true, fileMustExist: true });
-			// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-		} catch (e: any) {
-			return {
-				success: false,
-				error: `Could not open Windsurf database: ${e.message}`,
-			};
-		}
-
-		try {
-			// Read cached plan info
-			const planInfoRaw = readWindsurfKey(
-				db,
-				"windsurf.settings.cachedPlanInfo",
-			);
-			if (!planInfoRaw) {
-				db.close();
-				return { success: false, error: "No cached plan info in Windsurf IDE" };
-			}
-
-			const planInfo = JSON.parse(planInfoRaw) as WindsurfCachedPlanInfo;
-
-			// DO NOT use protobuf for usage counters - they contain incorrect data
-			// The cache local (windsurf.settings.cachedPlanInfo) contains the correct usage data
-			// that is updated by Windsurf IDE on each usage.
-			// Only use protobuf for billing cycle timestamps if needed for stale detection.
-			// DO NOT reset usage counters to 0 - this would erase correct usage data.
-			// The cache local should only be used for metadata, not for usage counters.
-			const authStatusRaw = readWindsurfKey(db, "windsurfAuthStatus");
-			if (authStatusRaw) {
-				try {
-					const authData = JSON.parse(authStatusRaw);
-					if (authData.userStatusProtoBinaryBase64) {
-						const billing = extractBillingCycleFromProtobuf(
-							authData.userStatusProtoBinaryBase64,
-						);
-						if (billing) {
-							const protoStartMs = billing.startSeconds * 1000;
-							// Use field 17 (weekly window start) for stale detection - it advances more frequently
-							// than the monthly billing cycle, making it a reliable indicator of cycle boundaries
-							const weeklyWindowStartMs = billing.weeklyWindowStartSeconds > 0
-								? billing.weeklyWindowStartSeconds * 1000
-								: protoStartMs;
-
-							// The cachedPlanInfo is stale if its endTimestamp <= the weekly window start
-							// (meaning it's from the previous billing cycle)
-							if (planInfo.endTimestamp <= weeklyWindowStartMs) {
-								// Calculate the new monthly billing cycle duration from the previous cycle
-								const previousCycleDuration = planInfo.endTimestamp - planInfo.startTimestamp;
-								// The new monthly cycle starts when the previous one ended (Apr 11), not the weekly window (Apr 14)
-								planInfo.startTimestamp = planInfo.endTimestamp;
-								// Use the calculated monthly duration, not the protobuf's weekly window
-								planInfo.endTimestamp = planInfo.endTimestamp + previousCycleDuration;
-								planInfo.isStale = true;
-
-								// Update totals from protobuf if available
-								if (billing.totalMessages > 0) {
-									planInfo.usage.messages = billing.totalMessages;
-								}
-								if (billing.totalFlowActions > 0) {
-									planInfo.usage.flowActions = billing.totalFlowActions;
-								}
-
-								// DO NOT reset usage counters to 0 - this would erase correct usage data
-								// The cache local usage counters should be preserved as they contain the actual usage
-								// Only reset if the cache local itself is completely missing or corrupted
-							}
-						}
-					}
-				} catch {
-					// Failed to parse protobuf — use cached data as-is
-				}
-			}
-
-			// Source 3: Read codeium.windsurf → windsurf.state.cachedUserStatus (may be fresher)
-			// This is a separate protobuf snapshot stored inside a large JSON blob.
-			// It can sometimes have more recent usage data than windsurfAuthStatus.
-			try {
-				const codeiumWindsurfRaw = readWindsurfKey(db, "codeium.windsurf");
-				if (codeiumWindsurfRaw) {
-					const codeiumBlob = JSON.parse(codeiumWindsurfRaw);
-					const cachedUserStatusB64 =
-						codeiumBlob?.["windsurf.state.cachedUserStatus"];
-					if (cachedUserStatusB64 && typeof cachedUserStatusB64 === "string") {
-						const billing3 =
-							extractBillingCycleFromProtobuf(cachedUserStatusB64);
-						if (billing3) {
-							// Only use if it's from the same or newer billing cycle
-							const proto3StartMs = billing3.startSeconds * 1000;
-							if (proto3StartMs >= planInfo.startTimestamp) {
-								// Take the max of all sources for usage counters
-								if (billing3.usedMessages > planInfo.usage.usedMessages) {
-									planInfo.usage.usedMessages = billing3.usedMessages;
-									planInfo.usage.remainingMessages = Math.max(
-										0,
-										planInfo.usage.messages - billing3.usedMessages,
-									);
-								}
-								if (billing3.usedFlowActions > planInfo.usage.usedFlowActions) {
-									planInfo.usage.usedFlowActions = billing3.usedFlowActions;
-									planInfo.usage.remainingFlowActions = Math.max(
-										0,
-										planInfo.usage.flowActions - billing3.usedFlowActions,
-									);
-								}
-							}
-						}
-					}
-				}
-			} catch {
-				// Failed to parse codeium.windsurf blob — continue with existing data
-			}
-
-			// Read user name from auth data
-			let userName: string | undefined;
-			const authUserRaw = readWindsurfKey(db, "codeium.windsurf-windsurf_auth");
-			if (authUserRaw) {
-				try {
-					const parsed = JSON.parse(authUserRaw);
-					userName = parsed.name || parsed.userName || parsed.email;
-				} catch {
-					// If it's not JSON, it's likely the user name string directly
-					if (authUserRaw.length > 0 && authUserRaw.length < 200) {
-						userName = authUserRaw;
-					}
-				}
-			}
-
-			db.close();
-			return { success: true, planInfo, userName };
-
-			// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-		} catch (e: any) {
-			try {
-				db.close();
-			} catch {
-				/* ignore */
-			}
-			return {
-				success: false,
-				error: `Error reading Windsurf plan info: ${e.message}`,
-			};
-		}
+		Database = loadBetterSqlite();
 		// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-	} catch (error: any) {
+	} catch (e: any) {
 		return {
 			success: false,
-			error: error.message || "Unknown error reading Windsurf plan info",
+			error: `better-sqlite3 not available: ${e.message}`,
+		};
+	}
+
+	let db: import("better-sqlite3").Database;
+	try {
+		db = new Database(dbPath, { readonly: true, fileMustExist: true });
+		// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
+	} catch (e: any) {
+		return {
+			success: false,
+			error: `Could not open Windsurf database: ${e.message}`,
+		};
+	}
+
+	try {
+		// Read cached plan info
+		const planInfoRaw = readWindsurfKey(
+			db,
+			"windsurf.settings.cachedPlanInfo",
+		);
+		if (!planInfoRaw) {
+			db.close();
+			return { success: false, error: "No cached plan info in Windsurf IDE" };
+		}
+
+		const planInfo = JSON.parse(planInfoRaw) as WindsurfCachedPlanInfo;
+
+		// DO NOT use protobuf for usage counters - they contain incorrect data
+		// The cache local (windsurf.settings.cachedPlanInfo) contains the correct usage data
+		// that is updated by Windsurf IDE on each usage.
+		// Only use protobuf for billing cycle timestamps if needed for stale detection.
+		// DO NOT reset usage counters to 0 - this would erase correct usage data.
+		// The cache local should only be used for metadata, not for usage counters.
+		const authStatusRaw = readWindsurfKey(db, "windsurfAuthStatus");
+		if (authStatusRaw) {
+			try {
+				const authData = JSON.parse(authStatusRaw);
+				if (authData.userStatusProtoBinaryBase64) {
+					const billing = extractBillingCycleFromProtobuf(
+						authData.userStatusProtoBinaryBase64,
+					);
+					if (billing) {
+						const protoStartMs = billing.startSeconds * 1000;
+						// Use field 17 (weekly window start) for stale detection - it advances more frequently
+						// than the monthly billing cycle, making it a reliable indicator of cycle boundaries
+						const weeklyWindowStartMs = billing.weeklyWindowStartSeconds > 0
+							? billing.weeklyWindowStartSeconds * 1000
+							: protoStartMs;
+
+						// The cachedPlanInfo is stale if its endTimestamp <= the weekly window start
+						// (meaning it's from the previous billing cycle)
+						if (planInfo.endTimestamp <= weeklyWindowStartMs) {
+							// Calculate the new monthly billing cycle duration from the previous cycle
+							const previousCycleDuration = planInfo.endTimestamp - planInfo.startTimestamp;
+							// The new monthly cycle starts when the previous one ended (Apr 11), not the weekly window (Apr 14)
+							planInfo.startTimestamp = planInfo.endTimestamp;
+							// Use the calculated monthly duration, not the protobuf's weekly window
+							planInfo.endTimestamp = planInfo.endTimestamp + previousCycleDuration;
+							planInfo.isStale = true;
+
+							// Update totals from protobuf if available
+							if (billing.totalMessages > 0) {
+								planInfo.usage.messages = billing.totalMessages;
+							}
+							if (billing.totalFlowActions > 0) {
+								planInfo.usage.flowActions = billing.totalFlowActions;
+							}
+
+							// DO NOT reset usage counters to 0 - this would erase correct usage data
+							// The cache local usage counters should be preserved as they contain the actual usage
+							// Only reset if the cache local itself is completely missing or corrupted
+						}
+					}
+				}
+			} catch {
+				// Failed to parse protobuf — use cached data as-is
+			}
+		}
+
+		// Source 3: Read codeium.windsurf → windsurf.state.cachedUserStatus (may be fresher)
+		// This is a separate protobuf snapshot stored inside a large JSON blob.
+		// It can sometimes have more recent usage data than windsurfAuthStatus.
+		try {
+			const codeiumWindsurfRaw = readWindsurfKey(db, "codeium.windsurf");
+			if (codeiumWindsurfRaw) {
+				const codeiumBlob = JSON.parse(codeiumWindsurfRaw);
+				const cachedUserStatusB64 =
+					codeiumBlob?.["windsurf.state.cachedUserStatus"];
+				if (cachedUserStatusB64 && typeof cachedUserStatusB64 === "string") {
+					const billing3 =
+						extractBillingCycleFromProtobuf(cachedUserStatusB64);
+					if (billing3) {
+						// Only use if it's from the same or newer billing cycle
+						const proto3StartMs = billing3.startSeconds * 1000;
+						if (proto3StartMs >= planInfo.startTimestamp) {
+							// Take the max of all sources for usage counters
+							if (billing3.usedMessages > planInfo.usage.usedMessages) {
+								planInfo.usage.usedMessages = billing3.usedMessages;
+								planInfo.usage.remainingMessages = Math.max(
+									0,
+									planInfo.usage.messages - billing3.usedMessages,
+								);
+							}
+							if (billing3.usedFlowActions > planInfo.usage.usedFlowActions) {
+								planInfo.usage.usedFlowActions = billing3.usedFlowActions;
+								planInfo.usage.remainingFlowActions = Math.max(
+									0,
+									planInfo.usage.flowActions - billing3.usedFlowActions,
+								);
+							}
+						}
+					}
+				}
+			}
+		} catch {
+			// Failed to parse codeium.windsurf blob — continue with existing data
+		}
+
+		// Read user name from auth data
+		let userName: string | undefined;
+		const authUserRaw = readWindsurfKey(db, "codeium.windsurf-windsurf_auth");
+		if (authUserRaw) {
+			try {
+				const parsed = JSON.parse(authUserRaw);
+				userName = parsed.name || parsed.userName || parsed.email;
+			} catch {
+				// If it's not JSON, it's likely the user name string directly
+				if (authUserRaw.length > 0 && authUserRaw.length < 200) {
+					userName = authUserRaw;
+				}
+			}
+		}
+
+		db.close();
+		return { success: true, planInfo, userName };
+
+		// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
+	} catch (e: any) {
+		try {
+			db.close();
+		} catch {
+			/* ignore */
+		}
+		return {
+			success: false,
+			error: `Error reading Windsurf plan info: ${e.message}`,
 		};
 	}
 }

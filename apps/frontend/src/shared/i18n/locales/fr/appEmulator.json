@@ -134,5 +134,198 @@
 			"message_too_long": "Un message est trop long.",
 			"queue_unwritable": "Le dossier de la tâche n'a pas pu être écrit."
 		}
+	},
+	"devices": {
+		"iphone-15": "iPhone 15",
+		"iphone-15-pro-max": "iPhone 15 Pro Max",
+		"pixel-8": "Pixel 8",
+		"pixel-9": "Pixel 9",
+		"galaxy-z-fold-5": "Galaxy Z Fold 5 (plié)",
+		"ipad-mini": "iPad Mini",
+		"ipad-pro": "iPad Pro",
+		"desktop-1080p": "Ordinateur Full HD",
+		"desktop-4k": "Ordinateur 4K (mise à l’échelle 150 %)",
+		"tv-1080p": "Téléviseur connecté 16:9"
+	},
+	"matrix": {
+		"toggle": "Matrice d’appareils",
+		"intro": "Chaque appareil coché rend {{path}} depuis le serveur de l’émulateur, l’un après l’autre, puis la page est lue pour y trouver les bugs responsive.",
+		"introRoot": "La page affichée n’est pas sur le serveur de l’émulateur : la matrice rend la racine du serveur.",
+		"category": {
+			"phone": "Téléphones",
+			"tablet": "Tablettes",
+			"desktop": "Ordinateurs",
+			"tv": "Téléviseur"
+		},
+		"dimensions": "{{width}} × {{height}} @{{dpr}}x",
+		"capture_one": "Capturer {{count}} appareil",
+		"capture_other": "Capturer {{count}} appareils",
+		"stop": "Arrêter après cet appareil",
+		"selectAll": "Tous",
+		"selectNone": "Aucun",
+		"clear": "Effacer les captures",
+		"empty": "Cochez des appareils, puis capturez : chacun s’affiche ici, côte à côte.",
+		"pending": "En attente…",
+		"capturing": "Rendu sur cet appareil…",
+		"imageAlt": "La page rendue sur {{device}}",
+		"keep": "Garder pour la revue visuelle",
+		"errors": {
+			"invalid-request": "La demande a été refusée.",
+			"unknown-device": "Cet appareil n’est pas dans le catalogue.",
+			"not-running": "Le serveur de l’émulateur ne tourne pas : lancez-le, puis capturez de nouveau.",
+			"invalid-path": "Cette adresse n’est pas une page du serveur de l’émulateur.",
+			"busy": "Une autre capture est en cours : attendez qu’elle se termine.",
+			"load-failed": "La page ne s’est pas chargée à temps sur cet appareil.",
+			"capture-failed": "La page n’a pas pu être capturée sur cet appareil.",
+			"unknown-throttling": "Ce profil de bridage n'est pas dans la liste.",
+			"throttling-failed": "Le bridage réseau ou processeur n'a pas pu être appliqué sur cet appareil.",
+			"session-failed": "La session de l’aperçu n’a pas pu être lue : capturez de nouveau sans elle.",
+			"unknown-persona": "Ce persona n'existe plus : choisissez une autre session.",
+			"persona-locked": "Les cookies du persona n'ont pas pu être déchiffrés (trousseau du système verrouillé ou changé) : enregistrez-le à nouveau.",
+			"persona-elsewhere": "Ce persona a été enregistré pour un autre serveur : il n'est rejoué que sur cet hôte."
+		},
+		"report": {
+			"unavailable": "La page n’a pas pu être lue pour y chercher les bugs responsive.",
+			"clean": "Aucun bug responsive détecté.",
+			"pageOverflow": "La page est plus large que l’écran de {{px}} px : elle défile de côté.",
+			"truncated": "Lecture partielle : les {{count}} premiers éléments seulement."
+		},
+		"issues": {
+			"horizontalOverflow_one": "{{count}} élément dépasse le bord de l’écran",
+			"horizontalOverflow_other": "{{count}} éléments dépassent le bord de l’écran",
+			"overflowingMedia_one": "{{count}} image ou média est plus large que l’écran",
+			"overflowingMedia_other": "{{count}} images ou médias sont plus larges que l’écran",
+			"smallTouchTarget_one": "{{count}} cible tactile de moins de 44 × 44 px",
+			"smallTouchTarget_other": "{{count}} cibles tactiles de moins de 44 × 44 px",
+			"smallText_one": "{{count}} texte de moins de 12 px",
+			"smallText_other": "{{count}} textes de moins de 12 px",
+			"overlappingElements_one": "{{count}} paire d'éléments se chevauche",
+			"overlappingElements_other": "{{count}} paires d'éléments se chevauchent",
+			"truncatedText_one": "{{count}} texte est coupé ou déborde de sa boîte",
+			"truncatedText_other": "{{count}} textes sont coupés ou débordent de leur boîte",
+			"brokenNavigation_one": "{{count}} navigation est inaccessible sur mobile",
+			"brokenNavigation_other": "{{count}} navigations sont inaccessibles sur mobile"
+		},
+		"throttling": {
+			"network": "Réseau",
+			"cpu": "Processeur",
+			"hint": "Appliqué à la prochaine capture : la page se charge comme sur cette connexion ou ce processeur plus lent."
+		},
+		"network": {
+			"none": "Sans bridage",
+			"4g": "4G",
+			"fast-3g": "3G rapide",
+			"slow-3g": "3G lente"
+		},
+		"cpu": {
+			"1x": "Pleine vitesse",
+			"2x": "2× plus lent",
+			"4x": "4× plus lent",
+			"6x": "6× plus lent"
+		},
+		"cpuSlowdown": "Processeur {{rate}}× plus lent",
+		"loadTime": "Chargée en {{seconds}} s",
+		"exporting": "Export en cours…",
+		"exported": "Grille enregistrée sous {{name}}.",
+		"exportErrors": {
+			"invalid-request": "L'export a été refusé.",
+			"nothing-to-export": "Aucune capture à exporter : capturez d'abord des appareils.",
+			"busy": "Une capture ou un autre export est en cours : attendez qu'il se termine.",
+			"export-failed": "L'image de la grille n'a pas pu être construite.",
+			"write-failed": "L'image n'a pas pu être écrite à l'endroit choisi."
+		},
+		"orientation": {
+			"label": "Orientation",
+			"portrait": "Portrait",
+			"landscape": "Paysage"
+		},
+		"previewSessionHint": "Les cookies que l’aperçu envoie à ce serveur sont prêtés à chaque capture : une page derrière une connexion s’affiche comme vous la voyez. Le stockage local n’est pas partagé.",
+		"withPreviewSession": "Session de l’aperçu",
+		"markers": "Encadrer les éléments fautifs",
+		"exportPng": "Exporter en PNG",
+		"exportPdf": "Exporter en PDF",
+		"auto": "Affichée pour la revue de cette tâche : ses changements touchent l’interface.",
+		"withPersona": "Persona {{name}}",
+		"custom": {
+			"legend": "Mes appareils",
+			"add": "Ajouter un appareil",
+			"hint": "Gardés sur cet ordinateur. Largeur et hauteur en pixels CSS ; l'app vérifie chaque champ avant de l'émuler.",
+			"name": "Nom",
+			"width": "Largeur (px CSS)",
+			"height": "Hauteur (px CSS)",
+			"scale": "Densité de pixels",
+			"mobile": "Navigateur mobile (applique la balise viewport)",
+			"touch": "Écran tactile",
+			"userAgent": "User agent",
+			"userAgentFrom": "Partir du navigateur de",
+			"save": "Ajouter cet appareil",
+			"remove": "Retirer {{name}}",
+			"invalid": "Vérifiez les champs : largeur et hauteur de 240 à 3 840 px, densité de 1 à 4, un nom de 1 à 40 caractères, un user agent en ASCII simple (512 caractères au plus).",
+			"errors": {
+				"invalid-request": "La demande a été refusée.",
+				"invalid-device": "Cet appareil sort des bornes : vérifiez ses champs.",
+				"too-many": "20 appareils au plus : retirez-en un d'abord.",
+				"unknown-device": "Cet appareil n'existe plus.",
+				"write-failed": "La liste des appareils n'a pas pu être enregistrée."
+			}
+		},
+		"session": {
+			"label": "Session",
+			"blank": "Session vierge",
+			"preview": "La session de l'aperçu (cookies)",
+			"persona": "Persona : {{name}}",
+			"personaHint_one": "{{count}} cookie enregistré pour {{host}} le {{date}}, chiffré par le trousseau du système ; rejoué sur cet hôte seulement.",
+			"personaHint_other": "{{count}} cookies enregistrés pour {{host}} le {{date}}, chiffrés par le trousseau du système ; rejoués sur cet hôte seulement.",
+			"saveTitle": "Enregistrer la session de l'aperçu comme persona",
+			"saveHint": "Connectez-vous dans l'aperçu sous l'identité voulue, puis enregistrez : les cookies que l'aperçu envoie à ce serveur sont chiffrés et gardés sur cet ordinateur. Ils ne sont jamais affichés.",
+			"personaName": "Nom du persona",
+			"save": "Enregistrer le persona",
+			"delete": "Supprimer ce persona",
+			"errors": {
+				"invalid-request": "Donnez au persona un nom de 1 à 40 caractères.",
+				"not-running": "Le serveur de l'émulateur ne tourne pas : lancez-le, connectez-vous dans l'aperçu, puis enregistrez.",
+				"encryption-unavailable": "Aucun trousseau du système ne peut chiffrer les cookies : le persona n'a pas été enregistré.",
+				"session-failed": "La session de l'aperçu n'a pas pu être lue.",
+				"no-cookies": "L'aperçu n'envoie aucun cookie à ce serveur : connectez-vous d'abord dans l'aperçu.",
+				"too-many": "10 personas au plus : supprimez-en un d'abord.",
+				"unknown-persona": "Ce persona n'existe plus.",
+				"write-failed": "Les personas n'ont pas pu être enregistrés."
+			}
+		},
+		"scan": {
+			"title": "Points de rupture",
+			"intro": "Lit la page, sur l'appareil choisi, aux largeurs courantes et à un pixel de part et d'autre de chaque point de rupture de largeur que déclarent ses feuilles de style.",
+			"device": "Appareil",
+			"run": "Lire les points de rupture",
+			"running": "Lecture de la page à chaque largeur…",
+			"breakpoints": "Points de rupture déclarés : {{list}}",
+			"none": "Aucun point de rupture de largeur dans les feuilles de style que la page peut lire.",
+			"width": "Largeur",
+			"overflow": "Défilement de côté",
+			"issues": "Bugs responsive",
+			"widthPx": "{{width}} px",
+			"overflowPx": "{{px}} px",
+			"clean": "Aucun",
+			"partial": "Lecture partielle",
+			"nearBreakpoint": "À côté d'un point de rupture"
+		},
+		"mode": {
+			"captures": "Captures",
+			"live": "Vues vivantes"
+		},
+		"live": {
+			"sync": "Naviguer et défiler ensemble",
+			"hint": "Chaque appareil coché montre la page vivante. Bouger dans l'une fait bouger les autres ; le serveur de dev les recharge toutes quand le code change.",
+			"capped": "{{count}} vues vivantes au plus : les {{count}} premiers appareils cochés sont montrés.",
+			"empty": "Cochez des appareils pour les voir vivants, côte à côte.",
+			"errors": {
+				"invalid-request": "La demande a été refusée.",
+				"unknown-device": "Cet appareil n'est pas dans le catalogue.",
+				"unknown-view": "Cette vue n'appartient pas à la matrice.",
+				"not-running": "Le serveur de l'émulateur ne tourne pas : lancez-le, puis revenez.",
+				"elsewhere": "Cette vue a quitté le serveur de l'émulateur : elle n'est pas émulée.",
+				"emulation-failed": "L'appareil n'a pas pu être émulé dans cette vue."
+			}
+		}
 	}
 }

@@ -247,28 +247,16 @@ export function Ideation({ projectId, onGoToTask }: IdeationProps) {
 			{/* Dialogs — always rendered so they mount/unmount cleanly without affecting sibling layout */}
 			<IdeationDialogs
 				showConfigDialog={showConfigDialog}
-				showAddMoreDialog={showEmptyState ? false : showAddMoreDialog}
+				showAddMoreDialog={!showEmptyState && showAddMoreDialog}
 				config={config}
-				typesToAdd={showEmptyState ? [] : typesToAdd}
-				availableTypesToAdd={showEmptyState ? [] : getAvailableTypesToAdd()}
+				typesToAdd={typesToAdd}
+				availableTypesToAdd={getAvailableTypesToAdd()}
 				onToggleIdeationType={toggleIdeationType}
-				onToggleTypeToAdd={
-					showEmptyState
-						? () => {
-								/* noop */
-							}
-						: toggleTypeToAdd
-				}
+				onToggleTypeToAdd={toggleTypeToAdd}
 				onSetConfig={setConfig}
 				onCloseConfigDialog={() => setShowConfigDialog(false)}
 				onCloseAddMoreDialog={() => setShowAddMoreDialog(false)}
-				onConfirmAddMore={
-					showEmptyState
-						? () => {
-								/* noop */
-							}
-						: handleAddMoreIdeas
-				}
+				onConfirmAddMore={handleAddMoreIdeas}
 			/>
 
 			{/* Environment Configuration Modal */}

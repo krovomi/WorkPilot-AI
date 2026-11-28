@@ -1,6 +1,13 @@
 import { IPC_CHANNELS } from "../../../shared/constants";
 import type { GitHubAPIComment } from "../../../main/ipc-handlers/github/types";
 import type {
+	LearnedSuppression,
+	ReviewConventionsResult,
+	ReviewFeedbackInput,
+	ReviewFeedbackResult,
+	ReviewFeedbackStatsResult,
+} from "../../../shared/types/review-feedback";
+import type {
 	GitHubImportResult,
 	GitHubInvestigationResult,
 	GitHubInvestigationStatus,
@@ -40,7 +47,6 @@ export interface AutoFixConfig {
 	enabled: boolean;
 	labels: string[];
 	requireHumanApproval: boolean;
-	botToken?: string;
 	model: string;
 	thinkingLevel: string;
 }
@@ -266,6 +272,10 @@ export interface GitHubAPI {
 	 * the component read the rest anyway.
 	 */
 	startGitHubAuth: () => Promise<IPCResult<GitHubAuthStartResult>>;
+	/**
+	 * Whether gh holds a token: `token` is MASKED_SECRET, never the value.
+	 * Saving it with `githubAuthMethod: "oauth"` stores gh's token (main).
+	 */
 	getGitHubToken: () => Promise<IPCResult<{ token: string }>>;
 	getGitHubUser: () => Promise<IPCResult<{ username: string; name?: string }>>;
 	listGitHubUserRepos: () => Promise<
@@ -421,6 +431,36 @@ export interface GitHubAPI {
 		username: string,
 	) => Promise<boolean>;
 	markReviewPosted: (projectId: string, prNumber: number) => Promise<boolean>;
+	/** Accept / reject / not applicable on one finding of a saved review (#361). */
+	setReviewFindingFeedback: (
+		projectId: string,
+		prNumber: number,
+		input: ReviewFeedbackInput,
+	) => Promise<ReviewFeedbackResult>;
+	getReviewFindingFeedback: (
+		projectId: string,
+		prNumber: number,
+	) => Promise<ReviewFeedbackResult>;
+	/** The project's acceptance rate per category and its learned rules (#361). */
+	getReviewFeedbackStats: (
+		projectId: string,
+	) => Promise<ReviewFeedbackStatsResult>;
+	/** Forget what the project said about one kind of remark. */
+	resetReviewFeedbackRule: (
+		projectId: string,
+		signature: string,
+	) => Promise<ReviewFeedbackStatsResult>;
+	/** A maintainer approves or discards a held rejection (server projects). */
+	decideHeldReviewFeedback: (
+		projectId: string,
+		prNumber: number,
+		findingId: string,
+		approve: boolean,
+	) => Promise<ReviewFeedbackStatsResult>;
+	/** Write `.workpilot/review-conventions.md` from the feedback. */
+	writeReviewConventions: (
+		projectId: string,
+	) => Promise<ReviewConventionsResult>;
 	getPRReview: (
 		projectId: string,
 		prNumber: number,
@@ -518,7 +558,9 @@ export interface PRReviewFinding {
 		| "test"
 		| "docs"
 		| "pattern"
-		| "performance";
+		| "performance"
+		| "verification_failed"
+		| "redundancy";
 	title: string;
 	description: string;
 	file: string;
@@ -526,6 +568,8 @@ export interface PRReviewFinding {
 	endLine?: number;
 	suggestedFix?: string;
 	fixable: boolean;
+	/** Set when the project's feedback downgraded it: how often its kind was rejected. */
+	learnedRejections?: number;
 }
 
 /**
@@ -554,6 +598,7 @@ export interface PRReviewResult {
 	hasPostedFindings?: boolean;
 	postedFindingIds?: string[];
 	postedAt?: string;
+	learnedSuppressions?: LearnedSuppression[];
 	// Deep codebase context metadata
 	deepContext?: {
 		projectPatterns: Record<string, string>;
@@ -1025,6 +1070,54 @@ export const createGitHubAPI = (): GitHubAPI => ({
 
 	markReviewPosted: (projectId: string, prNumber: number): Promise<boolean> =>
 		invokeIpc(IPC_CHANNELS.GITHUB_PR_MARK_REVIEW_POSTED, projectId, prNumber),
+
+	setReviewFindingFeedback: (
+		projectId: string,
+		prNumber: number,
+		input: ReviewFeedbackInput,
+	): Promise<ReviewFeedbackResult> =>
+		invokeIpc(
+			IPC_CHANNELS.GITHUB_PR_REVIEW_FEEDBACK_SET,
+			projectId,
+			prNumber,
+			input,
+		),
+
+	getReviewFindingFeedback: (
+		projectId: string,
+		prNumber: number,
+	): Promise<ReviewFeedbackResult> =>
+		invokeIpc(IPC_CHANNELS.GITHUB_PR_REVIEW_FEEDBACK_GET, projectId, prNumber),
+
+	getReviewFeedbackStats: (
+		projectId: string,
+	): Promise<ReviewFeedbackStatsResult> =>
+		invokeIpc(IPC_CHANNELS.GITHUB_PR_REVIEW_FEEDBACK_STATS, projectId),
+
+	resetReviewFeedbackRule: (
+		projectId: string,
+		signature: string,
+	): Promise<ReviewFeedbackStatsResult> =>
+		invokeIpc(IPC_CHANNELS.GITHUB_PR_REVIEW_FEEDBACK_RESET, projectId, signature),
+
+	decideHeldReviewFeedback: (
+		projectId: string,
+		prNumber: number,
+		findingId: string,
+		approve: boolean,
+	): Promise<ReviewFeedbackStatsResult> =>
+		invokeIpc(
+			IPC_CHANNELS.GITHUB_PR_REVIEW_FEEDBACK_HELD_DECIDE,
+			projectId,
+			prNumber,
+			findingId,
+			approve,
+		),
+
+	writeReviewConventions: (
+		projectId: string,
+	): Promise<ReviewConventionsResult> =>
+		invokeIpc(IPC_CHANNELS.GITHUB_PR_REVIEW_CONVENTIONS_WRITE, projectId),
 
 	getPRReview: (
 		projectId: string,

@@ -12,7 +12,9 @@ the API environment minus every variable the server reads for itself, plus
 what the run needs (its streaming token, its user, that user's own
 integration secrets). Provider credentials the operator set for builds
 (``CLAUDE_CODE_OAUTH_TOKEN`` and the like) stay: the run needs them, and they
-are the deployment's, not a tenant's.
+are the deployment's, not a tenant's. A provider for which the starter chose
+a default AI account of their own gets that key instead
+(``services/ai_accounts.py``).
 
 ``tests/backend/test_run_env.py`` reads every ``WORKPILOT_*`` name the
 ``server`` package uses and fails when one is neither stripped here nor listed
@@ -35,6 +37,14 @@ SERVER_ONLY_ENV: frozenset[str] = frozenset(
         "WORKPILOT_ACCESS_TOKEN_TTL_MINUTES",
         "WORKPILOT_REFRESH_TOKEN_TTL_DAYS",
         "WORKPILOT_INVITATION_TTL_HOURS",
+        "WORKPILOT_PASSWORD_RESET_TTL_MINUTES",
+        "WORKPILOT_USAGE_RETENTION_DAYS",
+        "WORKPILOT_PAGE_ACTIVITY_RETENTION_DAYS",
+        # The Prometheus scraper's token (routers/operations.py).
+        "WORKPILOT_METRICS_TOKEN",
+        # The usage report's defaults (services/report_settings.py).
+        "WORKPILOT_REPORT_TIMEZONE",
+        "WORKPILOT_REPORT_LANGUAGE",
         "WORKPILOT_PASSWORD_MIN_LENGTH",
         "WORKPILOT_PASSWORD_HIBP_CHECK",
         "WORKPILOT_PUBLIC_BASE_URL",
@@ -48,6 +58,15 @@ SERVER_ONLY_ENV: frozenset[str] = frozenset(
         "WORKPILOT_RUN_ISOLATION",
         "WORKPILOT_ENTRA_TENANT_ID",
         "WORKPILOT_ENTRA_CLIENT_ID",
+        "WORKPILOT_OIDC_ISSUER",
+        "WORKPILOT_OIDC_CLIENT_ID",
+        "WORKPILOT_OIDC_NAME",
+        "WORKPILOT_OIDC_SCOPES",
+        "WORKPILOT_SELF_APPROVAL",
+        "WORKPILOT_APPROVAL_QUORUM",
+        "WORKPILOT_APPROVAL_ROLES",
+        "WORKPILOT_APPROVAL_ESCALATION_HOURS",
+        "WORKPILOT_APPROVAL_ESCALATION_ROLES",
         "WORKPILOT_SMTP_HOST",
         "WORKPILOT_SMTP_PORT",
         "WORKPILOT_SMTP_USER",
@@ -57,6 +76,8 @@ SERVER_ONLY_ENV: frozenset[str] = frozenset(
         "WORKPILOT_SMTP_USE_SSL",
         "WORKPILOT_ADMIN_PASSWORD",
         "WORKPILOT_WS_ALLOWED_ORIGINS",
+        # Where the server is hosted (deploy/configure.py): the deploy's.
+        "WORKPILOT_HOSTING",
         # The PostgreSQL password of deploy/docker-compose.yml, which reaches
         # the API through the same env file.
         "POSTGRES_PASSWORD",
@@ -76,6 +97,12 @@ RUN_ENV: frozenset[str] = frozenset(
         # The card's phone targets (``run_manager.card_environment``): the
         # server's own value would choose for every card.
         "WORKPILOT_MOBILE_TARGETS",
+        # The run's usage pipe (``usage_records.UsageChannel``): a value the
+        # server had would point the run at a descriptor that is not its own.
+        "WORKPILOT_USAGE_FD",
+        # The groups of the run's starter, whose ``team:`` memories it
+        # recalls (``brain.lifecycle.scopes.TEAMS_ENV``).
+        "WORKPILOT_RECALL_TEAMS",
     }
 )
 

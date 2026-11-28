@@ -13,7 +13,7 @@ when absent, the runner saves the current contracts and returns an empty diff.
 Output protocol (one JSON object per line, prefixed):
     API_WATCHER_EVENT:{"type": "progress", "data": {"status": "..."}}
     API_WATCHER_RESULT:{...diff dict...}
-    API_WATCHER_ERROR:<message>
+    API_WATCHER_ERROR:"<message>"   (a JSON string)
 """
 
 from __future__ import annotations
@@ -150,6 +150,9 @@ def _empty_diff(fmt: ContractFormat = ContractFormat.UNKNOWN) -> dict[str, Any]:
 
 
 def run_scan(project_path: Path) -> dict[str, Any]:
+    # Resolved like the files found under it: through a symlinked or relative
+    # path, every contract fell outside it and none could be parsed.
+    project_path = project_path.resolve()
     _emit_event("start", {"status": "Discovering API specifications..."})
     specs = _discover_specs(project_path)
 
@@ -212,6 +215,13 @@ def run_scan(project_path: Path) -> dict[str, Any]:
             "diff": _empty_diff(),
             "migrationGuideMarkdown": "",
             "summary": f"Failed to read baseline: {exc}",
+        }
+    if not isinstance(baseline_data, dict) or not baseline_data:
+        # An empty baseline stopped the runner with an empty error message.
+        return {
+            "diff": _empty_diff(),
+            "migrationGuideMarkdown": "",
+            "summary": "Failed to read baseline: it holds no contract",
         }
 
     _emit_event("progress", {"status": "Diffing against baseline..."})
@@ -322,6 +332,11 @@ def main() -> None:
     project_path = Path(args.project_path)
     if not project_path.exists():
         _emit("API_WATCHER_ERROR", f"Project path does not exist: {project_path}")
+        sys.exit(1)
+    if not project_path.is_dir():
+        # Said here, in the same words on every OS: the error the scan would
+        # raise is worded by the system ("[WinError 267] ..." on Windows).
+        _emit("API_WATCHER_ERROR", f"Not a directory: {project_path}")
         sys.exit(1)
 
     if args.save_baseline:

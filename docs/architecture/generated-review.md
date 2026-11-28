@@ -1,3 +1,9 @@
+---
+feature: Code généré en revue
+summary: >-
+  Le code d'une page va sur la branche d'une carte en revue, jamais dans le dossier du projet.
+---
+
 # Code généré en revue : une carte, un worktree, une PR
 
 > Pourquoi une page qui écrit du code dans un projet passe par une carte du Kanban, et comment.
@@ -19,7 +25,7 @@ pages écrivaient, elles, directement dans le checkout, donc sur la branche cour
 | Barre « Commande rapide » du Kanban | tout ce que l'agent de la commande écrit ([F182](../audit/findings/F182.md)) | 5 |
 
 Passent déjà par une carte (donc un worktree et une PR) : Visuel vers Code, Migration de code,
-Dette technique, Plateformes mobiles, migration .NET, autofix GitHub et GitLab, les fonctions
+Dette technique, Plateformes mobiles, migration .NET, autofix GitHub, les fonctions
 et le nettoyage des notebooks ([notebook-agent.md](notebook-agent.md)). N'écrivent rien
 dans le projet : la traduction inter-langages (dossier temporaire), les extraits contextuels
 (copie), le playground, le compagnon, les analyses (accessibilité, i18n, dérive de doc,
@@ -50,6 +56,14 @@ avant d'écrire :
    les fichiers qu'elle a changés. La page montre la carte (« Voir la carte ») et peut ouvrir la PR
    (« Créer la PR », le même `TASK_WORKTREE_CREATE_PR` que le Kanban : GitHub, GitLab, Azure
    DevOps).
+5. **Le log.** La carte ne passe jamais par le pipeline, qui écrit le `task_logs.json` d'une
+   tâche : chaque exécution commitée y ajoute donc ses entrées dans la phase de codage
+   (`generated-review/review-log.ts`) : son résumé, les lignes d'étape de la page (le studio de
+   tests passe les siennes, 400 au plus), les fichiers du commit et son message. Ni prompt, ni
+   code généré (S1). L'onglet Logs et le Bureau Pixel le lisent comme celui de toute tâche ; sans
+   lui, ils restaient sur « En attente de logs… ». Le titre de la carte nomme le fichier par son
+   nom, jamais par son chemin absolu, même quand un dossier a une espace
+   (`generated-review/review-subject.ts`).
 
 Les exécutions d'une même page rejoignent la carte qui attend encore sa revue : des tests puis
 les paquets qu'ils demandent, deux designs d'un même écran font une carte, une branche, une PR.
@@ -121,7 +135,7 @@ fois le travail fini, il occupe le disque pour rien (`main/worktree-purge/`).
   GitLab, Azure DevOps). Fusionnée, la carte passe « Terminé » avec `prMergedAt`, puis son worktree
   et sa branche locale `workpilot/<spec>` sont supprimés, sans demander. Les parties d'un
   découpage sont suivies par `split-merge-watch.ts` et purgées ici une fois terminées.
-- **« Purger »** (barre du Kanban) : liste les worktrees des cartes à PR fusionnée, terminées,
+- **« Purger »** (menu « ⋯ » de la barre du Kanban) : liste les worktrees des cartes à PR fusionnée, terminées,
   archivées ou abandonnées, avec la place occupée, et supprime ceux que la personne coche.
 - **Jamais purgé** : un worktree avec des modifications non commitées (affiché, case grisée),
   une carte sur laquelle une autre est encore empilée, une carte en cours, un lien à la place du
@@ -131,4 +145,4 @@ fois le travail fini, il occupe le disque pour rien (`main/worktree-purge/`).
 
 Vérification : `pytest tests/test_review_worktree_runner.py -q` ;
 `pytest tests/test_slash_command_runner.py -q` ;
-`cd apps/frontend && pnpm test -- generated-review test-generation-service-errors design-to-code-write changelog-review pair-programming-review worktree-purge WorktreePurgeButton quick-command-run`.
+`cd apps/frontend && pnpm test -- generated-review test-generation-service-errors design-to-code-write changelog-review pair-programming-review worktree-purge WorktreePurgeDialog quick-command-run`.

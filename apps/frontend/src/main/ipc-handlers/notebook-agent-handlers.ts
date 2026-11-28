@@ -29,6 +29,7 @@ import {
 	readRunRequest,
 	refactorOnReviewCard,
 } from "../notebook-agent/notebook-runs";
+import { decodeRunnerError } from "../utils/runner-error";
 
 interface RunRequest {
 	projectPath: string;
@@ -113,7 +114,7 @@ export function registerNotebookAgentHandlers(): void {
 							console.error("[Notebook] Bad result line:", err);
 						}
 					} else if (line.startsWith(ERROR_PREFIX)) {
-						errorMessage = line.slice(ERROR_PREFIX.length);
+						errorMessage = decodeRunnerError(line.slice(ERROR_PREFIX.length));
 					}
 				}
 			});

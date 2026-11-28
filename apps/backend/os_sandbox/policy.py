@@ -147,6 +147,24 @@ def _state_dir(entry: str) -> Path | None:
     return path
 
 
+def _hidden_around(hidden: Path, writable: Iterable[Path]) -> list[Path]:
+    """`hidden`, or, when a writable path lies inside it, everything in it
+    but the way down to that path."""
+    inside = [w for w in writable if w == hidden or w.is_relative_to(hidden)]
+    if not inside:
+        return [hidden]
+    if hidden in inside or not hidden.is_dir():
+        return []
+    try:
+        entries = sorted(hidden.iterdir())
+    except OSError:
+        return []
+    kept: list[Path] = []
+    for entry in entries:
+        kept.extend(_hidden_around(entry, inside))
+    return kept
+
+
 def _protected_inside(root: Path) -> list[Path]:
     """The security configuration directly under a writable root."""
     found = [root / name for name in PROTECTED_CONFIG_NAMES]
@@ -227,12 +245,12 @@ def build_policy(
         hidden_candidates.append(git_dir.parent / ".workpilot" / ".env")
     hidden_existing = _existing(hidden_candidates)
     # A hidden path inside a writable one stays hidden; a writable one inside
-    # a hidden one (an agent's own state under ~/.config) stays writable,
-    # because the agent's login is its own.
+    # a hidden one (an agent's own state under ~/.config, the folder of a CLI
+    # account under WorkPilot's own settings) stays writable, because the
+    # agent's login is its own, and the rest of that hidden folder stays
+    # hidden.
     hidden_existing = [
-        h
-        for h in hidden_existing
-        if not any(w == h or w.is_relative_to(h) for w in writable)
+        kept for h in hidden_existing for kept in _hidden_around(h, writable)
     ]
     hidden_dirs = tuple(p for p in hidden_existing if p.is_dir())
     hidden_files = tuple(p for p in hidden_existing if not p.is_dir())

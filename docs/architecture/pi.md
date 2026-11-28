@@ -1,3 +1,10 @@
+---
+feature: pi (pi.dev)
+summary: >-
+  Harness qui n'émet rien (pi lit `AGENTS.md`, `.agents/skills/`), `PiCliAgentClient` en `--mode
+  json` puis RPC, droits par `--tools`, `/trust` jamais accordé à la place d'une personne.
+---
+
 # pi (pi.dev) — plan d'intégration par lots
 
 > **Statut : lots 0 à 5 livrés** (lot 5 en partie, dit au § 8). Un lot = une PR vers `develop`. Les lots sont ordonnés par

@@ -5,8 +5,9 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const selected = vi.hoisted(() => ({ id: "p1" as string | null }));
 vi.mock("../project-store", () => ({
-	useProjectStore: { getState: () => ({ selectedProjectId: "p1" }) },
+	useProjectStore: { getState: () => ({ selectedProjectId: selected.id }) },
 }));
 
 import type { DesignStackDetection, DesignToCodeResult } from "../../../shared/types/design-to-code";
@@ -14,6 +15,7 @@ import { buildDesignTaskDescription } from "../../components/visual-to-code/desi
 import { stepOfPhase, stepStates } from "../../lib/design-import-steps";
 import {
 	detectDesignStack,
+	loadDesignLoopStats,
 	runDesignToCodePipeline,
 	useDesignToCodeStore,
 	writeDesignFilesToProject,
@@ -23,6 +25,18 @@ const api = {
 	runDesignToCodePipeline: vi.fn(),
 	detectDesignStack: vi.fn(),
 	writeDesignFiles: vi.fn(),
+	getDesignLoopStats: vi.fn(),
+};
+
+const STATS = {
+	loops: 2,
+	converged: 1,
+	averageScore: 0.9,
+	averageIterations: 2,
+	writes: 1,
+	kept: 1,
+	pending: 0,
+	retouched: 0,
 };
 
 function result(overrides: Partial<DesignToCodeResult> = {}): DesignToCodeResult {
@@ -58,6 +72,8 @@ function result(overrides: Partial<DesignToCodeResult> = {}): DesignToCodeResult
 
 beforeEach(() => {
 	vi.clearAllMocks();
+	selected.id = "p1";
+	api.getDesignLoopStats.mockResolvedValue(STATS);
 	(globalThis as unknown as { electronAPI: typeof api }).electronAPI = api;
 	useDesignToCodeStore.setState({
 		...useDesignToCodeStore.getInitialState(),
@@ -71,6 +87,7 @@ describe("stepStates", () => {
 	it("maps every runner phase to a step", () => {
 		expect(stepOfPhase("analyzing")).toBe("vision");
 		expect(stepOfPhase("code_generation")).toBe("code");
+		expect(stepOfPhase("render_loop")).toBe("code");
 		expect(stepOfPhase("figma_sync")).toBe("project");
 		expect(stepOfPhase("unknown")).toBeNull();
 	});
@@ -130,6 +147,24 @@ describe("design-to-code store", () => {
 		]);
 	});
 
+	it("keeps the loop's latest step and forgets the picked iteration on a new run", () => {
+		const store = useDesignToCodeStore.getState();
+		store.setRenderLoop(false);
+		store.selectIteration(2);
+		expect(useDesignToCodeStore.getState()).toMatchObject({ renderLoop: false, selectedIteration: 2 });
+
+		store.startPipeline();
+		expect(useDesignToCodeStore.getState().selectedIteration).toBeNull();
+		const loop = { stage: "correct" as const, iteration: 1, max_iterations: 5, score: 0.8, best: 0 };
+		store.applyProgress({ phase: "render_loop", status: "", detail: { loop } });
+		store.applyProgress({ phase: "render_loop", status: "", detail: {} });
+		expect(useDesignToCodeStore.getState()).toMatchObject({ phase: "render_loop", live: { loop } });
+
+		store.selectIteration(1);
+		store.resetPipeline();
+		expect(useDesignToCodeStore.getState()).toMatchObject({ selectedIteration: null, live: { loop: null } });
+	});
+
 	it("keeps an edited sentence and restores the default when cleared", () => {
 		useDesignToCodeStore.getState().setNote(1, "  reuse our tokens  ");
 		expect(useDesignToCodeStore.getState().notes).toEqual({ 1: "reuse our tokens" });
@@ -148,13 +183,36 @@ describe("design-to-code store", () => {
 		api.runDesignToCodePipeline.mockResolvedValue(result());
 		await runDesignToCodePipeline();
 		expect(api.runDesignToCodePipeline).toHaveBeenCalledWith(
-			expect.objectContaining({ projectId: "p1", framework: "maui" }),
+			expect.objectContaining({ projectId: "p1", framework: "maui", renderLoop: true }),
 		);
 		expect(useDesignToCodeStore.getState()).toMatchObject({
 			phase: "complete",
 			selectedStep: "code",
 			selectedFilePath: "src/Header.tsx",
 		});
+	});
+
+	it("sends the loop's options only with the loop", async () => {
+		useDesignToCodeStore.setState({ imageData: "data:image/png;base64,AAAA" });
+		api.runDesignToCodePipeline.mockResolvedValue(result());
+		useDesignToCodeStore.getState().setLoopOptions({ maxIterations: 3, states: true });
+		expect(useDesignToCodeStore.getState().loopOptions).toMatchObject({
+			maxIterations: 3,
+			threshold: 0.95,
+			states: true,
+			responsive: false,
+		});
+		await runDesignToCodePipeline();
+		expect(api.runDesignToCodePipeline).toHaveBeenLastCalledWith(
+			expect.objectContaining({
+				renderLoopOptions: expect.objectContaining({ maxIterations: 3, states: true }),
+			}),
+		);
+		useDesignToCodeStore.getState().setRenderLoop(false);
+		await runDesignToCodePipeline();
+		expect(api.runDesignToCodePipeline).toHaveBeenLastCalledWith(
+			expect.objectContaining({ renderLoop: false, renderLoopOptions: undefined }),
+		);
 	});
 
 	it("records the failed step when the run fails", async () => {
@@ -180,6 +238,45 @@ describe("design-to-code store", () => {
 			{ path: "tests/visual/header.spec.ts", content: "test()" },
 		]);
 		expect(useDesignToCodeStore.getState()).toMatchObject({ selectedStep: "project", writing: false });
+	});
+
+	it("reads the loop's figures again after a loop or a write that reached a card", async () => {
+		useDesignToCodeStore.setState({ imageData: "data:image/png;base64,AA" });
+		api.runDesignToCodePipeline.mockResolvedValue(result());
+		await runDesignToCodePipeline();
+		expect(api.getDesignLoopStats).not.toHaveBeenCalled();
+		api.runDesignToCodePipeline.mockResolvedValue(
+			result({ render_loop: { status: "converged" } as DesignToCodeResult["render_loop"] }),
+		);
+		await runDesignToCodePipeline();
+		expect(api.getDesignLoopStats).toHaveBeenCalledTimes(1);
+
+		api.writeDesignFiles.mockResolvedValue({ written: [], refused: [] });
+		await writeDesignFilesToProject();
+		expect(api.getDesignLoopStats).toHaveBeenCalledTimes(1);
+		api.writeDesignFiles.mockResolvedValue({ written: [], refused: [], review: { specId: "001" } });
+		await writeDesignFilesToProject();
+		await vi.waitFor(() => expect(api.getDesignLoopStats).toHaveBeenCalledTimes(2));
+		expect(useDesignToCodeStore.getState().loopStats).toEqual(STATS);
+	});
+
+	it("keeps the figures of the selected project only", async () => {
+		await loadDesignLoopStats(null);
+		expect(useDesignToCodeStore.getState().loopStats).toBeNull();
+		expect(api.getDesignLoopStats).not.toHaveBeenCalled();
+
+		selected.id = "p2";
+		await loadDesignLoopStats("p1");
+		expect(useDesignToCodeStore.getState().loopStats).toBeNull();
+
+		selected.id = "p1";
+		api.getDesignLoopStats.mockResolvedValueOnce(undefined);
+		await loadDesignLoopStats("p1");
+		expect(useDesignToCodeStore.getState().loopStats).toBeNull();
+
+		api.getDesignLoopStats.mockRejectedValueOnce(new Error("ipc"));
+		await loadDesignLoopStats("p1");
+		expect(useDesignToCodeStore.getState().loopStats).toBeNull();
 	});
 
 	it("survives a project whose stack cannot be read", async () => {

@@ -49,6 +49,8 @@ export interface Incident {
 	fix_branch?: string;
 	fix_pr_url?: string;
 	fix_worktree?: string;
+	/** The board card whose build fixes the incident. */
+	fix_card?: string;
 	qa_result?: Record<string, unknown>;
 	error_message?: string;
 	stack_trace?: string;
@@ -83,13 +85,149 @@ export interface FragilityReport {
 	suggested_tests: string[];
 }
 
+// ── Risk trends (proactive mode, #370) ─────────────────────
+
+export type RiskTrajectory =
+	| "new"
+	| "stable"
+	| "slow_rise"
+	| "fast_rise"
+	| "improving";
+
+export interface RiskPoint {
+	day: string;
+	risk: number;
+}
+
+export interface FileRiskTrend {
+	file: string;
+	trajectory: RiskTrajectory;
+	/** Risk points per week over the window. */
+	slope: number;
+	acceleration: number;
+	risk: number;
+	start_risk: number;
+	reset: boolean;
+	entered_hot: boolean;
+	complexity_change_pct: number;
+	churn_start: number;
+	churn_now: number;
+	points: RiskPoint[];
+}
+
+export interface RiskCluster {
+	directory: string;
+	files: string[];
+	rising: number;
+	fast: number;
+	total: number;
+	share: number;
+	mean_slope: number;
+}
+
+export interface RiskTrendReport {
+	snapshots: number;
+	window_days: number;
+	files: number;
+	counts: Record<RiskTrajectory, number>;
+	hot: FileRiskTrend[];
+	rising: FileRiskTrend[];
+	improving: FileRiskTrend[];
+	entered_hot: string[];
+	clusters: RiskCluster[];
+}
+
+// ── Incident groups (production mode, #372) ────────────────
+
+export interface IncidentGroup {
+	sources: string[];
+	report_count: number;
+}
+
+export interface SuspectCommit {
+	sha: string;
+	subject: string;
+	committed_at: number;
+	files: string[];
+	score: number;
+	since?: string;
+}
+
+/** Open production incidents whose most suspect commit is the same. */
+export interface IncidentCluster {
+	id: string;
+	commit: string;
+	subject: string;
+	incident_ids: string[];
+	severity: IncidentSeverity;
+	occurrences: number;
+	affected_users: number;
+	sources: string[];
+}
+
+// ── Bisect (CI/CD mode, #375) ──────────────────────────────
+
+export type BisectStatus =
+	| "found"
+	| "ambiguous"
+	| "flaky"
+	| "not_reproduced"
+	| "good_fails"
+	| "budget"
+	| "unavailable";
+
+export interface BisectStep {
+	sha: string;
+	outcome: "good" | "bad" | "skip";
+	role: "bad-check" | "flaky-check" | "good-check" | "search";
+	seconds: number;
+	detail: string;
+}
+
+export interface BisectResult {
+	status: BisectStatus;
+	good: string;
+	bad: string;
+	first_bad: string;
+	first_bad_subject: string;
+	candidates: string[];
+	steps: BisectStep[];
+	tested: number;
+	commits_in_range: number;
+	command: string;
+	narrowed: boolean;
+	reason: string;
+	cached: boolean;
+}
+
+export interface BisectTriggers {
+	fired: boolean;
+	reasons: Array<"trivial_diff" | "old_test" | "dependency_changed">;
+	changed_lines: number | null;
+	old_tests: string[];
+	dependency_files: string[];
+}
+
+/** One line the bisect streams while it runs. */
+export interface BisectProgressEvent {
+	incidentId: string;
+	step: BisectStep & { tested: number };
+}
+
+export interface BisectRequestResult {
+	success: boolean;
+	result?: BisectResult;
+	error?: string;
+}
+
 // ── Configuration ──────────────────────────────────────────
 
 export interface CICDConfig {
 	enabled: boolean;
 	watchBranches: string[];
 	autoFixEnabled: boolean;
-	autoCreatePR: boolean;
+	/** Bisect when a trigger fires and a green commit is known (#375). */
+	autoBisect?: boolean;
 }
 
 export interface ProductionConfig {
@@ -133,6 +271,9 @@ export interface SelfHealingDashboardData {
 		max_risk: number;
 		top_files: Array<{ file: string; risk: number }>;
 	};
+	/** Absent when the dashboard came from the Node fallback (no history). */
+	riskTrends?: RiskTrendReport;
+	incidentClusters?: IncidentCluster[];
 }
 
 // ── IPC Payloads ───────────────────────────────────────────

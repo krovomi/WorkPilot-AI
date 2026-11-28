@@ -6,20 +6,36 @@
 import type { ServerClient } from "./client";
 import type {
 	AgentRun,
+	ApproveResult,
 	AuthConfig,
 	BoardCard,
+	CardApproval,
 	CardChanges,
 	CardDetails,
 	CardKind,
+	Criticality,
+	Delegation,
+	ExecutionWavePlan,
+	GovernanceReport,
 	MyPermissions,
+	PageVisitCount,
+	ProjectMember,
 	RunPhase,
 	ServerProject,
 	SteeringMessage,
 	TaskLogs,
 	UiPreferences,
+	WaveHistory,
+	WaveRunAnswer,
 } from "./types";
 import type { ThemePrefs } from "../ui/theme-ids";
+import type { Leaderboard, LeaderboardPeriod, LeaderboardScope, ReplayShare } from "../team/types";
+import type { Channel, ChannelSettings, Moment, NeedsYouOverview, TestResult } from "../needs-you/types";
 import type { Memory } from "../context/index-file";
+import type { AskAnswer } from "../board-ask/types";
+import type { MyUsage, UsageNotice } from "../usage/types";
+import type { AiAccount, AiAccounts } from "../ai-accounts/types";
+import { decided, type MemoryDecision, type MemoryLifecycle } from "../context/lifecycle";
 import type { EngineOption, SettingsPayload } from "../new-card/engine";
 import type { AnalysisKind, CostSummary, DashboardSnapshot, WorkSession } from "../insights/types";
 import type {
@@ -68,6 +84,8 @@ export function api(client: ServerClient) {
 	return {
 		authConfig: () => client.publicRequest<AuthConfig>("GET", "/auth/config"),
 		permissions: () => client.request<MyPermissions>("GET", "/auth/me/permissions"),
+		/** How the current sign-in was opened; read through `auth/my-session.ts`, never shown raw. */
+		mySession: () => client.request<unknown>("GET", "/auth/me/session"),
 		projects: () => client.request<ServerProject[]>("GET", "/projects"),
 		project: (projectId: string) => client.request<ServerProject>("GET", `/projects/${enc(projectId)}`),
 		cards: async (projectId: string) =>
@@ -82,12 +100,36 @@ export function api(client: ServerClient) {
 				...(card.settings ? { settings: card.settings } : {}),
 				...(card.attachments?.length ? { attachments: card.attachments } : {}),
 			}),
+		/** A question about the board, answered by the server as a job (`shared_board/ask.py`). */
+		askBoard: (projectId: string, body: { question: string; language: string; history: { question: string; answer: string }[] }) =>
+			client.request<{ job: FeatureJob }>("POST", `/api/board/ask?project_id=${enc(projectId)}`, body),
+		boardAnswer: (projectId: string, jobId: string) =>
+			client.request<AskAnswer>("GET", `/api/board/ask/jobs/${enc(jobId)}?project_id=${enc(projectId)}`),
+		cancelBoardAsk: (projectId: string, jobId: string) =>
+			client.request<{ cancelled: boolean }>("POST", `/api/board/ask/jobs/${enc(jobId)}/cancel?project_id=${enc(projectId)}`),
 		/** The providers and models a card may be created with (`shared_board/engines.py`). */
 		engines: async (projectId: string) =>
 			(await client.request<{ engines: EngineOption[] }>("GET", `/api/board/engines?project_id=${enc(projectId)}`))
 				.engines,
 		deleteCard: (projectId: string, cardId: string) => client.request("DELETE", cardsPath(projectId, cardId)),
-		approve: (projectId: string, cardId: string) => client.request("POST", cardsPath(projectId, cardId, "approve")),
+		approve: (projectId: string, cardId: string) =>
+			client.request<ApproveResult>("POST", cardsPath(projectId, cardId, "approve")),
+		/** A card's criticality, its approvals and what is missing (`shared_board/approvals.py`). */
+		approvals: (projectId: string, cardId: string) =>
+			client.request<CardApproval>("GET", cardsPath(projectId, cardId, "approvals")),
+		setCriticality: (projectId: string, cardId: string, criticality: Criticality) =>
+			client.request<CardApproval>("PUT", cardsPath(projectId, cardId, "criticality"), { criticality }),
+		/** The approvals lent on the project, running or to come. */
+		delegations: (projectId: string) =>
+			client.request<Delegation[]>("GET", `/api/board/delegations?project_id=${enc(projectId)}`),
+		lendApproval: (projectId: string, toUserId: string, endsAt: string) =>
+			client.request<Delegation>("POST", `/api/board/delegations?project_id=${enc(projectId)}`, {
+				to_user_id: toUserId,
+				ends_at: endsAt,
+			}),
+		endDelegation: (projectId: string, delegationId: string) =>
+			client.request("DELETE", `/api/board/delegations/${enc(delegationId)}?project_id=${enc(projectId)}`),
+		members: (projectId: string) => client.request<ProjectMember[]>("GET", `/projects/${enc(projectId)}/members`),
 		changes: (projectId: string, cardId: string) =>
 			client.request<CardChanges>("GET", cardsPath(projectId, cardId, "changes")),
 		logs: async (projectId: string, cardId: string) =>
@@ -129,8 +171,6 @@ export function api(client: ServerClient) {
 				featurePath("insights", `/sessions/${enc(sessionId)}/messages`, projectId),
 				{ message },
 			),
-		cancelInsightJob: (projectId: string, jobId: string) =>
-			client.request<{ cancelled: boolean }>("POST", featurePath("insights", `/jobs/${enc(jobId)}/cancel`, projectId)),
 		featureSnapshot: (feature: JobFeature, projectId: string) =>
 			client.request<FeatureSnapshot>("GET", featurePath(feature, "/snapshot", projectId)),
 		startFeatureJob: (feature: JobFeature, projectId: string, options: Record<string, unknown> = {}) =>
@@ -171,24 +211,131 @@ export function api(client: ServerClient) {
 			client.request<{ cancelled: boolean }>("POST", featurePath("analyses", `/${kind}/jobs/${enc(jobId)}/cancel`, projectId)),
 		memories: async (projectId: string, query: string) => {
 			const q = query.trim();
-			const found = await client.request<{ available: boolean; memories?: Memory[]; results?: Memory[] }>(
+			type Row = Omit<Memory, "id"> & { id?: string; path?: string };
+			const found = await client.request<{ available: boolean; memories?: Row[]; results?: Row[] }>(
 				"GET",
 				featurePath("context", "/memories", projectId, `&limit=50${q ? `&query=${enc(q)}` : ""}`),
 			);
-			return { available: found.available, memories: (q ? found.results : found.memories) ?? [] };
+			// A search result is named by its vault path, as a listed memory by its id.
+			const rows = (q ? found.results : found.memories) ?? [];
+			return {
+				available: found.available,
+				memories: rows.map(({ path, ...m }): Memory => ({ ...m, id: m.id ?? path ?? "" })),
+			};
 		},
+		/** The memory's trash, its pins and how long a forgotten one stays. */
+		memoryLifecycle: (projectId: string) =>
+			client.request<MemoryLifecycle>("GET", featurePath("context", "/memory/lifecycle", projectId, "&limit=1")),
+		forgetMemory: async (projectId: string, id: string, reason: string) =>
+			decided(
+				await client.request<MemoryDecision>("POST", featurePath("context", "/memory/forget", projectId), { id, reason }),
+			),
+		restoreMemory: async (projectId: string, id: string) =>
+			decided(await client.request<MemoryDecision>("POST", featurePath("context", "/memory/restore", projectId), { id })),
+		pinMemory: async (projectId: string, id: string, pinned: boolean) =>
+			decided(
+				await client.request<MemoryDecision>("POST", featurePath("context", "/memory/pin", projectId), { id, pinned }),
+			),
+		/** The policy of the project, its waiting calls and its agents, as the server reads them. */
+		governance: (projectId: string) =>
+			client.request<GovernanceReport>("GET", featurePath("governance", "", projectId)),
+		/** Approve or refuse a waiting call, in the name of the person signed in. */
+		answerGovernance: (projectId: string, requestId: string, approved: boolean) =>
+			client.request<{ answer: { decision: "approved" | "refused" } }>(
+				"POST",
+				featurePath("governance", `/approvals/${enc(requestId)}`, projectId),
+				{ approved },
+			),
+		/** The kill switch of the project: the person's agents, or (its owner) all of them. */
+		stopGovernance: (projectId: string, scope: "mine" | "project") =>
+			client.request<{ stoppedRuns: number; stoppedJobs: number }>(
+				"POST",
+				featurePath("governance", "/stop", projectId),
+				{ scope },
+			),
+		/** The waves of the backlog, as the server plans them now. */
+		wavePlan: (projectId: string) =>
+			client.request<ExecutionWavePlan>("GET", featurePath("execution-waves", "/plan", projectId)),
+		waveRun: (projectId: string) =>
+			client.request<WaveRunAnswer>("GET", featurePath("execution-waves", "/run", projectId)),
+		/** Plans the backlog and starts its first wave, as the person signed in. */
+		startWaveRun: (projectId: string, advanceWhen: "merged" | "review") =>
+			client.request<WaveRunAnswer>("POST", featurePath("execution-waves", "/run", projectId), { advanceWhen }),
+		/** Starts what may start now; the next wave once this one settled. */
+		stepWaveRun: (projectId: string) =>
+			client.request<WaveRunAnswer>("POST", featurePath("execution-waves", "/run/step", projectId)),
+		stopWaveRun: (projectId: string) =>
+			client.request<WaveRunAnswer>("DELETE", featurePath("execution-waves", "/run", projectId)),
+		waveHistory: (projectId: string) =>
+			client.request<WaveHistory>("GET", featurePath("execution-waves", "/history", projectId)),
 		secretKinds: async () => (await client.request<{ kinds: string[] }>("GET", "/users/me/secrets")).kinds,
 		setSecret: (kind: SecretKind, value: string) =>
 			client.request<{ saved: boolean }>("PUT", "/users/me/secrets", { kind, value }),
 		deleteSecret: (kind: SecretKind) =>
 			client.request<{ deleted: boolean }>("DELETE", `/users/me/secrets/${enc(kind)}`),
+		/** The person's AI accounts on the server; never a key. */
+		aiAccounts: () => client.request<AiAccounts>("GET", "/users/me/ai-accounts"),
+		addAiAccount: (provider: string, name: string, key: string) =>
+			client.request<AiAccount>("POST", "/users/me/ai-accounts", { provider, name, key }),
+		/** Rename an account, replace its key, or both. */
+		updateAiAccount: (accountId: string, change: { name?: string; key?: string }) =>
+			client.request<AiAccount>("PATCH", `/users/me/ai-accounts/${enc(accountId)}`, change),
+		deleteAiAccount: (accountId: string) =>
+			client.request<{ deleted: boolean; was_default: boolean }>("DELETE", `/users/me/ai-accounts/${enc(accountId)}`),
+		/** The account whose key the person's runs get for `provider`; null: the server's own. */
+		setDefaultAiAccount: (provider: string, accountId: string | null) =>
+			client.request<{ provider: string; account_id: string | null }>(
+				"PUT",
+				`/users/me/ai-accounts/defaults/${enc(provider)}`,
+				{ account_id: accountId },
+			),
 		preferences: () => client.request<UiPreferences>("GET", "/users/me/preferences"),
 		setPreferences: (prefs: ThemePrefs) =>
 			client.request<UiPreferences>("PUT", "/users/me/preferences", {
 				theme: prefs.theme,
 				colorTheme: prefs.colorTheme,
 			}),
+		/** The person's own "needs you" channels and moments (`server/routers/needs_you.py`). */
+		needsYou: () => client.request<NeedsYouOverview>("GET", "/users/me/needs-you"),
+		saveNeedsYouChannel: (channel: Channel, settings: ChannelSettings) =>
+			client.request<{ saved: boolean }>("PUT", `/users/me/needs-you/channels/${enc(channel)}`, settings),
+		deleteNeedsYouChannel: (channel: Channel) =>
+			client.request<{ deleted: boolean }>("DELETE", `/users/me/needs-you/channels/${enc(channel)}`),
+		testNeedsYouChannel: async (channel: Channel) =>
+			(await client.request<{ result: TestResult }>("POST", `/users/me/needs-you/channels/${enc(channel)}/test`))
+				.result,
+		saveNeedsYouMoments: (events: Record<Moment, boolean>, locale: string) =>
+			client.request<{ saved: boolean }>("PUT", "/users/me/needs-you/preferences", { events, locale }),
+		/** The team's leaderboard: only those who agreed are named (`shared_features/pixel_office.py`). */
+		leaderboard: (projectId: string, scope: LeaderboardScope, period: LeaderboardPeriod) =>
+			client.request<Leaderboard>("GET", featurePath("pixel-office", "/leaderboard", projectId, `&scope=${scope}&period=${period}`)),
+		/** Shows, or stops showing, the person's own name on the organization's leaderboards. */
+		setLeaderboardConsent: (projectId: string, visible: boolean) =>
+			client.request<{ visible: boolean }>("PUT", featurePath("pixel-office", "/consent", projectId), { visible }),
+		/** The replay links the person made, on every project they still reach. */
+		myReplayShares: async () =>
+			(await client.request<{ shares: ReplayShare[] }>("GET", "/api/features/replay-shares/mine")).shares,
+		revokeReplayShare: (projectId: string, shareId: string) =>
+			client.request<{ revoked: boolean }>("DELETE", featurePath("replay-shares", `/${enc(shareId)}`, projectId)),
 		streamInfo: () => client.request<{ url: string | null }>("GET", "/api/board/stream"),
+		/** What the organization's administrators see of the person, for these UTC days. */
+		myUsage: (start: string, end: string) =>
+			client.request<MyUsage>("GET", `/users/me/usage?start=${enc(start)}&end=${enc(end)}`),
+		/** Everything the server keeps about the person's usage, as JSON text. */
+		exportMyUsage: async () =>
+			JSON.stringify(await client.request<unknown>("GET", "/users/me/usage/export"), null, 2),
+		/** What is measured, and whether the person still has to be told. */
+		usageNotice: () => client.request<UsageNotice>("GET", "/users/me/usage-notice"),
+		/** The person read the notice; the server records it. */
+		markUsageNoticeSeen: () => client.request<UsageNotice>("POST", "/users/me/usage-notice"),
+		/** Whether the person's organization counts which screens they open. */
+		pageActivity: () => client.request<{ enabled: boolean }>("GET", "/users/me/page-activity"),
+		/** Today's opens per screen (`usage/pages.ts` names only). */
+		sendPageActivity: (visits: PageVisitCount[]) =>
+			client.request<{ enabled: boolean; recorded: number }>("POST", "/users/me/page-activity", {
+				client: "mobile",
+				visits,
+			}),
 	};
 }
 

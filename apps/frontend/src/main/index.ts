@@ -60,6 +60,7 @@ import { AgentManager } from "./agent";
 import { getAppLanguage, initAppLanguage } from "./app-language";
 import { setupErrorLogging } from "./app-logger";
 import { initializeAppUpdater, stopPeriodicUpdates } from "./app-updater";
+import { backendReloadArgs } from "./backend-reload-args";
 import { isProfileAuthenticated } from "./claude-profile/profile-utils";
 import { getUsageMonitor } from "./claude-profile/usage-monitor";
 import {
@@ -113,6 +114,8 @@ import {
 } from "./services/profile/profile-manager";
 import { initSentryMain } from "./sentry";
 import { armSmokeTest, isSmokeTest } from "./smoke-test";
+import { forgeAccountsFilePath } from "./forge/forge-accounts";
+import { aiAccountsFilePath } from "./ai-accounts/ai-accounts";
 import { initSecretStorage, primeSecretFiles } from "./secret-storage";
 import {
 	getSettingsPath,
@@ -121,8 +124,21 @@ import {
 	writeSettingsFile,
 } from "./settings-utils";
 import { teamBotConfigPath } from "./team-bot-config";
+import {
+	localBackendLaunchState,
+	markLocalBackendFailed,
+	markLocalBackendReady,
+	markLocalBackendStarting,
+} from "./local-backend-readiness";
+import { watchSpawnedBackend } from "./local-backend-launch";
+import {
+	localBackendPort,
+	localBackendUrl,
+	settleLocalBackendPort,
+} from "./local-backend-port";
 import { migrateSourceEnvSecrets } from "./source-env";
 import { TerminalManager } from "./terminal-manager";
+import { guardMainWindow } from "./window-recovery";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Window sizing constants
@@ -554,6 +570,11 @@ function createWindow(): void {
 
 	// WORKPILOT_SMOKE_TEST=1: quit once the renderer has mounted (CI, release)
 	armSmokeTest(mainWindow);
+	// A dead renderer or a failed first load left the window white for good:
+	// reload it within a budget and log why (window-recovery.ts, tested there;
+	// this file starts the app on import and no unit test loads it).
+	/* v8 ignore next */
+	guardMainWindow(mainWindow);
 
 	// Initialize spell check languages
 	initializeSpellCheckLanguages();
@@ -640,14 +661,34 @@ async function waitForBackendReady(url: string, timeoutMs = 10000) {
 	});
 }
 
+/**
+ * How long a backend this app spawned may take to answer. A cold start (the
+ * first launch after an update compiles the whole backend; slower still under
+ * WSL) takes tens of seconds: the former 10 s reported a backend that was only
+ * starting as failed, with an error dialog.
+ */
+const BACKEND_START_TIMEOUT_MS = 90_000;
+
 // Fonction pour lancer le backend si nécessaire
 async function launchBackendIfNeeded() {
+	try {
+		await startBackend();
+		markLocalBackendReady();
+	} catch (err) {
+		markLocalBackendFailed();
+		throw err;
+	}
+}
+
+async function startBackend() {
 	// Lancé aussi quand l'app est connectée à un serveur WorkPilot : les
 	// projets locaux et les outils propres à la machine (hooks, mémoire,
 	// notifications) parlent à ce backend local, le serveur ne les sert pas.
 	// Vérifie si le backend répond déjà
+	const port = localBackendPort();
+	const providersUrl = `${localBackendUrl()}/providers`;
 	try {
-		await waitForBackendReady("http://127.0.0.1:9000/providers", 1500);
+		await waitForBackendReady(providersUrl, 1500);
 		return;
 	} catch {
 		/* noop */
@@ -661,30 +702,10 @@ async function launchBackendIfNeeded() {
 		);
 	}
 	const providerApiModule = "provider_api:app";
-	// `--reload` belongs to development only. In a packaged app the backend
-	// source never changes, and the watcher costs a second supervisor process
-	// plus roughly double the memory — while a stray write under backendDir
-	// (a log, a cache) can restart the API under the user's feet mid-task.
-	const reloadArgs = is.dev
-		? [
-				"--reload",
-				// Watch only backend source; the shared virtualenv lives at the repo
-				// root, so scoping the watcher to backendDir keeps pip installs (from
-				// the PythonEnvManager) from triggering an endless reload storm.
-				// NOTE: do not add glob --reload-exclude patterns (e.g. ".venv/*"):
-				// the bundled Windows python.exe expands wildcard argv, turning the
-				// pattern into extra positional args and making uvicorn exit code 2.
-				"--reload-dir",
-				backendDir,
-				// PythonEnvManager installs into backendDir/.venv, which is INSIDE
-				// the watched dir — exclude it or every pip install reload-storms
-				// the server. No wildcard => safe from the argv expansion issue
-				// above. Must be ABSOLUTE: uvicorn's FileFilter matches exclude
-				// dirs against the changed file's (absolute) parents.
-				"--reload-exclude",
-				resolve(backendDir, ".venv"),
-			]
-		: [];
+	// main/index.ts is never loaded by a unit test (it starts the app on
+	// import); the arguments are tested in backend-reload-args.test.ts.
+	/* v8 ignore next */
+	const reloadArgs = backendReloadArgs(backendDir, is.dev);
 	backendProcess = spawn(
 		pythonPath,
 		[
@@ -694,7 +715,7 @@ async function launchBackendIfNeeded() {
 			"--host",
 			"127.0.0.1",
 			"--port",
-			"9000",
+			String(port),
 			...reloadArgs,
 		],
 		{
@@ -704,8 +725,22 @@ async function launchBackendIfNeeded() {
 			env: { ...process.env, UVICORN_CMD: "1" },
 		},
 	);
-	// Attend qu'il soit prêt
-	await waitForBackendReady("http://127.0.0.1:9000/providers", 10000);
+	const spawned = backendProcess;
+	spawned.once("exit", () => {
+		if (backendProcess === spawned) backendProcess = null;
+	});
+	// Attend qu'il soit prêt. S'il s'arrête avant, un autre backend a pu prendre
+	// le port entre-temps (celui de `pnpm run dev`) : local-backend-launch.ts.
+	const { exited } = watchSpawnedBackend(spawned, port, () =>
+		waitForBackendReady(providersUrl, 1500).then(
+			() => true,
+			() => false,
+		),
+	);
+	await Promise.race([
+		waitForBackendReady(providersUrl, BACKEND_START_TIMEOUT_MS),
+		exited,
+	]);
 }
 
 async function ensureBackendLaunched() {
@@ -722,7 +757,13 @@ async function ensureBackendLaunched() {
 			);
 		}
 	} else {
+		// No Python, no backend: the views waiting for it stop waiting.
+		const onEnvError = () => {
+			if (localBackendLaunchState() === "pending") markLocalBackendFailed();
+		};
+		pythonEnvManager.once("error", onEnvError);
 		pythonEnvManager.once("ready", async () => {
+			pythonEnvManager.off("error", onEnvError);
 			try {
 				await launchBackendIfNeeded();
 			} catch (err: unknown) {
@@ -866,6 +907,8 @@ function appSecretFiles(): string[] {
 		getProfilesFilePath(),
 		join(app.getPath("userData"), "config", "claude-profiles.json"),
 		teamBotConfigPath(),
+		forgeAccountsFilePath(),
+		aiAccountsFilePath(),
 	];
 }
 
@@ -1282,6 +1325,19 @@ async function main() {
 	initializeCredentialIntegration().catch((error) => {
 		console.warn("[main] Failed to initialize credential integration:", error);
 	});
+
+	// The backend's port, before anything calls it: 9000 unless BACKEND_PORT
+	// names another, or another program holds 9000 (local-backend-port.ts).
+	const portChoice = await settleLocalBackendPort();
+	if (portChoice?.movedFrom !== undefined) {
+		console.warn(
+			`[main] Port ${portChoice.movedFrom} is held by a program that is not a WorkPilot backend: the local backend uses port ${portChoice.port}.`,
+		);
+	}
+
+	// The window opens before the backend answers: views that ask it at mount
+	// wait for this launch instead of reporting it unreachable.
+	markLocalBackendStarting();
 
 	// Create window
 	createWindow();

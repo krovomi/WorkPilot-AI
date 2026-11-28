@@ -1,3 +1,11 @@
+---
+feature: Agent d'accessibilité
+summary: >-
+  WCAG 2.2 lu dans le balisage de toutes les stacks et le CSS (liaisons, spread, composants :
+  silence si incertain), contraste, score 0-100 et historique ; scan dynamique en fenêtre cachée
+  sur localhost ; corrections sur carte de revue.
+---
+
 # Agent d'accessibilité (#391)
 
 La page Accessibilité vérifie les critères WCAG 2.2 que la source permet de juger, note le
@@ -86,7 +94,8 @@ a toujours le même score : chaque analyse ajoute une ligne à
 
 Dans le main Electron, jamais dans le renderer. L'adresse est celle de l'App Emulator, ou une
 adresse tapée qui doit être sur cet ordinateur (`localhost`, `*.localhost`, `127.x`, `[::1]`,
-sans identifiants). La fenêtre est cachée, sans preload ni Node, en bac à sable, dans une session
+sans identifiants) ; les ports des services de WorkPilot (le backend que le main utilise et son
+WebSocket) sont refusés. La fenêtre est cachée, sans preload ni Node, en bac à sable, dans une session
 en mémoire vidée après l'analyse ; elle refuse les permissions, les fenêtres et toute navigation
 ou redirection vers une autre origine. Par le protocole DevTools, l'analyse lit l'arbre
 d'accessibilité, appuie sur Tab jusqu'à 60 fois, mesure les couleurs rendues et vérifie que le

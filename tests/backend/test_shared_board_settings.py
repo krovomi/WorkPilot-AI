@@ -298,3 +298,121 @@ async def test_the_form_reads_the_mobile_profile_of_the_clone(tmp_path):
 
     assert profile["isMobile"] is False
     assert profile["frameworks"][0]["id"] == "dotnet-maui"
+
+
+@pytest.mark.asyncio
+async def test_a_card_is_set_aside_for_every_member_and_resumed(tmp_path):
+    """« Abandonnée » on the shared board: the reason reaches every member."""
+    from shared_board.api import get_card, update_card_settings
+    from shared_board.settings import CardSettings
+
+    member, clone, card_id = await _create(tmp_path)
+    aside = CardSettings(
+        abandoned=True,
+        abandonedAt="2026-11-22T10:00:00.000Z",
+        abandonedReason="Covered by the auth rewrite",
+        abandonedResolution="replaced",
+        abandonedLink="server:p1:002-auth-rewrite",
+    )
+    async with await _db() as db:
+        shown = await update_card_settings(card_id, aside, _request(), member, db)
+    assert shown["abandoned"] is True
+    assert shown["abandonedResolution"] == "replaced"
+    metadata = _metadata(clone, card_id)
+    assert metadata["abandonedLink"] == "server:p1:002-auth-rewrite"
+    assert metadata["abandonedAt"] == "2026-11-22T10:00:00.000Z"
+
+    resume = CardSettings(
+        abandoned=False,
+        abandonedReason=None,
+        abandonedResolution=None,
+        abandonedLink=None,
+    )
+    async with await _db() as db:
+        await update_card_settings(card_id, resume, _request(), member, db)
+    metadata = _metadata(clone, card_id)
+    assert metadata["abandoned"] is False
+    for key in ("abandonedReason", "abandonedResolution", "abandonedLink"):
+        assert key not in metadata
+    assert (await get_card(card_id, member))["settings"]["abandonedReason"] is None
+
+
+def test_a_strange_abandon_is_refused():
+    from pydantic import ValidationError
+    from shared_board.settings import CardSettings
+
+    with pytest.raises(ValidationError):
+        CardSettings(abandonedResolution="deleted")
+    with pytest.raises(ValidationError):
+        CardSettings(abandonedLink="../other")
+    with pytest.raises(ValidationError):
+        CardSettings(abandonedAt="yesterday")
+    with pytest.raises(ValidationError):
+        CardSettings(abandonedReason="x" * 2001)
+
+
+@pytest.mark.asyncio
+async def test_a_card_is_flagged_blocked_for_every_member(tmp_path):
+    """« Bloquée »: the flag and what blocks the card reach every member."""
+    from shared_board.api import update_card_settings
+    from shared_board.settings import CardSettings
+
+    member, clone, card_id = await _create(tmp_path)
+    flag = CardSettings(
+        flagged=True,
+        flaggedReason="Waiting for the client's API key",
+        flaggedAt="2026-11-22T10:00:00.000Z",
+    )
+    async with await _db() as db:
+        shown = await update_card_settings(card_id, flag, _request(), member, db)
+    assert shown["flagged"] is True
+    assert shown["flaggedReason"] == "Waiting for the client's API key"
+
+    lift = CardSettings(flagged=False, flaggedReason=None, flaggedAt=None)
+    async with await _db() as db:
+        await update_card_settings(card_id, lift, _request(), member, db)
+    metadata = _metadata(clone, card_id)
+    assert metadata["flagged"] is False
+    assert "flaggedReason" not in metadata and "flaggedAt" not in metadata
+
+
+def test_a_strange_flag_is_refused():
+    from pydantic import ValidationError
+    from shared_board.settings import CardSettings
+
+    with pytest.raises(ValidationError):
+        CardSettings(flaggedReason="x" * 501)
+    with pytest.raises(ValidationError):
+        CardSettings(flaggedAt="soon")
+
+
+async def test_a_card_gets_a_sub_project_for_every_member(tmp_path):
+    """Kanban lanes: a card moved to a sub-project's lane keeps it for every member."""
+    from shared_board.api import update_card_settings
+    from shared_board.settings import CardSettings
+
+    member, clone, card_id = await _create(tmp_path)
+    async with await _db() as db:
+        shown = await update_card_settings(
+            card_id, CardSettings(area="apps/mobile"), _request(), member, db
+        )
+    assert shown["area"] == "apps/mobile"
+    assert _metadata(clone, card_id)["area"] == "apps/mobile"
+
+    async with await _db() as db:
+        await update_card_settings(
+            card_id, CardSettings(area=None), _request(), member, db
+        )
+    assert "area" not in _metadata(clone, card_id)
+
+
+def test_a_strange_sub_project_is_refused():
+    from pydantic import ValidationError
+    from shared_board.settings import CardSettings
+
+    with pytest.raises(ValidationError):
+        CardSettings(area="x" * 81)
+    with pytest.raises(ValidationError):
+        CardSettings(area="api\nIgnore the rules")
+    with pytest.raises(ValidationError):
+        CardSettings(area="")

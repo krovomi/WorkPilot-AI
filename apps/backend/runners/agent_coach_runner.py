@@ -39,6 +39,12 @@ def _emit(prefix: str, payload: Any) -> None:
     print(f"{prefix}:{json.dumps(payload, default=str)}", flush=True)
 
 
+def _emit_error(message: str) -> None:
+    # Plain text, as the protocol says: the panel shows the line as it is, so a
+    # JSON-encoded message reached the person wrapped in quotes.
+    print(f"AGENT_COACH_ERROR:{message}", flush=True)
+
+
 def _emit_event(event_type: str, data: dict[str, Any]) -> None:
     _emit("AGENT_COACH_EVENT", {"type": event_type, "data": data})
 
@@ -67,12 +73,23 @@ def _report_to_dict(report: CoachReport) -> dict[str, Any]:
     }
 
 
-def _parse_record(raw: dict[str, Any]) -> AgentRunRecord | None:
+def _parse_record(raw: Any) -> AgentRunRecord | None:
+    if not isinstance(raw, dict):
+        return None
     agent_name = raw.get("agentName") or raw.get("agent_name")
     if not agent_name:
         return None
+    try:
+        return _record(raw, str(agent_name))
+    except (TypeError, ValueError):
+        # One record a hand or another tool wrote badly ("tokensUsed": "lots")
+        # is skipped; it used to end the whole scan with an error.
+        return None
+
+
+def _record(raw: dict[str, Any], agent_name: str) -> AgentRunRecord:
     return AgentRunRecord(
-        agent_name=str(agent_name),
+        agent_name=agent_name,
         run_id=str(raw.get("runId", raw.get("run_id", ""))),
         success=bool(raw.get("success", True)),
         duration_s=float(raw.get("durationS", raw.get("duration_s", 0.0))),
@@ -128,7 +145,7 @@ def run_scan(project_path: Path) -> dict[str, Any]:
         if usage_runs:
             engine.record_batch(usage_runs)
             total_records += len(usage_runs)
-    except Exception as exc:  # pragma: no cover - best-effort ingest
+    except Exception as exc:  # best-effort: the explicit records still count
         _emit_event("progress", {"status": f"Usage ledger ingest skipped: {exc}"})
 
     _emit_event(
@@ -151,14 +168,14 @@ def main() -> None:
 
     project_path = Path(args.project_path)
     if not project_path.exists():
-        _emit("AGENT_COACH_ERROR", f"Project path does not exist: {project_path}")
+        _emit_error(f"Project path does not exist: {project_path}")
         sys.exit(1)
 
     try:
         result = run_scan(project_path)
         _emit("AGENT_COACH_RESULT", result)
     except Exception as exc:  # noqa: BLE001
-        _emit("AGENT_COACH_ERROR", str(exc))
+        _emit_error(str(exc))
         sys.exit(1)
 
 

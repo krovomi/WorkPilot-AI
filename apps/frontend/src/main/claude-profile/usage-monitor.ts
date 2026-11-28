@@ -19,6 +19,8 @@ import type {
 } from "@shared/types";
 import type { APIProfile } from "@shared/types/profile";
 import { frontendDebugLog } from "../../shared/utils/debug-logger";
+import { localBackendUrl } from "../local-backend-port";
+import { reauthSnapshot, usageProfileOf } from "./usage-profile";
 import {
 	type ApiProvider,
 	getProviderLabel,
@@ -58,8 +60,7 @@ import { getVelocityTracker } from "./velocity-tracker";
  * @param labelKey - The translation key (e.g., "common:usage.windowWeeklyQuota")
  * @returns Human-readable label or the original key if not found
  */
-function translateUsageLabel(labelKey: string | undefined): string {
-	if (!labelKey) return "Unknown";
+function translateUsageLabel(labelKey: string): string {
 	const translations: Record<string, string> = {
 		"common:usage.window5Hour": "5-hour window",
 		"common:usage.window7Day": "7-day window",
@@ -272,7 +273,6 @@ interface ActiveProfileResult {
 	profileEmail?: string;
 	isAPIProfile: boolean;
 	baseUrl: string;
-	credential?: string;
 }
 
 /**
@@ -282,6 +282,19 @@ interface ActiveProfileResult {
  */
 function isHttpError(error: unknown): error is Error & { statusCode?: number } {
 	return error instanceof Error && "statusCode" in error;
+}
+
+/**
+ * An authentication failure of the usage API: a 401 or 403, or another status
+ * whose body says the credentials were refused (fetchUsageViaAPI throws both).
+ */
+function isAuthFailure(error: unknown): boolean {
+	return (
+		isHttpError(error) &&
+		(error.statusCode === 401 ||
+			error.statusCode === 403 ||
+			error.message.includes("Auth Failure"))
+	);
 }
 
 export class UsageMonitor extends EventEmitter {
@@ -770,9 +783,12 @@ export class UsageMonitor extends EventEmitter {
 
 			// Wait for all fetches to complete in parallel, with a global safety timeout
 			// in case any sub-promise hangs (sub-promises have their own 10s timeouts).
+			// The timer is cleared once the batch settles: left running, every
+			// refresh kept one more 30 s timer alive.
 			const FETCH_ALL_TIMEOUT_MS = 30000;
-			const timeoutPromise = new Promise<never>((_, reject) =>
-				setTimeout(
+			let batchTimer: NodeJS.Timeout | undefined;
+			const timeoutPromise = new Promise<never>((_, reject) => {
+				batchTimer = setTimeout(
 					() =>
 						reject(
 							new Error(
@@ -780,12 +796,12 @@ export class UsageMonitor extends EventEmitter {
 							),
 						),
 					FETCH_ALL_TIMEOUT_MS,
-				),
-			);
+				);
+			});
 			const fetchResults = await Promise.race([
 				Promise.all(fetchPromises),
 				timeoutPromise,
-			]);
+			]).finally(() => clearTimeout(batchTimer));
 
 			// Collect all updates and build summaries
 			for (const result of fetchResults) {
@@ -1477,8 +1493,10 @@ export class UsageMonitor extends EventEmitter {
 				this.emit("all-profiles-usage-updated", allProfilesUsage);
 			}
 
-			// Step 4: Check thresholds and perform proactive swap (OAuth profiles only)
-			if (activeProfile.isAPIProfile === false) {
+			// Step 4: Check thresholds and perform proactive swap (Claude OAuth
+			// profiles only: Windsurf or Copilot running out is no reason to
+			// change Claude accounts)
+			if (!activeProfile.isAPIProfile && provider === "anthropic") {
 				const profileManager = getClaudeProfileManager();
 				const settings = profileManager.getAutoSwitchSettings();
 
@@ -1492,13 +1510,11 @@ export class UsageMonitor extends EventEmitter {
 				// Get velocity data for predictive switching
 				const velocityTracker = getVelocityTracker();
 				const velocityData = velocityTracker.getVelocity(profileId);
-				const timeToLimit = velocityData
-					? velocityTracker.getEstimatedTimeToLimit(
-							profileId,
-							settings.sessionThreshold ?? 95,
-							settings.weeklyThreshold ?? 99,
-						)
-					: undefined;
+				const timeToLimit = velocityTracker.getEstimatedTimeToLimit(
+					profileId,
+					settings.sessionThreshold ?? 95,
+					settings.weeklyThreshold ?? 99,
+				);
 
 				const thresholds = this.checkThresholdsExceeded(usage, settings);
 
@@ -1516,11 +1532,7 @@ export class UsageMonitor extends EventEmitter {
 						weeklyPercent: usage.weeklyPercent,
 						weeklyThreshold: settings.weeklyThreshold ?? 99,
 					});
-				} else if (
-					velocityData &&
-					velocityData.confidence !== "low" &&
-					timeToLimit
-				) {
+				} else if (velocityData.confidence !== "low") {
 					// Velocity-based early switch: predicted to hit limit soon
 					if (
 						timeToLimit.sessionMinutesRemaining !== null &&
@@ -1581,15 +1593,14 @@ export class UsageMonitor extends EventEmitter {
 				}
 			} else {
 				this.debugLog(
-					"[UsageMonitor:TRACE] Skipping proactive swap for API profile (only supported for OAuth profiles)",
+					"[UsageMonitor:TRACE] Skipping proactive swap: only supported for Claude OAuth profiles",
 				);
 			}
 		} catch (error) {
 			// Step 5: Handle auth failures
-			if (
-				isHttpError(error) &&
-				(error.statusCode === 401 || error.statusCode === 403)
-			) {
+			// A refusal read in the body (a 400 naming the token) is one too: it
+			// used to end as "Check failed", never refreshed nor swapped.
+			if (isAuthFailure(error)) {
 				if (profileId) {
 					await this.handleAuthFailure(profileId, isAPIProfile);
 					return; // handleAuthFailure manages its own logging
@@ -1643,6 +1654,9 @@ export class UsageMonitor extends EventEmitter {
 	 * @returns Active profile info or null if no profile is active
 	 */
 	private async determineActiveProfile(): Promise<ActiveProfileResult | null> {
+		// An active API profile saved without a key (Copilot signs in with gh,
+		// Windsurf with its IDE), looked at once the Windsurf settings are read.
+		let keylessAPIProfile: APIProfile | undefined;
 		// First, check if an API profile is active
 		try {
 			const profilesFile = await loadProfilesFile();
@@ -1665,6 +1679,7 @@ export class UsageMonitor extends EventEmitter {
 					};
 				} else if (activeAPIProfile) {
 					// API profile exists but missing apiKey - fall back to OAuth
+					keylessAPIProfile = activeAPIProfile;
 					this.debugLog(
 						"[UsageMonitor:TRACE] Active API profile missing apiKey, falling back to OAuth",
 						{
@@ -1690,7 +1705,6 @@ export class UsageMonitor extends EventEmitter {
 		// Check if a non-Claude provider (Windsurf, Copilot) is selected
 		// This prevents fetching Anthropic usage when another provider is active
 		const profileManager = getClaudeProfileManager();
-		const settings = profileManager.getSettings();
 
 		// Check if Windsurf is the active provider — multiple detection methods:
 		// 1. selectedProvider in settings.json (persisted by CredentialManager.setActiveProvider)
@@ -1756,36 +1770,30 @@ export class UsageMonitor extends EventEmitter {
 			);
 		}
 
-		// Check if Copilot or Windsurf is configured via API profiles
-		if (settings.activeProfileId) {
-			try {
-				const currentProfilesFile = await loadProfilesFile();
-				const activeProfile = currentProfilesFile.profiles.find(
-					(p: { id?: string }) => p.id === settings.activeProfileId,
-				);
-				if (activeProfile) {
-					const provider = detectProvider(activeProfile.baseUrl);
-					if (provider === "copilot" || provider === "windsurf") {
-						this.debugLog(
-							`[UsageMonitor:TRACE] Active provider is ${provider} (from API profile)`,
-							{
-								profileId: activeProfile.id,
-								profileName: activeProfile.name,
-								baseUrl: activeProfile.baseUrl,
-							},
-						);
-						return {
-							profileId: activeProfile.id,
-							profileName: activeProfile.name,
-							profileEmail: undefined, // API profiles don't have email
-							isAPIProfile: false,
-							baseUrl: activeProfile.baseUrl,
-						};
-					}
-				}
-			} catch (error) {
-				this.debugLog("[UsageMonitor] Failed to check provider status:", error);
-			}
+		// Check if Copilot or Windsurf is configured via API profiles. The id is
+		// the API profiles' own active id: the OAuth one, looked up here before,
+		// named a profile of another list.
+		const keylessProvider =
+			keylessAPIProfile && detectProvider(keylessAPIProfile.baseUrl);
+		if (
+			keylessAPIProfile &&
+			(keylessProvider === "copilot" || keylessProvider === "windsurf")
+		) {
+			this.debugLog(
+				`[UsageMonitor:TRACE] Active provider is ${keylessProvider} (from API profile)`,
+				{
+					profileId: keylessAPIProfile.id,
+					profileName: keylessAPIProfile.name,
+					baseUrl: keylessAPIProfile.baseUrl,
+				},
+			);
+			return {
+				profileId: keylessAPIProfile.id,
+				profileName: keylessAPIProfile.name,
+				profileEmail: undefined, // API profiles don't have email
+				isAPIProfile: false,
+				baseUrl: keylessAPIProfile.baseUrl,
+			};
 		}
 
 		// If no API profile is active, check OAuth profiles
@@ -1989,28 +1997,26 @@ export class UsageMonitor extends EventEmitter {
 	 *
 	 * @param profileId - Profile identifier
 	 * @param credential - OAuth token or API key
-	 * @param activeProfile - Optional active profile info to avoid race conditions
+	 * @param activeProfile - The profile the usage is fetched for
 	 * @param providerName - Optional provider name for endpoint detection
 	 * @param suppressErrors - If true, suppresses error logging (used during startup)
 	 */
 	private async fetchUsage(
 		profileId: string,
-		credential?: string,
-		activeProfile?: ActiveProfileResult,
+		credential: string | undefined,
+		activeProfile: ActiveProfileResult,
 		providerName?: string,
 		suppressErrors?: boolean,
 	): Promise<UsageSnapshot | null> {
 		this.debugLog("[UsageMonitor:fetchUsage] Called with:", {
 			profileId,
 			hasCredential: !!credential,
-			hasActiveProfile: !!activeProfile,
 			providerName,
 		});
 
-		// Get profile name and email - prefer activeProfile since it's already determined
-		// This fixes the bug where API profile names were incorrectly shown for OAuth profiles
-		let profileName: string | undefined;
-		let profileEmail: string | undefined;
+		// The caller names the profile: looked up here by provider, an OAuth
+		// profile was shown under the name of any Anthropic API key profile.
+		const { profileName, profileEmail } = activeProfile;
 
 		// Special handling for Windsurf provider — route to getUsageForProvider()
 		// which has the full Codeium API integration (GetTeamCreditBalance, GetUser, etc.)
@@ -2027,23 +2033,12 @@ export class UsageMonitor extends EventEmitter {
 				"[UsageMonitor:Copilot] ENTERING Copilot branch - providerName is copilot",
 			);
 
-			// Get profile name and email from activeProfile for Copilot
-			if (activeProfile?.profileName) {
-				profileName = activeProfile.profileName;
-				profileEmail = activeProfile.profileEmail;
-				this.debugLog("[UsageMonitor:Copilot] Using activeProfile data:", {
-					profileName,
-					profileEmail,
-				});
-			}
-
 			this.debugLog(
 				"[UsageMonitor:Copilot] Using FastAPI backend for Copilot usage",
 			);
 
 			try {
-				// Call our FastAPI backend endpoint
-				const backendUrl = "http://localhost:9000/providers/usage/copilot";
+				const backendUrl = `${localBackendUrl()}/providers/usage/copilot`;
 				const response = await fetch(backendUrl, {
 					method: "GET",
 					headers: {
@@ -2116,58 +2111,6 @@ export class UsageMonitor extends EventEmitter {
 
 				return null;
 			}
-		}
-
-		// Only search API profiles if not already set from activeProfile
-		if (!profileName) {
-			try {
-				const profilesFile = await loadProfilesFile();
-				const apiProfile = profilesFile.profiles.find((p) => {
-					const detected = detectProvider(p.baseUrl);
-					return detected === providerName;
-				});
-				if (apiProfile) {
-					profileName = apiProfile.name;
-					this.debugLog("[UsageMonitor:FETCH] Found API profile:", {
-						profileId,
-						profileName,
-						baseUrl: apiProfile.baseUrl,
-					});
-				}
-			} catch (error) {
-				// Failed to load API profiles, continue to OAuth check
-				this.debugLog(
-					"[UsageMonitor:FETCH] Failed to load API profiles:",
-					error,
-				);
-			}
-		}
-
-		// If not found in API profiles, check OAuth profiles
-		if (!profileName) {
-			const profileManager = getClaudeProfileManager();
-			const oauthProfile = profileManager.getProfile(profileId);
-			if (oauthProfile) {
-				profileName = oauthProfile.name;
-				// Get email from OAuth profile if not already set
-				if (!profileEmail) {
-					profileEmail = oauthProfile.email;
-				}
-				this.debugLog("[UsageMonitor:FETCH] Found OAuth profile:", {
-					profileId,
-					profileName,
-					profileEmail,
-				});
-			}
-		}
-
-		// If still not found, return null
-		if (!profileName) {
-			this.debugLog(
-				"[UsageMonitor:FETCH] Profile not found in either API or OAuth profiles: " +
-					profileId,
-			);
-			return null;
 		}
 
 		// Special case: For anthropic OAuth profiles, if we don't have credential,
@@ -2269,7 +2212,7 @@ export class UsageMonitor extends EventEmitter {
 	 * @param profileId - Profile identifier
 	 * @param profileName - Profile display name
 	 * @param profileEmail - Optional email associated with the profile
-	 * @param activeProfile - Optional pre-determined active profile info to avoid race conditions
+	 * @param activeProfile - The profile the usage is fetched for (API or OAuth)
 	 * @param suppressErrors - If true, suppresses error logging (used during startup)
 	 * @returns Normalized usage snapshot or null on failure
 	 */
@@ -2277,8 +2220,8 @@ export class UsageMonitor extends EventEmitter {
 		credential: string,
 		profileId: string,
 		profileName: string,
-		profileEmail?: string,
-		activeProfile?: ActiveProfileResult,
+		profileEmail: string | undefined,
+		activeProfile: ActiveProfileResult,
 		suppressErrors?: boolean,
 	): Promise<UsageSnapshot | null> {
 		// ── Short-lived result cache ────────────────────────────────────────
@@ -2307,78 +2250,34 @@ export class UsageMonitor extends EventEmitter {
 			profileId,
 			profileName,
 			hasCredential: !!credential,
-			hasActiveProfile: !!activeProfile,
 		});
 
 		try {
-			// Step 1: Determine if we're using an API profile or OAuth profile
-			// Use passed activeProfile if available, otherwise detect to maintain backward compatibility
-			let apiProfile: APIProfile | undefined;
-			let baseUrl: string;
-			let provider: ApiProvider;
+			// Step 1: an API profile names its provider by its URL; an OAuth
+			// profile is always Anthropic
+			const baseUrl = activeProfile.isAPIProfile
+				? activeProfile.baseUrl
+				: "https://api.anthropic.com";
+			const provider: ApiProvider = detectProvider(baseUrl);
 
-			if (activeProfile?.isAPIProfile) {
-				// Use the pre-determined profile to avoid race conditions
-				// Trust the activeProfile data and use baseUrl directly
-				baseUrl = activeProfile.baseUrl;
-				provider = detectProvider(baseUrl);
-			} else if (activeProfile && !activeProfile.isAPIProfile) {
-				// OAuth profile - always Anthropic
-				provider = "anthropic";
-				baseUrl = "https://api.anthropic.com";
-			} else {
-				// No activeProfile passed - need to detect from profiles file
-				const profilesFile = await loadProfilesFile();
-				apiProfile = profilesFile.profiles.find((p) => p.id === profileId);
-
-				if (apiProfile?.apiKey) {
-					// API profile found
-					baseUrl = apiProfile.baseUrl;
-					provider = detectProvider(baseUrl);
-				} else {
-					// OAuth profile fallback
-					provider = "anthropic";
-					baseUrl = "https://api.anthropic.com";
-				}
-			}
-
-			const isAPIProfile = !!apiProfile;
 			this.debugLog("[UsageMonitor:TRACE] Fetching usage", {
 				provider,
 				baseUrl,
-				isAPIProfile,
 				profileId,
 			});
 
-			// ── Cache check with provider-specific TTL ───────────────────────────────
-			// For Windsurf, use 5s cache since data comes from local SQLite DB (fast read)
-			// For other providers, use standard 15s cache to avoid API rate limits
-			if (cached) {
-				const cacheTTL =
-					provider === "windsurf" ? 5000 : UsageMonitor.API_RESULT_CACHE_TTL_MS; // 5s for Windsurf (local DB read), 15s for others
-				if (Date.now() - cached.fetchedAt < cacheTTL) {
-					this.debugLog(
-						"[UsageMonitor:API_FETCH] Returning cached result for " +
-							profileId +
-							" (age: " +
-							Math.round((Date.now() - cached.fetchedAt) / 1000) +
-							"s, provider: " +
-							provider +
-							")",
-					);
-					return cached.snapshot;
-				}
-			}
+			// The cache was read above with its 15 s lifetime: a shorter one for
+			// Windsurf, checked again here, could never apply.
 
-			// Step 3: Handle API providers via our FastAPI backend (OpenAI, Copilot)
-			if (provider === "openai" || provider === "copilot") {
+			// Step 3: OpenAI goes through our FastAPI backend (Copilot and Windsurf
+			// never get here: fetchUsage answers them first)
+			if (provider === "openai") {
 				this.debugLog(
 					`[UsageMonitor:${provider}] Using FastAPI backend for ${provider} usage`,
 				);
 
 				try {
-					// Call our FastAPI backend endpoint
-					const backendUrl = `http://localhost:9000/providers/usage/${provider}`;
+					const backendUrl = `${localBackendUrl()}/providers/usage/${provider}`;
 					const response = await this.fetchBackendWithRetry(
 						backendUrl,
 						{
@@ -2409,21 +2308,12 @@ export class UsageMonitor extends EventEmitter {
 					);
 
 					// Normalize the backend response to match UsageSnapshot format
-					if (provider === "openai") {
-						return this.normalizeOpenAIResponse(
-							usageData,
-							profileId,
-							profileName,
-							profileEmail,
-						);
-					} else {
-						return this.normalizeCopilotResponse(
-							usageData,
-							profileId,
-							profileName,
-							profileEmail,
-						);
-					}
+					return this.normalizeOpenAIResponse(
+						usageData,
+						profileId,
+						profileName,
+						profileEmail,
+					);
 				} catch (error) {
 					this.debugLog(
 						`[UsageMonitor:${provider}] Failed to fetch from backend:`,
@@ -2445,21 +2335,12 @@ export class UsageMonitor extends EventEmitter {
 								provider: provider,
 								available: false,
 							};
-							if (provider === "openai") {
-								return this.normalizeOpenAIResponse(
-									placeholderData,
-									profileId,
-									profileName,
-									profileEmail,
-								);
-							} else {
-								return this.normalizeCopilotResponse(
-									placeholderData,
-									profileId,
-									profileName,
-									profileEmail,
-								);
-							}
+							return this.normalizeOpenAIResponse(
+								placeholderData,
+								profileId,
+								profileName,
+								profileEmail,
+							);
 						}
 					}
 
@@ -2495,17 +2376,8 @@ export class UsageMonitor extends EventEmitter {
 
 			// Step 6: Validate endpoint domain before making request (API providers only)
 			// Security: Only allow requests to known provider domains
-			let endpointHostname: string;
-			try {
-				const endpointUrl = new URL(usageEndpoint);
-				endpointHostname = endpointUrl.hostname;
-			} catch {
-				console.error(
-					"[UsageMonitor] Invalid usage endpoint URL:",
-					usageEndpoint,
-				);
-				return null;
-			}
+			// getUsageEndpoint built it with URL, so it parses
+			const endpointHostname = new URL(usageEndpoint).hostname;
 
 			if (!ALLOWED_USAGE_API_DOMAINS.has(endpointHostname)) {
 				console.error(
@@ -2694,8 +2566,6 @@ export class UsageMonitor extends EventEmitter {
 			);
 
 			// Step 6: Normalize response based on provider type
-			let normalizedUsage: UsageSnapshot | null = null;
-
 			this.debugLog(
 				"[UsageMonitor:NORMALIZATION] Selecting normalization method:",
 				{
@@ -2704,50 +2574,15 @@ export class UsageMonitor extends EventEmitter {
 				},
 			);
 
-			switch (provider as ApiProvider) {
-				case "anthropic":
-					normalizedUsage = this.normalizeAnthropicResponse(
-						rawData,
-						profileId,
-						profileName,
-						profileEmail,
-					);
-					break;
-				case "copilot":
-					normalizedUsage = this.normalizeCopilotResponse(
-						rawData,
-						profileId,
-						profileName,
-						profileEmail,
-					);
-					break;
-				case "windsurf":
-					normalizedUsage = this.normalizeWindsurfResponse(
-						rawData,
-						profileId,
-						profileName,
-						profileEmail,
-					);
-					break;
-				case "openai":
-				case "ollama":
-				case "ollama_local":
-				case "unknown":
-					this.debugLog(
-						"[UsageMonitor] Unsupported provider for usage normalization: " +
-							provider,
-					);
-					return null;
-			}
-
-			if (!normalizedUsage) {
-				this.debugLog(
-					`[UsageMonitor] Failed to normalize response from ${provider}`,
-				);
-				// Record failure timestamp for cooldown retry (normalization failure)
-				this.apiFailureTimestamps.set(profileId, Date.now());
-				return null;
-			}
+			// Only Anthropic gets this far: OpenAI went through the backend,
+			// Copilot and Windsurf through fetchUsage, and getUsageEndpoint knows
+			// no endpoint for any other provider.
+			const normalizedUsage = this.normalizeAnthropicResponse(
+				rawData,
+				profileId,
+				profileName,
+				profileEmail,
+			);
 
 			// For Anthropic Pro accounts on tier "default_claude_ai",
 			// the /api/oauth/usage endpoint returns seven_day: null and
@@ -2779,15 +2614,10 @@ export class UsageMonitor extends EventEmitter {
 			});
 
 			return normalizedUsage;
-			// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-		} catch (error: any) {
+		} catch (error) {
 			// Re-throw auth failures to be handled by checkUsageAndSwap
 			// This includes both status code auth failures (401/403) and body-detected failures
-			if (
-				error?.message?.includes("Auth Failure") ||
-				error?.statusCode === 401 ||
-				error?.statusCode === 403
-			) {
+			if (isAuthFailure(error)) {
 				throw error;
 			}
 
@@ -3465,25 +3295,25 @@ export class UsageMonitor extends EventEmitter {
 					stdio: ["pipe", "pipe", "pipe"],
 					timeout: 15000,
 				});
-				const process = spawn(spawnCommand, ["usage"], spawnOptions);
+				const child = spawn(spawnCommand, ["usage"], spawnOptions);
 
 				let stdout = "";
 				let stderr = "";
 
-				process.stdout?.on("data", (data) => {
+				child.stdout?.on("data", (data) => {
 					stdout += data.toString();
 				});
 
-				process.stderr?.on("data", (data) => {
+				child.stderr?.on("data", (data) => {
 					stderr += data.toString();
 				});
 
-				process.on("close", (code) => {
+				child.on("close", (code) => {
 					this.debugLog("[UsageMonitor:CLI] Process closed with code:", code);
 					resolve({ stdout, stderr, code });
 				});
 
-				process.on("error", (error) => {
+				child.on("error", (error) => {
 					this.debugLog("[UsageMonitor:CLI] Process error:", error);
 					reject(error);
 				});
@@ -3783,25 +3613,8 @@ export class UsageMonitor extends EventEmitter {
 			.filter((s) => s.at >= swapCutoff)
 			.slice(-UsageMonitor.MAX_SWAP_CHAIN_LENGTH);
 
-		// Get the "from" profile name
-		let fromProfileName: string | undefined;
-		const fromOAuthProfile = profileManager.getProfile(currentProfileId);
-		if (fromOAuthProfile) {
-			fromProfileName = fromOAuthProfile.name;
-		} else {
-			// It might be an API profile
-			try {
-				const profilesFile = await loadProfilesFile();
-				const fromAPIProfile = profilesFile.profiles.find(
-					(p) => p.id === currentProfileId,
-				);
-				if (fromAPIProfile) {
-					fromProfileName = fromAPIProfile.name;
-				}
-			} catch {
-				// Ignore
-			}
-		}
+		// The profile swapped from is a Claude account: only those are swapped
+		const fromProfileName = profileManager.getProfile(currentProfileId)?.name;
 
 		// Emit swap event
 		this.emit("proactive-swap-completed", {
@@ -3844,8 +3657,6 @@ export class UsageMonitor extends EventEmitter {
 				limitType,
 				timestamp: new Date(),
 			});
-		} else {
-			// noop
 		}
 
 		// Note: Don't immediately check new profile - let normal interval handle it
@@ -4002,7 +3813,7 @@ export class UsageMonitor extends EventEmitter {
 			);
 			try {
 				const resp = await fetch(
-					"http://localhost:9000/providers/usage/copilot",
+					`${localBackendUrl()}/providers/usage/copilot`,
 					{
 						signal: AbortSignal.timeout(5000),
 					},
@@ -4404,7 +4215,6 @@ export class UsageMonitor extends EventEmitter {
 		}
 
 		// Step 1: Search API profiles first (profiles.json) — these cover anthropic, openai, ollama API key profiles
-		let apiProfileSnapshot: UsageSnapshot | null = null;
 		try {
 			const profilesFile = await loadProfilesFile();
 			const apiProfile = profilesFile.profiles.find((p) => {
@@ -4433,7 +4243,7 @@ export class UsageMonitor extends EventEmitter {
 					// OpenAI special case — usage API has a different format
 					try {
 						const resp = await fetch(
-							"http://localhost:9000/providers/usage/openai",
+							`${localBackendUrl()}/providers/usage/openai`,
 						);
 						if (!resp.ok) {
 							return null;
@@ -4460,34 +4270,12 @@ export class UsageMonitor extends EventEmitter {
 						return null;
 					}
 				} else {
-					// Non-anthropic, non-openai providers — try API key fetch
-					const activeProfileResult: ActiveProfileResult = {
-						profileId: apiProfile.id,
-						profileName: apiProfile.name,
-						profileEmail: undefined,
-						isAPIProfile: true,
-						baseUrl: apiProfile.baseUrl,
-						credential: apiProfile.apiKey,
-					};
-
-					apiProfileSnapshot = await this.fetchUsageViaAPI(
-						apiProfile.apiKey,
-						apiProfile.id,
-						apiProfile.name,
-						undefined,
-						activeProfileResult,
-						true, // suppressErrors — Step 1 is a best-effort attempt before OAuth fallback
-					);
-
-					if (apiProfileSnapshot) {
-						return apiProfileSnapshot;
-					}
-
-					// API fetch returned no data — return a minimal snapshot with correct
-					// provider info so the UI displays the right provider name/account
-					// instead of falling through to OAuth (which would show Anthropic data)
+					// Any other provider: Copilot and Windsurf were answered above, and
+					// getUsageEndpoint knows no usage endpoint for the rest (Ollama,
+					// Google, Mistral…). A minimal snapshot keeps the provider's own
+					// name and account on screen instead of Anthropic's.
 					this.debugLog(
-						"[UsageMonitor:getUsageForProvider] Step 1: API profile returned no usage data, returning minimal snapshot for:",
+						"[UsageMonitor:getUsageForProvider] Step 1: no usage endpoint for this provider, returning minimal snapshot for:",
 						providerName,
 					);
 					return {
@@ -4516,10 +4304,8 @@ export class UsageMonitor extends EventEmitter {
 		// Step 2: Search OAuth profiles (ClaudeProfileManager) — these are always 'anthropic'
 		if (providerName === "anthropic") {
 			try {
-				const profileManager = getClaudeProfileManager();
-				const allOauthProfiles =
-					profileManager.getProfilesSortedByAvailability();
-				const oauthProfile = allOauthProfiles?.[0];
+				// The active account first: with several, the most available is not it
+				const oauthProfile = usageProfileOf(getClaudeProfileManager());
 
 				if (oauthProfile) {
 					this.debugLog(
@@ -4529,9 +4315,9 @@ export class UsageMonitor extends EventEmitter {
 					// Get credential for the OAuth profile
 					const credential = await this.getCredentialForProfile(oauthProfile);
 					if (!credential) {
-						// No credential yet (fresh install, token expired, etc.)
-						// Fall through to Step 4 to return a minimal Anthropic snapshot so the
-						// UI exits loading state instead of spinning indefinitely.
+						// Expired or revoked sign-in: offer to reconnect. Otherwise (fresh
+						// install…) Step 4 returns a minimal snapshot so the UI stops loading.
+						if (this.needsReauthProfiles.has(oauthProfile.id)) return reauthSnapshot(oauthProfile);
 						console.warn(
 							"[UsageMonitor:getUsageForProvider] Step 2: No credential found for OAuth profile:",
 							oauthProfile.name,
@@ -4542,7 +4328,13 @@ export class UsageMonitor extends EventEmitter {
 						const snapshot = await this.fetchUsage(
 							oauthProfile.id,
 							credential,
-							undefined, // activeProfile - will be determined inside fetchUsage
+							{
+								profileId: oauthProfile.id,
+								profileName: oauthProfile.name,
+								profileEmail: oauthProfile.email,
+								isAPIProfile: false,
+								baseUrl: "https://api.anthropic.com",
+							},
 							"anthropic", // providerName
 							true, // suppressErrors - Step 2 is also a best-effort attempt
 						);
@@ -4560,9 +4352,7 @@ export class UsageMonitor extends EventEmitter {
 					}
 				} else {
 					console.warn(
-						"[UsageMonitor:getUsageForProvider] Step 2: No OAuth profiles found in ClaudeProfileManager (total profiles:",
-						allOauthProfiles?.length ?? 0,
-						")",
+						"[UsageMonitor:getUsageForProvider] Step 2: No OAuth profiles found in ClaudeProfileManager",
 					);
 				}
 			} catch (error) {
@@ -4571,19 +4361,6 @@ export class UsageMonitor extends EventEmitter {
 					error,
 				);
 			}
-		}
-
-		// Step 2b: If API profile snapshot was obtained earlier (even with incomplete weekly data),
-		// return it as a fallback rather than returning nothing
-		if (apiProfileSnapshot) {
-			this.debugLog(
-				"[UsageMonitor:getUsageForProvider] Returning API profile snapshot as fallback:",
-				{
-					sessionPercent: apiProfileSnapshot.sessionPercent,
-					weeklyPercent: apiProfileSnapshot.weeklyPercent,
-				},
-			);
-			return apiProfileSnapshot;
 		}
 
 		// Step 3: Check if currentUsage matches the requested provider
@@ -4623,7 +4400,5 @@ export class UsageMonitor extends EventEmitter {
 export function getUsageMonitor(): UsageMonitor {
 	return UsageMonitor.getInstance();
 }
-
-declare const process: { env: { [key: string]: string | undefined } };
 
 export type { ApiProvider } from "../../shared/utils/provider-detection";

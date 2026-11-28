@@ -3,7 +3,8 @@
 		"cancel": "Cancel",
 		"retry": "Try again",
 		"loading": "Loading…",
-		"back": "Back"
+		"back": "Back",
+		"close": "Close"
 	},
 	"errors": {
 		"network": "The server can't be reached. Check your connection.",
@@ -17,7 +18,10 @@
 		"nothing_to_stop": "Nothing was running on this card any more. Pull to refresh.",
 		"entra_disabled": "This server doesn't offer Microsoft sign-in.",
 		"entra_failed": "Microsoft sign-in didn't complete.",
-		"entra_misconfigured": "The server's Microsoft sign-in settings are invalid."
+		"entra_misconfigured": "The server's Microsoft sign-in settings are invalid.",
+		"approval_waiting": "Your approval is recorded: {{given}} of {{needed}}. The build starts once the card has every approval it needs.",
+		"sso_disabled": "This server doesn't offer single sign-on.",
+		"sso_failed": "Single sign-on didn't complete."
 	},
 	"signIn": {
 		"title": "WorkPilot AI",
@@ -29,13 +33,36 @@
 		"submit": "Sign in",
 		"invalidUrl": "This isn't a valid server address.",
 		"insecureUrl": "Use an https:// address. Plain http is only allowed on your local network.",
-		"localDisabled": "This server only accepts Microsoft sign-in, which the mobile app doesn't support yet.",
+		"localDisabled": "This server doesn't accept passwords: sign in with Microsoft or with single sign-on.",
 		"failed": "Sign-in failed: {{message}}",
 		"badCredentials": "Wrong email or password.",
 		"or": "or",
 		"microsoft": "Sign in with Microsoft",
 		"entraDisabled": "This server doesn't offer Microsoft sign-in.",
-		"entraRefused": "The server refused this Microsoft account."
+		"entraRefused": "The server refused this Microsoft account.",
+		"sso": "Sign in with single sign-on",
+		"ssoRefused": "The server refused this account."
+	},
+	"forgotPassword": {
+		"open": "Forgot password?",
+		"title": "Forgotten password",
+		"askDescription": "Enter your account's email: the server sends you a link to choose a new password.",
+		"setDescription": "Paste the link you received (or its code), then choose your new password.",
+		"noEmail": "This server can't send email. Ask a server administrator for a reset link, then come back here with it.",
+		"send": "Send the link",
+		"sent": "If an account uses this address, a link is on its way. It works once, for a limited time.",
+		"haveLink": "I have a link",
+		"needLink": "I need a link",
+		"link": "Reset link or code",
+		"newPassword": "New password",
+		"confirm": "Confirm password",
+		"minLength": "At least {{count}} characters.",
+		"mismatch": "The passwords do not match.",
+		"save": "Set my password",
+		"invalidLink": "This reset link is invalid or has expired. Ask for a new one.",
+		"failed": "The password could not be reset: {{message}}",
+		"done": "Your password was changed. Sign in with the new one.",
+		"back": "Back to sign-in"
 	},
 	"unreachable": {
 		"title": "Server unreachable",
@@ -45,8 +72,9 @@
 	"projects": {
 		"title": "Projects",
 		"empty": "No project yet. Add one from the desktop app.",
-		"role": "Role: {{role}}",
-		"settings": "Settings"
+		"settings": "Settings",
+		"count_one": "{{count}} project",
+		"count_other": "{{count}} projects"
 	},
 	"board": {
 		"live": "Live",
@@ -58,7 +86,22 @@
 		"groupMark": "Part {{index}}/{{total}} · {{title}}",
 		"groupHint": "Shows only this group's cards",
 		"groupFilter": "Group {{group}} · show all",
-		"showAll": "Show every card"
+		"showAll": "Show every card",
+		"sync": "Sync",
+		"emptyHint": "Cards land here as they move along the board.",
+		"quickHint": "Long press for quick actions",
+		"quickActions": "Quick actions",
+		"openCard": "Open the card",
+		"search": "Search the board",
+		"clearSearch": "Clear the search",
+		"filters": "Filters",
+		"filtersOn_one": "Filters, {{count}} on",
+		"filtersOn_other": "Filters, {{count}} on",
+		"mine": "Mine",
+		"clearFilters": "Clear the filters",
+		"noMatch": "No card matches.",
+		"noMatchHint": "Other words or fewer filters may find it.",
+		"flagged": "Blocked"
 	},
 	"columns": {
 		"backlog": "Planning",
@@ -69,7 +112,9 @@
 		"build_failed": "Red Build",
 		"pr_created": "Open PR",
 		"done": "Done",
-		"error": "Error"
+		"error": "Error",
+		"failed": "Failed",
+		"abandoned": "Abandoned"
 	},
 	"kinds": {
 		"none": "Unspecified",
@@ -170,7 +215,8 @@
 		"steeringLabel": "Message for the next session",
 		"steeringSend": "Send",
 		"steeringQueued": "Waiting for the next session",
-		"steeringDelivered": "Delivered to session {{session}} ({{date}})"
+		"steeringDelivered": "Delivered to session {{session}} ({{date}})",
+		"working": "Agent working"
 	},
 	"actions": {
 		"start": "Start",
@@ -191,7 +237,6 @@
 	},
 	"settings": {
 		"title": "Settings",
-		"account": "Account",
 		"server": "Server",
 		"organization": "Organization",
 		"signOut": "Sign out",
@@ -235,7 +280,9 @@
 		"jobFailed": "The last run failed. {{error}}",
 		"toCard": "Turn into a card",
 		"openCard": "Open its card",
-		"context": "Context"
+		"context": "Context",
+		"governance": "Governance",
+		"waves": "Waves"
 	},
 	"roadmap": {
 		"empty": "No roadmap yet. Generate one: an agent studies the project and proposes phases and features.",
@@ -312,6 +359,29 @@
 			"merge_with_changes": "Mergeable after small changes",
 			"needs_revision": "Needs revision",
 			"blocked": "Blocked"
+		},
+		"feedback": {
+			"useful": "Useful",
+			"notUseful": "Not useful",
+			"why": "Why is it not useful?",
+			"notApplicable": "Does not apply here",
+			"held": "Waiting for a maintainer",
+			"heldTitle": "Rejections waiting for you",
+			"heldHint": "The reviewer learns from them once you approve: it will raise such remarks less on this project.",
+			"approve": "Approve",
+			"discard": "Discard",
+			"verdict": {
+				"accepted": "Useful",
+				"rejected": "Not useful",
+				"not_applicable": "Does not apply"
+			},
+			"reason": {
+				"false_positive": "It is wrong",
+				"too_pedantic": "Too pedantic",
+				"project_convention": "Our convention",
+				"legacy_exception": "Legacy code, on purpose",
+				"other": "Another reason"
+			}
 		}
 	},
 	"dashboard": {
@@ -339,7 +409,67 @@
 		"trend": "Against the period before",
 		"tokens": "Tokens",
 		"allTime": "Since the start",
-		"noSessions": "No session yet."
+		"noSessions": "No session yet.",
+		"tiles": {
+			"qa": "first-time QA passes",
+			"spent": "spent in {{days}} days",
+			"done": "cards done"
+		}
+	},
+	"governance": {
+		"intro": "What the project's workpilot.policy.yaml asks of its agents on the server. The server checks every action again.",
+		"policy": "Policy",
+		"none": "workpilot.policy.yaml sets no hours, files or token budget.",
+		"invalid": "workpilot.policy.yaml is refused: until it is fixed, no agent writes a file or runs a command.",
+		"schedule": "Hours",
+		"scheduleLine": "{{hours}} ({{timezone}}), {{days}}",
+		"openNow": "Open now",
+		"closedNow": "Closed now",
+		"noSchedule": "Any time",
+		"forbidden": "Forbidden files",
+		"requiresReview": "Files that need an approval",
+		"noFiles": "None",
+		"reviewers": "Approved by a member holding one of these roles: {{roles}}. Anyone who may approve can refuse.",
+		"anyMember": "Approved by any member of the project who may approve reviews, under their server account.",
+		"budget": "Token budget",
+		"budgetLine": "{{spent}} of {{limit}} tokens in the last hour",
+		"taskBudgetLine": "At most {{limit}} tokens per task",
+		"noBudget": "No token limit",
+		"loopLine": "Pauses an agent after {{count}} identical tool calls",
+		"agents": "Agents",
+		"agentsLine": "Running on the server: {{mine}} yours, {{project}} in all",
+		"stopMine": "Stop my agents",
+		"stopProject": "Stop every agent of the project",
+		"stopTitle": "Stop every agent of the project?",
+		"stopBody": "The runs and jobs of everyone on this project stop now. Their cards can be started again.",
+		"stopConfirm": "Stop them all",
+		"stopped_one": "{{count}} agent stopped. Its card can be started again.",
+		"stopped_other": "{{count}} agents stopped. Their cards can be started again.",
+		"pending_one": "{{count}} call waiting for an approval",
+		"pending_other": "{{count}} calls waiting for an approval",
+		"noPending": "No call is waiting for an approval.",
+		"approve": "Approve",
+		"refuse": "Refuse",
+		"approved": "Approved in your name: the agent's next identical call goes through, once.",
+		"refused": "Refused: the agent keeps being denied this call.",
+		"needsRole": "The policy asks one of these roles to approve: {{roles}}.",
+		"decisions": "Recent decisions",
+		"noDecisions": "No decision yet.",
+		"blocked_one": "{{count}} agent action stopped in the last 24 h",
+		"blocked_other": "{{count}} agent actions stopped in the last 24 h",
+		"trips_one": "{{count}} circuit-breaker trip in the last 7 days",
+		"trips_other": "{{count}} circuit-breaker trips in the last 7 days",
+		"approvedBy": "approved by {{name}}",
+		"decision": {
+			"deny": "Refused",
+			"review": "Review",
+			"approved": "Approved",
+			"warn": "Warned",
+			"outside_hours": "Outside hours",
+			"budget_exceeded": "Budget reached",
+			"invalid_policy": "Invalid policy",
+			"tool_loop": "Circuit breaker"
+		}
 	},
 	"analyses": {
 		"intro": "Each analysis runs on the server, on the project's code; everyone on the project reads its last report.",
@@ -412,12 +542,34 @@
 			"codebase_discovery": "Discovery",
 			"task_outcome": "Outcome",
 			"session_insight": "Session"
+		},
+		"trash": "Trash",
+		"pinned": "Pinned",
+		"pin": "Pin",
+		"unpin": "Unpin",
+		"forget": "Forget",
+		"forgetTitle": "Forget this memory?",
+		"forgetBody": "The agents stop reading it. It stays in the trash, where anyone who may write the project's insights can put it back.",
+		"restore": "Put back",
+		"trashHint": "A forgotten memory stays {{days}} days in the trash. {{pinned}} of {{limit}} memories are pinned.",
+		"trashEmpty": "Nothing in the trash.",
+		"forgottenBy": "Forgotten by {{name}}, {{date}}",
+		"forgottenOn": "Forgotten {{date}}",
+		"restorableUntil": "Can be put back until {{date}}",
+		"refused": {
+			"pin-limit": "At most {{limit}} memories can be pinned: unpin one first.",
+			"pinned": "A pinned memory cannot be forgotten: unpin it first.",
+			"not-found": "This memory is no longer there: the list is read again.",
+			"exists": "A memory of the same name is back already.",
+			"expired": "It stayed too long in the trash to be put back.",
+			"no-brain": "The project has no memory yet.",
+			"invalid": "The server did not recognize this memory.",
+			"failed": "The server did not take this decision."
 		}
 	},
 	"tokens": {
 		"title": "My tokens on the server",
 		"summary": "Your GitHub, GitLab, Azure DevOps, Jira and Linear tokens, used for your own calls.",
-		"manage": "Manage my tokens",
 		"intro": "The server keeps these tokens encrypted and uses them for your own forge and tracker calls. Once saved, a token is never shown again, on the phone or anywhere else.",
 		"kinds": {
 			"github_token": "GitHub",
@@ -437,10 +589,44 @@
 		"removeTitle": "Remove the {{name}} token?",
 		"removeBody": "The server forgets it; calls that need it stop until you add one again."
 	},
+	"aiAccounts": {
+		"title": "My AI accounts",
+		"summary": "Your own keys per AI provider; your runs use your default one.",
+		"intro": "Save your own keys for each AI provider: the runs you start use your default account instead of the server's. The server keeps the keys encrypted; once saved, a key is never shown again, on the phone or anywhere else.",
+		"empty": "No account yet: your runs use the server's accounts.",
+		"readOnly": "Your role does not let you add or change AI accounts.",
+		"providers": {
+			"claude": "Claude",
+			"openai": "OpenAI",
+			"google": "Google Gemini",
+			"mistral": "Mistral",
+			"deepseek": "DeepSeek",
+			"grok": "Grok",
+			"meta": "Meta Llama",
+			"openrouter": "OpenRouter",
+			"huggingface": "Hugging Face"
+		},
+		"keySaved": "Key saved {{date}}",
+		"serverAccount": "The server's account",
+		"serverAccountDetail": "What the server's administrator set up",
+		"edit": "Edit {{name}}",
+		"editShort": "Edit",
+		"removeOne": "Remove {{name}}",
+		"remove": "Remove",
+		"removeTitle": "Remove the account {{name}}?",
+		"removeBody": "The server forgets its key. If it was your default, your runs go back to the server's account.",
+		"name": "Name",
+		"namePlaceholder": "Personal, Client X…",
+		"key": "API key",
+		"newKey": "New key (leave empty to keep the current one)",
+		"claudeToken": "Claude Code token (claude setup-token)",
+		"save": "Save",
+		"addTitle": "Add an account",
+		"add": "Add the account"
+	},
 	"admin": {
 		"title": "Administration",
-		"summary": "Members, invitations, groups and roles of this organization.",
-		"open": "Open the administration",
+		"summary": "Overview, members, invitations, groups, roles, sessions, quotas and audit log of this organization.",
 		"of": "Organization: {{org}}",
 		"remove": "Remove",
 		"projectRole": {
@@ -530,6 +716,85 @@
 				"org": "Organization",
 				"project": "Project"
 			}
+		},
+		"overview": {
+			"title": "Overview",
+			"summary": "What the organization's agents do now and over the week, and its quotas.",
+			"running": "Agents running",
+			"queued": "Waiting to run",
+			"success": "Runs that succeeded, 7 days",
+			"members": "Members",
+			"activeOf": "{{active}} active of {{total}}",
+			"projects": "Projects",
+			"cards": "Cards",
+			"runs24h": "Runs in the last 24 h",
+			"failed24h": "Failed in the last 24 h",
+			"week": "The last 7 days",
+			"dayRuns_one": "{{date}}: {{count}} run",
+			"dayRuns_other": "{{date}}: {{count}} runs",
+			"noRuns": "No run this week.",
+			"topUsers": "Who started the most runs",
+			"runs_one": "{{count}} run",
+			"runs_other": "{{count}} runs",
+			"failures": "Last failures",
+			"status": {
+				"queued": "Waiting",
+				"running": "Running",
+				"succeeded": "Succeeded",
+				"failed": "Failed",
+				"cancelled": "Cancelled"
+			}
+		},
+		"sessions": {
+			"title": "Sessions",
+			"summary": "Who is signed in, how and until when, and sign someone out.",
+			"empty": "Nobody is signed in.",
+			"since": "since {{date}}",
+			"until": "until {{date}}",
+			"revoke": "Sign out everywhere",
+			"revokeTitle": "Sign {{name}} out of every device?",
+			"revokeBody": "They have to sign in again on each device. Their account stays as it is."
+		},
+		"quotas": {
+			"title": "Quotas",
+			"summary": "Seats, projects, agents at once and tokens a month, with their use now.",
+			"use": "Use now",
+			"limitsTitle": "Limits",
+			"limits": {
+				"max_users": "Seats",
+				"max_projects": "Projects",
+				"max_concurrent_runs": "Agents at once",
+				"monthly_token_budget": "Tokens this month"
+			},
+			"usedOf": "{{used}} of {{limit}}",
+			"usedNoLimit": "{{used}}, no limit",
+			"hint": "An empty field means no limit.",
+			"unlimited": "No limit",
+			"hardStop": "Stop the agents at the token budget",
+			"hardStopHint": "Without it, the budget only warns: the agents keep going past it.",
+			"invalid": "A limit is a whole number, 0 or more.",
+			"save": "Save the limits",
+			"saved": "Saved.",
+			"readOnly": "You can read the quotas, not change them.",
+			"meter": "{{name}} used"
+		},
+		"audit": {
+			"title": "Audit log",
+			"summary": "What was done in the organization, by whom and when.",
+			"empty": "Nothing recorded yet.",
+			"system": "the server",
+			"openHint": "Shows the details of this line",
+			"only": "Only {{action}}",
+			"all": "Show everything",
+			"filter": "Only this action",
+			"more": "Show older lines",
+			"methods": {
+				"local": "password",
+				"entra": "Microsoft Entra",
+				"oidc": "single sign-on",
+				"invite": "invitation",
+				"unknown": "another sign-in"
+			}
 		}
 	},
 	"share": {
@@ -565,5 +830,429 @@
 		"operator": "Operator",
 		"analyst": "Analyst",
 		"viewer": "Viewer"
+	},
+	"approval": {
+		"count": "{{given}} of {{needed}} approvals",
+		"criticality": "Criticality",
+		"levels": {
+			"low": "Low",
+			"medium": "Medium",
+			"high": "High"
+		},
+		"sources": {
+			"set": "Set by a person",
+			"assessed": "Assessed from the plan",
+			"default": "The server's default"
+		},
+		"missingRoles": "Still missing: {{roles}}",
+		"by": "{{by}}, {{at}}",
+		"byFor": "{{by}} for {{for}}, {{at}}"
+	},
+	"delegations": {
+		"title": "Lent approvals",
+		"hint": "Lend your approval to a colleague while you are away. They approve in your name until the end date.",
+		"current": "Current and planned",
+		"item": "{{from}} → {{to}}, {{start}} to {{end}}",
+		"active": "Active",
+		"planned": "Planned",
+		"end": "End",
+		"empty": "No approval is lent on this project.",
+		"lendTitle": "Lend my approval",
+		"noColleague": "No colleague can approve on this project.",
+		"days": "For how many days (1 to 90)",
+		"lend": "Lend"
+	},
+	"waves": {
+		"intro": "The server plans the backlog from its copy of the code: cards that share no file run side by side, wave after wave, in the order that merges best. Opening this page takes the run's next step.",
+		"execute": "Execute in optimal order",
+		"finished": "The last run went through all its waves.",
+		"ignored": "The saved run could not be read, so it was set aside.",
+		"advance": {
+			"merged": "Next wave once merged",
+			"review": "Next wave once in review"
+		},
+		"start": "Start the first wave",
+		"noRight": "You don't have the rights to start agents on this project.",
+		"empty": "Nothing in Planning or Queue to plan.",
+		"step": "Check now",
+		"stop": "Stop the run",
+		"stopTitle": "Stop the run?",
+		"stopBody": "The cards it started keep running; no further wave starts.",
+		"running": "Wave {{wave}} of {{total}}",
+		"wave": "Wave {{index}}",
+		"failure": {
+			"needs_approval": "waits for its spec to be approved",
+			"claimed": "claimed by someone else",
+			"already_running": "already running",
+			"quota": "over the agent quota",
+			"refused": "the server refused to start it",
+			"missing": "no longer on the board"
+		},
+		"blocked": "waits for a card it depends on",
+		"gone": "no longer on the board",
+		"agentRunning": "agent running",
+		"plan_one": "Plan: {{count}} wave, up to {{parallel}} at a time",
+		"plan_other": "Plan: {{count}} waves, up to {{parallel}} at a time",
+		"risk": "Conflict risk avoided: {{avoided}} of {{total}}",
+		"mergeChecks": "Trial merges: {{checked}} checked, {{conflicts}} in conflict",
+		"cycles": "Some cards depend on each other in a loop and are left out:",
+		"excluded": {
+			"cycle": "in a dependency loop",
+			"blocked_by_cycle": "depends on a card in a loop"
+		},
+		"history": "Last {{days}} days",
+		"historyIgnored": "The run history could not be read.",
+		"historyLine": "Runs: {{runs}} (stopped: {{stopped}}) · conflicts avoided: {{conflicts}} · risk avoided: {{risk}} · cards started: {{started}}",
+		"lastRun": "Last run finished {{at}}",
+		"conflictsLine": "Merge conflicts resolved: {{resolved}}, median time to resolve {{median}} · still open: {{open}}",
+		"conflictsNone": "No merge conflict resolved · still open: {{open}}",
+		"conflictsIgnored": "The merge conflict times could not be read.",
+		"minutes": "{{count}} min",
+		"hours": "{{hours}} h {{minutes}} min"
+	},
+	"mySession": {
+		"title": "My session",
+		"loading": "Loading the session",
+		"unavailable": "The session cannot be read from the server",
+		"method": "Opened with",
+		"methods": {
+			"local": "Password",
+			"entra": "Microsoft Entra ID",
+			"oidc": "Single sign-on: {{name}}",
+			"invite": "Accepted invitation",
+			"unknown": "Not recorded (session opened before the server named sign-ins)"
+		},
+		"issuer": "Identity provider",
+		"signedInAt": "Signed in at"
+	},
+	"nav": {
+		"projects": "Projects",
+		"board": "Board",
+		"more": "More",
+		"moreEmpty": "Your role opens no other page of this project.",
+		"pages": {
+			"chat": {
+				"title": "Team chat",
+				"hint": "Talk with whoever is on the project, live"
+			},
+			"leaderboard": {
+				"title": "Leaderboard",
+				"hint": "The season's points of those who show their name, and your badges"
+			},
+			"ask": {
+				"title": "Ask the board",
+				"hint": "A question in any language, answered with the tickets that relate to it"
+			},
+			"roadmap": {
+				"title": "Roadmap",
+				"hint": "The features planned for the project, by phase and priority"
+			},
+			"ideas": {
+				"title": "Ideas",
+				"hint": "Improvements an agent found in the code, to turn into cards"
+			},
+			"context": {
+				"title": "Context",
+				"hint": "What the agents know of the project: stack, services, memories"
+			},
+			"sessions": {
+				"title": "Sessions",
+				"hint": "Every agent session of the project, with its tokens and cost"
+			},
+			"analyses": {
+				"title": "Analyses",
+				"hint": "Security, performance, quality: reports run on the server"
+			},
+			"delegations": {
+				"title": "Lent approvals",
+				"hint": "Who may approve in your name while you are away"
+			},
+			"governance": {
+				"title": "Governance",
+				"hint": "The project's agent policy and the calls waiting for an approval"
+			},
+			"waves": {
+				"title": "Waves",
+				"hint": "The backlog planned in waves of cards that can run side by side"
+			}
+		}
+	},
+	"time": {
+		"now": "just now",
+		"minutes_one": "{{count}} min ago",
+		"minutes_other": "{{count}} min ago",
+		"hours_one": "{{count}} h ago",
+		"hours_other": "{{count}} h ago",
+		"days_one": "{{count}} d ago",
+		"days_other": "{{count}} d ago"
+	},
+	"inbox": {
+		"title": "For you",
+		"open": "What waits for you",
+		"waiting_one": "{{count}} card waits for you",
+		"waiting_other": "{{count}} cards wait for you",
+		"parts": {
+			"plan_one": "{{count}} plan to approve",
+			"plan_other": "{{count}} plans to approve",
+			"attention": "{{count}} to look at",
+			"review": "{{count}} to review"
+		},
+		"reasons": {
+			"plan": "Plans to approve",
+			"attention": "Stopped, to look at",
+			"review": "Done, to review"
+		},
+		"chips": {
+			"plan": "Plan",
+			"attention": "Stopped",
+			"review": "Review"
+		},
+		"empty": "Nothing waits for you.",
+		"emptyHint": "Cards you can approve, review or restart land here, from every project.",
+		"unreachable": "Could not read: {{names}}. Pull to try again.",
+		"intro": "From every project you are in: the cards in Human Review that you can act on, unless someone else claimed them."
+	},
+	"needsYou": {
+		"title": "Notify me elsewhere",
+		"summary": "ntfy, Telegram or Teams, when a card waits for you",
+		"intro": "When a card waits for you, the server also tells you on the service you pick. The project's name and the card's number go to that service, nothing else of the card.",
+		"off": "This server does not send them yet: an administrator turns them on. You can still set them up.",
+		"noVault": "This server has no secrets key, so it cannot store a channel. Ask an administrator.",
+		"readOnly": "Your role cannot set a channel: only someone who can start agents can.",
+		"moments": "When",
+		"language": "Language of the messages",
+		"languages": {
+			"en": "English",
+			"fr": "Français"
+		},
+		"events": {
+			"plan_review": "A plan waits for my approval",
+			"review_ready": "A card is ready for my review",
+			"failed": "A task I started stopped on an error",
+			"approval_escalated": "A plan has waited too long for an approver",
+			"review_feedback_held": "A review rejection waits for a maintainer"
+		},
+		"channels": {
+			"ntfy": "ntfy",
+			"telegram": "Telegram",
+			"teams": "Microsoft Teams"
+		},
+		"hints": {
+			"ntfy": "Push notifications through an ntfy topic, on ntfy.sh or your own server. Subscribe to the topic in the ntfy app.",
+			"telegram": "Messages from your own bot (create one with @BotFather), to your numeric user id.",
+			"teams": "A Teams incoming webhook or a Workflows URL of your channel."
+		},
+		"fields": {
+			"server": "Server (https)",
+			"topic": "Topic",
+			"access_token": "Access token (optional)",
+			"bot_token": "Bot token",
+			"chat_id": "Your user id",
+			"webhook_url": "Webhook URL"
+		},
+		"keep": "Set: leave empty to keep it",
+		"generate": "Generate a topic",
+		"state": {
+			"notSet": "Not set",
+			"on": "On",
+			"paused": "Paused",
+			"unreadable": "Set again"
+		},
+		"enabled": "Send on {{channel}}",
+		"set": "Set up",
+		"change": "Change",
+		"save": "Save",
+		"test": "Send a test",
+		"remove": "Remove",
+		"removeTitle": "Remove {{channel}}?",
+		"removeBody": "The server forgets this channel and its secrets.",
+		"result": {
+			"sent": "Test sent. Check {{channel}}.",
+			"blocked": "Not sent: the server refused the destination.",
+			"refused": "Not sent: {{channel}} refused the message. Check the settings.",
+			"unreachable": "Not sent: {{channel}} could not be reached."
+		}
+	},
+	"chat": {
+		"title": "Team chat",
+		"here_one": "{{count}} here",
+		"here_other": "{{count}} here",
+		"you": "You",
+		"connecting": "Connecting…",
+		"empty": "No message yet.",
+		"emptyHint": "Messages are kept on the team's server and seen by every member of the project.",
+		"message": "Message",
+		"send": "Send",
+		"reply": "Reply",
+		"replyTo": "Reply to {{name}}",
+		"replyingTo": "Replying to {{name}}: {{message}}",
+		"cancelReply": "Cancel the reply",
+		"inReplyTo": "{{name}}: {{message}}",
+		"readOnly": "Your role on this project lets you read the chat, not write in it.",
+		"rejected": {
+			"invalid": "This message cannot be sent: it is empty or longer than 2,000 characters.",
+			"too_fast": "Slow down: at most 5 messages in 5 seconds. Your message is back in the field.",
+			"unavailable": "The server cannot keep messages right now. Your message is back in the field."
+		}
+	},
+	"leaderboard": {
+		"title": "Leaderboard",
+		"where": "Where",
+		"when": "When",
+		"scope": {
+			"project": "This project",
+			"org": "Whole organization"
+		},
+		"period": {
+			"season": "This season",
+			"all": "Since the start"
+		},
+		"season": "Season from {{start}} to {{end}}",
+		"yours": "Your score",
+		"points_one": "{{count}} point",
+		"points_other": "{{count}} points",
+		"tally": "{{delivered}} delivered · {{reviews}} reviews",
+		"rank": "rank {{rank}}",
+		"unranked": "not ranked",
+		"showMe": "Show my name on the leaderboard",
+		"showMeHint": "Off until you turn it on. Without it, your work counts for you alone and nobody else sees it.",
+		"named": "Ranking",
+		"empty": "Nobody is named yet.",
+		"emptyHint": "People appear here once they choose to show their name.",
+		"entry_one": "Rank {{rank}}, {{name}}, {{count}} point",
+		"entry_other": "Rank {{rank}}, {{name}}, {{count}} points",
+		"youName": "{{name}} (you)",
+		"howItCounts": "A delivered card counts 1 to 3 points by its assessed complexity, an approval of a teammate's card 2. No token count or price is read, so every provider counts the same.",
+		"badges": {
+			"first_delivery": "First delivery",
+			"ten_deliveries": "Ten deliveries",
+			"complex_delivery": "Complex card delivered",
+			"first_review": "First review",
+			"ten_reviews": "Ten reviews"
+		}
+	},
+	"replays": {
+		"title": "My replay links",
+		"summary": "The replays you shared, and ending a link",
+		"hint": "The replay links you shared from WorkPilot on your computer, on every project you still reach.",
+		"empty": "You have shared no replay.",
+		"emptyHint": "Share a replay from a card in WorkPilot on your computer: its link shows here, so you can end it from your phone.",
+		"state": {
+			"active": "Open",
+			"expired": "Expired",
+			"revoked": "Ended"
+		},
+		"where_one": "{{project}} · {{count}} step",
+		"where_other": "{{project}} · {{count}} steps",
+		"opened_one": "Opened once, {{when}}",
+		"opened_other": "Opened {{count}} times, last {{when}}",
+		"neverOpened": "Not opened yet",
+		"until": "Opens until {{date}}",
+		"revoke": "End the link",
+		"revokeTitle": "End this link?",
+		"revokeBody": "“{{title}}” will no longer open for anyone who has the link."
+	},
+	"ask": {
+		"intro": "Ask about the board in any language, for instance « Was the admin page reviewed? ». The answer cites every related card, roadmap feature and idea, whatever language they are written in. Only you see your questions.",
+		"question": "Your question",
+		"followUp": "A follow-up question",
+		"send": "Ask",
+		"stop": "Stop",
+		"answering": "Looking for « {{question}} »…",
+		"noAnswer": "The server gave no answer. Try again.",
+		"keywords": "No model answered: these tickets share words with the question.",
+		"nothing": "No ticket relates to this question.",
+		"searched_one": "{{count}} ticket searched",
+		"searched_other": "{{count}} tickets searched",
+		"archived": "Archived",
+		"state": {
+			"done": "Done",
+			"in_review": "In review",
+			"in_progress": "In progress",
+			"planned": "Planned",
+			"failed": "Failed",
+			"abandoned": "Abandoned"
+		},
+		"coverage": {
+			"full": "Already done",
+			"partial": "Partly",
+			"related": "Related"
+		},
+		"kind": {
+			"roadmap": "Roadmap",
+			"idea": "Idea"
+		}
+	},
+	"myUsage": {
+		"title": "My usage",
+		"summary": "What administrators see of you, and your data to download.",
+		"intro": "What this organization's administrators see of you over the last 30 days: totals, action names, runs and jobs. Never a prompt, code, typed text or file name.",
+		"visibleTo": "Readable by: {{roles}}, and the server's platform administrators.",
+		"period": "Last 30 days",
+		"tokens_one": "{{value}} token",
+		"tokens_other": "{{value}} tokens",
+		"cost": "Cost: {{cost}}",
+		"costEstimated": "Cost: {{cost}} (partly estimated)",
+		"runs": "Runs: {{total}}, {{succeeded}} succeeded",
+		"jobs": "Jobs: {{total}}, {{succeeded}} succeeded",
+		"daily": "Tokens per day",
+		"timeline": "What you did",
+		"pages": "Pages opened",
+		"empty": "Nothing in this period.",
+		"event": "{{kind}}: {{what}}",
+		"kinds": {
+			"sign_in": "Sign-in",
+			"audit": "Action",
+			"run": "Run",
+			"job": "Job"
+		},
+		"export": "Share everything kept about me (JSON)",
+		"exportTitle": "My WorkPilot usage",
+		"notice": "Read again what is measured"
+	},
+	"usageNotice": {
+		"title": "What this server measures about you",
+		"intro": "This organization's server keeps a few figures about each member, to follow its use and costs.",
+		"bullet": "• {{text}}",
+		"measured": {
+			"tokens": "The tokens and cost of the agents you start, by provider and model",
+			"runs": "Your runs: phase, status, start and end",
+			"jobs": "Your project jobs: feature, status, start and end",
+			"sign_ins": "Your sign-ins: time, method, address and app",
+			"presence": "The days you were connected, and when you were last seen",
+			"pages": "How many times a day you open each screen of the app (its name only)"
+		},
+		"never": "Never a prompt, code, typed text or file name.",
+		"retention": "These figures are kept {{days}} days.",
+		"pageRetention": "Screen counts are kept {{days}} days.",
+		"visibleTo": "Readable by: {{roles}}, and the server's platform administrators.",
+		"rights": "You can see them and share everything kept about you in Settings, My usage. To have your account erased, ask a platform administrator.",
+		"understood": "I understand"
+	},
+	"cardLog": {
+		"title": "Log of #{{id}}",
+		"open": "See the whole log",
+		"phase": "Phase",
+		"show": "Show",
+		"all": "Everything",
+		"errors": "Errors",
+		"noTools": "Without the tools",
+		"find": "Find in the log",
+		"live": "An agent works: the log is read again every 3 seconds.",
+		"still": "No agent works on this card now.",
+		"follow": "Follow the end",
+		"empty": "No line to show."
+	},
+	"cardFiles": {
+		"open": "See the file full screen",
+		"previous": "Previous",
+		"next": "Next",
+		"position": "File {{index}} of {{count}}",
+		"status": {
+			"added": "Added",
+			"modified": "Modified",
+			"deleted": "Deleted",
+			"renamed": "Renamed"
+		}
 	}
 }

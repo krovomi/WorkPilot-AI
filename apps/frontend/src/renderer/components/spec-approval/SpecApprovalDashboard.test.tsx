@@ -7,6 +7,7 @@ import { SpecApprovalDashboard } from "./SpecApprovalDashboard";
 const submitReview = vi.fn();
 const startTask = vi.fn();
 let tasks: Task[] = [];
+let activeProject: Record<string, unknown> = { id: "p1", path: "/repo" };
 
 vi.mock("../../stores/task-store", () => ({
 	submitReview: (...args: unknown[]) => submitReview(...args),
@@ -15,7 +16,7 @@ vi.mock("../../stores/task-store", () => ({
 }));
 vi.mock("../../stores/project-store", () => ({
 	useProjectStore: (select: (s: { getActiveProject: () => unknown }) => unknown) =>
-		select({ getActiveProject: () => ({ id: "p1", path: "/repo" }) }),
+		select({ getActiveProject: () => activeProject }),
 }));
 vi.mock("react-i18next", () => ({
 	useTranslation: () => ({ t: (key: string) => key }),
@@ -72,6 +73,7 @@ describe("SpecApprovalDashboard", () => {
 		(globalThis as unknown as { electronAPI: unknown }).electronAPI = { invoke };
 		useSpecApprovalStore.getState().clear();
 		tasks = [task("1")];
+		activeProject = { id: "p1", path: "/repo" };
 	});
 
 	it("lists the plans waiting and loads the selected spec", async () => {
@@ -117,5 +119,68 @@ describe("SpecApprovalDashboard", () => {
 		});
 		expect(startTask).not.toHaveBeenCalled();
 		expect(screen.getByText("specApproval:decision.failed")).toBeInTheDocument();
+	});
+
+	describe("on a server project", () => {
+		const serverReview = vi.fn();
+		const approval = {
+			criticality: "medium",
+			criticalitySource: "default",
+			needed: 2,
+			count: 1,
+			roles: [],
+			missingRoles: [],
+			approvals: [],
+			complete: false,
+			approved: false,
+		};
+
+		beforeEach(() => {
+			activeProject = { id: "p1", path: "/repo", remote: { role: "member" } };
+			serverReview.mockReset();
+			(globalThis as unknown as { electronAPI: unknown }).electronAPI = {
+				invoke,
+				submitReview: serverReview,
+				getServerCardApproval: vi.fn().mockResolvedValue({ success: true, data: approval }),
+				setServerCardCriticality: vi.fn(),
+				listServerDelegations: vi.fn().mockResolvedValue({ success: true, data: [] }),
+				listServerDelegates: vi.fn().mockResolvedValue({ success: true, data: [] }),
+			};
+		});
+
+		it("shows the card's approvals and the lent approvals", async () => {
+			render(<SpecApprovalDashboard />);
+			expect(screen.getByTestId("server-delegations-panel")).toBeInTheDocument();
+			fireEvent.click(screen.getByText("Task 1"));
+			expect(await screen.findByTestId("server-approval-panel")).toBeInTheDocument();
+		});
+
+		it("says how many approvals the card has instead of a failure", async () => {
+			serverReview.mockResolvedValue({ success: false, error: "1 of 2" });
+			render(<SpecApprovalDashboard />);
+			fireEvent.click(screen.getByText("Task 1"));
+			await act(async () => {
+				fireEvent.click(screen.getByText("specApproval:decision.approve"));
+			});
+			expect(serverReview).toHaveBeenCalledWith("1", true, undefined);
+			expect(submitReview).not.toHaveBeenCalled();
+			expect(startTask).not.toHaveBeenCalled();
+			expect(screen.getByText("1 of 2")).toBeInTheDocument();
+		});
+
+		it("falls back on its own words, and starts the build once approved", async () => {
+			serverReview.mockResolvedValueOnce({ success: false });
+			render(<SpecApprovalDashboard />);
+			fireEvent.click(screen.getByText("Task 1"));
+			await act(async () => {
+				fireEvent.click(screen.getByText("specApproval:decision.approve"));
+			});
+			expect(screen.getByText("specApproval:decision.failed")).toBeInTheDocument();
+			serverReview.mockResolvedValueOnce({ success: true });
+			await act(async () => {
+				fireEvent.click(screen.getByText("specApproval:decision.approve"));
+			});
+			expect(startTask).toHaveBeenCalledWith("1");
+		});
 	});
 });

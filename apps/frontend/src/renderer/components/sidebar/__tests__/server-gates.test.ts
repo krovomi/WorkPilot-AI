@@ -37,10 +37,16 @@ describe("server project views", () => {
 			"github-prs",
 			"gitlab-issues",
 			"gitlab-merge-requests",
+			// Its governance, read and run by the server.
+			"guardrails",
 			"i18n-agent",
 			"ideation",
 			"insights",
 			"kanban",
+			// Its execution waves, planned and run by the server.
+			"mission-control",
+			// Its cards, and the team leaderboard the server computes.
+			"pixel-office",
 			"roadmap",
 			"session-history",
 			"tech-debt",

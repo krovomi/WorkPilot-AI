@@ -1,3 +1,11 @@
+---
+feature: Porte de mutation `tests-bite`
+summary: >-
+  Fautes plantées une à une dans les lignes de la tâche (toutes stacks), dans une copie jetable du
+  worktree ; suite rouge, sans commande ou trop lente = « inconnu », jamais vert ; survivants au
+  fixer comme tests manquants, ses fichiers non-test restaurés.
+---
+
 # Mutation gate `tests-bite` (F7)
 
 Coverage says a line ran, not that a test would fail if the line were wrong: a

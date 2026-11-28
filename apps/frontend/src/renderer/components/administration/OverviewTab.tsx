@@ -23,7 +23,7 @@ function StatCard({
 	readonly icon: React.ElementType;
 	readonly label: string;
 	readonly value: string | number;
-	readonly hint?: string;
+	readonly hint: string;
 	readonly tone?: "default" | "warning";
 }) {
 	return (
@@ -46,9 +46,7 @@ function StatCard({
 				>
 					{value}
 				</div>
-				{hint ? (
-					<div className="text-xs text-muted-foreground mt-1">{hint}</div>
-				) : null}
+				<div className="text-xs text-muted-foreground mt-1">{hint}</div>
 			</CardContent>
 		</Card>
 	);
@@ -195,6 +193,11 @@ export function OverviewTab() {
 						label={t("quotas.maxConcurrentRuns")}
 						used={overview.quota.used_concurrent_runs}
 						limit={overview.quota.max_concurrent_runs}
+					/>
+					<QuotaBar
+						label={t("quotas.monthlyTokenBudget")}
+						used={overview.quota.used_tokens_this_month ?? 0}
+						limit={overview.quota.monthly_token_budget}
 					/>
 					<div className="pt-2 border-t border-border">
 						<div className="flex justify-between text-xs">

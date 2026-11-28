@@ -45,7 +45,7 @@ export function usePtyProcess({
 	const currentCwdRef = useRef(cwd);
 	// Trigger state to force re-creation after resetForRecreate()
 	// Refs don't trigger re-renders, so we need a state to ensure the effect runs
-	const [_recreationTrigger, setRecreationTrigger] = useState(0);
+	const [recreationTrigger, setRecreationTrigger] = useState(0);
 	// Track retry attempts during recreation when dimensions aren't ready
 	const recreationRetryCountRef = useRef(0);
 	const recreationRetryTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -70,7 +70,7 @@ export function usePtyProcess({
 	 * When scheduling a retry, isCreatingRef remains true to prevent duplicate creation attempts.
 	 */
 	const scheduleRetryOrFail = useCallback(
-		(error: string): boolean => {
+		(error: string, afterFailedCreation = false): boolean => {
 			if (
 				isRecreatingRef?.current &&
 				recreationRetryCountRef.current < MAX_RECREATION_RETRIES
@@ -78,10 +78,14 @@ export function usePtyProcess({
 				recreationRetryCountRef.current += 1;
 				// Clear any existing timer before setting a new one
 				clearRetryTimer();
+				// After a failed creation, isCreatingRef stays true during the retry
+				// window, so nothing else starts one; the retry itself releases it.
+				// (While waiting for a size, it may be held by prepareForRecreate()
+				// until the old shell is destroyed: that one is not ours to release.)
 				recreationRetryTimerRef.current = setTimeout(() => {
+					if (afterFailedCreation) isCreatingRef.current = false;
 					setRecreationTrigger((prev) => prev + 1);
 				}, RECREATION_RETRY_DELAY);
-				// Keep isCreatingRef.current = true to prevent duplicate creation during retry window
 				return true;
 			}
 			// Not recreating or max retries exceeded - clear state and report error
@@ -165,8 +169,8 @@ export function usePtyProcess({
 			return;
 		}
 
-		// Clear retry counter since we're proceeding with creation
-		recreationRetryCountRef.current = 0;
+		// The retry count is kept across attempts: it is reset on success or
+		// once the recreation gives up, so failed attempts end in onError.
 
 		const store = getStore();
 		const terminalState = store.terminals.find((t) => t.id === terminalId);
@@ -176,7 +180,7 @@ export function usePtyProcess({
 		const isRestored = terminalState?.isRestored;
 
 		debugLog(
-			`[usePtyProcess] Starting PTY creation for terminal: ${terminalId}`,
+			`[usePtyProcess] Starting PTY creation for terminal: ${terminalId} (recreation ${recreationTrigger})`,
 		);
 		debugLog(
 			`[usePtyProcess] Terminal ${terminalId} state: isRestored=${isRestored}, status=${terminalState?.status}`,
@@ -205,7 +209,7 @@ export function usePtyProcess({
 
 		// Helper to handle error - returns true if retry was scheduled
 		const handleError = (error: string): boolean => {
-			const retrying = scheduleRetryOrFail(error);
+			const retrying = scheduleRetryOrFail(error, true);
 			// Only clear isCreatingRef if not retrying (scheduleRetryOrFail handles this)
 			// When retrying, keep isCreatingRef true to prevent duplicate creation
 			return retrying;
@@ -313,6 +317,7 @@ export function usePtyProcess({
 		clearRetryTimer,
 		scheduleRetryOrFail,
 		isRecreatingRef,
+		recreationTrigger,
 	]);
 
 	// Function to prepare for recreation by preventing the effect from running

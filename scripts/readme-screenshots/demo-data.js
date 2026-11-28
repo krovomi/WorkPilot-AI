@@ -367,6 +367,178 @@
 		},
 	].map((t) => ({ projectId: PROJECT, ...t }));
 
+	// --- Agile board: sprints, labels, points, status history -----------------
+	// What the list, the timeline and the reports read (docs/architecture/kanban-*.md).
+	const midnight = (days) => {
+		const d = new Date(now - days * day);
+		return d.toISOString().slice(0, 10);
+	};
+	const SPRINT_ACTIVE = "sp-0000000c";
+	const SPRINT_NEXT = "sp-0000000d";
+	const sprints = [
+		{
+			id: SPRINT_ACTIVE,
+			name: "Sprint 12",
+			state: "active",
+			goal: "Checkout and search ready for the sale",
+			createdAt: ago(12 * day).toISOString(),
+			startDate: midnight(6),
+			endDate: midnight(-8),
+			startedAt: ago(6 * day).toISOString(),
+		},
+		{
+			id: SPRINT_NEXT,
+			name: "Sprint 13",
+			state: "planned",
+			createdAt: ago(2 * day).toISOString(),
+			startDate: midnight(-8),
+			endDate: midnight(-22),
+		},
+		...[
+			["sp-0000000b", "Sprint 11", 20, 7, 24],
+			["sp-0000000a", "Sprint 10", 34, 21, 19],
+			["sp-00000009", "Sprint 9", 48, 35, 22],
+		].map(([id, name, start, end, points]) => ({
+			id,
+			name,
+			state: "closed",
+			createdAt: ago((start + 2) * day).toISOString(),
+			startDate: midnight(start),
+			endDate: midnight(end + 1),
+			startedAt: ago(start * day).toISOString(),
+			closedAt: ago(end * day).toISOString(),
+			report: { done: Math.round(points / 4), donePoints: points, carried: 1, carriedPoints: 3, carriedTo: null },
+		})),
+	];
+	const estimate = (points) => ({ complexityScore: points, confidenceLevel: 0.8, riskFactors: [] });
+	const move = (from, to, days) => ({ from, to, at: ago(days * day).toISOString(), actor: "agent" });
+	const agile = {
+		"t-01": { labels: ["auth", "security"], sprintId: SPRINT_NEXT, points: 8 },
+		"t-02": { labels: ["ui"], points: 5 },
+		"t-03": { labels: ["perf", "backend"], sprintId: SPRINT_ACTIVE, points: 3 },
+		"t-04": {
+			labels: ["api"],
+			sprintId: SPRINT_ACTIVE,
+			points: 5,
+			flag: "Waiting for the gateway's new quota",
+		},
+		"t-05": { labels: ["checkout"], sprintId: SPRINT_ACTIVE, points: 8, history: [move("queue", "in_progress", 4)] },
+		"t-06": { labels: ["search"], sprintId: SPRINT_ACTIVE, points: 5, history: [move("queue", "in_progress", 2)] },
+		"t-06b": { labels: ["search"], sprintId: SPRINT_ACTIVE, points: 3 },
+		"t-07": {
+			labels: ["reports"],
+			points: 3,
+			history: [move("queue", "in_progress", 5), move("in_progress", "ai_review", 1)],
+		},
+		"t-08": {
+			labels: ["a11y", "checkout"],
+			sprintId: SPRINT_ACTIVE,
+			points: 2,
+			history: [move("queue", "in_progress", 6), move("in_progress", "human_review", 3)],
+		},
+		"t-09": {
+			labels: ["email"],
+			sprintId: SPRINT_ACTIVE,
+			points: 5,
+			history: [move("queue", "in_progress", 9), move("in_progress", "done", 1)],
+		},
+		"t-10": {
+			labels: ["deps"],
+			sprintId: SPRINT_ACTIVE,
+			points: 3,
+			history: [move("queue", "in_progress", 12), move("in_progress", "done", 2)],
+		},
+	};
+	for (const task of tasks) {
+		const extra = agile[task.id];
+		if (!extra) continue;
+		task.metadata = {
+			...task.metadata,
+			labels: extra.labels,
+			...(extra.sprintId && { sprintId: extra.sprintId }),
+			smartEstimate: estimate(extra.points),
+			...(extra.flag && { flagged: true, flaggedReason: extra.flag, flaggedAt: ago(day).toISOString() }),
+		};
+		task.statusHistory = [move(null, "backlog", 14), ...(extra.history || [])];
+	}
+	// Earlier finished work, for the cycle time, the throughput and the flow.
+	const DONE_BEFORE = [
+		["004-guest-cart", "Keep the guest cart after sign-in", 26, 22],
+		["005-sitemap", "Sitemap for product pages", 24, 23],
+		["006-coupons", "Stackable coupons", 21, 15],
+		["007-webhooks", "Order webhooks for the ERP", 18, 13],
+		["008-images", "Responsive product images", 15, 12],
+		["009-returns", "Self-service returns", 12, 6],
+		["010-vat", "VAT by country at checkout", 10, 8],
+		["011-wishlist", "Share a wishlist", 8, 4],
+	];
+	DONE_BEFORE.forEach(([specId, title, started, finished], index) => {
+		tasks.push({
+			projectId: PROJECT,
+			id: `t-done-${index}`,
+			specId,
+			title,
+			description: title,
+			status: "done",
+			subtasks: [],
+			logs: [],
+			metadata: {
+				category: "feature",
+				priority: "medium",
+				labels: [index % 2 ? "checkout" : "catalog"],
+				sprintId: finished < 6 ? SPRINT_ACTIVE : finished < 20 ? "sp-0000000b" : "sp-0000000a",
+				smartEstimate: estimate([3, 5, 8][index % 3]),
+			},
+			statusHistory: [
+				move(null, "backlog", started + 3),
+				move("queue", "in_progress", started),
+				move("in_progress", "done", finished),
+			],
+			createdAt: ago((started + 3) * day),
+			updatedAt: ago(finished * day),
+		});
+	});
+	// Two ends without success: the « Échec » and « Abandonnée » columns.
+	tasks.push(
+		{
+			projectId: PROJECT,
+			id: "t-11",
+			specId: "017-gift-cards",
+			title: "Gift cards at checkout",
+			description: "Redeem a gift card code on the payment step.",
+			status: "human_review",
+			reviewReason: "errors",
+			subtasks: [],
+			logs: [],
+			metadata: { category: "feature", priority: "medium", labels: ["checkout"], sprintId: SPRINT_ACTIVE, smartEstimate: estimate(5) },
+			statusHistory: [move(null, "backlog", 9), move("queue", "in_progress", 3), move("in_progress", "human_review", 1)],
+			createdAt: ago(9 * day),
+			updatedAt: ago(day),
+		},
+		{
+			projectId: PROJECT,
+			id: "t-12",
+			specId: "003-legacy-coupons",
+			title: "Port the legacy coupon engine",
+			description: "Replaced by the stackable coupons task.",
+			status: "backlog",
+			subtasks: [],
+			logs: [],
+			metadata: {
+				category: "refactoring",
+				priority: "low",
+				labels: ["checkout"],
+				abandoned: true,
+				abandonedAt: ago(5 * day).toISOString(),
+				abandonedResolution: "duplicate",
+				abandonedReason: "Covered by « Stackable coupons »",
+			},
+			statusHistory: [move(null, "backlog", 30)],
+			createdAt: ago(30 * day),
+			updatedAt: ago(5 * day),
+		},
+	);
+
 	// --- Roadmap -------------------------------------------------------------
 	const feat = (
 		id,
@@ -821,6 +993,9 @@
 			data: tasks.filter((t) => t.projectId === projectId),
 		}),
 		getRoadmap: ok(roadmap),
+		listSprints: ok(sprints),
+		// A namespace, not a method: the preview's catch-all answers only methods.
+		serverUsage: { notePageVisit: () => undefined },
 		getIdeation: ok(ideation),
 		getInsightsSession: ok(insightsSession),
 		listInsightsSessions: ok(insightsSessions),
@@ -835,12 +1010,144 @@
 				weeklyResetTimestamp: new Date(now + 4 * day).toISOString(),
 				fetchedAt: new Date(),
 				limitType: "session",
+				plan: { billing: "subscription", name: "Claude Max 5x" },
 				usageWindows: {
 					sessionWindowLabel: "5-hour",
 					weeklyWindowLabel: "7-day",
 				},
 			},
 		}),
+		// Usage breakdown: two Claude accounts, each with the plan its sign-in reports.
+		requestAllProfilesUsage: async () => ({
+			success: true,
+			data: {
+				activeProfile: {
+					sessionPercent: 34,
+					weeklyPercent: 21,
+					profileId: "work",
+					profileName: "Work",
+					fetchedAt: new Date(),
+					plan: { billing: "subscription", name: "Claude Max 5x" },
+				},
+				allProfiles: [
+					{
+						profileId: "work",
+						profileName: "Work",
+						profileEmail: "dev@acme.example",
+						sessionPercent: 34,
+						weeklyPercent: 21,
+						isAuthenticated: true,
+						isRateLimited: false,
+						availabilityScore: 70,
+						isActive: true,
+						plan: { billing: "subscription", name: "Claude Max 5x" },
+					},
+					{
+						profileId: "personal",
+						profileName: "Personal",
+						profileEmail: "me@example.com",
+						sessionPercent: 8,
+						weeklyPercent: 46,
+						isAuthenticated: true,
+						isRateLimited: false,
+						availabilityScore: 60,
+						isActive: false,
+						plan: { billing: "subscription", name: "Claude Pro" },
+					},
+				],
+				fetchedAt: new Date(),
+			},
+		}),
+		// AI accounts: Claude (two sign-ins), Copilot, OpenAI and Mistral keys,
+		// Ollama; failover on. Keys are placeholders, never real values.
+		getClaudeProfiles: ok({
+			profiles: [
+				{
+					id: "work",
+					name: "Work",
+					email: "dev@acme.example",
+					isDefault: true,
+					isAuthenticated: true,
+					createdAt: ago(40 * day),
+				},
+				{
+					id: "personal",
+					name: "Personal",
+					email: "me@example.com",
+					isDefault: false,
+					isAuthenticated: true,
+					createdAt: ago(12 * day),
+				},
+			],
+			activeProfileId: "work",
+		}),
+		checkClaudeOAuth: async () => ({ isAuthenticated: true }),
+		checkCopilotAuth: async () => ({
+			success: true,
+			data: { authenticated: true, username: "acme-dev" },
+		}),
+		getAutoSwitchSettings: ok({
+			enabled: true,
+			proactiveSwapEnabled: true,
+			sessionThreshold: 95,
+			weeklyThreshold: 99,
+			autoSwitchOnRateLimit: true,
+			autoSwitchOnAuthFailure: true,
+			usageCheckInterval: 30000,
+		}),
+		// Code Migration: the analysis answers at once with the planner's plan.
+		onCodeMigrationComplete: (callback) => {
+			window.__DEMO_MIGRATION_DONE__ = callback;
+			return () => {};
+		},
+		startCodeMigration: (request) => {
+			const plan = {
+				migration_id: "mig-demo",
+				description: request.migrationDescription,
+				source: "React 18",
+				target: "React 19",
+				risk_level: "medium",
+				total_steps: 9,
+				phases: [
+					{
+						name: "Prepare",
+						steps: ["Upgrade react and react-dom", "Update @types/react"],
+					},
+					{
+						name: "Replace removed APIs",
+						steps: [
+							"ReactDOM.render → createRoot",
+							"String refs → useRef",
+							"propTypes → TypeScript types",
+						],
+					},
+					{
+						name: "Adopt the new defaults",
+						steps: ["ref as a prop instead of forwardRef", "Actions for forms"],
+					},
+					{ name: "Validate", steps: ["Type-check", "Run the test suite"] },
+				],
+			};
+			setTimeout(
+				() =>
+					window.__DEMO_MIGRATION_DONE__?.({
+						status: "completed",
+						migration_description: request.migrationDescription,
+						dry_run: true,
+						plan,
+						execution: { status: "skipped" },
+						summary: {
+							migration_id: plan.migration_id,
+							description: plan.description,
+							dry_run: true,
+							plan_status: "ready",
+							execution_status: "skipped",
+							files_modified: 0,
+						},
+					}),
+				300,
+			);
+		},
 		getDashboardSnapshot: async () => ({ success: true, snapshot }),
 		// Agent Terminals: no pty in the preview, so the capture writes the
 		// session text itself through the output listener kept here.
@@ -854,6 +1161,28 @@
 			return () => {};
 		},
 		__wrap: {
+			getSettings: (r) => {
+				if (!r?.data) return r;
+				const tested = { date: ago(20 * min).toISOString(), success: true };
+				return {
+					...r,
+					data: {
+						...r.data,
+						selectedProvider: "anthropic",
+						globalOpenAIApiKey: "••••••••",
+						globalMistralApiKey: "••••••••",
+						testResult_anthropic: tested,
+						testResult_copilot: tested,
+						testResult_openai: tested,
+						testResult_mistral: tested,
+						testResult_ollama: tested,
+					},
+				};
+			},
+			invoke: (r, channel) =>
+				channel === "github-copilot:getStatus"
+					? { installed: true, authenticated: true, username: "acme-dev" }
+					: r,
 			getProjects: (r) => {
 				if (!r || !Array.isArray(r.data)) return r;
 				return {

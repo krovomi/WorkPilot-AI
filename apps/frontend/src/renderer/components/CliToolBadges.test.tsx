@@ -45,6 +45,11 @@ vi.mock("./HermesStatusBadge", () => ({
 		<Stub id="hermes" {...p} />
 	),
 }));
+vi.mock("./ReaStatusBadge", () => ({
+	ReaStatusBadge: (p: { onPresenceChange?: (x: CliPresence) => void }) => (
+		<Stub id="rea" {...p} />
+	),
+}));
 vi.mock("./AgentCliStatusBadge", () => ({
 	AgentCliStatusBadge: (p: { tool: string; onPresenceChange?: (x: CliPresence) => void }) => (
 		<Stub id={p.tool} onPresenceChange={p.onPresenceChange} />
@@ -73,6 +78,7 @@ describe("CliToolBadges", () => {
 			pi: "missing",
 			"gemini-cli": "missing",
 			hermes: "installed",
+			rea: "missing",
 		});
 		render(<CliToolBadges isCollapsed={false} onNavigateToTerminals={vi.fn()} />);
 		expect(shown()).toEqual([
@@ -84,6 +90,7 @@ describe("CliToolBadges", () => {
 			"antigravity",
 			"gemini-cli",
 			"pi",
+			"rea",
 		]);
 	});
 
@@ -96,5 +103,28 @@ describe("CliToolBadges", () => {
 
 		expect(shown()[0]).toBe("antigravity");
 		expect(mounts.antigravity).toBe(1);
+	});
+});
+
+describe("CliToolBadges summary", () => {
+	it("tells the summary each new answer, and only when one changes", () => {
+		Object.assign(presence, { codex: "installed" });
+		const onPresenceMapChange = vi.fn();
+		render(
+			<CliToolBadges
+				isCollapsed={false}
+				onNavigateToTerminals={vi.fn()}
+				onPresenceMapChange={onPresenceMapChange}
+			/>,
+		);
+		expect(onPresenceMapChange).toHaveBeenLastCalledWith({ codex: "installed" });
+		const calls = onPresenceMapChange.mock.calls.length;
+
+		// A badge that checks again and finds the same answer changes nothing.
+		act(() => reporters.codex("installed"));
+		expect(onPresenceMapChange).toHaveBeenCalledTimes(calls);
+
+		act(() => reporters.pi("missing"));
+		expect(onPresenceMapChange).toHaveBeenLastCalledWith({ codex: "installed", pi: "missing" });
 	});
 });

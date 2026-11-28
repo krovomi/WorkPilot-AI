@@ -191,6 +191,11 @@ class CliSubprocessAgentClient(AgentClient):
     #: The providers.yaml entry whose ``sandbox:`` block this CLI runs under;
     #: None reads `provider_name()`.
     sandbox_provider: str | None = None
+    #: The project's custom MCP servers this CLI may start (`core.cli_mcp`);
+    #: None until `custom_mcp_servers` looks them up.
+    _mcp_servers: list[dict[str, Any]] | None = None
+    #: Whether this CLI is handed those servers (``standards.mcp: handed``).
+    hands_mcp_servers = False
 
     def __init__(
         self,
@@ -220,6 +225,8 @@ class CliSubprocessAgentClient(AgentClient):
         self.context_window_tokens: int | None = None
         self.context_usage_source: str = "reported"
         self._sandbox: Any = None
+        #: How this CLI runs in the task's microVM, when it does (`cli_microvm`).
+        self._cli_vm: Any = None
 
     def session_sandbox(self, spec_dir: Path | str | None = None) -> Any:
         """The OS sandbox this CLI's process runs in, decided once.
@@ -231,11 +238,14 @@ class CliSubprocessAgentClient(AgentClient):
         `os_sandbox.SandboxRequiredError` under ``WORKPILOT_SANDBOX=required``.
         """
         if self._sandbox is None:
+            import functools
             import shutil
 
             from os_sandbox import session_sandbox
             from os_sandbox.policy import install_dir
             from skills_registry.providers import get_provider_capabilities
+
+            from .cli_microvm import open_session
 
             name = self.sandbox_provider or self.provider_name()
             spec = get_provider_capabilities(name).sandbox
@@ -244,7 +254,8 @@ class CliSubprocessAgentClient(AgentClient):
                 for path in (self._resolve_executable(), shutil.which("node"))
                 if path
             ]
-            self._sandbox = session_sandbox(
+            open_sandbox = functools.partial(
+                session_sandbox,
                 self._project_dir,
                 spec_dir or getattr(self, "_spec_dir", None),
                 state_dirs=spec.state if spec else (),
@@ -255,14 +266,75 @@ class CliSubprocessAgentClient(AgentClient):
                 else f"{self.cli_label} has no sandbox profile in capabilities/providers.yaml",
                 readable=readable,
             )
+            # In the task's microVM when the person asked for it and sbx
+            # holds a key for this CLI (`cli_microvm`); else as before.
+            self._sandbox, self._cli_vm = open_session(
+                open_sandbox, spec, self.cli_label, self.model
+            )
         return self._sandbox
 
     def _resolve_executable(self) -> str | None:
         return self._executable
 
+    def runs_in_microvm(self) -> bool:
+        """Whether this CLI's process runs in the task's microVM (`cli_microvm`)."""
+        try:
+            self.session_sandbox()
+        except RuntimeError:  # SandboxRequiredError: the launch says it
+            return False
+        return self._cli_vm is not None
+
+    async def custom_mcp_servers(self) -> list[dict[str, Any]]:
+        """The approved custom MCP servers for this agent type, looked up once.
+
+        Under the OS sandbox the process reaches only its provider's hosts and
+        the package registries, so an HTTP server is left out and said so; a
+        command server runs inside the sandbox with the CLI.
+        """
+        if self._mcp_servers is None:
+            from core.cli_mcp import cli_mcp_servers
+
+            servers = await asyncio.to_thread(
+                cli_mcp_servers,
+                self._agent_type,
+                self._project_dir,
+                getattr(self, "_spec_dir", None),
+            )
+            try:
+                isolated = bool(self.session_sandbox().isolated)
+            except RuntimeError:  # SandboxRequiredError: the launch says it
+                isolated = False
+            if self._cli_vm is not None:
+                # The VM has none of the host's programs or ports.
+                for server in servers:
+                    logger.warning(
+                        "[cli-mcp] MCP server '%s' not started in %s: the CLI runs "
+                        "in the task's microVM",
+                        server.get("id"),
+                        self.cli_label,
+                    )
+                servers = []
+            elif isolated:
+                for server in servers:
+                    if server.get("type") == "http":
+                        logger.warning(
+                            "[cli-mcp] MCP server '%s' not started in %s: the OS "
+                            "sandbox reaches only the provider's hosts",
+                            server.get("id"),
+                            self.cli_label,
+                        )
+                servers = [s for s in servers if s.get("type") != "http"]
+            self._mcp_servers = servers
+        return self._mcp_servers
+
     def _launch(self, command: list[str]) -> tuple[list[str], dict[str, str]]:
         """The command and environment as started: under the sandbox if on."""
-        return self.session_sandbox().wrap(command, self._subprocess_env())
+        sandbox = self.session_sandbox()
+        if self._cli_vm is not None:
+            return self._cli_vm.launch(
+                sandbox, command, self._subprocess_env(), self._project_dir
+            )
+        return sandbox.wrap(command, self._subprocess_env())
 
     async def __aenter__(self) -> CliSubprocessAgentClient:
         return self

@@ -207,10 +207,10 @@ export class AppEmulatorService extends EventEmitter {
 	private autoBuildSourcePath: string | null = null;
 	/** Synchronous guard — prevents concurrent startServer calls (race condition on port check) */
 	private startingInProgress = false;
+	/** Bumped by every stop: a start begun before it spawns nothing after it. */
+	private startGeneration = 0;
 	/** Tracks all service processes for multi-service (fullstack) mode */
 	private readonly activeServiceProcesses = new Map<string, ChildProcess>();
-	/** Maps original paths with spaces → junction paths without spaces (Windows only) */
-	private readonly junctionMap = new Map<string, string>();
 	/** Maps @ngtools/webpack index.js path → original file content (for patch rollback) */
 	private readonly angularWebpackPatches = new Map<string, string>();
 
@@ -2065,7 +2065,7 @@ exit $launched.ExitCode
 		port: number;
 		projectDir: string;
 	} | null {
-		if (maxDepth <= 0) return null;
+		// Recursion only goes deeper while maxDepth > 1, so it never reaches 0.
 		const skipDirs = new Set([
 			"node_modules",
 			"dist",
@@ -2103,7 +2103,8 @@ exit $launched.ExitCode
 					continue;
 				}
 				const result = this.detectBackendAt(fullPath);
-				if (result) return { ...result, projectDir: fullPath };
+				// A .NET API found one level down runs from its own project folder.
+				if (result) return { ...result, projectDir: result.projectDir ?? fullPath };
 			}
 			if (maxDepth > 1) {
 				for (const entry of sorted) {
@@ -2211,7 +2212,7 @@ exit $launched.ExitCode
 		return new Promise<void>((resolve, reject) => {
 			const proc = spawn(pm, ["install"], {
 				cwd: projectDir,
-				env: process.env as Record<string, string>,
+				env: envWithoutCredentials(process.env),
 				shell: isWindows() ? true : undefined,
 				stdio: ["ignore", "pipe", "pipe"],
 			});
@@ -2290,7 +2291,7 @@ exit $launched.ExitCode
 			const [cmd, ...args] = installCmd?.split(" ") || [];
 			const proc = spawn(cmd, args, {
 				cwd: projectDir,
-				env: process.env as Record<string, string>,
+				env: envWithoutCredentials(process.env),
 				shell: isWindows() ? true : undefined,
 				stdio: ["ignore", "pipe", "pipe"],
 			});
@@ -2336,14 +2337,7 @@ exit $launched.ExitCode
 			throw new Error(`Could not detect project type in: ${projectDir}`);
 		}
 
-		const runnerPath = path.join(
-			autoBuildSource,
-			"runners",
-			"app_emulator_runner.py",
-		);
-		if (!existsSync(runnerPath)) {
-			throw new Error(`Could not detect project type in: ${projectDir}`);
-		}
+		const runnerPath = path.join(autoBuildSource, "runners", "app_emulator_runner.py");
 
 		return new Promise((resolve, reject) => {
 			const proc = spawn(
@@ -2368,7 +2362,7 @@ exit $launched.ExitCode
 			});
 
 			proc.on("close", (code) => {
-				this.detectionProcess = null;
+				if (this.detectionProcess === proc) this.detectionProcess = null;
 
 				// Parse the result from stdout
 				const marker = "__APP_EMULATOR_RESULT__:";
@@ -2412,7 +2406,7 @@ exit $launched.ExitCode
 			});
 
 			proc.on("error", (err) => {
-				this.detectionProcess = null;
+				if (this.detectionProcess === proc) this.detectionProcess = null;
 				reject(new Error(`Failed to start detection: ${err.message}`));
 			});
 		});
@@ -2426,21 +2420,21 @@ exit $launched.ExitCode
 		if (this.startingInProgress) {
 			return;
 		}
+		this.stopServer();
 		this.startingInProgress = true;
+		const generation = this.startGeneration;
 
 		try {
-			// Stop any existing server
-			this.stopServer();
-
 			// On Windows, taskkill is fire-and-forget. Wait for the OS to fully release
 			// ports from killed processes before probing them.
 			await new Promise<void>((resolve) => setTimeout(resolve, 1000));
+			if (generation !== this.startGeneration) return;
 
 			this.currentConfig = config;
 
 			// Fullstack multi-service path (e.g. .NET backend + Angular frontend)
 			if (config.services && config.services.length > 1) {
-				await this.startMultipleServices(config);
+				await this.startMultipleServices(config, generation);
 				return;
 			}
 
@@ -2526,6 +2520,7 @@ exit $launched.ExitCode
 				}
 			}
 
+			if (generation !== this.startGeneration) return;
 			this.emit("status", `Starting: ${config.startCommand}`);
 
 			const { cmd, args, shell } = this.parseStartCommand(config.startCommand);
@@ -2569,10 +2564,12 @@ exit $launched.ExitCode
 				}
 			});
 
+			// A replaced or stopped process may exit late (taskkill on Windows):
+			// its exit says nothing about the server running now.
 			proc.on("close", (code) => {
+				if (this.activeServerProcess !== proc) return;
 				this.activeServerProcess = null;
 				this.serverUrl = null;
-				// Release startingInProgress so a retry can start immediately
 				this.startingInProgress = false;
 				if (code !== null && code !== 0) {
 					this.emit("error", formatServerExitError(code, recentOutput));
@@ -2581,6 +2578,7 @@ exit $launched.ExitCode
 			});
 
 			proc.on("error", (err) => {
+				if (this.activeServerProcess !== proc) return;
 				this.activeServerProcess = null;
 				this.serverUrl = null;
 				this.startingInProgress = false;
@@ -2606,7 +2604,7 @@ exit $launched.ExitCode
 				}
 			}
 		} finally {
-			this.startingInProgress = false;
+			if (generation === this.startGeneration) this.startingInProgress = false;
 		}
 	}
 
@@ -2618,11 +2616,12 @@ exit $launched.ExitCode
 	 */
 	private async startMultipleServices(
 		config: AppEmulatorConfig,
+		generation: number,
 	): Promise<void> {
 		// biome-ignore lint/style/noNonNullAssertion: value is guaranteed by context
 		const services = config.services!;
 		const primary = services.find((s) => s.isPrimary) ?? services[0];
-		const secondaries = services.filter((s) => !s.isPrimary);
+		const secondaries = services.filter((s) => s !== primary);
 
 		// Resolve port conflicts for each service before spawning anything.
 		// Services whose port is already served by a live HTTP server are skipped entirely
@@ -2691,6 +2690,7 @@ exit $launched.ExitCode
 			} catch (err) {
 				this.emit("output", `[${svc.label}] ${String(err)}`);
 			}
+			if (generation !== this.startGeneration) return;
 			const proc = spawn(cmd, args, {
 				cwd: svc.projectDir,
 				env: envWithoutCredentials(process.env, {
@@ -2712,12 +2712,14 @@ exit $launched.ExitCode
 				}
 			});
 			proc.on("close", (code) => {
+				if (this.activeServiceProcesses.get(svc.label) !== proc) return;
 				this.activeServiceProcesses.delete(svc.label);
 				if (code !== null && code !== 0) {
 					this.emit("output", `[${svc.label}] exited with code ${code}`);
 				}
 			});
 			proc.on("error", (err) => {
+				if (this.activeServiceProcesses.get(svc.label) !== proc) return;
 				this.activeServiceProcesses.delete(svc.label);
 				this.emit("output", `[${svc.label}] failed to start: ${err.message}`);
 			});
@@ -2745,6 +2747,7 @@ exit $launched.ExitCode
 			this.startingInProgress = false;
 			return;
 		}
+		if (generation !== this.startGeneration) return;
 		const primaryProc = spawn(primaryCmd, primaryArgs, {
 			cwd: primary.projectDir,
 			env: envWithoutCredentials(process.env, {
@@ -2778,6 +2781,7 @@ exit $launched.ExitCode
 			}
 		});
 		primaryProc.on("close", (code) => {
+			if (this.activeServerProcess !== primaryProc) return;
 			this.activeServerProcess = null;
 			this.serverUrl = null;
 			this.startingInProgress = false;
@@ -2788,6 +2792,7 @@ exit $launched.ExitCode
 			this.emit("stopped");
 		});
 		primaryProc.on("error", (err) => {
+			if (this.activeServerProcess !== primaryProc) return;
 			this.activeServerProcess = null;
 			this.serverUrl = null;
 			this.startingInProgress = false;
@@ -3047,6 +3052,8 @@ exit $launched.ExitCode
 	 * Stop the dev server (single-service) or all services (multi-service).
 	 */
 	stopServer(): void {
+		this.startGeneration++;
+		this.startingInProgress = false;
 		const killProc = (proc: ChildProcess) => {
 			const pid = proc.pid;
 			try {
@@ -3074,17 +3081,12 @@ exit $launched.ExitCode
 			}
 		}
 
-		// Kill all tracked secondary service processes
-		for (const proc of this.activeServiceProcesses.values()) {
-			killProc(proc);
-		}
+		// Kill every service once: the primary is tracked in both places.
+		const processes = new Set(this.activeServiceProcesses.values());
+		if (this.activeServerProcess) processes.add(this.activeServerProcess);
+		for (const proc of processes) killProc(proc);
 		this.activeServiceProcesses.clear();
-
-		// Kill the primary / single-service process
-		if (this.activeServerProcess) {
-			killProc(this.activeServerProcess);
-			this.activeServerProcess = null;
-		}
+		this.activeServerProcess = null;
 
 		this.serverUrl = null;
 		this.currentConfig = null;
@@ -3097,31 +3099,10 @@ exit $launched.ExitCode
 			});
 		}
 
-		// Remove any junctions created to work around spaces-in-path issues
-		this.cleanupJunctions();
 		// Restore any @ngtools/webpack patches applied for the spaces-in-path bug
 		this.restoreAngularWebpackPatches();
 
 		this.emit("stopped");
-	}
-
-	/**
-	 * Remove all junctions created by ensureNoSpacesPath and clear the map.
-	 */
-	private cleanupJunctions(): void {
-		for (const junctionPath of this.junctionMap.values()) {
-			spawn(
-				"powershell",
-				[
-					"-NoProfile",
-					"-NonInteractive",
-					"-Command",
-					`Remove-Item -Path '${junctionPath}' -Force -ErrorAction SilentlyContinue`,
-				],
-				{ stdio: "ignore" },
-			);
-		}
-		this.junctionMap.clear();
 	}
 
 	/**

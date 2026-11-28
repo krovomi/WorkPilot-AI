@@ -29,6 +29,10 @@ from server.authz.scope import ProjectScope, resolve_project_scope
 from server.db.engine import get_db
 from server.db.models import Project
 from server.services.events import emit_board_event
+from server.services.run_manager import set_approval_carry
+from server.services.status_history import plan_status, record_status_change
+from shared_board import listing
+from shared_board.approvals import give_approval
 from shared_board.attachments import (
     MAX_IMAGES,
     ImageUpload,
@@ -185,8 +189,10 @@ async def request_changes(
     """Send the card's work back with what to change.
 
     Writes the request where the build reads it (``QA_FIX_REQUEST.md`` in the
-    workspace) and reopens the plan; the app then starts a ``build`` run. The
-    feedback is a person's text, written to a file, never to argv.
+    workspace), reopens the plan and adds this person's approval of it, as
+    Start does; the app then starts a ``build`` run. The route's permission
+    is the one the approval takes (``review.approve``). The feedback is a
+    person's text, written to a file, never to argv.
     """
     from server.services.run_manager import get_run_manager
 
@@ -230,11 +236,42 @@ async def request_changes(
         "origin": "change_request",
         "requested_at": now,
     }
+    shown = plan_status(listing.card_source(scope.path.resolve(), directory))
     for spec_dir in (directory, workspace_spec):
         plan = spec_dir / "implementation_plan.json"
         if plan.is_file():
             _reopen_plan(plan, dict(subtask))
+    # Back to In progress, by this person: in the card's history.
+    record_status_change(
+        directory,
+        "in_progress",
+        actor="user",
+        account_id=principal.id,
+        previous=shown,
+    )
+    # Sending the work back is this person's approval of the build it starts,
+    # one of those the card's criticality needs (``shared_board/approvals``),
+    # and on one's own card as the deployment allows: otherwise the build
+    # waits for the others' approvals.
+    given = await give_approval(db, scope, principal, directory, row, request)
+    approved = given is not None and given[0].complete
     emit_board_event(
         scope.project_id, "spec_updated", {"spec": card_id, "by": principal.id}
     )
-    return {"requested": True}
+    return {"requested": True, "approved": approved}
+
+
+def _approval_valid(spec_dir: Path) -> bool:
+    from review.state import ReviewState
+
+    return ReviewState.load(spec_dir).is_approval_valid(spec_dir)
+
+
+def _carry_approval(spec_dir: Path) -> None:
+    from review.state import ReviewState
+
+    ReviewState.load(spec_dir).carry_over(spec_dir)
+
+
+# A build that started approved keeps its approval over the plan it wrote.
+set_approval_carry(_approval_valid, _carry_approval)

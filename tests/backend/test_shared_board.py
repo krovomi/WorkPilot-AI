@@ -116,7 +116,7 @@ async def test_a_member_creates_reads_edits_and_deletes_a_card(
             CardCreate(
                 title="Add  login", description="Users sign in.", require_review=False
             ),
-            _request(),
+            _request(permissions=frozenset({"task.write", "review.approve"})),
             scope,
             db,
         )
@@ -158,11 +158,11 @@ async def test_a_viewer_reads_but_cannot_change_a_card(tmp_path):
     from fastapi import HTTPException
     from shared_board.api import (
         CardCreate,
-        approve_card,
         create_card,
         delete_card,
         get_card,
     )
+    from shared_board.approvals import approve_card
 
     pid, oid, clone = await _project(tmp_path)
     async with await _db() as db:
@@ -175,7 +175,7 @@ async def test_a_viewer_reads_but_cannot_change_a_card(tmp_path):
         for call in (
             lambda: create_card(CardCreate(title="T2"), _request(), viewer, db),
             lambda: delete_card(card["id"], _request(), viewer, db),
-            lambda: approve_card(card["id"], _request(), viewer),
+            lambda: approve_card(card["id"], _request(), viewer, db),
         ):
             with pytest.raises(HTTPException) as exc:
                 await call()
@@ -202,10 +202,10 @@ async def test_a_started_card_cannot_be_edited_and_approval_follows_the_spec(tmp
     from shared_board.api import (
         CardCreate,
         CardUpdate,
-        approve_card,
         create_card,
         update_card,
     )
+    from shared_board.approvals import approve_card
 
     pid, oid, clone = await _project(tmp_path)
     scope = _scope(pid, oid, clone, "member")
@@ -213,13 +213,21 @@ async def test_a_started_card_cannot_be_edited_and_approval_follows_the_spec(tmp
         card = await create_card(CardCreate(title="T"), _request(), scope, db)
     directory = clone / ".workpilot/specs" / card["id"]
 
-    with pytest.raises(HTTPException) as exc:
-        await approve_card(card["id"], _request(), scope)
-    assert exc.value.status_code == 409  # nothing to approve yet
+    approver = {"permissions": frozenset({"review.approve"})}
+    async with await _db() as db:
+        with pytest.raises(HTTPException) as exc:
+            await approve_card(card["id"], _request(**approver), scope, db)
+        assert exc.value.status_code == 409  # nothing to approve yet
 
-    (directory / "spec.md").write_text("# Spec\n", encoding="utf-8")
-    result = await approve_card(card["id"], _request(email="lead@x"), scope)
-    assert result == {"approved": True, "approvedBy": "lead@x"}
+        (directory / "spec.md").write_text("# Spec\n", encoding="utf-8")
+        # Without the approval right, refused.
+        with pytest.raises(HTTPException) as exc:
+            await approve_card(card["id"], _request(), scope, db)
+        assert exc.value.status_code == 403
+        # Its author, alone on the project, approves it.
+        result = await approve_card(card["id"], _request(**approver), scope, db)
+    assert result["approved"] is True and result["approvedBy"] == "U"
+    assert result["approval"]["count"] == 1 and result["approval"]["needed"] == 1
     assert ReviewState.load(directory).is_approval_valid(directory)
 
     with pytest.raises(HTTPException) as exc:
@@ -306,10 +314,137 @@ def test_the_spec_phase_waits_for_a_review_or_goes_on_to_the_build(tmp_path):
     assert cmd[cmd.index("--spec-dir") + 1] == str(tmp_path / ".workpilot/specs/001-x")
     assert cmd[-2:] == ["--model", "m-1"]
 
-    # Without a review, the spec phase goes on to the build, as in the app.
+    # Without a review, the spec phase goes on to the build, as in the app,
+    # when the person starting it may approve.
     _card_on_disk(tmp_path, "002-y", require_review=False)
-    unreviewed = build_command("spec", "002-y", str(tmp_path), None, scratch)
+    unreviewed = build_command(
+        "spec", "002-y", str(tmp_path), None, scratch, may_skip_review=True
+    )
     assert "--auto-approve" in unreviewed and "--no-build" not in unreviewed
+    # Anyone else's run stops at the spec: the build waits for an approval,
+    # and the card says it now asks for one.
+    meta = tmp_path / ".workpilot/specs/002-y/task_metadata.json"
+    waiting = build_command("spec", "002-y", str(tmp_path), None, scratch)
+    assert "--no-build" in waiting and "--auto-approve" not in waiting
+    assert json.loads(meta.read_text(encoding="utf-8")) == {
+        "requireReviewBeforeCoding": True
+    }
+    _card_on_disk(tmp_path, "003-z", require_review=False)
+    waiting = build_command(
+        "spec", "003-z", str(tmp_path), None, scratch, may_skip_review=False
+    )
+    assert "--no-build" in waiting and "--auto-approve" not in waiting
+
+
+def test_a_waiting_card_is_never_written_through_a_link(tmp_path):
+    from server.services.run_manager import build_command
+
+    outside = tmp_path / "outside.json"
+    outside.write_text(
+        json.dumps({"requireReviewBeforeCoding": False}), encoding="utf-8"
+    )
+    directory = tmp_path / ".workpilot" / "specs" / "004-w"
+    directory.mkdir(parents=True)
+    _link(directory / "task_metadata.json", outside)
+    cmd = build_command("spec", "004-w", str(tmp_path), None, tmp_path)
+    assert "--no-build" in cmd
+    assert json.loads(outside.read_text(encoding="utf-8")) == {
+        "requireReviewBeforeCoding": False
+    }
+
+
+@pytest.mark.asyncio
+async def test_a_card_without_a_review_needs_the_approval_right(tmp_path):
+    from shared_board.api import CardCreate, create_card
+
+    pid, oid, clone = await _project(tmp_path)
+    scope = _scope(pid, oid, clone, "member")
+
+    def _asked_review(card_id: str) -> bool:
+        meta = json.loads(
+            (clone / ".workpilot/specs" / card_id / "task_metadata.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        return meta["requireReviewBeforeCoding"]
+
+    async with await _db() as db:
+        contributor = await create_card(
+            CardCreate(title="Fix A", require_review=False),
+            _request(permissions=frozenset({"task.write"})),
+            scope,
+            db,
+        )
+        approver = await create_card(
+            CardCreate(title="Fix B", require_review=False),
+            _request(permissions=frozenset({"task.write", "review.approve"})),
+            scope,
+            db,
+        )
+        reviewed = await create_card(
+            CardCreate(title="Fix C", require_review=True),
+            _request(permissions=frozenset({"task.write", "review.approve"})),
+            scope,
+            db,
+        )
+    assert _asked_review(contributor["id"]) is True
+    assert _asked_review(approver["id"]) is False
+    assert _asked_review(reviewed["id"]) is True
+
+
+@pytest.mark.asyncio
+async def test_a_run_skips_the_review_only_for_who_may_approve(monkeypatch, tmp_path):
+    from server.auth.deps import CurrentUser
+    from server.routers import specs
+    from server.schemas import StartRunRequest
+    from server.services import run_manager
+
+    seen: list[bool] = []
+
+    class Manager:
+        async def start_run(self, **kwargs):
+            seen.append(kwargs["may_skip_review"])
+            raise run_manager.RunManagerError("stop here")
+
+    class Spec:
+        claimed_by = "u-1"
+        created_by = None
+        spec_name = "001-x"
+
+    class Project:
+        server_path = "/srv/p"
+        org_id = "o-1"
+
+    async def project_or_404(db, project_id):
+        return Project()
+
+    async def spec_or_404(db, project_id, spec_id):
+        return Spec()
+
+    monkeypatch.setattr(run_manager, "get_run_manager", lambda: Manager())
+    monkeypatch.setattr(specs, "_get_project_or_404", project_or_404)
+    monkeypatch.setattr(specs, "_get_spec_or_404", spec_or_404)
+    monkeypatch.setattr(specs, "ensure_can_act_on_spec", lambda *a: None)
+
+    from fastapi import HTTPException
+
+    await _project(tmp_path)
+    user = CurrentUser(id="u-1", email="a@x", display_name="A", role="member")
+    for permissions in (
+        frozenset({"agent.execute"}),
+        frozenset({"agent.execute", "review.approve"}),
+    ):
+        async with await _db() as db:
+            with pytest.raises(HTTPException):
+                await specs.start_run(
+                    "p",
+                    "s",
+                    StartRunRequest(phase="spec"),
+                    _request(permissions=permissions),
+                    user,
+                    db,
+                )
+    assert seen == [False, True]
 
 
 def test_run_phases_are_non_interactive_and_never_force_the_approval(tmp_path):
@@ -380,12 +515,17 @@ async def test_the_snapshot_sends_only_the_card_files_the_app_reads(tmp_path):
     (clone / ".workpilot/specs/not-a-card").mkdir()
 
     # A viewer reads the board too.
-    snapshot = await board_snapshot(_scope(pid, oid, clone, "viewer"))
+    async with await _db() as db:
+        snapshot = await board_snapshot(_scope(pid, oid, clone, "viewer"), db)
     assert len(snapshot["cards"]) == 2
     assert set(snapshot["cards"][card_id]) == {
         "requirements.json",
         "task_metadata.json",
         "spec.md",
+        # Written by the card's creation (server/services/status_history.py).
+        "status_history.json",
+        # Who created it, from the database (shared_board/run_facts.py).
+        "task_people.json",
     }
     assert snapshot["worktrees"] == {}
 
@@ -400,7 +540,8 @@ async def test_the_snapshot_carries_the_build_workspace(tmp_path):
     (building / card_id / "implementation_plan.json").write_text(
         '{"phases": []}', encoding="utf-8"
     )
-    snapshot = await board_snapshot(_scope(pid, oid, clone, "member"))
+    async with await _db() as db:
+        snapshot = await board_snapshot(_scope(pid, oid, clone, "member"), db)
     assert snapshot["worktrees"] == {
         card_id: {"implementation_plan.json": '{"phases": []}'}
     }
@@ -422,7 +563,8 @@ async def test_the_snapshot_follows_no_link_out_of_the_checkout(tmp_path):
     tasks.mkdir(parents=True)
     _link(tasks / second, tmp_path / "elsewhere")
 
-    snapshot = await board_snapshot(_scope(pid, oid, clone, "member"))
+    async with await _db() as db:
+        snapshot = await board_snapshot(_scope(pid, oid, clone, "member"), db)
     assert set(snapshot["cards"]) == {first, second}
     assert "qa_report.md" not in snapshot["cards"][first]
     assert snapshot["worktrees"] == {}

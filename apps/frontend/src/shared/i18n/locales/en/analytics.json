@@ -37,7 +37,8 @@
 		"costs": "Costs",
 		"performance": "Performance",
 		"builds": "Builds",
-		"errors": "Errors"
+		"errors": "Errors",
+		"compare": "How you compare"
 	},
 	"sections": {
 		"tasksByStatus": "Tasks by Status",
@@ -98,5 +99,92 @@
 		"pending": "Pending",
 		"failed": "Failed",
 		"cancelled": "Cancelled"
+	},
+	"compare": {
+		"title": "How you compare",
+		"loading": "Reading your projects...",
+		"error": "Could not compare this project",
+		"privacyLocal": "Compared with your other projects on this computer, read from their folders. Nothing leaves your computer.",
+		"privacyServer_one": "Compared with the projects of your organization you can read, as medians only, never by name, and only for groups of {{count}} project or more. Nothing leaves the server.",
+		"privacyServer_other": "Compared with the projects of your organization you can read, as medians only, never by name, and only for groups of {{count}} projects or more. Nothing leaves the server.",
+		"window_one": "Medians per spec over the last {{days}} days ({{count}} spec), against the {{days}} days before ({{previous}}).",
+		"window_other": "Medians per spec over the last {{days}} days ({{count}} specs), against the {{days}} days before ({{previous}}).",
+		"columns": {
+			"metric": "Per spec",
+			"recent": "This project",
+			"previous": "Before",
+			"trend": "Trend",
+			"project": "Project",
+			"segment": "Stack and size",
+			"specs": "Specs",
+			"weeks_one": "Last {{count}} week",
+			"weeks_other": "Last {{count}} weeks"
+		},
+		"groups": {
+			"segment": "Same stack and size",
+			"stack": "Same stack",
+			"all": "All projects",
+			"team": "Same team size"
+		},
+		"projectCount_one": "{{count}} project",
+		"projectCount_other": "{{count}} projects",
+		"metrics": {
+			"minutes": "Build time",
+			"cost": "Cost (USD)",
+			"qaIterations": "QA iterations",
+			"agents": "Agents",
+			"mutationScore": "Mutation score",
+			"firstCi": "First-run CI pass"
+		},
+		"sizes": {
+			"small": "Small repo",
+			"medium": "Medium repo",
+			"large": "Large repo",
+			"monorepo": "Monorepo",
+			"unknown": "Size unknown"
+		},
+		"otherStack": "Other stack",
+		"smallGroup_one": "A group's median shows from {{count}} active project.",
+		"smallGroup_other": "A group's median shows from {{count}} active projects: below that, only its size.",
+		"lowerIsBetter": "Lower is better, except for the mutation score and the first-run CI pass rate, where higher is. A spec's build time runs from its first agent session to its last.",
+		"yourProjects": "Your other projects",
+		"noOtherProjects": "None of your other projects built a spec in this period.",
+		"teams": {
+			"solo": "Solo",
+			"small": "Team of 2-5",
+			"medium": "Team of 6-20",
+			"large": "Team of 20+",
+			"unknown": "Team unknown"
+		},
+		"top": "top 10%: {{value}}",
+		"topNote_one": "Top 10% is the figure the best tenth of a group reach; it shows from {{count}} active project.",
+		"topNote_other": "Top 10% is the figure the best tenth of a group reach; it shows from {{count}} active projects with that figure.",
+		"sparkline": "{{metric}}, week by week",
+		"report": {
+			"button": "Generate team report",
+			"title": "How you compare: team report",
+			"generated": "Generated on {{date}}.",
+			"segment": "Segment: {{stack}}, {{size}}, {{team}}.",
+			"saved": "Team report saved to {{path}}",
+			"error": "Could not save the team report"
+		},
+		"kinds": {
+			"title": "By kind of work",
+			"kind": "Kind",
+			"others": "Other projects",
+			"none": "No spec of this period has a kind recorded on its card.",
+			"note_one": "Each cell: this project, then the median of the other projects for the same kind, from {{count}} project.",
+			"note_other": "Each cell: this project, then the median of the other projects for the same kind, from {{count}} projects."
+		},
+		"qualitySources": "The mutation score comes from the spec's mutation gate in QA, the first-run CI pass from the follow-through of its pull request: whether the CI passed on the pull request as it was opened, before any fix. A spec without them is not counted for them.",
+		"groupTrend": "trend: {{value}}",
+		"movedChip": "{{from}} → {{to}}",
+		"moving": "This project moved from {{from}} to {{to}} in the last {{days}} days: until that is older than {{days}} days, it is compared with projects of both.",
+		"pace": {
+			"title": "Your pace against your peers",
+			"faster": "{{metric}}: {{own}} for this project, {{group}} for the median of “{{groupName}}”. You are improving faster.",
+			"slower": "{{metric}}: {{own}} for this project, {{group}} for the median of “{{groupName}}”. Your peers are improving faster.",
+			"same": "{{metric}}: {{own}} for this project, {{group}} for the median of “{{groupName}}”. About the same pace."
+		}
 	}
 }

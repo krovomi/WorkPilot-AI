@@ -1,14 +1,21 @@
+import { useMemo } from "react";
 import { create } from "zustand";
 import type { TaskCategory, TaskPriority } from "../../shared/types";
 import {
+	type BoardFilterContext,
 	DEFAULT_SORT,
 	EMPTY_FILTERS,
 	type KanbanFilters,
 	type KanbanSort,
+	type QuickFilter,
 	type TaskSortDirection,
 	type TaskSortField,
 	type TaskSource,
 } from "../lib/kanban-filter";
+import type { LaneGrouping } from "../lib/kanban-lanes";
+import type { BoardLayout, ListSort } from "../lib/kanban-list";
+import { useCollaborationStore } from "./collaboration-store";
+import { useKanbanLanesStore } from "./kanban-lanes-store";
 
 // ============================================
 // Persistence (per-project localStorage)
@@ -34,6 +41,10 @@ export interface SavedView {
 	name: string;
 	filters: KanbanFilters;
 	sort: KanbanSort;
+	/** Columns or list, the lanes and the list's sort; absent on a view saved before them. */
+	layout?: BoardLayout;
+	grouping?: LaneGrouping;
+	listSort?: ListSort | null;
 }
 
 interface PersistedState {
@@ -152,6 +163,11 @@ interface KanbanFilterState {
 	togglePriority: (priority: TaskPriority) => void;
 	/** Show only one split group, or everything again for the same group. */
 	toggleGroup: (group: string) => void;
+	/** Show one sprint's cards (or "none": the backlog), or every card with undefined. */
+	setSprint: (sprint: string | undefined) => void;
+	/** Add or remove a label from the filter (compared without case). */
+	toggleLabel: (label: string) => void;
+	toggleQuick: (quick: QuickFilter) => void;
 	setSortField: (field: TaskSortField) => void;
 	setSortDirection: (direction: TaskSortDirection) => void;
 	toggleSortDirection: () => void;
@@ -163,6 +179,25 @@ interface KanbanFilterState {
 	applyView: (id: string) => void;
 	/** Delete a saved view. */
 	deleteView: (id: string) => void;
+}
+
+/** How the board is shown now, kept with a saved view. */
+function viewLayout(): Pick<SavedView, "layout" | "grouping" | "listSort"> {
+	const { layout, grouping, listSort } = useKanbanLanesStore.getState();
+	return { layout, grouping, listSort: listSort ? { ...listSort } : null };
+}
+
+/** A copy of filters that later edits to the live ones leave alone. */
+function copyFilters(filters: KanbanFilters): KanbanFilters {
+	const copy: KanbanFilters = {
+		...filters,
+		sources: [...filters.sources],
+		categories: [...filters.categories],
+		priorities: [...filters.priorities],
+	};
+	if (filters.labels) copy.labels = [...filters.labels];
+	if (filters.quick) copy.quick = [...filters.quick];
+	return copy;
 }
 
 /** Toggle a value's presence in an array (immutably). */
@@ -283,6 +318,32 @@ export const useKanbanFilterStore = create<KanbanFilterState>((set, get) => {
 			persist();
 		},
 
+		setSprint: (sprint) => {
+			set((state) => {
+				const { sprint: _current, ...rest } = state.filters;
+				return { filters: sprint ? { ...rest, sprint } : rest };
+			});
+			persist();
+		},
+
+		toggleLabel: (label) => {
+			set((state) => {
+				const current = state.filters.labels ?? [];
+				const key = label.toLocaleLowerCase();
+				const has = current.some((item) => item.toLocaleLowerCase() === key);
+				const labels = has ? current.filter((item) => item.toLocaleLowerCase() !== key) : [...current, label];
+				return { filters: { ...state.filters, labels } };
+			});
+			persist();
+		},
+
+		toggleQuick: (quick) => {
+			set((state) => ({
+				filters: { ...state.filters, quick: toggleInArray(state.filters.quick ?? [], quick) },
+			}));
+			persist();
+		},
+
 		setSortField: (field) => {
 			set((state) => ({ sort: { ...state.sort, field } }));
 			persist();
@@ -317,14 +378,9 @@ export const useKanbanFilterStore = create<KanbanFilterState>((set, get) => {
 					globalThis.crypto?.randomUUID?.() ??
 					`view-${Date.now()}-${Math.random().toString(36).slice(2)}`,
 				name: trimmed,
-				// Deep-copy so later edits to the live filters don't mutate the view.
-				filters: {
-					...filters,
-					sources: [...filters.sources],
-					categories: [...filters.categories],
-					priorities: [...filters.priorities],
-				},
+				filters: copyFilters(filters),
 				sort: { ...sort },
+				...viewLayout(),
 			};
 			const nextViews = [...savedViews, view];
 			set({ savedViews: nextViews });
@@ -336,15 +392,11 @@ export const useKanbanFilterStore = create<KanbanFilterState>((set, get) => {
 			const view = get().savedViews.find((v) => v.id === id);
 			if (!view) return;
 			set({
-				filters: {
-					...view.filters,
-					sources: [...view.filters.sources],
-					categories: [...view.filters.categories],
-					priorities: [...view.filters.priorities],
-				},
+				filters: copyFilters(view.filters),
 				sort: { ...view.sort },
 			});
 			persist();
+			useKanbanLanesStore.getState().applyView(view);
 		},
 
 		deleteView: (id) => {
@@ -356,3 +408,19 @@ export const useKanbanFilterStore = create<KanbanFilterState>((set, get) => {
 		},
 	};
 });
+
+/**
+ * The board's filters with what « Mes tâches » needs: the server cards whose
+ * claim is mine (the team room's locks, server mode). Same object while
+ * nothing changes, so the board's memo holds.
+ */
+export function useBoardFilters(): KanbanFilters & BoardFilterContext {
+	const filters = useKanbanFilterStore((s) => s.filters);
+	const locks = useCollaborationStore((s) => s.locks);
+	const me = useCollaborationStore((s) => s.me?.id);
+	return useMemo(() => {
+		if (!filters.quick?.includes("mine")) return filters;
+		const mine = Object.values(locks).filter((lock) => lock.userId === me);
+		return { ...filters, claimedByMe: new Set(mine.map((lock) => lock.taskId)) };
+	}, [filters, locks, me]);
+}

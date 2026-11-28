@@ -1,3 +1,11 @@
+---
+feature: Harness de contexte
+summary: >-
+  Tous providers : mesure commune, budget et arrêt sans progrès, préfixe stable, troncature à la
+  source, purge par lots, retours de sous-agents bornés, outils figés, `search_code`, rejeu à
+  chaque PR.
+---
+
 # Harness de contexte : le plan
 
 > **Statut : plan ; livrés : le lot 0 (mesurer, sauf sa ligne de base), le lot 1a (un budget
@@ -665,7 +673,7 @@ une nouvelle session : rien n'était à corriger de ce côté.
   héritent), Copilot et Windsurf préparent leurs outils une fois, outils MCP pontés compris. Chaque
   tour envoie les mêmes octets, et deux sessions qui reçoivent les mêmes outils aussi, quel que soit
   l'ordre du serveur MCP. Les corps des boucles ne changent pas.
-- `get_tool_definitions` rend la forme canonique : `LiteLLMRuntime` en profite aussi.
+- `get_tool_definitions` rend la forme canonique.
 
 **Ce qui est retiré.** Aucun droit de `AGENT_CONFIGS` ne change.
 

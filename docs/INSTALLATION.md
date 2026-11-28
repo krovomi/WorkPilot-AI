@@ -123,6 +123,17 @@ vérifier l'installation, et les pièges connus (Windows surtout). Le démarrage
    *`pnpm run dev` sert l'API locale (`provider_api.py`) sur le port 9000 avec le venv racine (`.venv`) ; les
    agents lancés par l'app utilisent `apps/backend/.venv`.*
 
+   *Port 9000 déjà pris : si c'est un backend WorkPilot (un lancement précédent resté ouvert, ou
+   celui que l'app a démarré pendant l'installation des dépendances), `pnpm run dev` le réutilise
+   et le dit ; il ne se recharge alors pas sur un changement de code, l'arrêter pour en avoir un
+   qui le fait. Si c'est un autre programme, le backend et l'app passent ensemble au port libre
+   suivant (9001 à 9020) et le disent (`scripts/dev.mjs`, `apps/backend/dev-port.mjs`) ; l'app
+   packagée fait de même (`apps/frontend/src/main/local-backend-port.ts`). Pour toujours garder un
+   port, `BACKEND_PORT=…` dans `.env-files/.env` : il est alors utilisé tel quel, et s'il est pris,
+   le programme qui le tient est signalé avec la commande qui le montre. Sous WSL en réseau
+   `mirrored`, un programme Windows peut tenir le port sans l'écouter (connexions en `CLOSE_WAIT`
+   de la redirection de ports de VS Code, par exemple) : recharger la fenêtre de VS Code le libère.*
+
 ## Notes Spécifiques Windows
 
 Le setup Windows a davantage de pièges que macOS/Linux, tous rencontrés et résolus en conditions réelles. Parcourez cette liste **avant** votre premier `pnpm run dev` si vous êtes sur Windows.

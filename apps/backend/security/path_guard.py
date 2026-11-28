@@ -73,9 +73,10 @@ import fnmatch
 import logging
 import os
 import re
-import tempfile
 from pathlib import Path
 from typing import Any
+
+from .scratch_dir import workpilot_scratch_dir
 
 logger = logging.getLogger(__name__)
 
@@ -127,6 +128,10 @@ PROTECTED_CONFIG_NAMES: tuple[str, ...] = (
     # The person's line comments and their status (`foundation/review_comments.py`):
     # an agent that could write it would mark its own work reviewed.
     "review-comments.json",
+    # The lessons the person turned off for this task (`learning_loop/applied.py`):
+    # an agent that could write it would lift the project's adopted rules from
+    # every later prompt of its own task.
+    "applied_lessons.json",
 )
 
 #: Why a protected file that is not security configuration is refused.
@@ -145,6 +150,11 @@ _REFUSAL_REASONS: dict[str, str] = {
         "it holds the person's line comments on the review and their status; "
         "WorkPilot marks what your session changed. Fix the code the comments "
         "point to, and say in your output what you did."
+    ),
+    "applied_lessons.json": (
+        "it records the lessons WorkPilot gave this task's prompts and the ones "
+        "the person turned off; only WorkPilot and the person write it. If a "
+        "lesson does not fit this task, say so in your output."
     ),
 }
 
@@ -170,6 +180,9 @@ PROTECTED_CONFIG_DIRS: dict[str, tuple[str, ...]] = {
         # an agent that wrote either would approve its own action.
         "guardrail-approvals.json",
         "guardrail-log.jsonl",
+        # The policy's audit trail (`security/policy_audit.py`): an agent that
+        # wrote it would erase or forge the record of what it was refused.
+        "policy-audit.jsonl",
         # The sources the person trusts not to carry a prompt injection
         # (`security/tool_result_guard.py`): an agent that wrote it would
         # silence the scan of what it reads next.
@@ -294,16 +307,6 @@ def protected_config_refusal(path: str, base: Path | None) -> str | None:
     )
 
 
-def workpilot_scratch_dir() -> Path:
-    """The one directory under the system temp root a build may write to.
-
-    Kept narrow deliberately: `tempfile.gettempdir()` is shared with every
-    process on the machine, and naming it as a root would also re-open a
-    worktree that happens to sit under it.
-    """
-    return Path(tempfile.gettempdir()) / "workpilot"
-
-
 def _resolved(path: Path | str) -> Path | None:
     try:
         return Path(path).expanduser().resolve()
@@ -384,6 +387,11 @@ def make_write_path_hook(
     """
     roots = resolve_write_roots(project_dir, spec_dir)
     base = _resolved(project_dir) if project_dir else None
+    # The reinforced sandbox (Settings, Sandbox): a narrowing inside the
+    # roots, read once like them. Imported here: `sandbox` reads this module.
+    from .sandbox import current_policy, write_refusal
+
+    policy = current_policy()
 
     async def _hook(
         input_data: dict[str, Any],
@@ -423,6 +431,12 @@ def make_write_path_hook(
                 logger.warning("write refused on security configuration: %s", target)
                 return _deny(refusal)
 
+            if refusal := write_refusal(
+                policy, target, base, spec_dir, _content_bytes(tool_input)
+            ):
+                logger.warning("write refused by the sandbox: %s", target)
+                return _deny(refusal)
+
         if not roots:
             # Nothing to confine against means the caller gave neither a
             # project nor a spec directory. Refusing every write would break a
@@ -434,6 +448,14 @@ def make_write_path_hook(
         return {}
 
     return _hook
+
+
+def _content_bytes(tool_input: dict[str, Any]) -> int | None:
+    """The size of what a whole-file write sends; None for an edit."""
+    content = tool_input.get("content")
+    if isinstance(content, str):
+        return len(content.encode("utf-8", errors="replace"))
+    return None
 
 
 def _deny(reason: str) -> dict[str, Any]:

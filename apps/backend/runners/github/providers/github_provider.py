@@ -9,15 +9,17 @@ Wraps the existing GHClient functionality.
 from __future__ import annotations
 
 import json
+import os
+import tempfile
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
 # Import from parent package or direct import
 try:
-    from ..gh_client import GHClient
+    from ..gh_client import GHClient, GHCommandError, GHTimeoutError, RateLimitExceeded
 except (ImportError, ValueError, SystemError):
-    from gh_client import GHClient
+    from gh_client import GHClient, GHCommandError, GHTimeoutError, RateLimitExceeded
 
 from .protocol import (
     IssueData,
@@ -28,6 +30,9 @@ from .protocol import (
     ProviderType,
     ReviewData,
 )
+
+# What a gh call raises when GitHub refuses or does not answer.
+_GH_ERRORS = (GHCommandError, GHTimeoutError, RateLimitExceeded)
 
 
 @dataclass
@@ -71,6 +76,16 @@ class GitHubProvider:
     def gh_client(self) -> GHClient:
         """Get the underlying GHClient."""
         return self._gh_client
+
+    async def _gh(self, args: list[str], input_text: str | None = None) -> str:
+        """Run a gh command against this provider's repository; its stdout.
+
+        `input_text` goes to gh's stdin, for a body passed as `--body-file -`.
+        """
+        result = await self._gh_client.run(
+            [*args, "-R", self._repo], input_text=input_text
+        )
+        return result.stdout
 
     # -------------------------------------------------------------------------
     # Pull Request Operations
@@ -187,9 +202,9 @@ class GitHubProvider:
         cmd.append("--yes")
 
         try:
-            await self._gh_client._run_gh_command(cmd)
+            await self._gh(cmd)
             return True
-        except Exception:
+        except _GH_ERRORS:
             return False
 
     async def close_pr(
@@ -201,9 +216,9 @@ class GitHubProvider:
         try:
             if comment:
                 await self.add_comment(pr_number, comment)
-            await self._gh_client._run_gh_command(["pr", "close", str(pr_number)])
+            await self._gh(["pr", "close", str(pr_number)])
             return True
-        except Exception:
+        except _GH_ERRORS:
             return False
 
     # -------------------------------------------------------------------------
@@ -284,7 +299,8 @@ class GitHubProvider:
         assignees: list[str] | None = None,
     ) -> IssueData:
         """Create a new issue."""
-        cmd = ["issue", "create", "--title", title, "--body", body]
+        # The body on stdin, never on the command line (GHClient._body_on_stdin).
+        cmd = ["issue", "create", "--title", title, "--body-file", "-"]
 
         if labels:
             for label in labels:
@@ -294,7 +310,7 @@ class GitHubProvider:
             for assignee in assignees:
                 cmd.extend(["--assignee", assignee])
 
-        result = await self._gh_client._run_gh_command(cmd)
+        result = await self._gh(cmd, input_text=body)
 
         # Parse the issue URL to get the number
         # gh issue create outputs the URL
@@ -312,9 +328,9 @@ class GitHubProvider:
         try:
             if comment:
                 await self.add_comment(number, comment)
-            await self._gh_client._run_gh_command(["issue", "close", str(number)])
+            await self._gh(["issue", "close", str(number)])
             return True
-        except Exception:
+        except _GH_ERRORS:
             return False
 
     async def add_comment(
@@ -354,18 +370,11 @@ class GitHubProvider:
             cmd.extend(["--description", label.description])
         cmd.append("--force")  # Update if exists
 
-        await self._gh_client._run_gh_command(cmd)
+        await self._gh(cmd)
 
     async def list_labels(self) -> list[LabelData]:
         """List all labels in the repository."""
-        result = await self._gh_client._run_gh_command(
-            [
-                "label",
-                "list",
-                "--json",
-                "name,color,description",
-            ]
-        )
+        result = await self._gh(["label", "list", "--json", "name,color,description"])
 
         labels_data = json.loads(result) if result else []
         return [
@@ -397,7 +406,7 @@ class GitHubProvider:
                 f"/repos/{self._repo}/collaborators/{username}/permission"
             )
             return result.get("permission", "none")
-        except Exception:
+        except _GH_ERRORS:
             return "none"
 
     # -------------------------------------------------------------------------
@@ -417,8 +426,21 @@ class GitHubProvider:
         endpoint: str,
         data: dict[str, Any] | None = None,
     ) -> Any:
-        """Make a POST request to the GitHub API."""
-        return await self._gh_client.api_post(endpoint, data)
+        """Make a POST request to the GitHub API.
+
+        The body goes to gh as a JSON file (`--input`), so its values keep
+        their types; ``-F`` would read a value starting with ``@`` as a path.
+        """
+        fd, body_path = tempfile.mkstemp(suffix=".json")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as body:
+                json.dump(data or {}, body)
+            result = await self._gh_client.run(
+                ["api", endpoint, "--method", "POST", "--input", body_path]
+            )
+        finally:
+            os.unlink(body_path)
+        return json.loads(result.stdout) if result.stdout.strip() else None
 
     # -------------------------------------------------------------------------
     # Helper Methods

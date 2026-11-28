@@ -18,6 +18,7 @@ from foundation.pause_state import is_paused
 from phase_config import get_thinking_budget
 from prompts_pkg.project_context import should_refresh_project_index
 from review import run_review_checkpoint
+from review.state import keep_reviewed_approval_only, read_review_record
 from task_logger import (
     LogEntryType,
     LogPhase,
@@ -250,12 +251,13 @@ class SpecOrchestrator:
             if not phase_output:
                 return
 
-            # Summarize the output
-            # Use sonnet shorthand - will resolve via API Profile if configured
+            # Summarize the output, on the task's provider and model
             summary = await summarize_phase_output(
                 phase_name,
                 phase_output,
-                model="sonnet",
+                project_dir=self.project_dir,
+                spec_dir=self.spec_dir,
+                model=self.model,
                 target_words=500,
             )
 
@@ -324,6 +326,9 @@ class SpecOrchestrator:
             )
         )
 
+        # What the review file holds before any phase runs an agent here.
+        review_record = read_review_record(self.spec_dir)
+
         # Smart cache: refresh project index if dependency files have changed
         await self._ensure_fresh_project_index()
 
@@ -391,8 +396,12 @@ class SpecOrchestrator:
         # Store summary for subsequent phases (compaction)
         await self._store_phase_summary("requirements")
 
-        # Rename spec folder with better name from requirements
-        rename_spec_dir_from_requirements(self.spec_dir)
+        # Rename spec folder with better name from requirements. The phases
+        # that follow write into the renamed folder: the executor, the
+        # validator and the runner all follow it.
+        self._rename_spec_dir_from_requirements()
+        phase_executor.spec_dir = self.spec_dir
+        phase_executor.spec_validator = self.validator
 
         # Update task description from requirements
         req = requirements.load_requirements(self.spec_dir)
@@ -410,17 +419,12 @@ class SpecOrchestrator:
         await self._create_linear_task_if_enabled()
 
         # === PHASE 3: AI COMPLEXITY ASSESSMENT ===
+        # It always succeeds: a failed assessor falls back to the heuristic.
         result = await run_phase(
             "complexity_assessment",
             lambda: self._phase_complexity_assessment_with_requirements(),
         )
         results.append(result)
-        if not result.success:
-            print_status("Complexity assessment failed", "error")
-            task_logger.end_phase(
-                LogPhase.PLANNING, success=False, message="Complexity assessment failed"
-            )
-            return False
 
         # Map of all available phases
         all_phases = {
@@ -531,6 +535,8 @@ class SpecOrchestrator:
         )
 
         # === HUMAN REVIEW CHECKPOINT ===
+        # Only the review approves: an approval the phases left is withdrawn.
+        keep_reviewed_approval_only(self.spec_dir, review_record)
         return self._run_review_checkpoint(auto_approve)
 
     def _emit_planning_failed(self, phase_name: str, errors: list[str]) -> None:
@@ -839,9 +845,9 @@ class SpecOrchestrator:
                 print_status("Build will not proceed without approval.", "warning")
                 return False
 
-        except SystemExit as e:
-            if e.code != 0:
-                return False
+        except SystemExit:
+            # The checkpoint exits on reject (1) and on quit (0): neither
+            # approves the spec.
             return False
         except KeyboardInterrupt:
             print()
@@ -850,43 +856,35 @@ class SpecOrchestrator:
 
         return True
 
-    # Backward compatibility methods for tests
     def _generate_spec_name(self, task_description: str) -> str:
-        """Generate a spec name from task description (backward compatibility).
-
-        This method is kept for backward compatibility with existing tests.
-        The functionality has been moved to models.generate_spec_name.
-
-        Args:
-            task_description: The task description
-
-        Returns:
-            Generated spec name
-        """
+        """The folder name a task description gives (models.generate_spec_name)."""
         from .models import generate_spec_name
 
         return generate_spec_name(task_description)
 
     def _rename_spec_dir_from_requirements(self) -> bool:
-        """Rename spec directory from requirements (backward compatibility).
+        """Name the spec folder after its requirements and move to it.
 
-        This method is kept for backward compatibility with existing tests.
-        The functionality has been moved to models.rename_spec_dir_from_requirements.
+        ``rename_spec_dir_from_requirements`` moves the folder; everything that
+        holds its path (this orchestrator, its validator, its agent runner, the
+        Jev context) moves with it. Before, only this method followed the move,
+        by guessing the new folder from its number prefix, and ``run`` did not
+        call it: every phase after requirements wrote into the old
+        ``NNN-pending`` path, which no longer existed.
 
         Returns:
-            True if successful or not needed, False on error
+            True if the folder holds its final name, False when there was
+            nothing to name it after or the rename failed
         """
-        result = rename_spec_dir_from_requirements(self.spec_dir)
-        # Update self.spec_dir if it was renamed
-        if result and self.spec_dir.name.endswith("-pending"):
-            # Find the renamed directory
-            parent = self.spec_dir.parent
-            prefix = self.spec_dir.name[:4]  # e.g., "001-"
-            for candidate in parent.iterdir():
-                if (
-                    candidate.name.startswith(prefix)
-                    and "pending" not in candidate.name
-                ):
-                    self.spec_dir = candidate
-                    break
-        return result
+        new_dir = rename_spec_dir_from_requirements(self.spec_dir)
+        if new_dir is None:
+            return False
+        if new_dir != self.spec_dir:
+            from dataclasses import replace
+
+            self.spec_dir = new_dir
+            self.validator = SpecValidator(new_dir)
+            if self._agent_runner is not None:
+                self._agent_runner.spec_dir = new_dir
+            self.jev_run.context = replace(self.jev_run.context, spec_dir=new_dir)
+        return True

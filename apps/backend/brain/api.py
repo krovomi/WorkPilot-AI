@@ -11,6 +11,7 @@ the server's and not the tenant's.
 | ``GET /task`` | what the brain learned on one Kanban task — the task panel's card |
 | ``POST /instruction`` | activate or turn down an instruction an agent proposed |
 | ``POST /sync``, ``POST /recall``, ``POST /learn``, ``GET /status`` | the rest |
+| ``/memory/*`` | the memory's journal, trash, pins and conflicts (`lifecycle/api.py`) |
 
 **The folder chosen here stays under the user's home directory.** The backend
 listens on localhost, and a page open in a browser can send it a request: an
@@ -88,6 +89,13 @@ class SettingsRequest(BaseModel):
     enabled: bool | None = None
     connect: bool = True
     """Create, clone or adopt the brain at the chosen folder now."""
+    conflict_embeddings: bool | None = None
+    """Let a local embeddings model find memory conflicts in other words."""
+    conflict_embeddings_model: str | None = None
+    """The local model it uses; ``""`` for the first one the server has."""
+    conflict_embeddings_provider: str | None = None
+    """The local server it asks (``ollama``, ``lm-studio``); ``""`` for Ollama,
+    else LM Studio."""
 
 
 class InstructionRequest(BaseModel):
@@ -173,7 +181,9 @@ def _checked_remote(value: str | None) -> tuple[str | None, str | None]:
         return None, "invalid-remote"
 
 
-_USERINFO = re.compile(r"(\b[a-z][a-z0-9+.-]*://)[^/@\s]+@", re.I)
+# Everything up to the last "@" before the host: a sign-in part may itself hold
+# an "@", and the part after the first one is still part of it.
+_USERINFO = re.compile(r"(\b[a-z][a-z0-9+.-]*://)[^/?#\s]+@", re.I)
 
 
 def _git_detail(text: str | None) -> str | None:
@@ -194,6 +204,10 @@ def _git_detail(text: str | None) -> str | None:
     return detail[:300] or None
 
 
+_QUOTED = re.compile(r"'[^'\n]*'")
+_HTTP_403 = re.compile(r"(?:error|http|status)[: ]+403\b|\b403 forbidden")
+
+
 def _clone_error(text: str) -> str:
     """What went wrong with a clone, as a code the UI translates.
 
@@ -201,14 +215,15 @@ def _clone_error(text: str) -> str:
     versions; the response carries a code instead, and the message stays in
     the backend's log.
     """
-    low = (text or "").lower()
-    if any(
+    # git quotes the URL or path it names; a folder called `pytest-403` or
+    # `permission denied` says nothing about why the clone failed.
+    low = _QUOTED.sub("''", text or "").lower()
+    if _HTTP_403.search(low) or any(
         k in low
         for k in (
             "permission denied",
             "authentication",
             "could not read username",
-            "403",
         )
     ):
         return "auth"
@@ -282,7 +297,51 @@ def settings_view() -> dict:
         "wsl": is_wsl(),
         "homeRoots": home_roots(),
         "browseRoot": browse_root(),
+        "conflictEmbeddings": _embeddings_view(),
     }
+
+
+def _embeddings_view() -> dict:
+    from .lifecycle import embeddings
+
+    return {
+        "enabled": embeddings.enabled(),
+        "model": embeddings.configured_model(),
+        "provider": embeddings.configured_provider(),
+        "enabledLocked": bool(os.environ.get(embeddings.SWITCH_ENV, "").strip()),
+        "modelLocked": bool(os.environ.get(embeddings.MODEL_ENV, "").strip()),
+        "providerLocked": bool(os.environ.get(embeddings.PROVIDER_ENV, "").strip()),
+    }
+
+
+def _save_embeddings(request: SettingsRequest) -> str | None:
+    """The memory conflicts' local model settings; a refusal code, or ``None``."""
+    from .lifecycle import embeddings
+
+    view = _embeddings_view()
+    model = request.conflict_embeddings_model
+    if model is not None:
+        model = model.strip()
+        if view["modelLocked"]:
+            return "env-locked"
+        if not embeddings.valid_model(model):
+            return "invalid-model"
+    provider = request.conflict_embeddings_provider
+    if provider is not None:
+        if view["providerLocked"]:
+            return "env-locked"
+        provider = embeddings.valid_provider(provider)
+        if provider is None:
+            return "invalid-provider"
+    if request.conflict_embeddings is not None and view["enabledLocked"]:
+        return "env-locked"
+    if provider is not None:
+        write_config(**{embeddings.CONFIG_PROVIDER: provider or None})
+    if model is not None:
+        write_config(**{embeddings.CONFIG_MODEL: model or None})
+    if request.conflict_embeddings is not None:
+        write_config(**{embeddings.CONFIG_SWITCH: request.conflict_embeddings})
+    return None
 
 
 @router.get("/settings")
@@ -290,6 +349,27 @@ def get_settings() -> dict:
     if _refused():
         return _DESKTOP_ONLY
     return {"success": True, "settings": settings_view()}
+
+
+@router.get("/settings/embeddings")
+def get_embeddings_found() -> dict:
+    """Which local server and model a sync's review would ask now, if any.
+
+    Its own route: asking the servers waits on them (a timeout each), and the
+    settings page should not. ``found`` is ``None`` when the check is off or
+    no local server has an embedding model.
+    """
+    if _refused():
+        return _DESKTOP_ONLY
+    from .lifecycle import embeddings
+
+    found = embeddings.find() if embeddings.enabled() else None
+    return {
+        "success": True,
+        "found": (
+            {"provider": found.provider, "model": found.model} if found else None
+        ),
+    }
 
 
 def _unexpected(what: str) -> dict:
@@ -319,6 +399,9 @@ def save_settings(request: SettingsRequest) -> dict:
 
 
 def _save_settings(request: SettingsRequest) -> dict:
+    code = _save_embeddings(request)
+    if code:
+        return _refusal(code)
     if request.path is not None and brain_source() == "env":
         return _refusal("env-locked")
     remote, code = _checked_remote(request.remote)
@@ -547,6 +630,62 @@ def instruction(request: InstructionRequest) -> dict:
     return {"success": True, "path": str(changed["path"]), "status": request.status}
 
 
+class VaultSignersRequest(BaseModel):
+    lines: list[str] = []
+    """One ``<name> <key>`` per line: an SSH public key or a GPG fingerprint."""
+
+
+def _vault_signers_view(brain: Brain) -> dict:
+    """The vault list in effect, for the notes outside every project."""
+    import subprocess
+
+    from .lifecycle import provenance
+
+    if not brain.exists:
+        return {"signers": [], "rejected": 0, "signing": False, "unverified": 0}
+    try:
+        trust, judged = provenance.vault_verdicts(brain.root)
+    except (OSError, subprocess.SubprocessError, ValueError) as exc:
+        logger.warning("brain: vault signatures not read: %s", exc)
+        trust, judged = provenance.Trust(), {}
+    return {
+        "signers": [s.to_dict() for s in trust.signers],
+        "rejected": len(trust.rejected),
+        "signing": provenance.signing_enabled(brain.root),
+        "unverified": sum(1 for v in judged.values() if v.status == "unverified"),
+    }
+
+
+@router.get("/signers")
+def get_vault_signers() -> dict:
+    """The keys whose signed notes outside every project reach agents."""
+    if _refused():
+        return _DESKTOP_ONLY
+    return {"success": True, **_vault_signers_view(Brain())}
+
+
+@router.post("/signers")
+def set_vault_signers(request: VaultSignersRequest) -> dict:
+    """Replace the vault's trusted signers (`lifecycle.signers.write_vault`).
+
+    The vault has no maintainers: whoever edits its settings here edits the
+    list, and a teammate's machine counts the change only when a key already
+    on the list signed it (`lifecycle.provenance`).
+    """
+    if _refused():
+        return _DESKTOP_ONLY
+    from .lifecycle import signers
+
+    brain = Brain()
+    if not brain.exists:
+        return {"success": False, "error": "no-brain", "code": "no-brain"}
+    kept = signers.write_vault(brain.root, request.lines[: signers.MAX_SIGNERS + 1])
+    if kept is None:
+        return {"success": False, "error": "invalid", "code": "invalid"}
+    brain.after_write("brain: change the vault's trusted signers")
+    return {"success": True, **_vault_signers_view(brain)}
+
+
 @router.get("/status")
 def status() -> dict:
     if _refused():
@@ -585,6 +724,7 @@ def sync(request: SyncRequest) -> dict:
         "pushed": result.pushed,
         "remote": result.remote,
         "conflicts": list(result.conflicts),
+        "memory_conflicts": dict(result.memory_conflicts),
         "skipped": result.skipped,
         "error": code,
         "code": code,
@@ -597,7 +737,9 @@ def sync(request: SyncRequest) -> dict:
 def recall(request: RecallRequest) -> dict:
     if _refused():
         return _DESKTOP_ONLY
-    return {"success": True, **Brain().recall(request.query, limit=request.limit)}
+    # A person searching: the notes no trusted key signed are shown, marked.
+    found = Brain().recall(request.query, limit=request.limit, include_unverified=True)
+    return {"success": True, **found}
 
 
 @router.post("/learn")
@@ -621,3 +763,10 @@ def learn(request: LearnRequest) -> dict:
         tags=request.tags,
     )
     return {"success": rel is not None, "path": rel}
+
+
+# The memory's lifecycle (journal, trash, pins, conflicts): its own module,
+# under this router so it is mounted, and refused in server mode, with it.
+from .lifecycle.api import router as _lifecycle_router  # noqa: E402
+
+router.include_router(_lifecycle_router)

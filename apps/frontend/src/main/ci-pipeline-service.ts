@@ -52,9 +52,20 @@ import {
 } from "./ipc-handlers/task/plan-file-utils";
 import { parseEnvFile } from "./ipc-handlers/utils";
 import { learningLoopService } from "./learning-loop-service";
+import { withForgeAccounts } from "./forge/forge-credentials";
 import { readProjectEnvFile } from "./project-env-file";
 import { projectStore } from "./project-store";
 import { taskStateManager } from "./task-state-manager";
+import { ciRouteAvailable, setCiFollowed } from "./suite-placement/ci-route";
+import { refreshGreenCards, type RefreshOutcome } from "./suite-placement/base-refresh";
+import { rerunQaReview } from "./suite-placement/qa-rerun";
+import { getEffectiveBaseBranch } from "./ipc-handlers/task/worktree-git-refs";
+import { commitRun } from "./suite-placement/ci-suite";
+import {
+	advanceCiSuite,
+	beginCiSuite,
+	taskCiSuite,
+} from "./suite-placement/ci-suite-flow";
 
 const DEFAULT_POLL_SECONDS = 60;
 /** Re-resolve provider credentials at most every 5 minutes per project. */
@@ -117,7 +128,8 @@ export function readMergedProjectEnv(project: Project): MergedEnv {
 			path.join(project.path, project.autoBuildPath || ".workpilot", ".env"),
 		),
 	);
-	return merged;
+	// A saved forge account the project names lends its token (forge-credentials).
+	return withForgeAccounts(merged);
 }
 
 function isAutoFixEnabled(env: MergedEnv): boolean {
@@ -210,6 +222,46 @@ class CiPipelineService {
 		}
 	}
 
+	/**
+	 * A build ended: when it sent its suite to the CI, push the branch and
+	 * look at its pipeline soon (`suite-placement/ci-suite-flow.ts`).
+	 */
+	async startCiSuite(project: Project, task: Task): Promise<void> {
+		const record = await beginCiSuite(project, task);
+		if (record?.state !== "pending") return;
+		await this.getProvider(project, { forceRefresh: true });
+		setTimeout(() => void this.refreshTask(task.id), 30_000);
+	}
+
+	/**
+	 * After a merge into a project's base: every other green card takes the
+	 * new base, then its suite runs again on the CI when this loop follows the
+	 * project's CI, else its QA review runs again here (`base-refresh.ts`).
+	 */
+	async refreshAfterMerge(
+		project: Project,
+		mergedTaskId: string | null,
+	): Promise<Record<string, RefreshOutcome>> {
+		const cached = await this.getProvider(project, { forceRefresh: true });
+		const followed = cached.adapter !== null && ciRouteAvailable(project.id);
+		const agentManager = this.agentManager;
+		const outcomes = await refreshGreenCards(project, projectStore.getTasks(project.id), mergedTaskId, {
+			ciFollowed: () => followed,
+			rerunQa: (task, owner) =>
+				agentManager
+					? rerunQaReview(task, owner, agentManager, () => this.getMainWindow?.() ?? null)
+					: Promise.resolve(false),
+			baseOf: (owner, task) =>
+				getEffectiveBaseBranch(owner.path, task.specId, owner.settings?.mainBranch),
+		});
+		projectStore.invalidateTasksCache(project.id);
+		const sent = Object.entries(outcomes).filter(([, outcome]) => outcome !== "up_to_date");
+		if (sent.length > 0) {
+			console.warn(`[BaseRefresh] ${project.name}: ${sent.map(([spec, o]) => `${spec}=${o}`).join(", ")}`);
+		}
+		return outcomes;
+	}
+
 	getStatus(taskId: string): TaskPipelineStatus | null {
 		return this.statuses.get(taskId) ?? null;
 	}
@@ -261,6 +313,8 @@ class CiPipelineService {
 		}
 		const entry: CachedProvider = { adapter, env, resolvedAt: Date.now() };
 		this.providerCache.set(project.id, entry);
+		// The builds of this project may send their suite to a CI this loop follows.
+		setCiFollowed(project.id, adapter !== null);
 		return entry;
 	}
 
@@ -314,7 +368,15 @@ class CiPipelineService {
 		const adapter = cached.adapter;
 		if (!adapter) return;
 		const branch = `workpilot/${task.specId}`;
-		const run = await adapter.fetchLatestRun(branch);
+		// A suite pushed for its commit is judged on that commit's runs.
+		const suite = taskCiSuite(project, task);
+		const run =
+			suite?.sha
+				? await commitRun(adapter, suite)
+				: await adapter.fetchLatestRun(branch);
+		if (suite?.state === "pending") {
+			await advanceCiSuite(project, task, adapter, suite, run);
+		}
 		if (!run) {
 			// No pipeline run for this branch — nothing to show, drop stale state.
 			if (this.statuses.delete(task.id)) {
@@ -600,6 +662,7 @@ class CiPipelineService {
 			{ type: startEvent.type } as TaskEvent,
 			startEvent.resetTask ?? task,
 			project,
+			"system",
 		);
 		taskStateManager.resetForNewRun(task.id);
 		this.getMainWindow?.()?.webContents.send(

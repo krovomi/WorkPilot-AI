@@ -35,5 +35,43 @@
 	"kickers": {
 		"queue": "Queue",
 		"plan": "Plan"
+	},
+	"server": {
+		"waiting": "Your approval is recorded: {{count}} of {{needed}}. The build starts once the card has every approval it needs.",
+		"heading": "Approvals on the server",
+		"criticality": "Criticality",
+		"levels": {
+			"low": "Low",
+			"medium": "Medium",
+			"high": "High"
+		},
+		"sources": {
+			"set": "set by an approver",
+			"assessed": "from the spec's assessment",
+			"default": "by default"
+		},
+		"count": "{{given}} of {{needed}} approvals",
+		"approved": "Build may start",
+		"missingRoles": "Still needed among the approvers: {{roles}}",
+		"by": "{{by}}, {{at}}",
+		"byFor": "{{by}} for {{for}}, {{at}}",
+		"loadFailed": "The approvals of this card could not be read.",
+		"saveFailed": "The criticality could not be changed."
+	},
+	"delegations": {
+		"heading": "Lent approvals",
+		"hint": "Lend your approval on this project to a colleague for a while (holidays, on-call): they approve in your name, up to 90 days.",
+		"empty": "No approval is lent on this project.",
+		"item": "{{from}} → {{to}}, {{start}} – {{end}}",
+		"active": "Running",
+		"planned": "Planned",
+		"end": "End the approval lent to {{to}}",
+		"to": "Colleague",
+		"pick": "Pick a colleague",
+		"from": "From (optional)",
+		"until": "Until",
+		"lend": "Lend my approval",
+		"loadFailed": "The lent approvals could not be read.",
+		"saveFailed": "The lent approval could not be saved."
 	}
 }

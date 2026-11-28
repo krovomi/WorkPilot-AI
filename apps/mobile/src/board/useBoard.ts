@@ -7,21 +7,15 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AppState } from "react-native";
-import { streamBase } from "../api/server-url";
 import type { BoardCard } from "../api/types";
 import { useSession } from "../auth/session";
-import { BOARD_EVENTS, channelUrl, parseStreamEvent, reconnectDelay } from "./stream";
+import { useAppActive } from "../project/useAppActive";
+import { useProjectSocket } from "../project/useProjectSocket";
+import { BOARD_EVENTS } from "./stream";
 
 const LIVE_POLL_MS = 15_000;
 const OFFLINE_POLL_MS = 5_000;
 const CHANGE_DEBOUNCE_MS = 300;
-
-type HeaderSocket = new (
-	url: string,
-	protocols: string | string[] | undefined,
-	options: { headers: Record<string, string> },
-) => WebSocket;
 
 export interface BoardState {
 	cards: BoardCard[] | null;
@@ -32,13 +26,13 @@ export interface BoardState {
 }
 
 export function useBoard(projectId: string): BoardState {
-	const { api, client, serverUrl } = useSession();
+	const { api } = useSession();
 	const [cards, setCards] = useState<BoardCard[] | null>(null);
 	const [error, setError] = useState<unknown>(null);
-	const [live, setLive] = useState(false);
 	const [refreshing, setRefreshing] = useState(false);
-	const [active, setActive] = useState(AppState.currentState === "active");
+	const active = useAppActive();
 	const inFlight = useRef(false);
+	const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 	const read = useCallback(async () => {
 		if (!api || inFlight.current) return;
@@ -59,10 +53,22 @@ export function useBoard(projectId: string): BoardState {
 		setRefreshing(false);
 	}, [read]);
 
-	useEffect(() => {
-		const sub = AppState.addEventListener("change", (state) => setActive(state === "active"));
-		return () => sub.remove();
-	}, []);
+	const { live } = useProjectSocket(projectId, active, {
+		onOpen: () => void read(),
+		onEvent: (event) => {
+			if (!BOARD_EVENTS.has(event.type)) return;
+			if (debounce.current) clearTimeout(debounce.current);
+			debounce.current = setTimeout(() => void read(), CHANGE_DEBOUNCE_MS);
+		},
+	});
+
+	// A change announced just before the screen left is not read.
+	useEffect(
+		() => () => {
+			if (debounce.current) clearTimeout(debounce.current);
+		},
+		[],
+	);
 
 	// The periodic read, shorter while the stream is down.
 	useEffect(() => {
@@ -71,78 +77,6 @@ export function useBoard(projectId: string): BoardState {
 		const timer = setInterval(() => void read(), live ? LIVE_POLL_MS : OFFLINE_POLL_MS);
 		return () => clearInterval(timer);
 	}, [active, live, read]);
-
-	// The live stream.
-	useEffect(() => {
-		if (!active || !api || !client || !serverUrl) return;
-		let stopped = false;
-		let socket: WebSocket | null = null;
-		let attempt = 0;
-		let reconnect: ReturnType<typeof setTimeout> | null = null;
-		let debounce: ReturnType<typeof setTimeout> | null = null;
-
-		const retry = () => {
-			if (stopped || reconnect) return;
-			reconnect = setTimeout(() => {
-				reconnect = null;
-				void open();
-			}, reconnectDelay(attempt));
-			attempt += 1;
-		};
-
-		const open = async () => {
-			let base: string | null = null;
-			try {
-				// Also refreshes an expired access token before the handshake.
-				base = streamBase(serverUrl, (await api.streamInfo()).url);
-			} catch {
-				base = null;
-			}
-			const token = client.currentAccessToken;
-			if (stopped) return;
-			if (!base || !token) {
-				retry();
-				return;
-			}
-			const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
-			if (client.activeOrgId) headers["X-WorkPilot-Org"] = client.activeOrgId;
-			try {
-				socket = new (WebSocket as unknown as HeaderSocket)(channelUrl(base, projectId), undefined, { headers });
-			} catch {
-				retry();
-				return;
-			}
-			const current = socket;
-			current.onopen = () => {
-				attempt = 0;
-				setLive(true);
-				void read();
-			};
-			current.onmessage = (message) => {
-				const event = parseStreamEvent(message.data);
-				if (!event || !BOARD_EVENTS.has(event.type)) return;
-				if (debounce) clearTimeout(debounce);
-				debounce = setTimeout(() => void read(), CHANGE_DEBOUNCE_MS);
-			};
-			current.onclose = () => {
-				if (socket !== current) return;
-				socket = null;
-				setLive(false);
-				retry();
-			};
-		};
-
-		void open();
-		return () => {
-			stopped = true;
-			if (reconnect) clearTimeout(reconnect);
-			if (debounce) clearTimeout(debounce);
-			const current = socket;
-			socket = null;
-			current?.close();
-			setLive(false);
-		};
-	}, [active, api, client, serverUrl, projectId, read]);
 
 	return { cards, error, live, refreshing, reload };
 }

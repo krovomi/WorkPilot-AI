@@ -1,0 +1,143 @@
+/** @vitest-environment jsdom */
+/**
+ * The usage popover's account switch: the other API-key accounts of the
+ * provider shown, the active one marked, one click making another the
+ * default; nothing for Claude (its profiles have their own list) nor for a
+ * provider with a single account.
+ */
+import "@testing-library/jest-dom/vitest";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import "../../../../shared/i18n";
+import type { AiAccountsSnapshot } from "../../../../shared/types/ai-accounts";
+import { useAiAccountUsageStore } from "../../../stores/ai-account-usage-store";
+import { useAiAccountsStore } from "../../../stores/ai-accounts-store";
+import { ProviderAccountSwitcher } from "../ProviderAccountSwitcher";
+
+const account = (id: string, name: string, provider = "openai", hasKey = true) => ({
+	id,
+	provider,
+	name,
+	hasKey,
+	createdAt: "2026-11-27T10:00:00.000Z",
+});
+const login = (id: string, name: string, provider: string, signedIn = true) => ({
+	...account(id, name, provider, false),
+	kind: "login" as const,
+	signedIn,
+});
+
+let snapshot: AiAccountsSnapshot;
+const bridge = {
+	listAiAccounts: vi.fn(async () => ({ success: true, data: snapshot })),
+	setDefaultAiAccount: vi.fn(async (provider: string, id: string | null) => {
+		snapshot = { ...snapshot, defaults: id ? { [provider]: id } : {} };
+		return { success: true };
+	}),
+};
+
+beforeEach(() => {
+	for (const fn of Object.values(bridge)) fn.mockClear();
+	snapshot = {
+		accounts: [account("a1", "Perso"), account("a2", "Client"), account("a3", "Empty", "openai", false)],
+		defaults: {},
+		mainKeys: ["openai"],
+	};
+	useAiAccountsStore.setState({ accounts: [], defaults: {}, mainKeys: [], loaded: false, error: null });
+	(globalThis as { electronAPI?: unknown }).electronAPI = bridge;
+});
+
+afterEach(() => {
+	cleanup();
+	(globalThis as { electronAPI?: unknown }).electronAPI = undefined;
+});
+
+describe("ProviderAccountSwitcher", () => {
+	it("lists the provider's accounts with a key, the active one first marked", async () => {
+		render(<ProviderAccountSwitcher provider="openai" />);
+		expect(await screen.findByText("Perso")).toBeInTheDocument();
+		expect(screen.getByText("Client")).toBeInTheDocument();
+		expect(screen.queryByText("Empty")).not.toBeInTheDocument();
+		expect(screen.getByRole("button", { name: /Main key/ })).toHaveAttribute("aria-pressed", "true");
+	});
+
+	it("switches the default account in one click", async () => {
+		render(<ProviderAccountSwitcher provider="openai" />);
+		fireEvent.click(await screen.findByRole("button", { name: /Client/ }));
+		await waitFor(() => expect(bridge.setDefaultAiAccount).toHaveBeenCalledWith("openai", "a2"));
+		await waitFor(() =>
+			expect(screen.getByRole("button", { name: /Client/ })).toHaveAttribute("aria-pressed", "true"),
+		);
+		fireEvent.click(screen.getByRole("button", { name: /Main key/ }));
+		await waitFor(() => expect(bridge.setDefaultAiAccount).toHaveBeenLastCalledWith("openai", null));
+	});
+
+	it("says when a switch is refused", async () => {
+		bridge.setDefaultAiAccount.mockResolvedValueOnce({ success: false, error: "Account not found" } as never);
+		render(<ProviderAccountSwitcher provider="openai" />);
+		fireEvent.click(await screen.findByRole("button", { name: /Perso/ }));
+		expect(await screen.findByRole("alert")).toHaveTextContent("Account not found");
+	});
+
+	it("shows what each account spent this month", async () => {
+		const usage = (key: string, costUsd: number) => ({
+			key,
+			costUsd,
+			inputTokens: 0,
+			outputTokens: 0,
+			sessions: 1,
+			complete: true,
+			budgetUsd: 0,
+			level: "none",
+		});
+		Object.assign(bridge, {
+			getAiAccountUsage: vi.fn(async () => ({
+				success: true,
+				data: { month: "2026-11", accounts: { a1: usage("a1", 3.5), a2: usage("a2", 0) } },
+			})),
+		});
+		render(<ProviderAccountSwitcher provider="openai" />);
+		expect(await screen.findByText("$3.50")).toBeInTheDocument();
+		expect(screen.getByRole("button", { name: /Client/ })).not.toHaveTextContent("$");
+		delete (bridge as { getAiAccountUsage?: unknown }).getAiAccountUsage;
+		useAiAccountUsageStore.setState({ accounts: {}, month: "", loaded: false });
+	});
+
+	it("shows nothing for Claude, an unknown provider or a single account", async () => {
+		const { container, rerender } = render(<ProviderAccountSwitcher provider="anthropic" />);
+		expect(container).toBeEmptyDOMElement();
+		rerender(<ProviderAccountSwitcher provider={null} />);
+		expect(container).toBeEmptyDOMElement();
+		snapshot = { accounts: [account("m1", "Solo", "mistral")], defaults: {}, mainKeys: [] };
+		rerender(<ProviderAccountSwitcher provider="mistral" />);
+		await waitFor(() => expect(bridge.listAiAccounts).toHaveBeenCalled());
+		expect(container).toBeEmptyDOMElement();
+	});
+
+	it("lists a CLI's signed-in accounts beside the sign-in of this computer", async () => {
+		snapshot = {
+			accounts: [login("c1", "Work", "copilot"), login("c2", "Waiting", "copilot", false)],
+			defaults: {},
+			mainKeys: [],
+		};
+		render(<ProviderAccountSwitcher provider="copilot" />);
+		fireEvent.click(await screen.findByRole("button", { name: /Work/ }));
+		expect(screen.queryByText("Waiting")).not.toBeInTheDocument();
+		await waitFor(() => expect(bridge.setDefaultAiAccount).toHaveBeenCalledWith("copilot", "c1"));
+		fireEvent.click(await screen.findByRole("button", { name: /Sign-in of this computer/ }));
+		await waitFor(() => expect(bridge.setDefaultAiAccount).toHaveBeenLastCalledWith("copilot", null));
+	});
+
+	it("keeps OpenAI's keys and Codex CLI's sign-ins apart", async () => {
+		snapshot = {
+			accounts: [account("a1", "Perso"), login("x1", "Plus", "codex")],
+			defaults: { openai: "a1" },
+			mainKeys: ["openai"],
+		};
+		render(<ProviderAccountSwitcher provider="openai" />);
+		expect(await screen.findByRole("button", { name: /Perso/ })).toHaveAttribute("aria-pressed", "true");
+		expect(screen.getByRole("button", { name: /Sign-in of this computer/ })).toHaveAttribute("aria-pressed", "true");
+		fireEvent.click(screen.getByRole("button", { name: /Plus/ }));
+		await waitFor(() => expect(bridge.setDefaultAiAccount).toHaveBeenCalledWith("codex", "x1"));
+	});
+});

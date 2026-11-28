@@ -14,6 +14,11 @@ Two kinds of process are wrapped:
 Claude Code and the Codex CLI sandbox their own commands; WorkPilot reports
 theirs (`delegated`) and does not wrap them twice.
 
+With the Docker Sandboxes microVM turned on (Settings, Sandbox;
+`os_sandbox.microvm`), the WorkPilot loop's commands run in the task's VM
+instead; when the VM cannot be had, the OS sandbox above takes over and the
+feed says why.
+
 ``WORKPILOT_SANDBOX``:
 
 - ``auto`` (default): sandboxed when the machine can; when it cannot, the
@@ -32,7 +37,18 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 
+from .evidence import record_session
 from .launch import ISOLATED, UNAVAILABLE, SandboxStatus, install_hint, probe, sandboxed
+from .microvm import (
+    BACKEND,
+    MicrovmError,
+    TaskVm,
+    blocked_hosts,
+    ensure_vm,
+    probe_microvm,
+    sbx_env,
+    task_vm,
+)
 from .policy import SandboxPolicy, build_policy
 from .proxy import FilteringProxy
 
@@ -74,20 +90,38 @@ class SessionSandbox:
     backend: str | None = None
     reason: str | None = None
     policy: SandboxPolicy | None = None
+    #: The task's microVM, when the commands run in one (`os_sandbox.microvm`).
+    vm: TaskVm | None = None
+    #: Why the microVM, turned on, is not the one used.
+    fallback_reason: str | None = None
     _started: float = field(default_factory=time.time)
     _proxy: FilteringProxy | None = None
+    _blocked_seen: dict[str, int] = field(default_factory=dict)
 
     @property
     def isolated(self) -> bool:
         return self.state == ISOLATED and self.policy is not None
 
     def wrap(
-        self, argv: list[str], env: dict[str, str], *, cwd: Path | str | None = None
+        self,
+        argv: list[str],
+        env: dict[str, str],
+        *,
+        cwd: Path | str | None = None,
+        stdin: bool = False,
+        vm_env: dict[str, str] | None = None,
     ) -> tuple[list[str], dict[str, str]]:
-        """`argv` and `env` as launched: under the sandbox when it is on."""
+        """`argv` and `env` as launched: under the sandbox when it is on.
+
+        `stdin`: the command reads its stdin (a microVM forwards it then).
+        `vm_env`: variables WorkPilot sets inside a microVM (`TaskVm.exec_argv`).
+        """
         policy = self.policy
         if not self.isolated or policy is None:
             return list(argv), dict(env)
+        if self.vm is not None:
+            argv = self.vm.exec_argv(list(argv), env, cwd, stdin=stdin, vm_env=vm_env)
+            return argv, sbx_env(env)
         if cwd is not None:
             policy = replace(policy, cwd=Path(cwd).resolve())
         command = sandboxed(list(argv), policy, env)
@@ -95,7 +129,16 @@ class SessionSandbox:
         return command.argv, command.env
 
     def refused_hosts(self, since: float | None = None) -> list[str]:
-        """Hosts the proxy refused for this session, oldest first, once each."""
+        """Hosts the proxy refused for this session, oldest first, once each.
+
+        In a microVM: those refused since the previous call (sbx counts
+        requests per host, without a time).
+        """
+        if self.vm is not None:
+            counts = blocked_hosts(self.vm.name)
+            fresh = [h for h, n in counts.items() if n > self._blocked_seen.get(h, 0)]
+            self._blocked_seen = counts
+            return fresh
         proxy = self._proxy
         if proxy is None:
             return []
@@ -108,6 +151,17 @@ class SessionSandbox:
 
     def summary(self) -> str:
         """One line for the task feed. Stable English."""
+        if self.state == ISOLATED and self.vm is not None:
+            return (
+                f"commands run in the task's Docker Sandboxes microVM ({self.vm.name}): "
+                "only the worktree and the spec are mounted, network limited to the allowlist"
+            )
+        line = self._summary()
+        if self.fallback_reason:
+            line += f" (Docker Sandboxes microVM not used: {self.fallback_reason})"
+        return line
+
+    def _summary(self) -> str:
         if self.state == ISOLATED:
             return (
                 f"commands run in the OS sandbox ({self.backend}): writes limited to the "
@@ -130,17 +184,30 @@ def session_sandbox(
     unavailable_reason: str | None = None,
     readable: Iterable[Path | str] = (),
     state_read_only: Iterable[str] = (),
+    microvm: bool = False,
 ) -> SessionSandbox:
     """The sandbox a session's commands run in, decided once per session.
 
     ``unavailable_reason`` says why this session cannot be sandboxed even if
-    the machine can (a CLI without a sandbox profile).
+    the machine can (a CLI without a sandbox profile). ``microvm``: this
+    session's commands can run in the task's microVM (the WorkPilot loop),
+    used when the person turned it on.
     """
     mode = sandbox_mode()
     if mode == "off":
         return SessionSandbox(OFF)
+    fallback_reason = None
+    if microvm:
+        chosen, fallback_reason = _microvm_session(
+            project_dir, spec_dir, cwd=cwd, provider_hosts=provider_hosts
+        )
+        if chosen is not None:
+            return chosen
     status: SandboxStatus = probe()
     reason = unavailable_reason or (None if status.available else status.reason)
+    if reason is not None and fallback_reason:
+        reason = f"Docker Sandboxes microVM unavailable ({fallback_reason}); {reason}"
+        fallback_reason = None
     if reason is not None:
         if mode == "required":
             raise SandboxRequiredError(
@@ -156,7 +223,40 @@ def session_sandbox(
         readable=readable,
         state_read_only=state_read_only,
     )
-    return SessionSandbox(ISOLATED, status.backend, None, policy)
+    return SessionSandbox(
+        ISOLATED, status.backend, None, policy, fallback_reason=fallback_reason
+    )
+
+
+def _microvm_session(
+    project_dir: Path | str,
+    spec_dir: Path | str | None,
+    *,
+    cwd: Path | str | None,
+    provider_hosts: Iterable[str],
+) -> tuple[SessionSandbox | None, str | None]:
+    """The task's microVM session, or why there is none; (None, None) when off."""
+    from security.agent_safety_settings import load_settings
+
+    settings = load_settings().sandbox.microvm
+    if not settings.enabled:
+        return None, None
+    status = probe_microvm()
+    if not status.available:
+        return None, status.reason
+    policy = build_policy(project_dir, spec_dir, cwd=cwd, provider_hosts=provider_hosts)
+    try:
+        vm = task_vm(
+            policy,
+            project_dir,
+            spec_dir,
+            memory_gb=settings.memory_gb,
+            cpus=settings.cpus,
+        )
+        ensure_vm(vm)
+    except MicrovmError as error:
+        return None, str(error)
+    return SessionSandbox(ISOLATED, BACKEND, None, policy, vm=vm), None
 
 
 def delegated_status(tool: str) -> SessionSandbox:
@@ -166,6 +266,14 @@ def delegated_status(tool: str) -> SessionSandbox:
 
 _reported: set[tuple[str, str, str]] = set()
 _reported_lock = threading.Lock()
+
+
+def _report_reason(sandbox: SessionSandbox) -> str | None:
+    """Why commands are not isolated, cut to what the app keeps (500)."""
+    for reason in (sandbox.reason, getattr(sandbox, "fallback_reason", None)):
+        if isinstance(reason, str) and reason:
+            return reason[:500]
+    return None
 
 
 def first_report(
@@ -182,11 +290,14 @@ def first_report(
         if key in _reported:
             return None
         _reported.add(key)
+    # Kept for the approval tier of the task's PR (`os_sandbox/evidence.py`).
+    record_session(spec_dir, provider, sandbox.state, sandbox.backend)
     return {
         "provider": provider,
         "state": sandbox.state,
         "backend": sandbox.backend,
-        "reason": sandbox.reason,
+        # The app keeps a reason of 500 characters at most (`main/task-sandbox.ts`).
+        "reason": _report_reason(sandbox),
         "network": sandbox.policy.allowlist.describe() if sandbox.policy else [],
     }
 

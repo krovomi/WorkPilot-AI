@@ -143,6 +143,8 @@ export function providerSupportsThinking(provider: string): boolean {
 		"custom",
 		"grok",
 		"windsurf",
+		"openrouter",
+		"huggingface",
 	].includes(provider);
 }
 

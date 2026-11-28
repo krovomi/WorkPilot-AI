@@ -1,19 +1,22 @@
 import { Keyboard, X } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
+import { type NavIndexEntry, useNavIndexStore } from "./sidebar/nav-index";
 
 // ---------------------------------------------------------------------------
-// Types
+// Shortcut definitions
 // ---------------------------------------------------------------------------
 
 interface ShortcutEntry {
-	keys: string;
-	label: string;
+	readonly keys: string;
+	/** A key of `common:shortcutsOverlay.items`. */
+	readonly label: string;
 }
 
 interface ShortcutGroup {
-	title: string;
-	shortcuts: ShortcutEntry[];
+	/** A key of `common:shortcutsOverlay.groups`. */
+	readonly title: string;
+	readonly shortcuts: readonly ShortcutEntry[];
 }
 
 interface KeyboardShortcutsOverlayProps {
@@ -21,52 +24,40 @@ interface KeyboardShortcutsOverlayProps {
 	readonly onOpenChange: (open: boolean) => void;
 }
 
-// ---------------------------------------------------------------------------
-// Shortcut definitions
-// ---------------------------------------------------------------------------
-
-const SHORTCUT_GROUPS: ShortcutGroup[] = [
+// What `useKeyboardShortcuts`, `App.tsx`, `TerminalGrid.tsx`, the voice
+// assistant and the stop-all button listen for. The menu's own two-letter
+// shortcuts are read from the menu itself (`useNavIndexStore`).
+const SHORTCUT_GROUPS: readonly ShortcutGroup[] = [
 	{
-		title: "Navigation",
+		title: "navigation",
 		shortcuts: [
-			{ keys: "Ctrl+1", label: "Go to Kanban" },
-			{ keys: "Ctrl+2", label: "Go to Terminals" },
-			{ keys: "Ctrl+3", label: "Go to Insights" },
-			{ keys: "Ctrl+4", label: "Go to Roadmap" },
-			{ keys: "Ctrl+5", label: "Go to Settings" },
-			{ keys: "K", label: "Kanban (sidebar)" },
-			{ keys: "A", label: "Terminals (sidebar)" },
-			{ keys: "N", label: "Insights (sidebar)" },
-			{ keys: "D", label: "Roadmap (sidebar)" },
-			{ keys: "I", label: "Ideation (sidebar)" },
+			{ keys: "Ctrl+1", label: "goKanban" },
+			{ keys: "Ctrl+2", label: "goTerminals" },
+			{ keys: "Ctrl+3", label: "goInsights" },
+			{ keys: "Ctrl+4", label: "goRoadmap" },
+			{ keys: "Ctrl+5", label: "openSettings" },
 		],
 	},
 	{
-		title: "General",
+		title: "general",
 		shortcuts: [
-			{ keys: "Ctrl+K", label: "Command Palette" },
-			{ keys: "Ctrl+/", label: "Keyboard Shortcuts" },
-			{ keys: "Ctrl+N", label: "New Task" },
-			{ keys: "Ctrl+,", label: "Open Settings" },
-			{ keys: "Ctrl+T", label: "Add Project" },
+			{ keys: "Ctrl+K", label: "commandPalette" },
+			{ keys: "Ctrl+/", label: "shortcuts" },
+			{ keys: "Ctrl+N", label: "newTask" },
+			{ keys: "Ctrl+,", label: "openSettings" },
+			{ keys: "Ctrl+T", label: "addProject" },
 			// The default; Settings → Voice assistant changes it.
-			{ keys: "Ctrl+Shift+Space", label: "Voice Assistant" },
-			{ keys: "Escape", label: "Close dialog / overlay" },
+			{ keys: "Ctrl+Shift+Space", label: "voiceAssistant" },
+			// Pauses every running task; each resumes from its card.
+			{ keys: "Ctrl+Shift+.", label: "stopAgents" },
+			{ keys: "Escape", label: "closeDialog" },
 		],
 	},
 	{
-		title: "Terminal",
-		shortcuts: [{ keys: "Ctrl+Shift+T", label: "New Terminal" }],
-	},
-	{
-		title: "Sidebar",
+		title: "terminal",
 		shortcuts: [
-			{ keys: "L", label: "Changelog" },
-			{ keys: "C", label: "Context" },
-			{ keys: "M", label: "Agent Tools" },
-			{ keys: "W", label: "Worktrees" },
-			{ keys: "G", label: "GitHub Issues" },
-			{ keys: "P", label: "GitHub PRs" },
+			{ keys: "Ctrl+T", label: "newTerminal" },
+			{ keys: "Ctrl+W", label: "closeTerminal" },
 		],
 	},
 ];
@@ -99,8 +90,12 @@ export function KeyboardShortcutsOverlay({
 	open,
 	onOpenChange,
 }: KeyboardShortcutsOverlayProps) {
-	const { t } = useTranslation();
-	const overlayRef = useRef<HTMLDivElement>(null);
+	const { t } = useTranslation(["common", "navigation"]);
+	// The pages the menu shows right now, each with its two-letter shortcut
+	const navEntries = useNavIndexStore((state) => state.entries);
+	const menuShortcuts = navEntries.filter(
+		(entry): entry is NavIndexEntry & { shortcut: string } => Boolean(entry.shortcut),
+	);
 
 	useEffect(() => {
 		if (!open) return;
@@ -119,35 +114,38 @@ export function KeyboardShortcutsOverlay({
 	if (!open) return null;
 
 	return (
-		<div
-			role="none"
-			className="fixed inset-0 z-100 flex items-center justify-center"
-			onClick={() => onOpenChange(false)}
-			onKeyDown={(e) => e.key === "Escape" && onOpenChange(false)}
-		>
-			{/* Backdrop */}
-			<div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+		<div className="fixed inset-0 z-100 flex items-center justify-center">
+			{/* Backdrop: a click outside the panel closes it */}
+			<button
+				type="button"
+				tabIndex={-1}
+				aria-label={t("common:buttons.close")}
+				className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+				onClick={() => onOpenChange(false)}
+			/>
 
 			{/* Panel */}
-			{/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: stop-propagation handler */}
-			{/* biome-ignore lint/a11y/noStaticElementInteractions: stop-propagation handler */}
-			{/* biome-ignore lint/a11y/useKeyWithClickEvents: keyboard events handled by outer overlay */}
 			<div
-				ref={overlayRef}
+				role="dialog"
+				aria-modal="true"
+				aria-labelledby="keyboard-shortcuts-title"
 				className="relative w-full max-w-2xl max-h-[80vh] overflow-hidden rounded-xl border border-border bg-card shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-200"
-				onClick={(e) => e.stopPropagation()}
 			>
 				{/* Header */}
 				<div className="flex items-center justify-between border-b border-border px-6 py-4">
 					<div className="flex items-center gap-3">
 						<Keyboard className="h-5 w-5 text-primary" />
-						<h2 className="text-lg font-semibold text-foreground">
+						<h2
+							id="keyboard-shortcuts-title"
+							className="text-lg font-semibold text-foreground"
+						>
 							{t("common:shortcutsOverlay.title")}
 						</h2>
 					</div>
 					<button
 						type="button"
 						onClick={() => onOpenChange(false)}
+						aria-label={t("common:buttons.close")}
 						className="rounded-lg p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
 					>
 						<X className="h-4 w-4" />
@@ -158,25 +156,24 @@ export function KeyboardShortcutsOverlay({
 				<div className="overflow-y-auto p-6 max-h-[calc(80vh-130px)]">
 					<div className="grid grid-cols-2 gap-8">
 						{SHORTCUT_GROUPS.map((group) => (
-							<div key={group.title}>
-								<h3 className="mb-3 text-sm font-semibold text-foreground uppercase tracking-wider">
-									{group.title}
-								</h3>
-								<div className="space-y-2">
-									{group.shortcuts.map((shortcut) => (
-										<div
-											key={shortcut.keys}
-											className="flex items-center justify-between gap-4 rounded-lg px-2 py-1.5 hover:bg-accent/30 transition-colors"
-										>
-											<span className="text-sm text-foreground">
-												{shortcut.label}
-											</span>
-											<Kbd>{shortcut.keys}</Kbd>
-										</div>
-									))}
-								</div>
-							</div>
+							<ShortcutSection
+								key={group.title}
+								title={t(`common:shortcutsOverlay.groups.${group.title}`)}
+								rows={group.shortcuts.map((shortcut) => ({
+									keys: shortcut.keys,
+									label: t(`common:shortcutsOverlay.items.${shortcut.label}`),
+								}))}
+							/>
 						))}
+						{menuShortcuts.length > 0 && (
+							<ShortcutSection
+								title={t("common:shortcutsOverlay.groups.menu")}
+								rows={menuShortcuts.map((entry) => ({
+									keys: entry.shortcut,
+									label: t(entry.labelKey),
+								}))}
+							/>
+						)}
 					</div>
 				</div>
 
@@ -184,6 +181,33 @@ export function KeyboardShortcutsOverlay({
 				<div className="border-t border-border px-6 py-3 text-center text-xs text-muted-foreground">
 					{t("common:shortcutsOverlay.pressBefore")} <Kbd>{t("common:shortcutsOverlay.escapeKey")}</Kbd> {t("common:shortcutsOverlay.pressAfter")}
 				</div>
+			</div>
+		</div>
+	);
+}
+
+function ShortcutSection({
+	title,
+	rows,
+}: {
+	readonly title: string;
+	readonly rows: readonly { keys: string; label: string }[];
+}) {
+	return (
+		<div>
+			<h3 className="mb-3 text-sm font-semibold text-foreground uppercase tracking-wider">
+				{title}
+			</h3>
+			<div className="space-y-2">
+				{rows.map((row) => (
+					<div
+						key={row.keys}
+						className="flex items-center justify-between gap-4 rounded-lg px-2 py-1.5 hover:bg-accent/30 transition-colors"
+					>
+						<span className="text-sm text-foreground">{row.label}</span>
+						<Kbd>{row.keys}</Kbd>
+					</div>
+				))}
 			</div>
 		</div>
 	);

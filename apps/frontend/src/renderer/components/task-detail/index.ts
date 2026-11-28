@@ -4,7 +4,6 @@ export { TaskDetailModal } from "./TaskDetailModal";
 export { TaskHeader } from "./TaskHeader";
 export { TaskLogs } from "./TaskLogs";
 export { TaskMetadata } from "./TaskMetadata";
-export { TaskProgress } from "./TaskProgress";
 export { TaskReview } from "./TaskReview";
 export { TaskSubtasks } from "./TaskSubtasks";
 export { TaskWarnings } from "./TaskWarnings";

@@ -32,11 +32,12 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import glob
 import os
 import re
 import shutil
 from pathlib import Path
+
+from foundation.platform.browser import chrome_executable
 
 from .perf import PerfResult, from_summary, page_score, parse_lighthouse_summary
 
@@ -45,41 +46,6 @@ __all__ = ["BrowserSession", "chrome_executable", "devtools_server_config"]
 _CONNECT_TIMEOUT = 120.0
 _CALL_TIMEOUT = 90.0
 _SERVER_ID = "chrome_devtools"
-
-
-def chrome_executable(explicit: str = "") -> str:
-    """A Chromium/Chrome binary to drive, or "" to let the tool find its own."""
-    for candidate in (explicit, os.environ.get("CHROME_PATH", "")):
-        if candidate and Path(candidate).is_file():
-            return candidate
-    roots = [
-        os.environ.get("PLAYWRIGHT_BROWSERS_PATH", ""),
-        "/opt/pw-browsers",
-        str(Path.home() / ".cache" / "ms-playwright"),
-    ]
-    layouts = (
-        "chromium-*/chrome-linux/chrome",
-        "chromium-*/chrome-linux64/chrome",
-        "chromium-*/chrome-mac/Chromium.app/Contents/MacOS/Chromium",
-        "chromium-*/chrome-win/chrome.exe",
-    )
-    for root in roots:
-        if not root:
-            continue
-        for layout in layouts:
-            found = sorted(glob.glob(os.path.join(root, layout)), reverse=True)
-            if found:
-                return found[0]
-    for name in (
-        "google-chrome",
-        "google-chrome-stable",
-        "chromium",
-        "chromium-browser",
-    ):
-        path = shutil.which(name)
-        if path:
-            return path
-    return ""
 
 
 def _is_root() -> bool:
@@ -456,6 +422,10 @@ class BrowserSession:
         if self._mcp is not None:
             return await self._call("navigate_page", {"type": "url", "url": url})
         page = self._page
+        # Like chrome-devtools-mcp, the console and the requests are the
+        # current page's: what the last page printed is not this one's error.
+        self._console.clear()
+        self._network.clear()
         try:
             response = await page.goto(url, wait_until="load", timeout=60_000)
         except Exception as exc:  # noqa: BLE001

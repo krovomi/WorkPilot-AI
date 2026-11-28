@@ -13,15 +13,19 @@ from __future__ import annotations
 
 import enum
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 from sqlalchemy import (
     JSON,
+    BigInteger,
     Boolean,
+    Date,
     DateTime,
+    Float,
     ForeignKey,
     Index,
     Integer,
+    LargeBinary,
     String,
     Text,
     UniqueConstraint,
@@ -69,6 +73,8 @@ class ProjectRole(str, enum.Enum):
 class IdentityProvider(str, enum.Enum):
     LOCAL = "local"
     ENTRA = "entra"
+    # Any OpenID Connect provider (``server/auth/oidc_generic.py``).
+    OIDC = "oidc"
 
 
 class RoleScope(str, enum.Enum):
@@ -205,11 +211,12 @@ class User(Base):
 
 
 class UserIdentity(Base):
-    """One login method for a user (local password or Entra ID subject).
+    """One login method for a user (local password, Entra ID or OIDC subject).
 
     A single user may have both: e.g. an admin with a local password who
     also signs in with SSO. ``subject`` is the Entra ``oid`` claim for
-    provider=entra, or the (lowercased) email for provider=local.
+    provider=entra, ``<issuer>|<sub>`` for provider=oidc, or the (lowercased)
+    email for provider=local.
     """
 
     __tablename__ = "user_identities"
@@ -252,6 +259,10 @@ class AuthSession(Base):
     revoked_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # The sign-in this session comes from, kept across refreshes: what the
+    # audit log names an action's session by (``jwt_tokens.LOGIN_METHODS``).
+    login_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    login_method: Mapped[str | None] = mapped_column(String(16), nullable=True)
 
 
 class AccessToken(Base):
@@ -453,6 +464,123 @@ class SpecIndex(Base):
     )
 
 
+class SpecCriticality(Base):
+    """How critical a person said a card is, which sets how many approve it.
+
+    A card with no row takes its criticality from the spec's own assessment
+    (``server/authz/approval_policy.py``), never below ``medium``.
+    """
+
+    __tablename__ = "spec_criticality"
+
+    project_id: Mapped[str] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), primary_key=True
+    )
+    spec_name: Mapped[str] = mapped_column(String(300), primary_key=True)
+    criticality: Mapped[str] = mapped_column(String(10))
+    set_by: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    set_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+class SpecApproval(Base):
+    """One person's approval of a card's spec and plan, as they then stood.
+
+    ``content_hash`` is the SHA-256 of ``spec.md`` and the plan when it was
+    given: an edit afterwards voids it. ``slot_id`` is whose approval it is:
+    the person's own, or the approver they stand in for (``acting_for``,
+    through a delegation). The row stays when its person leaves: it is the
+    record of who approved what.
+    """
+
+    __tablename__ = "spec_approvals"
+    __table_args__ = (
+        UniqueConstraint(
+            "project_id",
+            "spec_name",
+            "content_hash",
+            "slot_id",
+            name="uq_spec_approval",
+        ),
+        Index("ix_spec_approvals_card", "project_id", "spec_name"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    project_id: Mapped[str] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE")
+    )
+    spec_name: Mapped[str] = mapped_column(String(300))
+    content_hash: Mapped[str] = mapped_column(String(64))
+    user_id: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    slot_id: Mapped[str] = mapped_column(String(36))
+    acting_for: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    criticality: Mapped[str] = mapped_column(String(10))
+    # The role slugs that approval was given with (the stand-in's: the
+    # approver they act for), for the roles a criticality asks for.
+    roles: Mapped[list] = mapped_column(JSON, default=list)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )
+
+
+class ApprovalDelegation(Base):
+    """An approver's right to approve on a project, lent for a while.
+
+    From ``starts_at`` to ``ends_at``, ``to_user_id`` approves the cards of
+    ``project_id`` in the name of ``from_user_id``, as long as that person
+    may still approve there. A delegate never lends it on.
+    """
+
+    __tablename__ = "approval_delegations"
+    __table_args__ = (Index("ix_delegations_to_user", "to_user_id", "ends_at"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    org_id: Mapped[str] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE")
+    )
+    project_id: Mapped[str] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), index=True
+    )
+    from_user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE")
+    )
+    to_user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    ends_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )
+    revoked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+
+class ApprovalEscalation(Base):
+    """A card whose plan waited too long, and when the second group heard of it.
+
+    One row per spec run whose plan waited: a later spec run starts a new
+    wait, which may escalate again (``services/approval_escalation.py``).
+    """
+
+    __tablename__ = "approval_escalations"
+
+    run_id: Mapped[str] = mapped_column(
+        ForeignKey("agent_runs.id", ondelete="CASCADE"), primary_key=True
+    )
+    project_id: Mapped[str] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), index=True
+    )
+    spec_name: Mapped[str] = mapped_column(String(300))
+    criticality: Mapped[str] = mapped_column(String(10))
+    notified: Mapped[int] = mapped_column(Integer, default=0)
+    escalated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )
+
+
 class AgentRun(Base):
     __tablename__ = "agent_runs"
 
@@ -585,6 +713,27 @@ class UserPreference(Base):
     )
 
 
+class UserMenuLayout(Base):
+    """How a person arranged the desktop's left menu, the same on every desktop.
+
+    ``layout`` is the JSON object the desktop keeps in its sidebar preferences
+    (``apps/frontend/src/shared/utils/menu-layout.ts``): the order of the
+    spaces and of their pages, the pages moved to another space, the pins and
+    the pages hidden. ``server.services.preferences`` checks it. One row per
+    person, created on the first save.
+    """
+
+    __tablename__ = "user_menu_layouts"
+
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    layout: Mapped[dict] = mapped_column(JSON, default=dict)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, onupdate=_utcnow
+    )
+
+
 class NeedsYouChannel(Base):
     """Where a person is told a card needs them: ntfy, Telegram or Teams.
 
@@ -667,6 +816,33 @@ class UserSecret(Base):
     )
 
 
+class UserAiAccount(Base):
+    """One of a person's AI accounts (an API key of a provider), Fernet-encrypted.
+
+    A person may keep several per provider (their own key, their employer's,
+    a client's); the one marked ``is_default`` is the key their runs get
+    (``server/services/ai_accounts.py``). The key is never read back by a
+    route: only whether it is set.
+    """
+
+    __tablename__ = "user_ai_accounts"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    provider: Mapped[str] = mapped_column(String(32))
+    name: Mapped[str] = mapped_column(String(80))
+    encrypted_key: Mapped[str] = mapped_column(Text)
+    is_default: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )
+    key_set_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )
+
+
 class Invitation(Base):
     """A single-use, expiring invitation to create a local account.
 
@@ -711,6 +887,34 @@ class Invitation(Base):
     )
 
 
+class PasswordReset(Base):
+    """A single-use, short-lived link to set a new local password.
+
+    Asked for by the person (an email to their address) or issued by a
+    platform admin. As for :class:`Invitation`, only the SHA-256 hash of the
+    token is stored; a newer link, or a successful reset, closes the others.
+    """
+
+    __tablename__ = "password_resets"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    # The platform admin who issued it; None when the person asked for it.
+    created_by: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    used_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )
+
+
 class AuditLog(Base):
     """Administrative and security events.
 
@@ -737,6 +941,10 @@ class AuditLog(Base):
     payload: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
     user_agent: Mapped[str | None] = mapped_column(String(400), nullable=True)
+    # The sign-in the actor acted under, and how they signed in (None for an
+    # entry written without a signed-in session).
+    login_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    login_method: Mapped[str | None] = mapped_column(String(16), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow
     )
@@ -794,6 +1002,324 @@ class TeamChatMessage(Base):
     author_name: Mapped[str] = mapped_column(String(200))
     body: Mapped[str] = mapped_column(Text)
     reply_to: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )
+
+
+class ReplayShare(Base):
+    """A recorded agent session shared with a server project's team (#347).
+
+    ``bundle`` is the ``.wpreplay`` the sharer's app built, already masked
+    there (``replay/bundle.py``) and read back once here before it is kept.
+    The link that opens it holds a token the server only keeps as its
+    SHA-256 (``token_hash``): the row alone cannot rebuild the link. A share
+    ends at ``expires_at`` or when it is revoked, which also drops its bundle.
+    """
+
+    __tablename__ = "replay_shares"
+    __table_args__ = (Index("ix_replay_shares_project", "project_id", "created_at"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    project_id: Mapped[str] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE")
+    )
+    created_by: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    created_by_name: Mapped[str] = mapped_column(String(200), default="")
+    title: Mapped[str] = mapped_column(String(200), default="")
+    steps: Mapped[int] = mapped_column(Integer, default=0)
+    size_bytes: Mapped[int] = mapped_column(Integer, default=0)
+    bundle: Mapped[bytes] = mapped_column(LargeBinary)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    open_count: Mapped[int] = mapped_column(Integer, default=0)
+    last_opened_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # How many bookmarks the shared session carries, for the project's usage
+    # figures (``replay_share_overview.py``); unknown for a share made before
+    # revision 0020.
+    bookmarks: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+
+class McpServerReview(Base):
+    """A member's security review of a catalogue MCP server, shared within
+    one organization (#369, lots 5 and 6).
+
+    One review per person, organization and server (``server_id`` is the id
+    of the app's MCP catalogue): writing again replaces it. Every project of
+    the organization reads it; no other organization does. ``project_id`` is
+    the project it was last written from, kept for a downgrade and never
+    shown. ``verdict`` is one of a closed list (``mcp_reviews.VERDICTS``);
+    ``comment`` is plain text, shown as text, never fed to a model.
+    """
+
+    __tablename__ = "mcp_server_reviews"
+    __table_args__ = (
+        UniqueConstraint("org_id", "server_id", "author_id", name="uq_mcp_org_review"),
+        Index("ix_mcp_server_reviews_org", "org_id", "server_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    org_id: Mapped[str] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE")
+    )
+    project_id: Mapped[str | None] = mapped_column(
+        ForeignKey("projects.id", ondelete="SET NULL"), nullable=True
+    )
+    server_id: Mapped[str] = mapped_column(String(100))
+    author_id: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    author_name: Mapped[str] = mapped_column(String(200), default="")
+    verdict: Mapped[str] = mapped_column(String(16))
+    comment: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )
+
+
+class LeaderboardConsent(Base):
+    """Whether a person agreed to show by name on their organization's
+    Pixel Office leaderboards (#350).
+
+    No row, or ``visible`` false, is no: the leaderboard then counts the
+    person's work without naming it to anyone but them
+    (``shared_features/pixel_office.py``). One row per person and
+    organization, written only by that person.
+    """
+
+    __tablename__ = "leaderboard_consents"
+
+    org_id: Mapped[str] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), primary_key=True
+    )
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    visible: Mapped[bool] = mapped_column(Boolean, default=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, onupdate=_utcnow
+    )
+
+
+class UsageRecord(Base):
+    """The tokens one agent session of a server run or job used.
+
+    Written by the server only, from the run's usage channel
+    (``services/usage_records.py``): the run reports each session it ends,
+    the server checks the values and stores them against the person who
+    started it, its organization, its project and its run or job. Totals,
+    never content: no prompt, no answer, no file name. A deleted account
+    keeps its rows with ``user_id`` emptied, so the organization's totals stay
+    right without naming anyone.
+    """
+
+    __tablename__ = "usage_records"
+    __table_args__ = (
+        Index("ix_usage_org_time", "org_id", "created_at"),
+        Index("ix_usage_user_time", "user_id", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    org_id: Mapped[str] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE")
+    )
+    project_id: Mapped[str | None] = mapped_column(
+        ForeignKey("projects.id", ondelete="SET NULL"), nullable=True
+    )
+    user_id: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    run_id: Mapped[str | None] = mapped_column(
+        ForeignKey("agent_runs.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    job_id: Mapped[str | None] = mapped_column(
+        ForeignKey("project_jobs.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    #: The run's phase (spec, planning, coding, qa...) or the job's feature.
+    phase: Mapped[str] = mapped_column(String(40))
+    agent_type: Mapped[str] = mapped_column(String(40), default="")
+    provider: Mapped[str] = mapped_column(String(40), default="")
+    model: Mapped[str] = mapped_column(String(120), default="")
+    input_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    output_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    cache_write_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    cache_read_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    #: Millionths of a US dollar: the provider's price, or the catalog's.
+    cost_micro_usd: Mapped[int] = mapped_column(Integer, default=0)
+    #: True when the provider reported no count and it was estimated.
+    estimated: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )
+
+
+class PresenceDay(Base):
+    """One person's presence in one organization on one day.
+
+    Written by the server only, from the requests it authenticates
+    (``services/presence.py``): the day, and the last moment that day the
+    person made a request. That is all presence keeps: which pages, cards or
+    texts never come into it. It answers who is active (per day, week, month),
+    who is signed in now, and which accounts lie dormant. A deleted account
+    keeps its days with ``user_id`` emptied, so the counts of past days stay
+    right without naming anyone. Rows older than the retention are erased
+    (``services/usage_retention.py``).
+    """
+
+    __tablename__ = "presence_days"
+    __table_args__ = (
+        UniqueConstraint("user_id", "org_id", "day", name="uq_presence_user_org_day"),
+        Index("ix_presence_org_day", "org_id", "day"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    #: None for a platform administrator acting in no organization.
+    org_id: Mapped[str | None] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), nullable=True
+    )
+    day: Mapped[date] = mapped_column(Date)
+    last_seen_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )
+
+
+class PageVisit(Base):
+    """How many times one person opened one page of one app on one day.
+
+    Sent in batches by the desktop and the phone, only while the person's
+    organization has page activity on (``services/page_activity.py``, off by
+    default), and only for a name of the closed lists there: no project, card,
+    path or text, only which screen and how often. Rows older than the
+    organization's retention are erased (``services/usage_retention.py``);
+    turning page activity off erases the organization's rows at once. A
+    deleted account keeps its counts with ``user_id`` emptied.
+    """
+
+    __tablename__ = "page_visits"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id", "org_id", "day", "client", "page", name="uq_page_visit"
+        ),
+        Index("ix_page_visit_org_day", "org_id", "day"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    org_id: Mapped[str] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE")
+    )
+    day: Mapped[date] = mapped_column(Date)
+    #: ``desktop`` or ``mobile``.
+    client: Mapped[str] = mapped_column(String(10))
+    page: Mapped[str] = mapped_column(String(60))
+    count: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class UsageReportSend(Base):
+    """One usage report an organization was due, claimed once.
+
+    The scheduler (``services/usage_report_schedule.py``) inserts the row
+    before it sends: the unique key on the organization, the kind and the
+    period makes a second send of the same report impossible, even after a
+    restart or with two server processes. ``status`` says what happened
+    (``sent``, ``failed``, ``no_smtp``, ``no_recipient``); only how many
+    addresses it went to is kept, never which.
+    """
+
+    __tablename__ = "usage_report_sends"
+    __table_args__ = (
+        UniqueConstraint("org_id", "kind", "period", name="uq_usage_report_send"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    org_id: Mapped[str] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE")
+    )
+    #: ``daily``, ``weekly`` or ``monthly``.
+    kind: Mapped[str] = mapped_column(String(10))
+    #: The first day the report covers (``YYYY-MM-DD``).
+    period: Mapped[date] = mapped_column(Date)
+    status: Mapped[str] = mapped_column(String(20), default="claimed")
+    recipients: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )
+
+
+class UsageBudget(Base):
+    """A monthly token budget for one person, group or project.
+
+    ``target_id`` is the user's, group's or project's id, within ``org_id``;
+    a target that no longer exists drops its budget the next time the budgets
+    are read (``services/usage_budgets.py``), and erasing an account drops
+    its budget at once. ``block`` refuses new runs and jobs once the budget
+    is spent, as the organization's own budget does with its hard stop.
+    """
+
+    __tablename__ = "usage_budgets"
+    __table_args__ = (
+        UniqueConstraint("org_id", "scope", "target_id", name="uq_usage_budget"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    org_id: Mapped[str] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), index=True
+    )
+    #: ``person``, ``group`` or ``project``.
+    scope: Mapped[str] = mapped_column(String(10))
+    target_id: Mapped[str] = mapped_column(String(36))
+    monthly_tokens: Mapped[int] = mapped_column(BigInteger)
+    block: Mapped[bool] = mapped_column(Boolean, default=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, onupdate=_utcnow
+    )
+
+
+class UsageBudgetAlert(Base):
+    """A budget that passed one of its alert thresholds, once per month.
+
+    ``budget_key`` is the budget's id, or ``org`` for the organization's own
+    monthly budget; the unique key lets one alert through per budget, month
+    and threshold (80 or 100), however many servers check.
+    """
+
+    __tablename__ = "usage_budget_alerts"
+    __table_args__ = (
+        UniqueConstraint(
+            "org_id", "budget_key", "month", "threshold", name="uq_usage_budget_alert"
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    org_id: Mapped[str] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), index=True
+    )
+    budget_key: Mapped[str] = mapped_column(String(36))
+    scope: Mapped[str] = mapped_column(String(10))
+    #: The first day of the month the alert counts in.
+    month: Mapped[date] = mapped_column(Date)
+    threshold: Mapped[int] = mapped_column(Integer)
+    percent: Mapped[float] = mapped_column(Float)
+    #: How many addresses the alert email went to (0 without SMTP).
+    recipients: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow
     )

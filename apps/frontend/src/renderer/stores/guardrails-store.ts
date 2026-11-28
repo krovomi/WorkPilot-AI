@@ -38,12 +38,24 @@ interface GuardrailsState {
 	reset: () => void;
 }
 
+/** Two rules added in the same millisecond still need two ids. */
+let lastRule = 0;
 const emptyRule = (): GuardrailRuleDoc => ({
-	id: `rule-${Date.now()}`,
+	id: `rule-${Date.now()}-${++lastRule}`,
 	description: "",
 	action: "warn",
 	when: { tool: ["Write", "Edit"] },
 });
+
+/**
+ * The project the page is on, and the project whose rules `doc` holds. They
+ * differ while another project's rules load: answers for a project left
+ * behind are dropped, and a save never writes one project's rules into
+ * another's file.
+ */
+let shownPath: string | null = null;
+let loadedPath: string | null = null;
+const isShown = (projectPath: string) => projectPath === shownPath;
 
 export const useGuardrailsStore = create<GuardrailsState>((set, get) => ({
 	doc: { version: 1, rules: [] },
@@ -58,9 +70,17 @@ export const useGuardrailsStore = create<GuardrailsState>((set, get) => ({
 	checking: false,
 
 	load: async (projectPath) => {
+		shownPath = projectPath;
 		set({ loading: true, error: null, loadFailed: false, diffCheck: null });
+		// Another project: the last one's rules and results are not its own.
+		if (projectPath !== loadedPath) {
+			// A diff check still out for the last project no longer holds this one's button.
+			set({ doc: { version: 1, rules: [] }, dirty: false, lastTest: null, policy: null, activity: null, checking: false });
+		}
 		try {
 			const doc = await globalThis.electronAPI.loadGuardrails(projectPath);
+			if (!isShown(projectPath)) return;
+			loadedPath = projectPath;
 			// A reply without a rules array (an older main, a preview) is an
 			// empty document, never a page that cannot render.
 			const rules = Array.isArray(doc?.rules) ? doc.rules : [];
@@ -70,13 +90,14 @@ export const useGuardrailsStore = create<GuardrailsState>((set, get) => ({
 				loading: false,
 			});
 		} catch (e) {
+			if (!isShown(projectPath)) return;
 			set({ error: String(e), loading: false, loadFailed: true });
 		}
 		void get().refreshInsights(projectPath);
 	},
 
 	save: async (projectPath) => {
-		if (get().loadFailed) return;
+		if (get().loadFailed || loadedPath !== projectPath) return;
 		set({ loading: true, error: null });
 		try {
 			await globalThis.electronAPI.saveGuardrails(projectPath, get().doc);
@@ -92,6 +113,7 @@ export const useGuardrailsStore = create<GuardrailsState>((set, get) => ({
 			globalThis.electronAPI.validateGuardrails(projectPath),
 			globalThis.electronAPI.getGuardrailActivity(projectPath),
 		]);
+		if (!isShown(projectPath)) return;
 		set({
 			policy: policy.status === "fulfilled" ? policy.value : null,
 			activity: activity.status === "fulfilled" ? activity.value : null,
@@ -110,9 +132,10 @@ export const useGuardrailsStore = create<GuardrailsState>((set, get) => ({
 	checkDiff: async (projectPath, ref) => {
 		set({ checking: true, error: null });
 		try {
-			set({ diffCheck: await globalThis.electronAPI.checkGuardrailsDiff(projectPath, ref), checking: false });
+			const diffCheck = await globalThis.electronAPI.checkGuardrailsDiff(projectPath, ref);
+			if (isShown(projectPath)) set({ diffCheck, checking: false });
 		} catch (e) {
-			set({ error: String(e), checking: false });
+			if (isShown(projectPath)) set({ error: String(e), checking: false });
 		}
 	},
 
@@ -149,9 +172,9 @@ export const useGuardrailsStore = create<GuardrailsState>((set, get) => ({
 				toolName,
 				toolInput,
 			);
-			set({ lastTest });
+			if (isShown(projectPath)) set({ lastTest });
 		} catch (e) {
-			set({ error: String(e) });
+			if (isShown(projectPath)) set({ error: String(e) });
 		}
 	},
 

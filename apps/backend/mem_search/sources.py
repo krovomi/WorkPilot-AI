@@ -165,8 +165,10 @@ class PatternSource:
         try:
             from learning_loop.pattern_storage import PatternStorage
 
+            # What an agent may recall: not a pattern no trusted key signed,
+            # nor one scoped to another branch or team.
             self._cache = [
-                p.to_dict() for p in PatternStorage(self.project_dir).load_patterns()
+                p.to_dict() for p in PatternStorage(self.project_dir).recall_patterns()
             ]
         except Exception as exc:  # noqa: BLE001 - no patterns is an empty source
             logger.debug("could not read the learning patterns: %s", exc)
@@ -237,7 +239,10 @@ class BrainSource:
     The index is built from the vault's ``graph.json`` — a node's label, tags and
     frontmatter — so no note body is read until its detail is asked for. Build
     notes, memory notes (gotchas, patterns, codebase, sessions, outcomes) and
-    whatever else the project's agents filed there are all one source.
+    whatever else the project's agents filed there are all one source. A note
+    scoped to another branch or team is not (`brain.lifecycle.scopes.recalled`):
+    its scope is in its frontmatter, so each note's is read once, small as
+    notes are; a task log never is.
     """
 
     name = "brain"
@@ -245,7 +250,8 @@ class BrainSource:
     def __init__(self, project_dir: Path):
         from brain.tasks import project_name, project_rel
 
-        self.project = project_name(Path(project_dir))
+        self.project_dir = Path(project_dir)
+        self.project = project_name(self.project_dir)
         self.prefix = project_rel(self.project).parent.as_posix() + "/"
         self._brain = None
         self._nodes: list[dict] | None = None
@@ -275,7 +281,7 @@ class BrainSource:
                 brain._refresh()
             # The learning loop's patterns are `PatternSource`'s, with their
             # evidence; listing them here too would show each one twice.
-            self._nodes = [
+            nodes = [
                 node
                 for node in brain.graph().nodes.values()
                 if str(node.get("source_file") or "").startswith(self.prefix)
@@ -283,6 +289,19 @@ class BrainSource:
                 and "learning-loop"
                 not in ((node.get("metadata") or {}).get("tags") or [])
             ]
+            # What this source answers goes to an agent: not a note no
+            # trusted key signed (`brain.lifecycle.provenance`), nor one
+            # scoped elsewhere (`brain.lifecycle.scopes`).
+            from brain.lifecycle import scopes
+            from brain.lifecycle.provenance import unverified_among
+
+            hidden = unverified_among(
+                brain.root, [str(n["source_file"]) for n in nodes]
+            )
+            signed = [n for n in nodes if str(n["source_file"]) not in hidden]
+            self._nodes = brain.recalled(
+                signed, scopes.audience(self.project_dir), len(signed)
+            )
         except Exception as exc:  # noqa: BLE001
             logger.debug("could not read the brain graph: %s", exc)
         return self._nodes

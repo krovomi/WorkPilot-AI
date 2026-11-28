@@ -24,15 +24,59 @@
 	"model": "Modèle",
 	"createAgent": "Créer l'agent",
 	"agentNamePlaceholder": "ex. : Agent d'architecture",
+	"defaultAgentName": "Agent {{role}}",
+	"createError": "Impossible de créer l'agent : {{error}}",
+	"createFailed": "L'agent n'a pas été créé.",
+	"roles": {
+		"architect": "Architecte",
+		"coder": "Développeur",
+		"tester": "Testeur",
+		"reviewer": "Relecteur",
+		"documenter": "Rédacteur",
+		"planner": "Planificateur",
+		"debugger": "Débogueur",
+		"custom": "Personnalisé"
+	},
+	"roleHints": {
+		"architect": "Conception et architecture du système",
+		"coder": "Implémentation du code",
+		"tester": "Tests et QA",
+		"reviewer": "Revue de code",
+		"documenter": "Documentation",
+		"planner": "Planification des tâches",
+		"debugger": "Correction de bugs",
+		"custom": "Rôle personnalisé"
+	},
+	"tiers": {
+		"flagship": "Haut de gamme",
+		"standard": "Standard",
+		"fast": "Rapide",
+		"local": "Local"
+	},
+	"status": {
+		"idle": "Inactif",
+		"running": "En cours",
+		"paused": "En pause",
+		"completed": "Terminé",
+		"error": "Erreur",
+		"waiting": "En attente"
+	},
 	"noEvents": "Aucun événement pour l'instant",
 	"agentPanel": {
+		"actions": "Actions pour {{name}}",
+		"taskLabel": "Tâche pour {{name}}",
+		"start": "Démarrer",
+		"stopAgent": "Arrêter {{name}}",
 		"files": "Fichiers ({{count}})",
 		"remove": "Retirer",
 		"thinking": "Réflexion",
 		"taskPlaceholder": "Description de la tâche...",
 		"restart": "Redémarrer",
 		"noModel": "Aucun modèle",
-		"working": "En cours..."
+		"answering": "Réponse en cours…",
+		"waitingForModel": "En attente du modèle…",
+		"answer": "Réponse",
+		"stop": "Arrêter"
 	},
 	"noDecisions": "Aucune décision enregistrée pour l'instant",
 	"session": "Session",
@@ -50,5 +94,172 @@
 		"featureModelMixing": "Un fournisseur et un modèle par agent : Claude, OpenAI, Gemini, Ollama…",
 		"featureDecisionTree": "Suivez pourquoi chaque agent a choisi son étape suivante.",
 		"featureLiveView": "Tokens, coût et événements au fil de l’eau."
-	}
+	},
+	"events": {
+		"agent_created": "Agent créé",
+		"agent_removed": "Agent retiré",
+		"agent_started": "Agent démarré",
+		"agent_paused": "Agent en pause",
+		"agent_resumed": "Agent repris",
+		"agent_stopped": "Agent arrêté",
+		"agent_config_updated": "Réglages de l'agent modifiés",
+		"agent_completed": "Agent a répondu",
+		"agent_failed": "Agent en échec",
+		"agent_rebalanced": "Agent rééquilibré",
+		"agent_rebalance_skipped": "Agent non rééquilibré",
+		"agent_loop_detected": "Agent en boucle"
+	},
+	"compose": {
+		"tabManual": "Manuel",
+		"tabAuto": "Composition automatique",
+		"tabsLabel": "Comment ajouter des agents",
+		"intro": "Décrivez le travail, choisissez une spec ou un modèle de session : Mission Control propose une équipe sur les providers choisis, et une moins chère si vous fixez un budget.",
+		"templatesLabel": "Modèle de session",
+		"templates": {
+			"auto": {
+				"label": "D'après la description",
+				"hint": "Le travail décide : son type, sa taille, ses domaines et ses tests."
+			},
+			"bug_fix": {
+				"label": "Correction de bug",
+				"hint": "Un débogueur, un développeur, un testeur si le projet a des tests."
+			},
+			"new_feature": {
+				"label": "Nouvelle fonctionnalité",
+				"hint": "Un architecte, des développeurs selon la taille, un relecteur, un testeur."
+			},
+			"refactor_module": {
+				"label": "Refonte de module",
+				"hint": "Un architecte, des développeurs selon la taille, un relecteur critique."
+			},
+			"incident_response": {
+				"label": "Réponse à incident",
+				"hint": "Un débogueur haut de gamme, un développeur, un relecteur, un rédacteur du post-mortem."
+			},
+			"generic": {
+				"label": "Générique",
+				"hint": "Un développeur et un relecteur."
+			}
+		},
+		"promptLabel": "Travail à faire",
+		"promptPlaceholder": "ex. Corriger le plantage quand l'API de connexion expire",
+		"specLabel": "Spec d'une tâche",
+		"noSpec": "Aucune spec",
+		"providersLabel": "Providers",
+		"providersHint": "Chaque rôle va au premier provider qui a un modèle capable de son niveau.",
+		"providerOrder": "Ordre de préférence : {{list}}",
+		"budgetLabel": "Budget maximal",
+		"budgetPlaceholder": "Sans limite",
+		"budgetUnits": {
+			"usd": "Dollars US",
+			"tokens": "Tokens"
+		},
+		"refine": "Demander un second avis à un modèle rapide du premier provider",
+		"suggest": "Proposer une équipe",
+		"summary": "Modèle : {{template}} · taille : {{complexity}}",
+		"complexity": {
+			"small": "petite",
+			"medium": "moyenne",
+			"large": "grande"
+		},
+		"tiers": {
+			"flagship": "haut de gamme",
+			"standard": "standard",
+			"fast": "rapide",
+			"local": "local",
+			"provider_default": "au choix du provider"
+		},
+		"providerDefault": "Modèle choisi par le provider",
+		"unpriced": "prix inconnu",
+		"flatRate": "pas de prix au token",
+		"cost": "{{value}} $",
+		"tokens": "{{value}} tokens",
+		"total": "Estimation : {{cost}} $ · {{tokens}} tokens",
+		"degraded": "Budget dépassé : l'équipe complète coûte {{full}} $. Équipe proposée : {{proposed}} $ (économie de {{delta}} $, qualité attendue {{quality}} %).",
+		"refused": "Budget trop bas : même la plus petite équipe demande {{cost}} $ et {{tokens}} tokens. Augmentez le budget ou partez d'un modèle de session plus petit.",
+		"changes": {
+			"dropped": "{{role}} retiré",
+			"model": "{{role}} : {{from}} → {{to}}"
+		},
+		"apply": "Créer {{count}} agents",
+		"agentName": "{{role}} {{n}}",
+		"warnings": {
+			"vague_input": "La description est trop vague : une équipe générique est proposée. Ajoutez des détails ou choisissez un modèle de session.",
+			"provider_unsupported": "{{provider}} ne peut pas faire tourner un agent seul ici et a été écarté.",
+			"role_unserved": "Aucun provider choisi n'a de modèle adapté au rôle {{role}} (appel d'outils ou fenêtre de contexte).",
+			"unpriced_models": "Certains modèles n'ont pas de prix dans le catalogue : leur coût n'est pas compté.",
+			"hints_unusable": "La réponse du modèle rapide est inutilisable : les heuristiques ont décidé seules.",
+			"refine_failed": "{{provider}} n'a pas répondu au second avis : les heuristiques ont décidé seules."
+		},
+		"errors": {
+			"invalid_request": "La demande n'est pas valide.",
+			"invalid_providers": "Choisissez au moins un provider (huit au plus).",
+			"unknown_template": "Modèle de session inconnu.",
+			"invalid_budget": "Le budget doit être un nombre positif (un nombre entier de tokens).",
+			"invalid_project": "Le projet est inconnu.",
+			"invalid_spec": "La spec est introuvable dans ce projet.",
+			"no_provider": "Aucun des providers choisis ne peut faire tourner un agent seul.",
+			"no_capable_model": "Aucun des providers choisis n'a de modèle adapté à ces rôles.",
+			"generic": "Impossible de proposer une équipe : {{error}}"
+		},
+		"calibrated": "Estimations de tokens calibrées sur vos sessions passées pour : {{roles}}.",
+		"rebalanceHint": "Pendant que l'équipe travaille, un agent qui échoue ou tourne en boucle passe à un autre de ces providers ou à un modèle plus puissant, dans le budget."
+	},
+	"rebalance": {
+		"badge_one": "Rééquilibré une fois",
+		"badge_other": "Rééquilibré {{count}} fois",
+		"loopBadge": "En boucle",
+		"helperBadge": "Aide {{name}}",
+		"helpedBadge": "Agent d'appoint lancé",
+		"helperTask": "Cherche pourquoi {{name}} est bloqué, puis fait sa tâche",
+		"moved": "{{reason}} : {{action}}, {{from}} → {{to}}",
+		"notMoved": "{{reason}} : {{skipped}}",
+		"reasons": {
+			"loop": "La réponse se répétait",
+			"rate_limited": "Limite de débit ou quota du provider",
+			"provider_failed": "Provider indisponible",
+			"failed": "Le run a échoué"
+		},
+		"actions": {
+			"retry_profile": "relancé sur un autre profil Claude",
+			"reroute": "passé à un autre provider",
+			"escalate": "passé à un modèle plus puissant",
+			"helper": "confié à un agent d'appoint"
+		},
+		"skipped": {
+			"limit": "déjà rééquilibré autant de fois que permis pour cette tâche",
+			"over_budget": "la session a dépassé son budget",
+			"no_alternative": "aucun autre provider ni modèle plus puissant ne peut tenir le rôle",
+			"disabled": "le rééquilibrage automatique est coupé"
+		},
+		"loopSources": {
+			"answer": "Lue dans la réponse",
+			"steps": "Lue dans l'arbre de décision : les mêmes étapes, encore et encore"
+		}
+	},
+	"health": {
+		"budgetUsd": "{{spent}} $ dépensés sur {{budget}} $",
+		"budgetTokens": "{{spent}} tokens dépensés sur {{budget}}",
+		"rebalances_one": "{{count}} rééquilibrage",
+		"rebalances_other": "{{count}} rééquilibrages",
+		"autoRebalance": "Rééquilibrer automatiquement les agents bloqués",
+		"overBudget": "Cette session a épuisé son budget : les agents ne passent plus à des modèles plus puissants, et chaque nouveau run creuse le dépassement."
+	},
+	"metrics": {
+		"kicker": "Historique",
+		"title": "Sessions passées",
+		"sessions_one": "{{count}} session",
+		"sessions_other": "{{count}} sessions",
+		"none": "—",
+		"percent": "{{value}} %",
+		"autoShare": "Lancées par la composition automatique",
+		"tokensAutoManual": "Tokens par session, auto / manuelle",
+		"tokensPair": "{{auto}} / {{manual}} ({{delta}})",
+		"delta": "Δ {{value}}",
+		"estimateRatio": "Dépensé / estimé (auto)",
+		"ratio": "× {{value}}",
+		"rebalances": "Rééquilibrages par session",
+		"overrun": "Budgets dépassés"
+	},
+	"serverDescription": "Un projet du serveur d'équipe : ses agents tournent sur le serveur, qui planifie et exécute ses vagues."
 }

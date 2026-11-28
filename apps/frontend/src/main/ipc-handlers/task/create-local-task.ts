@@ -6,12 +6,19 @@
  * `requirements.json` and the attached images. Shared with the main-process
  * features that open cards themselves (multi-repo orchestration).
  */
-import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync, type Dirent } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { AUTO_BUILD_PATHS, getSpecsDir } from "../../../shared/constants";
-import type { Project, Task, TaskMetadata } from "../../../shared/types";
+import type {
+	Project,
+	Task,
+	TaskMetadata,
+	TaskStatusActor,
+} from "../../../shared/types";
 import { slugifySpecTitle } from "../../../shared/utils/spec-slug";
 import { projectStore } from "../../project-store";
+import { recordTaskCreator } from "../../task-run-facts";
+import { recordStatusChange } from "../../task-status-history";
 
 export interface NewLocalTask {
 	/** Plain-text title, already generated when the user gave none. */
@@ -22,6 +29,8 @@ export interface NewLocalTask {
 	readonly displayDescription: string;
 	readonly descriptionIsHtml: boolean;
 	readonly metadata?: TaskMetadata;
+	/** Who opens the card, for its status history; a person by default. */
+	readonly createdBy?: TaskStatusActor;
 }
 
 export function createLocalTask(project: Project, input: NewLocalTask): Task {
@@ -34,22 +43,10 @@ export function createLocalTask(project: Project, input: NewLocalTask): Task {
 	// Find next available spec number
 	let specNumber = 1;
 	if (existsSync(specsDir)) {
+		// withFileTypes always yields Dirent entries; a file is not a spec.
 		const existingDirs = readdirSync(specsDir, { withFileTypes: true })
-			.filter((d: Dirent | string) => {
-				// Handle both Dirent objects and string fallbacks
-				if (typeof d === "string") {
-					// If it's a string, check if it's a directory by using statSync
-					const fullPath = path.join(specsDir, d);
-					try {
-						return statSync(fullPath).isDirectory();
-					} catch {
-						return false;
-					}
-				}
-				// If it's a Dirent object, use isDirectory method
-				return typeof d.isDirectory === "function" && d.isDirectory();
-			})
-			.map((d: Dirent | string) => (typeof d === "string" ? d : d.name));
+			.filter((entry) => entry.isDirectory())
+			.map((entry) => entry.name);
 
 		// Extract numbers from spec directory names (e.g., "001-feature" -> 1)
 		const existingNumbers = existingDirs
@@ -176,16 +173,25 @@ export function createLocalTask(project: Project, input: NewLocalTask): Task {
 		JSON.stringify(implementationPlan, null, 2),
 		"utf-8",
 	);
+	// The first entry of its history: where lead time starts.
+	recordStatusChange(specDir, {
+		to: "backlog",
+		actor: input.createdBy ?? "user",
+		previous: null,
+	});
+	// Who made it: this computer's person, or the automation that did.
+	recordTaskCreator(
+		specDir,
+		project.path,
+		input.createdBy === "system" ? "automation" : "person",
+	);
 
-	// Save task metadata if provided
-	if (taskMetadata) {
-		const metadataPath = path.join(specDir, "task_metadata.json");
-		writeFileSync(
-			metadataPath,
-			JSON.stringify(taskMetadata, null, 2),
-			"utf-8",
-		);
-	}
+	// Always written: it carries at least the source type.
+	writeFileSync(
+		path.join(specDir, "task_metadata.json"),
+		JSON.stringify(taskMetadata, null, 2),
+		"utf-8",
+	);
 
 	// Create requirements.json with attached images
 	const requirements: Record<string, unknown> = {

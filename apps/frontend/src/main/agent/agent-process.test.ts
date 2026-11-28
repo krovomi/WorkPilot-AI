@@ -214,6 +214,7 @@ vi.mock("../rate-limit-detector", () => ({
 	detectRateLimit: vi.fn(() => ({ isRateLimited: false })),
 	createSDKRateLimitInfo: vi.fn(),
 	detectAuthFailure: vi.fn(() => ({ isAuthFailure: false })),
+	detectBillingFailure: vi.fn(() => ({ isBillingFailure: false })),
 }));
 
 vi.mock("../python-detector", () => ({
@@ -269,6 +270,35 @@ vi.mock("../env-utils", () => ({
 	getAugmentedEnv: vi.fn(() => ({ ...process.env })),
 }));
 
+const failover = vi.hoisted(() => ({
+	provider: null as string | null,
+	otherProvider: false,
+}));
+vi.mock("../provider-failover/task-phase-provider", () => ({
+	FAILOVER_REQUEST_EVENT: "provider-failover-request",
+	taskPhaseProvider: () => failover.provider,
+	chainHasOtherProvider: () => failover.otherProvider,
+}));
+
+// The Claude profile a card or its project pins (none unless a test sets one).
+const pinned = vi.hoisted(() => ({
+	profile: undefined as { id: string; name: string; configDir: string } | undefined,
+}));
+vi.mock("./pinned-claude-profile", () => ({
+	pinnedClaudeProfile: () => pinned.profile,
+	pinnedClaudeProfileEnv: () =>
+		pinned.profile
+			? {
+					env: { CLAUDE_CONFIG_DIR: pinned.profile.configDir },
+					profileId: pinned.profile.id,
+					profileName: pinned.profile.name,
+					wasSwapped: false,
+				}
+			: undefined,
+}));
+
+import { getClaudeProfileManager } from "../claude-profile-manager";
+import { ensureValidToken, markAgentRunning } from "../claude-profile/token-refresh";
 import { getToolInfo } from "../cli-tool-manager";
 import { projectStore } from "../project-store";
 import { pythonEnvManager } from "../python-env-manager";
@@ -1239,4 +1269,193 @@ describe("resolveExitFailure - backend exit without terminal phase", () => {
 		expect(resolveExitFailure(1, "auth_failure_paused")).toBeNull();
 	});
 
+});
+
+describe("AgentProcessManager - cross-provider failover requests", () => {
+	type Swapper = {
+		handleRateLimitWithAutoSwap: (taskId: string, detection: unknown, type: string) => boolean;
+		handleAuthFailureWithAutoSwap: (taskId: string, detection: unknown) => boolean;
+	};
+	let manager: Swapper;
+	let requests: unknown[][];
+	const profiles = { best: null as null | { id: string; name: string; isAuthenticated: boolean } };
+
+	beforeEach(() => {
+		vi.clearAllMocks();
+		failover.provider = null;
+		failover.otherProvider = false;
+		profiles.best = null;
+		vi.mocked(getClaudeProfileManager).mockReturnValue({
+			getAutoSwitchSettings: () => ({ enabled: true, autoSwitchOnRateLimit: true, autoSwitchOnAuthFailure: true }),
+			getBestAvailableProfile: () => profiles.best,
+		} as never);
+		const emitter = new EventEmitter();
+		requests = [];
+		emitter.on("provider-failover-request", (...args: unknown[]) => requests.push(args));
+		manager = new AgentProcessManager(new AgentState(), new AgentEvents(), emitter) as unknown as Swapper;
+	});
+
+	it("hands a task running off Claude to the failover", () => {
+		failover.provider = "copilot";
+		expect(manager.handleRateLimitWithAutoSwap("t1", { profileId: "p" }, "task-execution")).toBe(true);
+		expect(manager.handleAuthFailureWithAutoSwap("t2", { profileId: "p" })).toBe(true);
+		expect(requests).toEqual([
+			["t1", "rate_limit"],
+			["t2", "auth_failure"],
+		]);
+	});
+
+	it("hands a Claude task over only when no Claude account is left and the chain has another provider", () => {
+		failover.provider = "anthropic";
+		failover.otherProvider = true;
+		expect(manager.handleRateLimitWithAutoSwap("t1", { profileId: "p" }, "task-execution")).toBe(true);
+		expect(manager.handleAuthFailureWithAutoSwap("t1", { profileId: "p" })).toBe(true);
+		expect(requests).toHaveLength(2);
+
+		failover.otherProvider = false;
+		expect(manager.handleAuthFailureWithAutoSwap("t1", { profileId: "p" })).toBe(false);
+		expect(manager.handleRateLimitWithAutoSwap("t1", { profileId: "p" }, "task-execution")).toBe(false);
+		expect(requests).toHaveLength(2);
+	});
+
+	it("leaves a task it cannot place to the Claude-only path", () => {
+		expect(manager.handleAuthFailureWithAutoSwap("t1", { profileId: "p" })).toBe(false);
+		expect(requests).toHaveLength(0);
+	});
+
+	it("moves a task off Claude whose balance is spent (402) like a limit, when the failover on limits is on", () => {
+		const { detectBillingFailure } = rateLimitDetector;
+		const spender = manager as unknown as { handleSpentBalance: (taskId: string, output: string) => boolean };
+		failover.provider = "deepseek";
+		expect(spender.handleSpentBalance("t1", "402 Insufficient Balance")).toBe(false);
+
+		vi.mocked(detectBillingFailure).mockReturnValue({ isBillingFailure: true } as never);
+		expect(spender.handleSpentBalance("t1", "402 Insufficient Balance")).toBe(true);
+		expect(requests).toEqual([["t1", "rate_limit"]]);
+		// The exit of the process reaches it once no limit was read.
+		const exited = manager as unknown as {
+			handleProcessFailure: (taskId: string, output: string, type: string) => boolean;
+		};
+		expect(exited.handleProcessFailure("t3", "402 Insufficient Balance", "task-execution")).toBe(true);
+		expect(requests).toEqual([
+			["t1", "rate_limit"],
+			["t3", "rate_limit"],
+		]);
+		requests.length = 1;
+
+		vi.mocked(getClaudeProfileManager).mockReturnValue({
+			getAutoSwitchSettings: () => ({ enabled: true, autoSwitchOnRateLimit: false, autoSwitchOnAuthFailure: true }),
+		} as never);
+		expect(spender.handleSpentBalance("t2", "402 Insufficient Balance")).toBe(false);
+		expect(requests).toHaveLength(1);
+		vi.mocked(detectBillingFailure).mockReturnValue({ isBillingFailure: false } as never);
+		// Neither a limit, a spent balance nor a lost sign-in: an ordinary failure.
+		expect(exited.handleProcessFailure("t4", "Build failed", "task-execution")).toBe(false);
+		expect(requests).toHaveLength(1);
+	});
+});
+
+describe("AgentProcessManager - an expired refresh token asks for the sign-in before the run", () => {
+	type Prompter = {
+		requestReauthBeforeSpawn: (taskId: string, profileId: string, error: string | undefined) => void;
+	};
+	let manager: Prompter;
+	let failures: unknown[][];
+
+	function withAutoSwitch(enabled: boolean, onAuthFailure: boolean): void {
+		vi.mocked(getClaudeProfileManager).mockReturnValue({
+			getAutoSwitchSettings: () => ({
+				enabled,
+				autoSwitchOnRateLimit: false,
+				autoSwitchOnAuthFailure: onAuthFailure,
+			}),
+		} as never);
+	}
+
+	beforeEach(() => {
+		vi.clearAllMocks();
+		const emitter = new EventEmitter();
+		failures = [];
+		emitter.on("auth-failure", (...args: unknown[]) => failures.push(args));
+		manager = new AgentProcessManager(new AgentState(), new AgentEvents(), emitter) as unknown as Prompter;
+	});
+
+	it("shows the re-authentication prompt for the profile at once", () => {
+		withAutoSwitch(false, false);
+		manager.requestReauthBeforeSpawn("task-1", "primary", "Refresh token expired");
+		expect(failures).toEqual([
+			[
+				"task-1",
+				expect.objectContaining({
+					profileId: "primary",
+					failureType: "expired",
+					originalError: "Refresh token expired",
+				}),
+			],
+		]);
+	});
+
+	it("still prompts when auto-switch is on but not for auth failures", () => {
+		withAutoSwitch(true, false);
+		manager.requestReauthBeforeSpawn("task-1", "primary", undefined);
+		expect(failures).toHaveLength(1);
+	});
+
+	it("leaves the run's 401 to auto-switch when it moves auth failures to another profile", () => {
+		withAutoSwitch(true, true);
+		manager.requestReauthBeforeSpawn("task-1", "primary", "Refresh token expired");
+		expect(failures).toEqual([]);
+	});
+});
+
+describe("AgentProcessManager - a Claude account pinned by the card or its project", () => {
+	let processManager: AgentProcessManager;
+
+	beforeEach(() => {
+		vi.clearAllMocks();
+		spawnCalls.length = 0;
+		mockProcesses.length = 0;
+		delete process.env.CLAUDE_CODE_OAUTH_TOKEN;
+		vi.mocked(profileService.getAPIProfileEnv).mockResolvedValue({});
+		vi.mocked(ensureValidToken).mockResolvedValue({ wasRefreshed: false } as never);
+		processManager = new AgentProcessManager(new AgentState(), new AgentEvents(), new EventEmitter());
+	});
+
+	afterEach(() => {
+		pinned.profile = undefined;
+		processManager.killAllProcesses();
+	});
+
+	it("runs on the pinned profile: its token is refreshed and marked in use, never the active one", async () => {
+		pinned.profile = { id: "work", name: "Work", configDir: "/profiles/work" };
+		await processManager.spawnProcess(
+			"task-1",
+			"/fake/cwd",
+			["run.py"],
+			{},
+			"task-execution",
+			undefined,
+			{
+				providers: ["claude"],
+				startProvider: "claude",
+				usesClaude: true,
+				accounts: { claude: "work" },
+			},
+		);
+
+		expect(spawnCalls).toHaveLength(1);
+		expect(spawnCalls[0].options.env.CLAUDE_CONFIG_DIR).toBe("/profiles/work");
+		expect(rateLimitDetector.getBestAvailableProfileEnv).not.toHaveBeenCalled();
+		expect(ensureValidToken).toHaveBeenCalledWith("/profiles/work", undefined, { forceRefresh: true });
+		expect(markAgentRunning).toHaveBeenCalledWith("/profiles/work");
+
+		// A failure in its output is charged to the pinned profile, not the active one.
+		(
+			processManager as unknown as {
+				handleProcessFailure: (taskId: string, output: string, type: string) => boolean;
+			}
+		).handleProcessFailure("task-1", "Error: 401 Unauthorized", "task-execution");
+		expect(rateLimitDetector.detectRateLimit).toHaveBeenCalledWith("Error: 401 Unauthorized", "work");
+		expect(rateLimitDetector.detectAuthFailure).toHaveBeenCalledWith("Error: 401 Unauthorized", "work");
+	});
 });

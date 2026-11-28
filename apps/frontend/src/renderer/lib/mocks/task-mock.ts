@@ -33,7 +33,14 @@ export const taskMock = {
 
 	deleteTask: async () => ({ success: true }),
 
+	listTaskSnapshots: async () => ({ success: true as const, data: [] }),
+	restoreTaskSnapshot: async () => ({
+		success: false as const,
+		error: "Snapshots are not available in browser mode",
+	}),
 	getTaskGoal: async () => ({ success: true as const, data: { goal: null } }),
+	getAppliedLessons: async () => ({ success: true as const, data: { lessons: [], disabled: [] } }),
+	setLessonDisabled: async () => ({ success: true as const, data: { lessons: [], disabled: [] } }),
 	setTaskGoal: async () => ({ success: true as const, data: { goal: null } }),
 
 	updateTask: async (
@@ -62,6 +69,16 @@ export const taskMock = {
 	stopTask: () => {
 		console.warn("[Browser Mock] stopTask called");
 	},
+
+	stopAllAgents: async () => ({
+		success: true,
+		data: { pausedTasks: [], stoppedProcesses: 0, failedTasks: [] },
+	}),
+
+	stopAgentsAfterStep: async () => ({
+		success: true,
+		data: { stoppingTasks: [], failedTasks: [] },
+	}),
 
 	submitReview: async () => ({ success: true }),
 
@@ -219,4 +236,16 @@ export const taskMock = {
 	onBestOfNEvent: () => () => {
 		/* noop */
 	},
+	// Execution waves (#358): the planner reads worktrees, only in Electron.
+	planExecutionWaves: async () => ({
+		success: false as const,
+		error: "Execution waves are not available in the browser preview",
+	}),
+	loadExecutionWaveRun: async () => ({ success: true as const, data: { run: null, ignored: false } }),
+	saveExecutionWaveRun: async () => ({ success: true as const }),
+	clearExecutionWaveRun: async () => ({ success: true as const }),
+	loadExecutionWaveHistory: async () => ({
+		success: true as const,
+		data: { records: [], ignored: false },
+	}),
 };

@@ -1,0 +1,329 @@
+---
+feature: Execution waves (Conflict Predictor)
+summary: >-
+  Groupe les specs en attente en vagues sans fichier commun (plan, worktree, zones fragiles, liens
+  de code ; zéro LLM), vérifiées par merge de test ; « Exécuter dans l'ordre optimal » lance vague
+  après vague, survit à un redémarrage, tourne aussi sur le serveur (route, mobile, Mission
+  Control) et compte par sprint les conflits évités et le temps médian mesuré de résolution des
+  conflits restants.
+---
+
+# Execution waves (Conflict Predictor)
+
+Issue #358 (lots 1 to 4). The Conflict Predictor already scored pairs of live worktrees
+(`apps/backend/services/conflict_predictor_service.py`) and the swarm groups the subtasks of
+**one** spec into waves (`apps/backend/agents/swarm/dependency_analyzer.py`). This feature
+plans **across specs**: which of the specs waiting in the backlog or the queue may run side by
+side, in which order, and runs them that way.
+
+Shown in Mission Control (a "Execution waves" section, with or without a Mission Control session),
+and, for a project of a team server, by the server itself, the mobile app and the desktop's
+Mission Control ("Server mode" below).
+
+## Code
+
+| Part | File |
+|---|---|
+| Scorer (file weight, pair score, fragile links) | `apps/frontend/src/main/conflict-waves/scorer.ts` |
+| Planner (graph, cycles, colouring, merge order) | `apps/frontend/src/main/conflict-waves/planner.ts` |
+| Worktree changes (git by argument list) | `apps/frontend/src/main/conflict-waves/worktree-files.ts` |
+| Preventive merge check (`git merge-tree`) | `apps/frontend/src/main/conflict-waves/merge-check.ts` |
+| Fragile zones (`git log`, co-changes) | `apps/frontend/src/main/conflict-waves/fragile-zones.ts` |
+| Code links (imports, removed symbols; pure) | `apps/frontend/src/main/conflict-waves/code-links.ts` |
+| Code read for code links (files, worktree diff) | `apps/frontend/src/main/conflict-waves/code-reader.ts`, `worktree-files.ts` (`readWorktreeDiff`) |
+| Request validation, project resolution | `apps/frontend/src/main/conflict-waves/plan-service.ts` |
+| Saved run (`.workpilot/execution-waves-run.json`) | `apps/frontend/src/main/conflict-waves/run-store.ts` |
+| Run history (`.workpilot/execution-waves-history.json`) | `apps/frontend/src/main/conflict-waves/run-history.ts` |
+| IPC `conflictWaves:plan`, `:loadRun`, `:saveRun`, `:clearRun`, `:history` | `apps/frontend/src/main/ipc-handlers/conflict-waves-handlers.ts`, `preload/api/modules/conflict-waves-api.ts` |
+| Run, wave after wave, saved at every step | `apps/frontend/src/renderer/lib/wave-execution.ts`, `stores/execution-waves-store.ts` |
+| View, sprint metrics | `apps/frontend/src/renderer/components/conflict-predictor/WavesView.tsx`, `WavesNotices.tsx` |
+| Types | `apps/frontend/src/shared/types/conflict-waves.ts` |
+| Merge conflict times (`.workpilot/merge-conflict-times.json`), written by the merge flow | `apps/frontend/src/main/conflict-waves/conflict-times.ts`, `ipc-handlers/task/worktree-merge-handlers.ts` |
+| Their sprint figures | `apps/frontend/src/renderer/components/conflict-predictor/ConflictTimesSummary.tsx` |
+| Server: scorer, code links, planner, merge check (ports of the files above) | `apps/backend/shared_features/waves/scorer.py`, `code_links.py`, `planner.py`, `merge_check.py` |
+| Server: clone reads (git by argument list, card files), cards and options | `apps/backend/shared_features/waves/git_reads.py`, `service.py` |
+| Server: saved run, history, merge conflict times | `apps/backend/shared_features/waves/run_store.py`, `conflict_times.py` |
+| Server: the run (wave rules, starting cards, steps) | `apps/backend/shared_features/waves/execution.py`, `driver.py` |
+| Server routes `/api/features/execution-waves/*` | `apps/backend/shared_features/execution_waves.py` |
+| Mobile: the Waves page of a project | `apps/mobile/src/app/(app)/projects/[projectId]/waves.tsx` |
+| Desktop, server project: the routes, answers rebuilt field by field | `apps/frontend/src/main/conflict-waves/server-waves.ts`, `ipc-handlers/server-conflict-waves-handlers.ts`, `shared/types/server-conflict-waves.ts` |
+| Desktop, server project: Mission Control shows the server's waves | `apps/frontend/src/renderer/components/mission-control/ServerMissionControl.tsx`, `conflict-predictor/ServerWavesView.tsx`, `ServerWavesParts.tsx` |
+
+## Why in the main process, in TypeScript
+
+The inputs are already there: `projectStore.getTasks()` reads every spec's
+`implementation_plan.json` and gives each subtask its files (`extractSubtaskFiles`: the real
+`files_changed` once a subtask is done, the planner's `files_to_modify` / `files_to_create`
+before). The plan-time overlap check of one task (`main/utils/plan-conflicts.ts`) lives there
+too, and the queue that starts tasks is in the renderer. A Python runner would have re-read the
+same files for a computation that takes milliseconds. The planner is pure (no I/O, no clock),
+so moving it behind a backend route for server mode later is a copy, not a rewrite.
+
+## Score
+
+Static, deterministic, no model whatever the provider. A spec's footprint is the files its plan
+declares ∪ the files its worktree has changed (commits, index, working tree, untracked; WorkPilot's
+own files and build output left out). Paths compare without case, `\` or `./`.
+
+A shared file weighs by its role in the build, never by its language:
+
+| Weight | Files |
+|---|---|
+| 3 | dependency manifests and lockfiles: npm/pnpm/yarn/bun/deno, pyproject/poetry/uv/requirements, go.mod/sum, Cargo, Maven/Gradle, `.csproj`/`.fsproj`/`.sln`/`Directory.*.props`, Gemfile, Composer, pubspec, SwiftPM, CocoaPods, Mix, CMake, vcpkg, sbt, Cabal/Stack… |
+| 2 | shared configuration: `.env*`, `*.config.*`, `tsconfig*`, Dockerfile, compose, Makefile, CI pipelines, `appsettings*.json`, YAML/TOML/INI |
+| 1 | every other file |
+
+A pair's score is the sum, plus its fragile zones and code links (below); level `low` < 2 ≤ `medium` < 4 ≤
+`high` < 8 ≤ `critical`.
+
+### Fragile zones
+
+Two specs can meet in a merge without a file in common: an interface and its implementation, a
+schema and its migration, a component and its styles. The history says which files go together:
+`git log --no-merges --no-renames --name-only -z` over the last 300 commits of the project (one
+call, by argument list, 10 s timeout, 8 MB cap). A commit of more than 20 files (a reformat, a
+sweeping rename) says nothing and is left out; two files are coupled once 3 commits changed them
+together. Each coupled pair with one file in each spec, neither shared (a shared file is already
+scored), adds 1 to the pair's score, at most 3: the history hints, shared files decide. The pair
+lists them (`a/x ↔ b/y`), and the view says how many commits were read. On by default, off with
+the "Fragile zones" option (`options.fragileZones`, a boolean, validated); paths only, so any
+language.
+
+### Code links
+
+Two specs can also meet without a shared file or a history: one edits a module the other imports,
+or removes (renames) a symbol the other still uses. Both are read from the code, the same way in
+every language, with no parser per language and no model:
+
+- **Cross imports.** An import line is one that opens with a keyword from a closed list many
+  languages share (`import`, `from`, `export … from`, `require`, `include`, `#include`, `#import`,
+  `@import`/`@use`, `use`, `using`, `open`, `mod`, `extern crate`, `library`, `source`, `load`,
+  `alias`…), or holds `require(` / `import(`; Go's `import ( … )` block counts. A file is named by
+  its stem (`user_service`), its folder for an index file (`index`, `__init__`, `mod`, `main`…),
+  `parent/stem` for a name many folders have (`utils`, `types`, `config`…). A file of one spec whose
+  import lines name a file the other spec edits makes a link (`y → x`).
+- **Removed symbols.** From the worktree's diff since its merge-base (`git diff --unified=0
+  --no-ext-diff --no-textconv`, so no driver a repository's attributes name ever runs): an
+  identifier on removed lines, on no added line and in none of the spec's files as they are now,
+  is removed. Only identifiers shaped like chosen names count (`camelCase`, `snake_case`, a digit
+  after letters, at least 4 characters), not plain words a comment holds. A file of the other spec
+  that still uses one makes a link (`y → symbol`).
+
+Each link, one file in each spec and neither shared, adds 1, at most 3 per pair, like fragile
+zones. A spec's files are read from its worktree (the code as the spec leaves it), from the project
+when it has none (the code as it is). On by default, off with the "Code links" option
+(`options.codeLinks`, a boolean, validated); the view says how many files were read.
+
+## Plan
+
+1. **Conflict graph**: an edge when the score is above the **tolerance** (default 0: one shared
+   file is enough). The tolerance answers the over-estimation case of the issue (two specs editing
+   the same file in disjoint places).
+2. **Unplanned spec** (no plan, no worktree): its footprint is unknown. Default `isolate`: it
+   never shares a wave; option `independent` assumes it touches nothing the others touch.
+   Unplanned specs come after the planned ones, so a plan written meanwhile (a task with "review
+   before coding") is picked up by the next re-plan.
+3. **Dependencies** (`metadata.blockedBy`, the same field the queue honours) are precedence
+   constraints. A cycle (Tarjan) cannot be planned without a person: its specs and those waiting
+   on them are excluded and named in a red notice.
+4. **Greedy colouring**: by dependency depth, planned first, then weighted conflict degree (most
+   constrained first), priority, age, id. Each spec goes in the feasible wave (later than its
+   blockers, no edge with a member, under the project's **max parallel tasks**) that adds the
+   least residual (sub-tolerance) risk, the earliest on a tie.
+5. **Merge order** inside a wave: the spec that shares most with later waves first; the waves
+   after it then start from a base that holds it.
+6. **Preventive merge check**: two specs the colouring put in one wave, both with a worktree and
+   sharing files under the tolerance, are test-merged (below). A real textual conflict adds an
+   edge and the plan is computed again, until no such pair is left or a limit is reached.
+
+The result gives the total risk (everything at once) and the residual risk (inside the waves):
+their difference is the risk the plan avoids.
+
+### Preventive merge check
+
+The tolerance accepts pairs that share a file on the bet that they edit it in different places.
+The bet is checked where it can be: `git merge-tree --write-tree --name-only --no-messages -z`
+merges the commits of the two worktrees (`HEAD` of each, read with `git rev-parse`) in the object
+store only. No worktree, index, branch or ref changes; the trees it writes are unreachable objects
+git collects as usual. Exit 0 is clean; exit 1 with a tree id first is a conflict, and the files
+listed after it are shown ("A and B are under the tolerance, but a test merge conflicts on …:
+they run in different waves"). Anything else (no common history, a git older than 2.38, a
+timeout) is no answer: the pair keeps its score and is counted as not checkable.
+
+Only committed work is merged: what a worktree has not committed yet still counts in the score,
+not in the test merge. Riskiest pairs first, at most 24 pairs and 20 s per plan, each call under
+its own timeout (8 s, or what is left); pairs left over are counted and shown. Git receives object
+ids checked against `^[0-9a-f]{40}$|^[0-9a-f]{64}$`, never a name a branch could be called.
+
+Durations are never estimated (project rule): the "Gantt" lays specs out by wave, the waves run
+one after the other.
+
+## Dynamic re-planning
+
+- **Drift**: a spec whose worktree changed files outside its plan (≥ 3 by default) is reported
+  ("touched 5 files outside its plan. Replan?"), running specs included. Replan recomputes from
+  the worktrees as they are.
+- **At each wave**: when a wave settles, the specs not started yet are planned again, with the
+  real changes of the specs that ran.
+- A queued spec that shares files with a spec already running is reported.
+
+## Execute in optimal order
+
+The run starts the tasks of the current wave with `persistTaskStatus(id, "in_progress")`, the path
+the board's queue uses: the main process checks git and the provider's authentication and starts
+the build with the task's own provider and model. No new way to launch an agent. The run never
+starts more than the project's max parallel tasks (tasks running outside the plan count), never
+starts a task whose dependency is not finished, and never starts one twice. Waiting tasks stay in
+the backlog, so the board's queue cannot promote them out of order.
+
+The next wave starts once every task of the wave is **merged** (`done`, default: the next wave
+branches from a base that holds it) or, as an option, **in review** (`human_review`,
+`pr_created`, `done`, `error`, `build_failed`). A task put back in the backlog after it was
+started, archived or abandoned no longer holds the wave.
+
+The run watches the task store for the window's lifetime (`global-listeners.ts`), so it goes on
+when the person leaves the page. Stop ends the run; running tasks keep going.
+
+### A run that survives a restart
+
+After every step (a wave started, a task started, a wave planned again) the renderer sends the
+run's state: the project id, the waves in merge order, the current wave (those before it ran),
+the advance rule, the parallelism and the tasks already started. The main process writes it to
+`<project>/.workpilot/execution-waves-run.json`; a finished or stopped run is removed. Saves go
+one after the other; one that fails leaves the run going on in memory.
+
+When a project is selected (and at start-up for the one already selected), the file is read. A
+run found there is offered, "interrupted at wave 2 of 3 (saved …)", with **Resume** and
+**Abandon**; it is never resumed without the person, and never offered over a run going on.
+Resumed, it goes on where it was: tasks already started are not started again, the current wave
+waits for its tasks as before, and the view lists the run's waves until a plan is computed.
+Abandon removes the file. A file that is unreadable or incoherent is ignored, left as it is, and
+the view says so.
+
+## Run history and sprint metrics
+
+When a run ends (every wave ran, or Stop), the renderer clears the saved run with how it ended
+(`done` or `stopped`, a closed list). The main process then builds the record itself from the run
+it saved (already checked against the project's tasks) and its own clock, and adds it in front of
+`<project>/.workpilot/execution-waves-history.json` (at most 100 runs). A record holds the date,
+the outcome, the waves, the tasks, the tasks started, and what the run's plan avoided: the pairs of
+planned specs it kept in different waves (over the tolerance, or split by a test merge; unknown
+footprints not counted) and the risk it took out (total minus residual). The run state carries
+those two counters from the start, so a resumed run keeps them.
+
+The view sums the last 14 days: runs ended (and stopped), conflicts avoided, risk taken out, specs
+started, and when the last run ended. Counts only: no duration is estimated (project rule).
+
+## Resolution time of residual conflicts
+
+The plan avoids the conflicts it can see; the issue also asks how long the others take to resolve.
+That is measured, from two dates the merge flow records for each conflict, never estimated:
+
+- **Desktop.** A merge (`TASK_WORKTREE_MERGE`) whose output reports a git conflict, or a merge
+  preview whose `gitConflicts.hasConflicts` is true, opens an entry for the task; one open entry
+  per task, so a second preview keeps the first date. The task's next merge that goes through
+  (full, staged, or a branch already merged and committed) closes it. A merge with nothing to
+  stage, a failure that is not a conflict, and the timeout's guess record nothing.
+- **Server.** A card's `merge` run that fails opens an entry only when git finds a conflict
+  between the card's workspace head and its base branch (`git merge-tree` in the object store, as
+  the preventive check); its next `merge` run that succeeds closes it.
+
+Both write `<project>/.workpilot/merge-conflict-times.json` (version 1, newest first, at most 200
+entries: task, `detectedAt`, `resolvedAt` or null) with the main process's or the server's clock.
+The view and the mobile page show, over the same 14 days as the run metrics, the conflicts
+resolved, the median time from conflict to merge and the conflicts still open. Time saved by
+parallelism is still not shown: it would be an estimate (project rule).
+
+## Server mode
+
+A project of a team server has no Electron main process to plan it: the server does, from its
+clone, with a port of the same planner (`apps/backend/shared_features/waves/`, same weights,
+fragile zones, code links, preventive merge check, bounds and file formats). The run is the
+server's too:
+
+- **Starting a card** goes through the server's run manager, the way the board starts it, as the
+  person who takes the step, with `agent.execute` on the project: a card with a spec builds; one
+  without writes its spec first, and goes on to its build only when that person's approval alone
+  is enough. A card claimed by someone else, waiting for an approval, already running, or refused
+  by the run manager or the quotas is not started, and the run says why (a closed list). The card
+  is claimed only once its run started.
+- **A step** (start what may start, move to the next wave once this one settled, replan it) is
+  taken on `POST .../run/step`, which the mobile page sends when it opens, and when a run of the
+  project ends on the server: the run manager's listener (`set_run_ended_listener`) takes it as
+  the person who started the wave run, whose rights are read again first. Steps of one project
+  never overlap (a lock per project).
+- **The parallelism** is the request's (1 to 32), capped by the organisation's
+  `max_concurrent_runs`.
+- **The saved run and its history** are the desktop's files, in the clone's `.workpilot`, with the
+  same checks; a stop is recorded as `stopped`.
+
+Routes (`/api/features/execution-waves`, each with its permission, `project_id` only):
+
+| Route | Permission |
+|---|---|
+| `GET /plan` (bounded options in the query) | `task.read` |
+| `GET /run`, `GET /history` | `task.read` |
+| `POST /run` (options, advance rule), `POST /run/step` | `agent.execute` |
+| `DELETE /run` | `task.write` |
+
+The mobile app shows the plan, the run going on (each card's column, or why it waits), the
+counts of the last 14 days, and starts, steps and stops the run for those who may.
+
+The desktop app is a second client of the same routes. When the selected project is a server
+project, Mission Control (offered for it by `sidebar/server-gates.ts`) shows no session of this
+computer, whose agents would run on the mirror: it shows the server's waves, as the mobile page
+does (plan, run going on, start with the advance rule, "Check now" for a step, stop after a
+confirmation, and the run and merge conflict figures of the server's window). Opening it takes
+the run's next step for someone who may start agents. The buttons follow the person's
+permissions (`agent.execute`, `task.write`) and project role, the server checks them again.
+
+## Boundary
+
+`conflictWaves:plan` takes `{ projectId, taskIds?, options? }`. The handler checks every field:
+project id shape, at most 200 task ids, each one a spec folder name (letters, digits, marks,
+`.` `_` `-`, no separator), each one a backlog or queued task of **that** project; tolerance and
+drift threshold bounded numbers, policy in a closed list, fragile zones a boolean. The max parallelism is read from the
+project's settings, never from the request. Worktrees are found with `findTaskWorktree`
+(resolved, kept inside the project) and read with `git` by argument list, with a timeout and a
+cap of 2 000 files. Refusals are tested (`plan-service.test.ts`, `conflict-waves-handlers.test.ts`).
+
+The run channels take a project id (`loadRun`, `clearRun`) or a run state (`saveRun`), never a
+path. The project is a registered one; the state is rebuilt field by field (`validateRunState`):
+at least one wave, none empty, at most 200 tasks, each a spec folder name and in one wave only,
+the current wave within the waves, the advance rule in a closed list, the parallelism 1 to 32,
+every started task in a wave; anything else sent is dropped. On disk, the project root is
+resolved (`realpath`); `.workpilot` must be a real folder (not a link) that resolves to the
+root's own `.workpilot`; the run file may not be a link; the write goes to a fresh temporary file
+created exclusively (`wx`, mode `0600`) and renamed over the target; the read checks that the file
+opened is the one checked (device and inode), reads at most 256 KB, and wants version 1, a date,
+the same project and only tasks the project still has. Refusals are tested (`run-store.test.ts`,
+`conflict-waves-handlers.test.ts`), and the git calls against real repositories
+(`merge-check.test.ts`, `fragile-zones.test.ts`).
+
+Code links read files whose paths come from a plan an agent wrote and from git: each is resolved
+(links included) and must stay inside the worktree or the project; the file opened must be the one
+resolved (device and inode); only regular text files of at most 256 KB are read, at most 300 per
+spec and 3 000 per plan, 16 at a time. Dependency manifests and shared configuration (`.env`
+among them) are never read, their diff sections are dropped, and a removed symbol the secret
+redaction would mask is dropped: a value never becomes a link shown in the view. Only paths and
+identifiers taken from the diff reach the renderer (`code-reader.test.ts`).
+
+The server channels (`conflictWaves:serverPlan`, `:serverRun`, `:serverStart`, `:serverStep`,
+`:serverStop`, `:serverHistory`) take the id of a project the server listed (any other id,
+a local project's included, is refused before a request) and, for `serverStart`, the advance rule
+from a closed list. The main process sends them through `authedFetch` with the person's session,
+and rebuilds every answer before the renderer sees it: task and card ids of the planner's shape,
+start failures, advance rules, outcomes, exclusion reasons and board columns from closed lists,
+titles and dates bounded, counts and scores finite and capped (`server-waves.test.ts`).
+
+`clearRun` takes a project id and, optionally, an outcome from a closed list; anything else is
+refused before the disk is touched. `history` takes a project id. The history file goes through
+the same folder checks, bounded read (128 KB) and atomic write as the saved run, and each record is
+rebuilt field by field when read (`run-history.test.ts`).
+
+## Still to do
+
+Nothing the issue asks for. Not done, on purpose: time saved by parallelism is not shown, since it
+would be an estimate. The desktop's server view does not offer the planning options of the local
+view (tolerance, unplanned policy, fragile zones, code links): like the mobile page, it uses the
+server's defaults.

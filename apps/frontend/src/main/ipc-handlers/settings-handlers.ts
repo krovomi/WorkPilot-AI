@@ -1,5 +1,11 @@
 import { debugLog } from "../../shared/utils/debug-logger";
 import { parseJevSettings } from "../../shared/utils/jev-settings";
+import { parseSwarmSettings } from "../../shared/utils/swarm-settings";
+import { normalizeAgentSafety } from "../../shared/utils/agent-safety";
+import {
+	normalizeApprovalTierMode,
+	normalizeClaudeShipMode,
+} from "../../shared/utils/approval-tiers";
 import { execFileSync, spawn } from "node:child_process";
 import {
 	existsSync,
@@ -59,6 +65,7 @@ import {
 	maskSettingsSecrets,
 	unmaskSettingsUpdate,
 } from "../settings-secrets";
+import { pushMenuLayoutIfChanged } from "../server-menu-layout";
 import { pushThemeIfChanged } from "../server-ui-preferences";
 import {
 	isSecretSettingsKey,
@@ -71,6 +78,7 @@ import {
 	writeSourceEnvFile,
 } from "../source-env";
 import { testGenerationService } from "../test-generation-service";
+import { getBackendUrl } from "./_backend-fetch";
 import { findEnvLineBreak, parseEnvFile } from "./utils";
 import { getCurrentOS } from "../platform";
 import { buildCmdConsoleArgs } from "./task/launch-args";
@@ -158,6 +166,25 @@ function openTerminalForPlatform(resolvedPath: string): IPCResult<void> {
 /**
  * Validates a directory path for terminal opening
  */
+/**
+ * The file filters a dialog request names, kept only when each one is a name
+ * and a list of extensions; anything else gives no filter.
+ */
+export function dialogFilters(
+	filters: unknown,
+): { name: string; extensions: string[] }[] | undefined {
+	if (!Array.isArray(filters) || filters.length === 0) return undefined;
+	const valid = filters.every(
+		(f) =>
+			typeof f?.name === "string" &&
+			Array.isArray(f.extensions) &&
+			f.extensions.every((e: unknown) => typeof e === "string"),
+	);
+	return valid
+		? filters.map((f) => ({ name: f.name, extensions: [...f.extensions] }))
+		: undefined;
+}
+
 function validateDirectoryPath(dirPath: string): IPCResult<string> {
 	// Validate dirPath input
 	if (!dirPath || typeof dirPath !== "string" || dirPath.trim() === "") {
@@ -577,7 +604,7 @@ export function registerSettingsHandlers(
 				// Optionally notify the FastAPI backend (for LLM router feature).
 				// This is best-effort — the backend may not be running for non-router users.
 				makeBackendRequest<{ selected: string }>(
-					`http://127.0.0.1:9000/providers/select?provider=${encodeURIComponent(provider)}`,
+					`${getBackendUrl()}/providers/select?provider=${encodeURIComponent(provider)}`,
 					{ method: "POST", headers: { "Content-Type": "application/json" } },
 				);
 
@@ -600,7 +627,7 @@ export function registerSettingsHandlers(
 		async (): Promise<IPCResult<string | null>> => {
 			try {
 				const result = await makeBackendRequest<{ selected: string | null }>(
-					"http://127.0.0.1:9000/providers/selected",
+					`${getBackendUrl()}/providers/selected`,
 				);
 
 				if (result.success && result.data) {
@@ -741,6 +768,18 @@ export function registerSettingsHandlers(
 				const newSettings = { ...currentSettings, ...settings };
 				if (settings.jev !== undefined)
 					newSettings.jev = parseJevSettings(settings.jev);
+				if (settings.swarm !== undefined)
+					newSettings.swarm = parseSwarmSettings(settings.swarm);
+				// Sent to every agent process: bounded here, and again by the backend.
+				if (settings.agentSafety !== undefined)
+					newSettings.agentSafety = normalizeAgentSafety(settings.agentSafety);
+				if (settings.approvalTiers !== undefined)
+					newSettings.approvalTiers = normalizeApprovalTierMode(settings.approvalTiers);
+				if (settings.claudeShip !== undefined)
+					newSettings.claudeShip = normalizeClaudeShipMode(settings.claudeShip);
+				// Merges by itself: only a true boolean turns it on.
+				if (settings.expressLane !== undefined)
+					newSettings.expressLane = settings.expressLane === true;
 
 				// Sync defaultModel when agent profile changes (#414)
 				if (settings.selectedAgentProfile) {
@@ -756,8 +795,10 @@ export function registerSettingsHandlers(
 					secretFieldValues(newSettings, isSecretSettingsKey),
 				);
 				const credentialsSetAt = writeSettingsFile(newSettings);
-				// Server mode: the theme follows the person to their other devices.
+				// Server mode: the theme and the menu as arranged follow the
+				// person to their other devices.
 				pushThemeIfChanged(settings, newSettings);
+				pushMenuLayoutIfChanged(settings, currentSettings, newSettings);
 
 				// Apply Python path if changed
 				if (settings.pythonPath || settings.autoBuildPath) {
@@ -965,13 +1006,19 @@ export function registerSettingsHandlers(
 			if (!mainWindow) return [];
 
 			const properties: ("openFile" | "multiSelections")[] = ["openFile"];
-			if (options?.multi) properties.push("multiSelections");
+			if (options?.multi === true) properties.push("multiSelections");
+			const filters = dialogFilters(options?.filters);
 
 			const result = await dialog.showOpenDialog(mainWindow, {
 				properties,
-				title: options?.title ?? "Select Files",
-				defaultPath: options?.defaultPath,
-				filters: options?.filters,
+				title:
+					typeof options?.title === "string" && options.title
+						? options.title
+						: "Select Files",
+				...(typeof options?.defaultPath === "string" && options.defaultPath
+					? { defaultPath: options.defaultPath }
+					: {}),
+				...(filters ? { filters } : {}),
 			});
 
 			if (result.canceled) return [];

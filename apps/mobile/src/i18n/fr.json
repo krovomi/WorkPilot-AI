@@ -3,7 +3,8 @@
 		"cancel": "Annuler",
 		"retry": "Réessayer",
 		"loading": "Chargement…",
-		"back": "Retour"
+		"back": "Retour",
+		"close": "Fermer"
 	},
 	"errors": {
 		"network": "Le serveur est injoignable. Vérifiez votre connexion.",
@@ -17,7 +18,10 @@
 		"nothing_to_stop": "Plus rien ne tournait sur cette carte. Tire pour actualiser.",
 		"entra_disabled": "Ce serveur ne propose pas la connexion Microsoft.",
 		"entra_failed": "La connexion Microsoft n'a pas abouti.",
-		"entra_misconfigured": "Les réglages de connexion Microsoft du serveur sont invalides."
+		"entra_misconfigured": "Les réglages de connexion Microsoft du serveur sont invalides.",
+		"approval_waiting": "Votre approbation est enregistrée : {{given}} sur {{needed}}. Le build démarre quand la carte a toutes les approbations qu'il lui faut.",
+		"sso_disabled": "Ce serveur ne propose pas l'authentification unique.",
+		"sso_failed": "L'authentification unique n'a pas abouti."
 	},
 	"signIn": {
 		"title": "WorkPilot AI",
@@ -29,13 +33,36 @@
 		"submit": "Se connecter",
 		"invalidUrl": "Cette adresse de serveur n'est pas valide.",
 		"insecureUrl": "Utilisez une adresse https://. Le http simple n'est permis que sur votre réseau local.",
-		"localDisabled": "Ce serveur n'accepte que la connexion Microsoft, que l'app mobile ne gère pas encore.",
+		"localDisabled": "Ce serveur n'accepte pas les mots de passe : connectez-vous avec Microsoft ou par authentification unique.",
 		"failed": "Connexion impossible : {{message}}",
 		"badCredentials": "E-mail ou mot de passe incorrect.",
 		"or": "ou",
 		"microsoft": "Se connecter avec Microsoft",
 		"entraDisabled": "Ce serveur ne propose pas la connexion Microsoft.",
-		"entraRefused": "Le serveur a refusé ce compte Microsoft."
+		"entraRefused": "Le serveur a refusé ce compte Microsoft.",
+		"sso": "Se connecter par authentification unique (SSO)",
+		"ssoRefused": "Le serveur a refusé ce compte."
+	},
+	"forgotPassword": {
+		"open": "Mot de passe oublié ?",
+		"title": "Mot de passe oublié",
+		"askDescription": "Saisissez l'adresse de votre compte : le serveur vous envoie un lien pour choisir un nouveau mot de passe.",
+		"setDescription": "Collez le lien reçu (ou son code), puis choisissez votre nouveau mot de passe.",
+		"noEmail": "Ce serveur n'envoie pas d'e-mail. Demandez un lien de réinitialisation à un administrateur du serveur, puis revenez ici avec.",
+		"send": "Envoyer le lien",
+		"sent": "Si un compte utilise cette adresse, un lien est en route. Il ne sert qu'une fois, pour une durée limitée.",
+		"haveLink": "J'ai un lien",
+		"needLink": "Il me faut un lien",
+		"link": "Lien ou code de réinitialisation",
+		"newPassword": "Nouveau mot de passe",
+		"confirm": "Confirmer le mot de passe",
+		"minLength": "Au moins {{count}} caractères.",
+		"mismatch": "Les mots de passe ne correspondent pas.",
+		"save": "Enregistrer mon mot de passe",
+		"invalidLink": "Ce lien de réinitialisation est invalide ou a expiré. Demandez-en un nouveau.",
+		"failed": "Le mot de passe n'a pas pu être réinitialisé : {{message}}",
+		"done": "Votre mot de passe a été changé. Connectez-vous avec le nouveau.",
+		"back": "Retour à la connexion"
 	},
 	"unreachable": {
 		"title": "Serveur injoignable",
@@ -45,8 +72,9 @@
 	"projects": {
 		"title": "Projets",
 		"empty": "Aucun projet pour l'instant. Ajoutez-en un depuis l'app de bureau.",
-		"role": "Rôle : {{role}}",
-		"settings": "Réglages"
+		"settings": "Réglages",
+		"count_one": "{{count}} projet",
+		"count_other": "{{count}} projets"
 	},
 	"board": {
 		"live": "En direct",
@@ -58,7 +86,22 @@
 		"groupMark": "Partie {{index}}/{{total}} · {{title}}",
 		"groupHint": "N'affiche que les cartes de ce groupe",
 		"groupFilter": "Groupe {{group}} · tout afficher",
-		"showAll": "Afficher toutes les cartes"
+		"showAll": "Afficher toutes les cartes",
+		"sync": "Synchro",
+		"emptyHint": "Les cartes arrivent ici en avançant sur le tableau.",
+		"quickHint": "Appui long pour les actions rapides",
+		"quickActions": "Actions rapides",
+		"openCard": "Ouvrir la carte",
+		"search": "Chercher dans le tableau",
+		"clearSearch": "Effacer la recherche",
+		"filters": "Filtres",
+		"filtersOn_one": "Filtres, {{count}} actif",
+		"filtersOn_other": "Filtres, {{count}} actifs",
+		"mine": "Les miennes",
+		"clearFilters": "Effacer les filtres",
+		"noMatch": "Aucune carte ne correspond.",
+		"noMatchHint": "D'autres mots ou moins de filtres la trouveront peut-être.",
+		"flagged": "Bloquée"
 	},
 	"columns": {
 		"backlog": "Planification",
@@ -69,7 +112,9 @@
 		"build_failed": "Build rouge",
 		"pr_created": "PR ouverte",
 		"done": "Terminé",
-		"error": "Erreur"
+		"error": "Erreur",
+		"failed": "Échec",
+		"abandoned": "Abandonnée"
 	},
 	"kinds": {
 		"none": "Non précisé",
@@ -170,7 +215,8 @@
 		"steeringLabel": "Message pour la prochaine session",
 		"steeringSend": "Envoyer",
 		"steeringQueued": "En attente de la prochaine session",
-		"steeringDelivered": "Remis à la session {{session}} ({{date}})"
+		"steeringDelivered": "Remis à la session {{session}} ({{date}})",
+		"working": "Agent au travail"
 	},
 	"actions": {
 		"start": "Démarrer",
@@ -191,7 +237,6 @@
 	},
 	"settings": {
 		"title": "Réglages",
-		"account": "Compte",
 		"server": "Serveur",
 		"organization": "Organisation",
 		"signOut": "Se déconnecter",
@@ -235,7 +280,9 @@
 		"jobFailed": "La dernière exécution a échoué. {{error}}",
 		"toCard": "En faire une carte",
 		"openCard": "Ouvrir sa carte",
-		"context": "Contexte"
+		"context": "Contexte",
+		"governance": "Gouvernance",
+		"waves": "Vagues"
 	},
 	"roadmap": {
 		"empty": "Pas encore de roadmap. Générez-en une : un agent étudie le projet et propose des phases et des fonctionnalités.",
@@ -312,6 +359,29 @@
 			"merge_with_changes": "Fusionnable après de petits changements",
 			"needs_revision": "À reprendre",
 			"blocked": "Bloquée"
+		},
+		"feedback": {
+			"useful": "Utile",
+			"notUseful": "Pas utile",
+			"why": "Pourquoi n'est-ce pas utile ?",
+			"notApplicable": "Ne s'applique pas ici",
+			"held": "En attente d'un mainteneur",
+			"heldTitle": "Rejets qui vous attendent",
+			"heldHint": "Le relecteur en apprend une fois que vous approuvez : il fera moins ce genre de remarque sur ce projet.",
+			"approve": "Approuver",
+			"discard": "Écarter",
+			"verdict": {
+				"accepted": "Utile",
+				"rejected": "Pas utile",
+				"not_applicable": "Ne s'applique pas"
+			},
+			"reason": {
+				"false_positive": "C'est faux",
+				"too_pedantic": "Trop pointilleux",
+				"project_convention": "Notre convention",
+				"legacy_exception": "Code ancien, voulu ainsi",
+				"other": "Une autre raison"
+			}
 		}
 	},
 	"dashboard": {
@@ -339,7 +409,67 @@
 		"trend": "Par rapport à la période d'avant",
 		"tokens": "Tokens",
 		"allTime": "Depuis le début",
-		"noSessions": "Pas encore de session."
+		"noSessions": "Pas encore de session.",
+		"tiles": {
+			"qa": "QA réussies du premier coup",
+			"spent": "dépensés en {{days}} jours",
+			"done": "cartes terminées"
+		}
+	},
+	"governance": {
+		"intro": "Ce que le workpilot.policy.yaml du projet demande à ses agents sur le serveur. Le serveur revérifie chaque action.",
+		"policy": "Politique",
+		"none": "workpilot.policy.yaml ne fixe ni heures, ni fichiers, ni budget de jetons.",
+		"invalid": "workpilot.policy.yaml est refusé : tant qu'il n'est pas corrigé, aucun agent n'écrit de fichier ni ne lance de commande.",
+		"schedule": "Horaires",
+		"scheduleLine": "{{hours}} ({{timezone}}), {{days}}",
+		"openNow": "Ouvert maintenant",
+		"closedNow": "Fermé maintenant",
+		"noSchedule": "À toute heure",
+		"forbidden": "Fichiers interdits",
+		"requiresReview": "Fichiers qui demandent une approbation",
+		"noFiles": "Aucun",
+		"reviewers": "Approuvé par un membre qui a l'un de ces rôles : {{roles}}. Quiconque peut approuver peut refuser.",
+		"anyMember": "Approuvé par tout membre du projet qui peut approuver les revues, sous son compte du serveur.",
+		"budget": "Budget de jetons",
+		"budgetLine": "{{spent}} jetons sur {{limit}} dans la dernière heure",
+		"taskBudgetLine": "Au plus {{limit}} jetons par tâche",
+		"noBudget": "Pas de limite de jetons",
+		"loopLine": "Met un agent en pause après {{count}} appels d'outil identiques",
+		"agents": "Agents",
+		"agentsLine": "En cours sur le serveur : {{mine}} à vous, {{project}} en tout",
+		"stopMine": "Arrêter mes agents",
+		"stopProject": "Arrêter tous les agents du projet",
+		"stopTitle": "Arrêter tous les agents du projet ?",
+		"stopBody": "Les exécutions et les tâches de tous les membres du projet s'arrêtent tout de suite. Leurs cartes peuvent être relancées.",
+		"stopConfirm": "Tout arrêter",
+		"stopped_one": "{{count}} agent arrêté. Sa carte peut être relancée.",
+		"stopped_other": "{{count}} agents arrêtés. Leurs cartes peuvent être relancées.",
+		"pending_one": "{{count}} appel attend une approbation",
+		"pending_other": "{{count}} appels attendent une approbation",
+		"noPending": "Aucun appel n'attend d'approbation.",
+		"approve": "Approuver",
+		"refuse": "Refuser",
+		"approved": "Approuvé en votre nom : le prochain appel identique de l'agent passe, une fois.",
+		"refused": "Refusé : l'agent reste refusé sur cet appel.",
+		"needsRole": "La politique demande l'un de ces rôles pour approuver : {{roles}}.",
+		"decisions": "Dernières décisions",
+		"noDecisions": "Aucune décision pour l'instant.",
+		"blocked_one": "{{count}} action d'agent arrêtée dans les dernières 24 h",
+		"blocked_other": "{{count}} actions d'agent arrêtées dans les dernières 24 h",
+		"trips_one": "{{count}} déclenchement du coupe-circuit sur les 7 derniers jours",
+		"trips_other": "{{count}} déclenchements du coupe-circuit sur les 7 derniers jours",
+		"approvedBy": "approuvé par {{name}}",
+		"decision": {
+			"deny": "Refusé",
+			"review": "Revue",
+			"approved": "Approuvé",
+			"warn": "Averti",
+			"outside_hours": "Hors horaires",
+			"budget_exceeded": "Budget atteint",
+			"invalid_policy": "Politique invalide",
+			"tool_loop": "Coupe-circuit"
+		}
 	},
 	"analyses": {
 		"intro": "Chaque analyse tourne sur le serveur, sur le code du projet ; toute l'équipe du projet lit son dernier rapport.",
@@ -412,12 +542,34 @@
 			"codebase_discovery": "Découverte",
 			"task_outcome": "Résultat",
 			"session_insight": "Session"
+		},
+		"trash": "Corbeille",
+		"pinned": "Épinglée",
+		"pin": "Épingler",
+		"unpin": "Désépingler",
+		"forget": "Oublier",
+		"forgetTitle": "Oublier cette mémoire ?",
+		"forgetBody": "Les agents ne la lisent plus. Elle reste dans la corbeille, où quiconque peut écrire les insights du projet peut la remettre.",
+		"restore": "Remettre",
+		"trashHint": "Une mémoire oubliée reste {{days}} jours dans la corbeille. {{pinned}} mémoires sur {{limit}} sont épinglées.",
+		"trashEmpty": "La corbeille est vide.",
+		"forgottenBy": "Oubliée par {{name}}, le {{date}}",
+		"forgottenOn": "Oubliée le {{date}}",
+		"restorableUntil": "Peut être remise jusqu'au {{date}}",
+		"refused": {
+			"pin-limit": "Au plus {{limit}} mémoires peuvent être épinglées : désépinglez-en une d'abord.",
+			"pinned": "Une mémoire épinglée ne peut pas être oubliée : désépinglez-la d'abord.",
+			"not-found": "Cette mémoire n'est plus là : la liste est relue.",
+			"exists": "Une mémoire du même nom est déjà revenue.",
+			"expired": "Elle est restée trop longtemps dans la corbeille pour être remise.",
+			"no-brain": "Le projet n'a pas encore de mémoire.",
+			"invalid": "Le serveur n'a pas reconnu cette mémoire.",
+			"failed": "Le serveur n'a pas pris cette décision."
 		}
 	},
 	"tokens": {
 		"title": "Mes jetons sur le serveur",
 		"summary": "Vos jetons GitHub, GitLab, Azure DevOps, Jira et Linear, utilisés pour vos propres appels.",
-		"manage": "Gérer mes jetons",
 		"intro": "Le serveur garde ces jetons chiffrés et s'en sert pour vos propres appels aux forges et aux outils de suivi. Une fois enregistré, un jeton n'est plus jamais affiché, ni sur le téléphone ni ailleurs.",
 		"kinds": {
 			"github_token": "GitHub",
@@ -437,10 +589,44 @@
 		"removeTitle": "Retirer le jeton {{name}} ?",
 		"removeBody": "Le serveur l'oublie ; les appels qui en ont besoin s'arrêtent jusqu'à ce que vous en ajoutiez un."
 	},
+	"aiAccounts": {
+		"title": "Mes comptes IA",
+		"summary": "Vos propres clés par fournisseur IA ; vos runs utilisent celle par défaut.",
+		"intro": "Enregistrez vos propres clés pour chaque fournisseur IA : les runs que vous lancez utilisent votre compte par défaut à la place de celui du serveur. Le serveur garde les clés chiffrées ; une fois enregistrée, une clé n'est plus jamais affichée, ni sur le téléphone ni ailleurs.",
+		"empty": "Aucun compte pour l'instant : vos runs utilisent les comptes du serveur.",
+		"readOnly": "Votre rôle ne permet pas d'ajouter ni de modifier des comptes IA.",
+		"providers": {
+			"claude": "Claude",
+			"openai": "OpenAI",
+			"google": "Google Gemini",
+			"mistral": "Mistral",
+			"deepseek": "DeepSeek",
+			"grok": "Grok",
+			"meta": "Meta Llama",
+			"openrouter": "OpenRouter",
+			"huggingface": "Hugging Face"
+		},
+		"keySaved": "Clé enregistrée le {{date}}",
+		"serverAccount": "Le compte du serveur",
+		"serverAccountDetail": "Celui que l'administrateur du serveur a configuré",
+		"edit": "Modifier {{name}}",
+		"editShort": "Modifier",
+		"removeOne": "Supprimer {{name}}",
+		"remove": "Supprimer",
+		"removeTitle": "Supprimer le compte {{name}} ?",
+		"removeBody": "Le serveur oublie sa clé. Si c'était votre compte par défaut, vos runs reviennent au compte du serveur.",
+		"name": "Nom",
+		"namePlaceholder": "Perso, Client X…",
+		"key": "Clé d'API",
+		"newKey": "Nouvelle clé (vide pour garder l'actuelle)",
+		"claudeToken": "Jeton Claude Code (claude setup-token)",
+		"save": "Enregistrer",
+		"addTitle": "Ajouter un compte",
+		"add": "Ajouter le compte"
+	},
 	"admin": {
 		"title": "Administration",
-		"summary": "Membres, invitations, groupes et rôles de cette organisation.",
-		"open": "Ouvrir l'administration",
+		"summary": "Vue d'ensemble, membres, invitations, groupes, rôles, sessions, quotas et journal d'audit de cette organisation.",
 		"of": "Organisation : {{org}}",
 		"remove": "Retirer",
 		"projectRole": {
@@ -530,6 +716,85 @@
 				"org": "Organisation",
 				"project": "Projet"
 			}
+		},
+		"overview": {
+			"title": "Vue d'ensemble",
+			"summary": "Ce que font les agents de l'organisation maintenant et sur la semaine, et ses quotas.",
+			"running": "Agents en cours",
+			"queued": "En attente",
+			"success": "Exécutions réussies, 7 jours",
+			"members": "Membres",
+			"activeOf": "{{active}} actifs sur {{total}}",
+			"projects": "Projets",
+			"cards": "Cartes",
+			"runs24h": "Exécutions des dernières 24 h",
+			"failed24h": "Échecs des dernières 24 h",
+			"week": "Les 7 derniers jours",
+			"dayRuns_one": "{{date}} : {{count}} exécution",
+			"dayRuns_other": "{{date}} : {{count}} exécutions",
+			"noRuns": "Aucune exécution cette semaine.",
+			"topUsers": "Qui a lancé le plus d'exécutions",
+			"runs_one": "{{count}} exécution",
+			"runs_other": "{{count}} exécutions",
+			"failures": "Derniers échecs",
+			"status": {
+				"queued": "En attente",
+				"running": "En cours",
+				"succeeded": "Réussie",
+				"failed": "Échouée",
+				"cancelled": "Annulée"
+			}
+		},
+		"sessions": {
+			"title": "Sessions",
+			"summary": "Qui est connecté, comment et jusqu'à quand, et déconnecter quelqu'un.",
+			"empty": "Personne n'est connecté.",
+			"since": "depuis le {{date}}",
+			"until": "jusqu'au {{date}}",
+			"revoke": "Déconnecter partout",
+			"revokeTitle": "Déconnecter {{name}} de tous ses appareils ?",
+			"revokeBody": "Cette personne devra se reconnecter sur chaque appareil. Son compte reste tel quel."
+		},
+		"quotas": {
+			"title": "Quotas",
+			"summary": "Places, projets, agents en même temps et jetons par mois, avec leur usage actuel.",
+			"use": "Usage actuel",
+			"limitsTitle": "Limites",
+			"limits": {
+				"max_users": "Places",
+				"max_projects": "Projets",
+				"max_concurrent_runs": "Agents en même temps",
+				"monthly_token_budget": "Jetons ce mois-ci"
+			},
+			"usedOf": "{{used}} sur {{limit}}",
+			"usedNoLimit": "{{used}}, sans limite",
+			"hint": "Un champ vide veut dire sans limite.",
+			"unlimited": "Sans limite",
+			"hardStop": "Arrêter les agents au budget de jetons",
+			"hardStopHint": "Sans cette option, le budget ne fait qu'avertir : les agents continuent au-delà.",
+			"invalid": "Une limite est un nombre entier, 0 ou plus.",
+			"save": "Enregistrer les limites",
+			"saved": "Enregistré.",
+			"readOnly": "Vous pouvez lire les quotas, pas les modifier.",
+			"meter": "{{name}} : usage"
+		},
+		"audit": {
+			"title": "Journal d'audit",
+			"summary": "Ce qui a été fait dans l'organisation, par qui et quand.",
+			"empty": "Rien d'enregistré pour l'instant.",
+			"system": "le serveur",
+			"openHint": "Affiche le détail de cette ligne",
+			"only": "Seulement {{action}}",
+			"all": "Tout afficher",
+			"filter": "Seulement cette action",
+			"more": "Afficher les lignes plus anciennes",
+			"methods": {
+				"local": "mot de passe",
+				"entra": "Microsoft Entra",
+				"oidc": "authentification unique",
+				"invite": "invitation",
+				"unknown": "autre connexion"
+			}
 		}
 	},
 	"share": {
@@ -565,5 +830,429 @@
 		"operator": "Opérateur",
 		"analyst": "Analyste",
 		"viewer": "Lecteur"
+	},
+	"approval": {
+		"count": "{{given}} approbations sur {{needed}}",
+		"criticality": "Criticité",
+		"levels": {
+			"low": "Faible",
+			"medium": "Moyenne",
+			"high": "Haute"
+		},
+		"sources": {
+			"set": "Choisie par une personne",
+			"assessed": "Évaluée d'après le plan",
+			"default": "Valeur par défaut du serveur"
+		},
+		"missingRoles": "Il manque encore : {{roles}}",
+		"by": "{{by}}, {{at}}",
+		"byFor": "{{by}} pour {{for}}, {{at}}"
+	},
+	"delegations": {
+		"title": "Approbations prêtées",
+		"hint": "Prêtez votre approbation à un collègue pendant votre absence. Il approuve en votre nom jusqu'à la date de fin.",
+		"current": "En cours et prévues",
+		"item": "{{from}} → {{to}}, du {{start}} au {{end}}",
+		"active": "En cours",
+		"planned": "Prévue",
+		"end": "Terminer",
+		"empty": "Aucune approbation n'est prêtée sur ce projet.",
+		"lendTitle": "Prêter mon approbation",
+		"noColleague": "Aucun collègue ne peut approuver sur ce projet.",
+		"days": "Pour combien de jours (1 à 90)",
+		"lend": "Prêter"
+	},
+	"waves": {
+		"intro": "Le serveur planifie le backlog depuis sa copie du code : les cartes qui ne partagent aucun fichier tournent côte à côte, vague après vague, dans l'ordre qui fusionne le mieux. Ouvrir cette page fait avancer l'exécution.",
+		"execute": "Exécuter dans l'ordre optimal",
+		"finished": "La dernière exécution a passé toutes ses vagues.",
+		"ignored": "L'exécution enregistrée était illisible ; elle a été écartée.",
+		"advance": {
+			"merged": "Vague suivante une fois fusionnée",
+			"review": "Vague suivante une fois en revue"
+		},
+		"start": "Lancer la première vague",
+		"noRight": "Vous n'avez pas le droit de lancer des agents sur ce projet.",
+		"empty": "Rien à planifier en Planification ni en File.",
+		"step": "Vérifier maintenant",
+		"stop": "Arrêter l'exécution",
+		"stopTitle": "Arrêter l'exécution ?",
+		"stopBody": "Les cartes lancées continuent ; aucune autre vague ne démarre.",
+		"running": "Vague {{wave}} sur {{total}}",
+		"wave": "Vague {{index}}",
+		"failure": {
+			"needs_approval": "attend l'approbation de sa spec",
+			"claimed": "prise par quelqu'un d'autre",
+			"already_running": "déjà en cours",
+			"quota": "au-delà du quota d'agents",
+			"refused": "le serveur a refusé de la lancer",
+			"missing": "n'est plus sur le tableau"
+		},
+		"blocked": "attend une carte dont elle dépend",
+		"gone": "n'est plus sur le tableau",
+		"agentRunning": "agent en cours",
+		"plan_one": "Plan : {{count}} vague, jusqu'à {{parallel}} à la fois",
+		"plan_other": "Plan : {{count}} vagues, jusqu'à {{parallel}} à la fois",
+		"risk": "Risque de conflit évité : {{avoided}} sur {{total}}",
+		"mergeChecks": "Fusions d'essai : {{checked}} vérifiées, {{conflicts}} en conflit",
+		"cycles": "Des cartes dépendent les unes des autres en boucle et sont écartées :",
+		"excluded": {
+			"cycle": "dans une boucle de dépendances",
+			"blocked_by_cycle": "dépend d'une carte prise dans une boucle"
+		},
+		"history": "{{days}} derniers jours",
+		"historyIgnored": "L'historique des exécutions était illisible.",
+		"historyLine": "Exécutions : {{runs}} (arrêtées : {{stopped}}) · conflits évités : {{conflicts}} · risque évité : {{risk}} · cartes lancées : {{started}}",
+		"lastRun": "Dernière exécution terminée le {{at}}",
+		"conflictsLine": "Conflits de fusion résolus : {{resolved}}, en {{median}} (médiane) · encore ouverts : {{open}}",
+		"conflictsNone": "Aucun conflit de fusion résolu · encore ouverts : {{open}}",
+		"conflictsIgnored": "Les temps des conflits de fusion étaient illisibles.",
+		"minutes": "{{count}} min",
+		"hours": "{{hours}} h {{minutes}} min"
+	},
+	"mySession": {
+		"title": "Ma session",
+		"loading": "Lecture de la session",
+		"unavailable": "La session ne peut pas être lue sur le serveur",
+		"method": "Ouverte avec",
+		"methods": {
+			"local": "Mot de passe",
+			"entra": "Microsoft Entra ID",
+			"oidc": "Connexion unique : {{name}}",
+			"invite": "Invitation acceptée",
+			"unknown": "Non enregistrée (session ouverte avant que le serveur ne nomme les connexions)"
+		},
+		"issuer": "Fournisseur d'identité",
+		"signedInAt": "Connecté le"
+	},
+	"nav": {
+		"projects": "Projets",
+		"board": "Tableau",
+		"more": "Plus",
+		"moreEmpty": "Votre rôle n'ouvre aucune autre page de ce projet.",
+		"pages": {
+			"chat": {
+				"title": "Chat d'équipe",
+				"hint": "Parler en direct avec qui est sur le projet"
+			},
+			"leaderboard": {
+				"title": "Classement",
+				"hint": "Les points de la saison de qui montre son nom, et vos badges"
+			},
+			"ask": {
+				"title": "Interroger le tableau",
+				"hint": "Une question dans n'importe quelle langue, et les tickets qui s'y rapportent"
+			},
+			"roadmap": {
+				"title": "Roadmap",
+				"hint": "Les fonctionnalités prévues pour le projet, par phase et priorité"
+			},
+			"ideas": {
+				"title": "Idées",
+				"hint": "Les améliorations qu'un agent a trouvées dans le code, à changer en cartes"
+			},
+			"context": {
+				"title": "Contexte",
+				"hint": "Ce que les agents savent du projet : stack, services, mémoires"
+			},
+			"sessions": {
+				"title": "Sessions",
+				"hint": "Chaque session d'agent du projet, avec ses jetons et son coût"
+			},
+			"analyses": {
+				"title": "Analyses",
+				"hint": "Sécurité, performance, qualité : des rapports lancés sur le serveur"
+			},
+			"delegations": {
+				"title": "Approbations prêtées",
+				"hint": "Qui peut approuver en votre nom pendant votre absence"
+			},
+			"governance": {
+				"title": "Gouvernance",
+				"hint": "La politique des agents du projet et les appels en attente d'approbation"
+			},
+			"waves": {
+				"title": "Vagues",
+				"hint": "Le backlog planifié en vagues de cartes qui peuvent tourner côte à côte"
+			}
+		}
+	},
+	"time": {
+		"now": "à l'instant",
+		"minutes_one": "il y a {{count}} min",
+		"minutes_other": "il y a {{count}} min",
+		"hours_one": "il y a {{count}} h",
+		"hours_other": "il y a {{count}} h",
+		"days_one": "il y a {{count}} j",
+		"days_other": "il y a {{count}} j"
+	},
+	"inbox": {
+		"title": "Pour vous",
+		"open": "Ce qui vous attend",
+		"waiting_one": "{{count}} carte vous attend",
+		"waiting_other": "{{count}} cartes vous attendent",
+		"parts": {
+			"plan_one": "{{count}} plan à approuver",
+			"plan_other": "{{count}} plans à approuver",
+			"attention": "{{count}} à regarder",
+			"review": "{{count}} à relire"
+		},
+		"reasons": {
+			"plan": "Plans à approuver",
+			"attention": "Arrêtées, à regarder",
+			"review": "Terminées, à relire"
+		},
+		"chips": {
+			"plan": "Plan",
+			"attention": "Arrêtée",
+			"review": "Revue"
+		},
+		"empty": "Rien ne vous attend.",
+		"emptyHint": "Les cartes que vous pouvez approuver, relire ou relancer arrivent ici, de tous vos projets.",
+		"unreachable": "Lecture impossible : {{names}}. Tirez pour réessayer.",
+		"intro": "De tous vos projets : les cartes en revue humaine sur lesquelles vous pouvez agir, sauf celles qu'une autre personne a réservées."
+	},
+	"needsYou": {
+		"title": "Me prévenir ailleurs",
+		"summary": "ntfy, Telegram ou Teams, quand une carte vous attend",
+		"intro": "Quand une carte vous attend, le serveur vous prévient aussi sur le service choisi. Le nom du projet et le numéro de la carte partent vers ce service, rien d'autre de la carte.",
+		"off": "Ce serveur ne les envoie pas encore : un administrateur les active. Vous pouvez déjà les régler.",
+		"noVault": "Ce serveur n'a pas de clé de secrets : il ne peut pas enregistrer de canal. Demandez à un administrateur.",
+		"readOnly": "Votre rôle ne permet pas de régler un canal : il faut pouvoir lancer des agents.",
+		"moments": "Quand",
+		"language": "Langue des messages",
+		"languages": {
+			"en": "English",
+			"fr": "Français"
+		},
+		"events": {
+			"plan_review": "Un plan attend mon approbation",
+			"review_ready": "Une carte est prête pour ma revue",
+			"failed": "Une tâche que j'ai lancée s'est arrêtée sur une erreur",
+			"approval_escalated": "Un plan attend un approbateur depuis trop longtemps",
+			"review_feedback_held": "Un rejet de revue attend un mainteneur"
+		},
+		"channels": {
+			"ntfy": "ntfy",
+			"telegram": "Telegram",
+			"teams": "Microsoft Teams"
+		},
+		"hints": {
+			"ntfy": "Des notifications push par un topic ntfy, sur ntfy.sh ou votre propre serveur. Abonnez-vous au topic dans l'app ntfy.",
+			"telegram": "Des messages de votre propre bot (à créer avec @BotFather), vers votre identifiant numérique.",
+			"teams": "Un webhook entrant Teams ou une URL Workflows de votre canal."
+		},
+		"fields": {
+			"server": "Serveur (https)",
+			"topic": "Topic",
+			"access_token": "Jeton d'accès (facultatif)",
+			"bot_token": "Jeton du bot",
+			"chat_id": "Votre identifiant",
+			"webhook_url": "URL du webhook"
+		},
+		"keep": "Défini : laissez vide pour le garder",
+		"generate": "Générer un topic",
+		"state": {
+			"notSet": "Non réglé",
+			"on": "Actif",
+			"paused": "En pause",
+			"unreadable": "À ressaisir"
+		},
+		"enabled": "Envoyer sur {{channel}}",
+		"set": "Régler",
+		"change": "Modifier",
+		"save": "Enregistrer",
+		"test": "Envoyer un test",
+		"remove": "Retirer",
+		"removeTitle": "Retirer {{channel}} ?",
+		"removeBody": "Le serveur oublie ce canal et ses secrets.",
+		"result": {
+			"sent": "Test envoyé. Regardez {{channel}}.",
+			"blocked": "Non envoyé : le serveur a refusé la destination.",
+			"refused": "Non envoyé : {{channel}} a refusé le message. Vérifiez les réglages.",
+			"unreachable": "Non envoyé : {{channel}} est injoignable."
+		}
+	},
+	"chat": {
+		"title": "Chat d'équipe",
+		"here_one": "{{count}} ici",
+		"here_other": "{{count}} ici",
+		"you": "Vous",
+		"connecting": "Connexion…",
+		"empty": "Aucun message pour l'instant.",
+		"emptyHint": "Les messages sont gardés sur le serveur de l'équipe et lus par chaque membre du projet.",
+		"message": "Message",
+		"send": "Envoyer",
+		"reply": "Répondre",
+		"replyTo": "Répondre à {{name}}",
+		"replyingTo": "En réponse à {{name}} : {{message}}",
+		"cancelReply": "Annuler la réponse",
+		"inReplyTo": "{{name}} : {{message}}",
+		"readOnly": "Votre rôle sur ce projet vous permet de lire le chat, pas d'y écrire.",
+		"rejected": {
+			"invalid": "Ce message ne peut pas partir : il est vide ou dépasse 2 000 caractères.",
+			"too_fast": "Doucement : au plus 5 messages en 5 secondes. Votre message est revenu dans le champ.",
+			"unavailable": "Le serveur ne peut pas garder de message pour l'instant. Votre message est revenu dans le champ."
+		}
+	},
+	"leaderboard": {
+		"title": "Classement",
+		"where": "Où",
+		"when": "Quand",
+		"scope": {
+			"project": "Ce projet",
+			"org": "Toute l'organisation"
+		},
+		"period": {
+			"season": "Cette saison",
+			"all": "Depuis le début"
+		},
+		"season": "Saison du {{start}} au {{end}}",
+		"yours": "Votre score",
+		"points_one": "{{count}} point",
+		"points_other": "{{count}} points",
+		"tally": "{{delivered}} livrées · {{reviews}} revues",
+		"rank": "rang {{rank}}",
+		"unranked": "non classé",
+		"showMe": "Montrer mon nom au classement",
+		"showMeHint": "Désactivé tant que vous ne l'activez pas. Sans cela, votre travail ne compte que pour vous et personne d'autre ne le voit.",
+		"named": "Classement",
+		"empty": "Personne n'est nommé pour l'instant.",
+		"emptyHint": "Une personne apparaît ici dès qu'elle choisit de montrer son nom.",
+		"entry_one": "Rang {{rank}}, {{name}}, {{count}} point",
+		"entry_other": "Rang {{rank}}, {{name}}, {{count}} points",
+		"youName": "{{name}} (vous)",
+		"howItCounts": "Une tâche livrée compte de 1 à 3 points selon sa complexité évaluée, l'approbation de la tâche d'un collègue 2. Aucun nombre de jetons ni aucun prix n'est lu : chaque provider compte pareil.",
+		"badges": {
+			"first_delivery": "Première livraison",
+			"ten_deliveries": "Dix livraisons",
+			"complex_delivery": "Tâche complexe livrée",
+			"first_review": "Première revue",
+			"ten_reviews": "Dix revues"
+		}
+	},
+	"replays": {
+		"title": "Mes liens de replay",
+		"summary": "Les replays que vous avez partagés, et arrêter un lien",
+		"hint": "Les liens de replay que vous avez partagés depuis WorkPilot sur votre ordinateur, sur chaque projet que vous atteignez encore.",
+		"empty": "Vous n'avez partagé aucun replay.",
+		"emptyHint": "Partagez un replay depuis une tâche dans WorkPilot sur votre ordinateur : son lien s'affiche ici, pour l'arrêter depuis votre téléphone.",
+		"state": {
+			"active": "Ouvert",
+			"expired": "Expiré",
+			"revoked": "Arrêté"
+		},
+		"where_one": "{{project}} · {{count}} étape",
+		"where_other": "{{project}} · {{count}} étapes",
+		"opened_one": "Ouvert une fois, {{when}}",
+		"opened_other": "Ouvert {{count}} fois, la dernière {{when}}",
+		"neverOpened": "Pas encore ouvert",
+		"until": "S'ouvre jusqu'au {{date}}",
+		"revoke": "Arrêter le lien",
+		"revokeTitle": "Arrêter ce lien ?",
+		"revokeBody": "« {{title}} » ne s'ouvrira plus pour qui a le lien."
+	},
+	"ask": {
+		"intro": "Posez une question sur le tableau dans n'importe quelle langue, par exemple « Comment a été revue la page d'admin ? ». La réponse cite chaque carte, fonctionnalité de la roadmap et idée liée, quelle que soit la langue dans laquelle elle est écrite. Vous seul voyez vos questions.",
+		"question": "Votre question",
+		"followUp": "Une question de suite",
+		"send": "Demander",
+		"stop": "Arrêter",
+		"answering": "Recherche de « {{question}} »…",
+		"noAnswer": "Le serveur n'a pas répondu. Réessayez.",
+		"keywords": "Aucun modèle n'a répondu : ces tickets partagent des mots avec la question.",
+		"nothing": "Aucun ticket ne se rapporte à cette question.",
+		"searched_one": "{{count}} ticket parcouru",
+		"searched_other": "{{count}} tickets parcourus",
+		"archived": "Archivée",
+		"state": {
+			"done": "Terminée",
+			"in_review": "En revue",
+			"in_progress": "En cours",
+			"planned": "Prévue",
+			"failed": "Échec",
+			"abandoned": "Abandonnée"
+		},
+		"coverage": {
+			"full": "Déjà fait",
+			"partial": "En partie",
+			"related": "Lié"
+		},
+		"kind": {
+			"roadmap": "Roadmap",
+			"idea": "Idée"
+		}
+	},
+	"myUsage": {
+		"title": "Mon usage",
+		"summary": "Ce que les administrateurs voient de vous, et vos données à télécharger.",
+		"intro": "Ce que les administrateurs de cette organisation voient de vous sur les 30 derniers jours : totaux, noms d'actions, runs et jobs. Jamais un prompt, du code, un texte saisi ou un nom de fichier.",
+		"visibleTo": "Lisible par : {{roles}}, et les administrateurs de la plateforme du serveur.",
+		"period": "30 derniers jours",
+		"tokens_one": "{{value}} jeton",
+		"tokens_other": "{{value}} jetons",
+		"cost": "Coût : {{cost}}",
+		"costEstimated": "Coût : {{cost}} (en partie estimé)",
+		"runs": "Runs : {{total}}, dont {{succeeded}} réussis",
+		"jobs": "Jobs : {{total}}, dont {{succeeded}} réussis",
+		"daily": "Jetons par jour",
+		"timeline": "Ce que vous avez fait",
+		"pages": "Pages ouvertes",
+		"empty": "Rien sur cette période.",
+		"event": "{{kind}} : {{what}}",
+		"kinds": {
+			"sign_in": "Connexion",
+			"audit": "Action",
+			"run": "Run",
+			"job": "Job"
+		},
+		"export": "Partager tout ce qui est conservé sur moi (JSON)",
+		"exportTitle": "Mon usage de WorkPilot",
+		"notice": "Relire ce qui est mesuré"
+	},
+	"usageNotice": {
+		"title": "Ce que ce serveur mesure de vous",
+		"intro": "Le serveur de cette organisation conserve quelques chiffres sur chaque membre, pour suivre son usage et ses coûts.",
+		"bullet": "• {{text}}",
+		"measured": {
+			"tokens": "Les jetons et le coût des agents que vous lancez, par fournisseur et modèle",
+			"runs": "Vos runs : phase, statut, début et fin",
+			"jobs": "Vos jobs de projet : fonctionnalité, statut, début et fin",
+			"sign_ins": "Vos connexions : heure, méthode, adresse et application",
+			"presence": "Les jours où vous étiez connecté, et votre dernière présence",
+			"pages": "Combien de fois par jour vous ouvrez chaque écran de l'app (son nom seulement)"
+		},
+		"never": "Jamais un prompt, du code, un texte saisi ou un nom de fichier.",
+		"retention": "Ces chiffres sont conservés {{days}} jours.",
+		"pageRetention": "Les comptes d'écrans sont conservés {{days}} jours.",
+		"visibleTo": "Lisible par : {{roles}}, et les administrateurs de la plateforme du serveur.",
+		"rights": "Vous pouvez les consulter et partager tout ce qui est conservé sur vous dans Réglages, Mon usage. Pour faire effacer votre compte, demandez à un administrateur de la plateforme.",
+		"understood": "J'ai compris"
+	},
+	"cardLog": {
+		"title": "Journal de #{{id}}",
+		"open": "Voir tout le journal",
+		"phase": "Phase",
+		"show": "Afficher",
+		"all": "Tout",
+		"errors": "Erreurs",
+		"noTools": "Sans les outils",
+		"find": "Chercher dans le journal",
+		"live": "Un agent travaille : le journal est relu toutes les 3 secondes.",
+		"still": "Aucun agent ne travaille sur cette tâche maintenant.",
+		"follow": "Suivre la fin",
+		"empty": "Aucune ligne à afficher."
+	},
+	"cardFiles": {
+		"open": "Voir le fichier en plein écran",
+		"previous": "Précédent",
+		"next": "Suivant",
+		"position": "Fichier {{index}} sur {{count}}",
+		"status": {
+			"added": "Ajouté",
+			"modified": "Modifié",
+			"deleted": "Supprimé",
+			"renamed": "Renommé"
+		}
 	}
 }

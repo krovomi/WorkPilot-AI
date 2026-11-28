@@ -51,5 +51,207 @@
 	"kickers": {
 		"setup": "Setup",
 		"history": "History"
+	},
+	"monitor": {
+		"heading": "Watch after a deployment",
+		"description": "After a pipeline starts from WorkPilot, the health check and the metrics of the chosen source are compared with what they were before it, for a window of observation.",
+		"monitor_health_url": "Health check URL",
+		"monitor_prometheus_url": "Prometheus URL",
+		"monitor_prometheus_token": "Prometheus token (optional)",
+		"monitor_window_minutes": "Observation window (minutes)",
+		"monitor_deploy_wait_minutes": "Wait for the deployment to land (minutes)",
+		"auto_rollback": "Roll back by itself on a critical verdict",
+		"autoRollbackHint": "Off: the rollback is offered here. On: GitHub Actions and Azure Pipelines go back to the last run that succeeded, unless the change holds a database migration.",
+		"fileHint": "Metrics and thresholds: .workpilot/deploy-monitors.yaml (query in the source's language, kind error_rate, latency, throughput or custom, warning and critical in percent; canary_query compares the canary with the stable fleet at each sample). revert_pr: true opens a PR that reverts the deployed commit after a critical verdict; explain_incident: false keeps the model out of the incident report.",
+		"monitor_source": "Metric source",
+		"sources": {
+			"prometheus": "Prometheus",
+			"datadog": "Datadog",
+			"newrelic": "New Relic",
+			"cloudwatch": "Amazon CloudWatch",
+			"grafana": "Grafana"
+		},
+		"monitor_datadog_site": "Datadog site",
+		"monitor_datadog_api_key": "Datadog API key",
+		"monitor_datadog_app_key": "Datadog application key",
+		"monitor_newrelic_region": "New Relic region",
+		"monitor_newrelic_account_id": "New Relic account id",
+		"monitor_newrelic_api_key": "New Relic user API key",
+		"monitor_aws_region": "AWS region",
+		"monitor_aws_access_key_id": "AWS access key id",
+		"monitor_aws_secret_access_key": "AWS secret access key",
+		"monitor_aws_session_token": "AWS session token (optional)",
+		"queryHint": {
+			"prometheus": "Each metric's query is PromQL; a vector is summed.",
+			"datadog": "Each metric's query is a Datadog metric query; the newest point of each series over the last five minutes is summed.",
+			"newrelic": "Each metric's query is NRQL with its SINCE clause; the numbers of the result are summed.",
+			"cloudwatch": "Each metric's query is a Metrics Insights query or metric math; the newest value of each result over the last five minutes is summed.",
+			"grafana": "Each metric's query is the data source's expression (PromQL for Prometheus or Mimir, LogQL for Loki); the newest value of each frame over the last five minutes is summed."
+		},
+		"monitor_grafana_url": "Grafana URL",
+		"monitor_grafana_token": "Grafana service account token",
+		"monitor_grafana_datasource_uid": "Grafana data source uid"
+	},
+	"watch": {
+		"notConfigured": "Not watched: no health check or metric is configured.",
+		"verdict": {
+			"ok": "Healthy",
+			"warning": "Degraded",
+			"critical": "Critical",
+			"unknown": "Not measured"
+		},
+		"phase": {
+			"baseline": "measuring the baseline",
+			"waiting": "waiting for the deployment",
+			"watching": "watching",
+			"done": "window ended",
+			"interrupted": "interrupted (the app was closed)"
+		},
+		"samples_one": "{{count}} sample",
+		"samples_other": "{{count}} samples",
+		"healthOk": "health check OK",
+		"healthFailed": "health check failed",
+		"metric": "{{name}}: {{baseline}} → {{current}} ({{change}} %, {{level}})",
+		"problems": "Settings ignored: {{problems}}",
+		"migrations": "Database migrations between the good version and this one: {{files}}. A rollback restores the code only; handle these migrations by hand.",
+		"rollback": {
+			"proposed": "Rollback proposed.",
+			"started": "Rollback started: the last good run is running again.",
+			"failed": "The rollback could not start.",
+			"blocked_migrations": "Automatic rollback blocked by a database migration.",
+			"manual": "Rollback by hand.",
+			"startedFlag": "Rollback started: the feature flag {{flag}} is off, nothing was redeployed."
+		},
+		"byPerson": "(asked from the app)",
+		"plan": {
+			"manual": "This provider cannot re-run a past pipeline on its commit: start the last good one again from its page.",
+			"no_previous_success": "No earlier successful run to go back to.",
+			"not_configured": "The provider settings are incomplete for a rollback.",
+			"unreachable": "The provider could not be reached to plan the rollback.",
+			"unsupported": "Rollback is not supported for this provider.",
+			"offline": "Strict offline mode: no provider is called, roll back by hand."
+		},
+		"openTarget": "Open the last good run ({{run}})",
+		"revertHint": "The branch still holds the faulty commit: revert it before the next deployment.",
+		"rollbackButton": "Roll back",
+		"confirm": "Run the last good deployment again?",
+		"confirmButton": "Confirm the rollback",
+		"cancel": "Cancel",
+		"revertPr": {
+			"open": "Open the revert PR of {{sha}}",
+			"opened": "Revert PR opened.",
+			"exists": "A revert PR is already open.",
+			"failed": "The revert PR could not be opened.",
+			"conflict": "The deployed commit does not revert cleanly: revert it by hand.",
+			"no_commit": "The provider did not say which commit it deployed: no revert PR.",
+			"unknown_commit": "The deployed commit is not in the local clone: fetch it, then revert it by hand.",
+			"not_on_branch": "The deployed commit is not on the target branch: nothing to revert there.",
+			"offline": "Strict offline mode: no revert PR is opened.",
+			"unavailable": "No forge is available to open the revert PR."
+		},
+		"incident": {
+			"title": "Incident report",
+			"samples": "{{critical}} critical and {{warning}} degraded sample(s)",
+			"health": "health check failed {{failed}} of {{checks}} times",
+			"metric": "{{name}}: {{baseline}} before, {{worst}} at worst ({{change}} %, {{level}})",
+			"explanation": "The project's model:"
+		},
+		"alerts": {
+			"line": "Alerts: {{list}}",
+			"sent": "{{channel}} sent",
+			"failed": "{{channel}} not delivered",
+			"invalid": "{{channel}} settings refused",
+			"offline": "{{channel}} skipped (strict offline)",
+			"channels": {
+				"slack": "Slack",
+				"pagerduty": "PagerDuty",
+				"email": "e-mail"
+			}
+		},
+		"metricCanary": "{{name}} (canary): stable {{baseline}} → canary {{current}} ({{change}} %, {{level}})",
+		"withProject": "(with {{project}})",
+		"linkedByHand": "Roll back the linked services by hand too: {{projects}}.",
+		"confirmLinked": "Run the last good deployment again? These go back with it: {{projects}}.",
+		"linked": {
+			"started": "{{project}}: rollback started.",
+			"failed": "{{project}}: the rollback could not start.",
+			"blocked_migrations": "{{project}}: rollback blocked by a database migration.",
+			"manual": "{{project}}: roll back by hand.",
+			"not_deployed_since": "{{project}}: not deployed since the good version, nothing to roll back.",
+			"missing": "{{project}}: the project is no longer in the app.",
+			"error": "{{project}}: no answer from its rollback.",
+			"migrations": "Migrations: {{files}}.",
+			"openTarget": "last good run"
+		},
+		"review": {
+			"question": "Was this verdict right?",
+			"false_positive": "False alarm",
+			"confirmed": "Real problem"
+		},
+		"investigate": {
+			"selfHealing": "Investigate in Self-Healing",
+			"task": "Open the task"
+		},
+		"flag": {
+			"done": "Feature flag {{flag}} turned off.",
+			"failed": "The feature flag {{flag}} could not be turned off: the deployment was rolled back instead.",
+			"offline": "The feature flag {{flag}} was left on: strict offline mode forbids its service."
+		}
+	},
+	"alerts": {
+		"heading": "Alerts after a bad deployment",
+		"description": "A degraded verdict goes to Slack and e-mail; a critical one also pages the on-call person through PagerDuty. Only the facts of the watch are sent, never the model's text.",
+		"alert_slack_webhook_url": "Slack incoming webhook URL",
+		"alert_pagerduty_routing_key": "PagerDuty integration (routing) key",
+		"alert_pagerduty_region": "PagerDuty region",
+		"alert_email_to": "E-mail recipients (comma-separated)",
+		"alert_email_from": "E-mail sender",
+		"alert_smtp_host": "SMTP server",
+		"alert_smtp_port": "SMTP port (465: TLS, otherwise STARTTLS)",
+		"alert_smtp_user": "SMTP user (optional)",
+		"alert_smtp_password": "SMTP password (optional)",
+		"offlineHint": "Strict offline mode: only a webhook or an SMTP server on this machine or a private address is used; PagerDuty is not called."
+	},
+	"links": {
+		"heading": "Services rolled back with this one",
+		"description": "When a rollback of this project starts, the projects switched on here go back too, each with its own CI/CD settings, to where they were at this project's last good run. A project not deployed since then is left as it is.",
+		"none": "No other project in the app."
+	},
+	"figures": {
+		"heading": "Watch figures",
+		"watches": "Watched deployments",
+		"verdicts": "Bad verdicts",
+		"verdictsValue": "{{critical}} critical, {{warning}} degraded",
+		"rollbacks": "Rollbacks",
+		"rollbacksValue": "{{automatic}} automatic, {{person}} asked by a person",
+		"incidentsAvoided": "Incidents avoided",
+		"timeToRollback": "Degradation to rollback",
+		"timeValue": "mean {{mean}}, median {{median}} ({{count}} timed)",
+		"falseAlarms": "False alarms",
+		"falseAlarmsValue": "{{rate}} % ({{count}} of {{reviewed}} reviewed verdicts; {{rollbacks}} needless rollback(s))",
+		"noReview": "no verdict reviewed yet",
+		"slow": "The median is above the three-minute goal: shorten the wait or the interval in .workpilot/deploy-monitors.yaml, or turn the automatic rollback on.",
+		"month": "Month",
+		"automatic": "Automatic",
+		"person": "By a person",
+		"critical": "Critical",
+		"local": "Computed on this machine from this project's watches; nothing is sent anywhere."
+	},
+	"flag": {
+		"heading": "Feature flag rollback",
+		"description": "When the deployed change sits behind a feature flag, a critical verdict turns the flag off first: nothing is redeployed and a database migration does not stand in the way. If the flag cannot be switched, the deployment is rolled back as usual. The token is stored encrypted.",
+		"rollback_flag_provider": "Flag service",
+		"none": "No flag",
+		"providers": {
+			"unleash": "Unleash",
+			"launchdarkly": "LaunchDarkly",
+			"configcat": "ConfigCat"
+		},
+		"rollback_flag_key": "Flag key (ConfigCat: key or setting id)",
+		"rollback_flag_environment": "Environment (ConfigCat: environment id)",
+		"rollback_flag_project": "Project (LaunchDarkly project key, ConfigCat config id, Unleash project)",
+		"rollback_flag_url": "Service URL (https; LaunchDarkly and ConfigCat default to their own)",
+		"rollback_flag_user": "ConfigCat API user name",
+		"rollback_flag_token": "API token"
 	}
 }

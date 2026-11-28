@@ -51,5 +51,207 @@
 	"kickers": {
 		"setup": "Réglages",
 		"history": "Historique"
+	},
+	"monitor": {
+		"heading": "Surveillance après déploiement",
+		"description": "Après un pipeline lancé depuis WorkPilot, le health check et les métriques de la source choisie sont comparés à ce qu'ils étaient avant, pendant une fenêtre d'observation.",
+		"monitor_health_url": "URL du health check",
+		"monitor_prometheus_url": "URL de Prometheus",
+		"monitor_prometheus_token": "Jeton Prometheus (facultatif)",
+		"monitor_window_minutes": "Fenêtre d'observation (minutes)",
+		"monitor_deploy_wait_minutes": "Attente du déploiement (minutes)",
+		"auto_rollback": "Rollback automatique sur un verdict critique",
+		"autoRollbackHint": "Désactivé : le rollback est proposé ici. Activé : GitHub Actions et Azure Pipelines reviennent à la dernière exécution réussie, sauf si le changement contient une migration de base de données.",
+		"fileHint": "Métriques et seuils : .workpilot/deploy-monitors.yaml (requête dans le langage de la source, type error_rate, latency, throughput ou custom, warning et critical en pourcentage ; canary_query compare le canary au parc stable à chaque mesure). revert_pr: true ouvre une PR qui reverte le commit déployé après un verdict critique ; explain_incident: false tient le modèle hors du rapport d'incident.",
+		"monitor_source": "Source des métriques",
+		"sources": {
+			"prometheus": "Prometheus",
+			"datadog": "Datadog",
+			"newrelic": "New Relic",
+			"cloudwatch": "Amazon CloudWatch",
+			"grafana": "Grafana"
+		},
+		"monitor_datadog_site": "Site Datadog",
+		"monitor_datadog_api_key": "Clé d'API Datadog",
+		"monitor_datadog_app_key": "Clé d'application Datadog",
+		"monitor_newrelic_region": "Région New Relic",
+		"monitor_newrelic_account_id": "Identifiant du compte New Relic",
+		"monitor_newrelic_api_key": "Clé d'API utilisateur New Relic",
+		"monitor_aws_region": "Région AWS",
+		"monitor_aws_access_key_id": "Identifiant de la clé d'accès AWS",
+		"monitor_aws_secret_access_key": "Clé d'accès secrète AWS",
+		"monitor_aws_session_token": "Jeton de session AWS (facultatif)",
+		"queryHint": {
+			"prometheus": "La requête de chaque métrique est en PromQL ; un vecteur est additionné.",
+			"datadog": "La requête de chaque métrique est une requête de métrique Datadog ; le point le plus récent de chaque série sur les cinq dernières minutes est additionné.",
+			"newrelic": "La requête de chaque métrique est en NRQL, avec sa clause SINCE ; les nombres du résultat sont additionnés.",
+			"cloudwatch": "La requête de chaque métrique est une requête Metrics Insights ou une expression mathématique ; la valeur la plus récente de chaque résultat sur les cinq dernières minutes est additionnée.",
+			"grafana": "La requête de chaque métrique est l'expression de la source de données (PromQL pour Prometheus ou Mimir, LogQL pour Loki) ; la valeur la plus récente de chaque frame sur les cinq dernières minutes est additionnée."
+		},
+		"monitor_grafana_url": "URL de Grafana",
+		"monitor_grafana_token": "Jeton de compte de service Grafana",
+		"monitor_grafana_datasource_uid": "uid de la source de données Grafana"
+	},
+	"watch": {
+		"notConfigured": "Non surveillé : aucun health check ni aucune métrique configurés.",
+		"verdict": {
+			"ok": "Sain",
+			"warning": "Dégradé",
+			"critical": "Critique",
+			"unknown": "Non mesuré"
+		},
+		"phase": {
+			"baseline": "mesure de référence",
+			"waiting": "attente du déploiement",
+			"watching": "surveillance",
+			"done": "fenêtre terminée",
+			"interrupted": "interrompue (l'app a été fermée)"
+		},
+		"samples_one": "{{count}} mesure",
+		"samples_other": "{{count}} mesures",
+		"healthOk": "health check OK",
+		"healthFailed": "health check en échec",
+		"metric": "{{name}} : {{baseline}} → {{current}} ({{change}} %, {{level}})",
+		"problems": "Réglages ignorés : {{problems}}",
+		"migrations": "Migrations de base de données entre la bonne version et celle-ci : {{files}}. Un rollback ne restaure que le code ; traitez ces migrations à la main.",
+		"rollback": {
+			"proposed": "Rollback proposé.",
+			"started": "Rollback lancé : la dernière exécution réussie tourne à nouveau.",
+			"failed": "Le rollback n'a pas pu démarrer.",
+			"blocked_migrations": "Rollback automatique bloqué par une migration de base de données.",
+			"manual": "Rollback à faire à la main.",
+			"startedFlag": "Rollback lancé : le feature flag {{flag}} est coupé, rien n'a été redéployé."
+		},
+		"byPerson": "(demandé depuis l'app)",
+		"plan": {
+			"manual": "Ce fournisseur ne peut pas relancer un ancien pipeline sur son commit : relancez le dernier bon depuis sa page.",
+			"no_previous_success": "Aucune exécution réussie antérieure vers laquelle revenir.",
+			"not_configured": "Les réglages du fournisseur sont incomplets pour un rollback.",
+			"unreachable": "Le fournisseur n'a pas répondu pour préparer le rollback.",
+			"unsupported": "Le rollback n'est pas pris en charge pour ce fournisseur.",
+			"offline": "Mode hors-ligne strict : aucun fournisseur n'est appelé, rollback à la main."
+		},
+		"openTarget": "Ouvrir la dernière bonne exécution ({{run}})",
+		"revertHint": "La branche contient toujours le commit fautif : revertez-le avant le prochain déploiement.",
+		"rollbackButton": "Revenir en arrière",
+		"confirm": "Relancer le dernier déploiement réussi ?",
+		"confirmButton": "Confirmer le rollback",
+		"cancel": "Annuler",
+		"revertPr": {
+			"open": "Ouvrir la PR de revert de {{sha}}",
+			"opened": "PR de revert ouverte.",
+			"exists": "Une PR de revert est déjà ouverte.",
+			"failed": "La PR de revert n'a pas pu être ouverte.",
+			"conflict": "Le commit déployé ne se revert pas proprement : revertez-le à la main.",
+			"no_commit": "Le fournisseur n'a pas dit quel commit il a déployé : pas de PR de revert.",
+			"unknown_commit": "Le commit déployé n'est pas dans le clone local : récupérez-le, puis revertez-le à la main.",
+			"not_on_branch": "Le commit déployé n'est pas sur la branche cible : rien à y revert.",
+			"offline": "Mode hors-ligne strict : aucune PR de revert n'est ouverte.",
+			"unavailable": "Aucune forge disponible pour ouvrir la PR de revert."
+		},
+		"incident": {
+			"title": "Rapport d'incident",
+			"samples": "{{critical}} mesure(s) critique(s) et {{warning}} dégradée(s)",
+			"health": "health check en échec {{failed}} fois sur {{checks}}",
+			"metric": "{{name}} : {{baseline}} avant, {{worst}} au pire ({{change}} %, {{level}})",
+			"explanation": "Le modèle du projet :"
+		},
+		"alerts": {
+			"line": "Alertes : {{list}}",
+			"sent": "{{channel}} : envoyée",
+			"failed": "{{channel}} : non remise",
+			"invalid": "{{channel}} : réglages refusés",
+			"offline": "{{channel}} : ignorée (hors-ligne strict)",
+			"channels": {
+				"slack": "Slack",
+				"pagerduty": "PagerDuty",
+				"email": "e-mail"
+			}
+		},
+		"metricCanary": "{{name}} (canary) : stable {{baseline}} → canary {{current}} ({{change}} %, {{level}})",
+		"withProject": "(avec {{project}})",
+		"linkedByHand": "Rollback à faire à la main aussi pour les services liés : {{projects}}.",
+		"confirmLinked": "Relancer le dernier bon déploiement ? Ceux-ci reviennent en arrière avec lui : {{projects}}.",
+		"linked": {
+			"started": "{{project}} : rollback démarré.",
+			"failed": "{{project}} : le rollback n'a pas pu démarrer.",
+			"blocked_migrations": "{{project}} : rollback bloqué par une migration de base de données.",
+			"manual": "{{project}} : rollback à faire à la main.",
+			"not_deployed_since": "{{project}} : pas déployé depuis la bonne version, rien à remettre en arrière.",
+			"missing": "{{project}} : le projet n'est plus dans l'app.",
+			"error": "{{project}} : pas de réponse de son rollback.",
+			"migrations": "Migrations : {{files}}.",
+			"openTarget": "dernière bonne exécution"
+		},
+		"review": {
+			"question": "Ce verdict était-il juste ?",
+			"false_positive": "Fausse alerte",
+			"confirmed": "Vrai problème"
+		},
+		"investigate": {
+			"selfHealing": "Enquêter dans Self-Healing",
+			"task": "Ouvrir la tâche"
+		},
+		"flag": {
+			"done": "Feature flag {{flag}} coupé.",
+			"failed": "Le feature flag {{flag}} n'a pas pu être coupé : le déploiement a été remis en arrière à la place.",
+			"offline": "Le feature flag {{flag}} est resté actif : le mode hors-ligne strict interdit son service."
+		}
+	},
+	"alerts": {
+		"heading": "Alertes après un mauvais déploiement",
+		"description": "Un verdict dégradé part sur Slack et par e-mail ; un verdict critique prévient aussi la personne d'astreinte par PagerDuty. Seuls les faits de la surveillance sont envoyés, jamais le texte du modèle.",
+		"alert_slack_webhook_url": "URL du webhook entrant Slack",
+		"alert_pagerduty_routing_key": "Clé d'intégration (routing key) PagerDuty",
+		"alert_pagerduty_region": "Région PagerDuty",
+		"alert_email_to": "Destinataires de l'e-mail (séparés par des virgules)",
+		"alert_email_from": "Expéditeur de l'e-mail",
+		"alert_smtp_host": "Serveur SMTP",
+		"alert_smtp_port": "Port SMTP (465 : TLS, sinon STARTTLS)",
+		"alert_smtp_user": "Utilisateur SMTP (facultatif)",
+		"alert_smtp_password": "Mot de passe SMTP (facultatif)",
+		"offlineHint": "Hors-ligne strict : seuls un webhook ou un serveur SMTP sur cette machine ou à une adresse privée sont utilisés ; PagerDuty n'est pas appelé."
+	},
+	"links": {
+		"heading": "Services remis en arrière avec celui-ci",
+		"description": "Quand un rollback de ce projet démarre, les projets activés ici reviennent aussi en arrière, chacun avec ses propres réglages CI/CD, là où ils étaient à la dernière bonne exécution de ce projet. Un projet qui n'a pas été déployé depuis reste tel quel.",
+		"none": "Aucun autre projet dans l'app."
+	},
+	"figures": {
+		"heading": "Chiffres de la surveillance",
+		"watches": "Déploiements surveillés",
+		"verdicts": "Mauvais verdicts",
+		"verdictsValue": "{{critical}} critiques, {{warning}} dégradés",
+		"rollbacks": "Rollbacks",
+		"rollbacksValue": "{{automatic}} automatiques, {{person}} demandés par une personne",
+		"incidentsAvoided": "Incidents évités",
+		"timeToRollback": "De la dégradation au rollback",
+		"timeValue": "moyenne {{mean}}, médiane {{median}} ({{count}} mesurés)",
+		"falseAlarms": "Fausses alertes",
+		"falseAlarmsValue": "{{rate}} % ({{count}} sur {{reviewed}} verdicts jugés ; {{rollbacks}} rollback(s) inutile(s))",
+		"noReview": "aucun verdict jugé pour le moment",
+		"slow": "La médiane dépasse l'objectif de trois minutes : raccourcissez l'attente ou l'intervalle dans .workpilot/deploy-monitors.yaml, ou activez le rollback automatique.",
+		"month": "Mois",
+		"automatic": "Automatiques",
+		"person": "Par une personne",
+		"critical": "Critiques",
+		"local": "Calculés sur cette machine à partir des surveillances de ce projet ; rien n'est envoyé nulle part."
+	},
+	"flag": {
+		"heading": "Rollback par feature flag",
+		"description": "Quand le changement déployé est derrière un feature flag, un verdict critique coupe d'abord ce flag : rien n'est redéployé et une migration de base de données ne bloque pas. Si le flag ne peut pas être coupé, le déploiement est remis en arrière comme d'habitude. Le jeton est gardé chiffré.",
+		"rollback_flag_provider": "Service de flags",
+		"none": "Aucun flag",
+		"providers": {
+			"unleash": "Unleash",
+			"launchdarkly": "LaunchDarkly",
+			"configcat": "ConfigCat"
+		},
+		"rollback_flag_key": "Clé du flag (ConfigCat : clé ou id du réglage)",
+		"rollback_flag_environment": "Environnement (ConfigCat : id de l'environnement)",
+		"rollback_flag_project": "Projet (clé de projet LaunchDarkly, id de config ConfigCat, projet Unleash)",
+		"rollback_flag_url": "URL du service (https ; LaunchDarkly et ConfigCat ont la leur par défaut)",
+		"rollback_flag_user": "Nom d'utilisateur de l'API ConfigCat",
+		"rollback_flag_token": "Jeton d'API"
 	}
 }

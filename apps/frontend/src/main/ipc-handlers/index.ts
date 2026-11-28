@@ -32,9 +32,11 @@ import { registerBountyBoardHandlers } from "./bounty-board-handlers";
 import { registerTechDebtHandlers } from "./tech-debt-handlers";
 import { registerServerAnalysisHandlers } from "./server-analyses";
 import { registerTeamBotHandlers } from "./team-bot-handlers";
+import { registerPixelOfficeHandlers } from "./pixel-office-handlers";
 import { registerApiExplorerHandlers } from "./api-explorer-handlers";
 import { registerApiWatcherHandlers } from "./api-watcher-handlers";
 import { registerAppEmulatorHandlers } from "./app-emulator-handlers";
+import { registerDeviceMatrixHandlers } from "./device-matrix-handlers";
 import { registerMobileHandlers } from "./mobile-handlers";
 import { registerAppUpdateHandlers } from "./app-update-handlers";
 import {
@@ -42,8 +44,12 @@ import {
 	setupArchitectureVisualizerEventForwarding,
 } from "./architecture-visualizer-handlers";
 import { registerArenaHandlers } from "./arena-handlers";
+import { registerMissionControlHandlers } from "./mission-control-handlers";
+import { registerConflictWavesHandlers } from "./conflict-waves-handlers";
+import { registerServerConflictWavesHandlers } from "./server-conflict-waves-handlers";
 import { registerAzureDevOpsHandlers } from "./azure-devops-handlers";
 import { registerBrowserAgentHandlers } from "./browser-agent-handlers";
+import { registerBrowserRecorderHandlers } from "./browser-recorder-handlers";
 import { registerCarbonProfilerHandlers, startCarbonBudgetSchedule } from "./carbon-profiler-handlers";
 import { registerChangelogHandlers } from "./changelog-handlers";
 import { registerCICDTriggersHandlers } from "./cicd-triggers-handlers";
@@ -62,6 +68,7 @@ import { registerContextAwareSnippetsHandlers } from "./context-aware-snippets-h
 import { registerContextHandlers } from "./context-handlers";
 import { registerContextMeshHandlers } from "./context-mesh-handlers";
 import { registerAgentCliHandlers } from "./agent-cli-handlers";
+import { registerReaHandlers } from "./rea-handlers";
 import { registerTaskPermissionHandlers } from "./task-permission-handlers";
 import { registerCopilotCliHandlers } from "./copilot-cli-handlers";
 import { registerCopilotOAuthHandlers } from "./copilot-oauth-handlers";
@@ -69,6 +76,8 @@ import { registerCostHandlers } from "./cost-handlers";
 import { registerCostPredictorHandlers } from "./cost-predictor-handlers";
 import { registerFormulaMatrixHandlers } from "./formula-matrix-handlers";
 import { registerBenchHandlers } from "./bench-handlers";
+import { registerBoardAskHandlers } from "./board-ask-handlers";
+import { registerSprintHandlers } from "./sprint-handlers";
 import { registerBoardMcpHandlers } from "./board-mcp-handlers";
 import { registerCredentialHandlers } from "./credential-handlers";
 import { registerCrossLanguageTranslationHandlers } from "./cross-language-translation-handlers";
@@ -77,6 +86,11 @@ import { registerDocDriftHandlers } from "./doc-drift-handlers";
 import { registerDocumentationHandlers } from "./documentation-handlers";
 import { registerCodeInsightsHandlers } from "./code-insights-handlers";
 import { registerEnvHandlers } from "./env-handlers";
+import { registerForgeAccountsHandlers } from "./forge-accounts-handlers";
+import { registerAiAccountsHandlers } from "./ai-accounts-handlers";
+import { registerAiAccountUsageHandlers } from "./ai-account-usage-handlers";
+import { registerApprovalsHandlers } from "./approvals-handlers";
+import { registerForgeBindingHandlers } from "./forge-binding-handlers";
 import { registerEnvSnapshotHandlers } from "./env-snapshot-handlers";
 import { registerOfflineModeHandlers } from "./offline-mode-handlers";
 import { registerFileHandlers } from "./file-handlers";
@@ -84,7 +98,9 @@ import { registerFlakyTestsHandlers } from "./flaky-tests-handlers";
 import { registerGitHubCopilotHandlers } from "./github-copilot-handlers";
 import { registerGitSurgeonHandlers } from "./git-surgeon-handlers";
 import { registerGithubHandlers } from "./github-handlers";
-import { registerGitlabHandlers } from "./gitlab-handlers";
+import { registerGitlabHandlers } from "./gitlab";
+import { registerBitbucketHandlers } from "./bitbucket";
+import { registerGovernanceHandlers } from "./governance-handlers";
 import { registerGuardrailsHandlers } from "./guardrails-handlers";
 import { registerI18nAgentHandlers } from "./i18n-agent-handlers";
 import { registerIdeationHandlers } from "./ideation-handlers";
@@ -121,16 +137,22 @@ import { registerReleaseCoordinatorHandlers } from "./release-coordinator-handle
 import { setupQualityHandlers } from "./quality-handlers";
 import { registerRoadmapHandlers } from "./roadmap-handlers";
 import { registerScreenshotHandlers } from "./screenshot-handlers";
+import { registerSelfHealingBisectHandlers } from "./self-healing-bisect-handlers";
 import { registerSelfHealingHandlers } from "./self-healing-handlers";
 import { registerServerAdminHandlers } from "./server-admin-handlers";
+import { registerServerApprovalHandlers } from "./server-approval-handlers";
 import { registerServerAuthHandlers } from "./server-auth-handlers";
+import { registerServerSsoHandlers } from "./server-sso-handlers";
+import { registerServerUsageHandlers } from "./server-usage-handlers";
 import { registerServerProjectHandlers } from "./server-project-handlers";
 import { registerServerWorkspaceHandlers } from "./server-workspace-handlers";
+import { registerBuildCompareHandlers } from "./build-compare-handlers";
 import { registerTeamRoomHandlers } from "./team-room-handlers";
 import { registerJevHandlers } from "./jev-handlers";
 import { registerSecureStorageHandlers } from "./secure-storage-handlers";
 import { registerSettingsHandlers } from "./settings-handlers";
 import { setupSmartEstimationHandlers } from "./smart-estimation-handlers";
+import { registerSmartEstimationCalibrationHandlers } from "./smart-estimation-calibration-handlers";
 import { registerAgentCoachHandlers } from "./agent-coach-handlers";
 import { registerOnboardingAgentHandlers } from "./onboarding-agent-handlers";
 import { registerSandboxHandlers } from "./sandbox-handlers";
@@ -139,6 +161,7 @@ import { registerConsensusArbiterHandlers } from "./consensus-arbiter-handlers";
 import { registerInjectionGuardHandlers } from "./injection-guard-handlers";
 import { registerSpecApprovalHandlers } from "./spec-approval-handlers";
 import { registerPhase35FeatureHandlers } from "./phase35-features-handlers";
+import { registerGenTestsRunHandlers } from "./gen-tests-run-handlers";
 import { registerPipelineHandlers } from "./pipeline-handlers";
 import { registerTaskHandlers } from "./task-handlers";
 import { registerTerminalWorktreeIpcHandlers } from "./terminal";
@@ -146,6 +169,12 @@ import { registerTerminalHandlers } from "./terminal-handlers";
 import { registerDesignToCodeHandlers } from "./design-to-code-handlers";
 import { setupTestGenerationHandlers } from "./test-generation-handlers";
 import { registerTimeTravelHandlers } from "./time-travel-handlers";
+import { registerLocalBackendHandlers } from "./local-backend-handlers";
+import { registerReplayHandlers } from "./replay-handlers";
+import { registerReplayShareHandlers } from "./replay-share-handlers";
+import { registerReplayTeamShareHandlers } from "./replay-team-share-handlers";
+import { registerReplayUsageHandlers } from "./replay-usage-handlers";
+import { registerReplayVideoHandlers } from "./replay-video-handlers";
 import {
 	registerVisualProgrammingHandlers,
 	setupVisualProgrammingEventForwarding,
@@ -168,8 +197,12 @@ export {
 	setupArchitectureVisualizerEventForwarding,
 } from "./architecture-visualizer-handlers";
 export { registerArenaHandlers } from "./arena-handlers";
+export { registerMissionControlHandlers } from "./mission-control-handlers";
+export { registerConflictWavesHandlers } from "./conflict-waves-handlers";
+export { registerServerConflictWavesHandlers } from "./server-conflict-waves-handlers";
 export { registerAzureDevOpsHandlers } from "./azure-devops-handlers";
 export { registerBrowserAgentHandlers } from "./browser-agent-handlers";
+export { registerBrowserRecorderHandlers } from "./browser-recorder-handlers";
 export { registerCarbonProfilerHandlers } from "./carbon-profiler-handlers";
 export { registerChangelogHandlers } from "./changelog-handlers";
 export { registerCICDTriggersHandlers } from "./cicd-triggers-handlers";
@@ -188,6 +221,7 @@ export { registerContextAwareSnippetsHandlers } from "./context-aware-snippets-h
 export { registerContextHandlers } from "./context-handlers";
 export { registerContextMeshHandlers } from "./context-mesh-handlers";
 export { registerAgentCliHandlers } from "./agent-cli-handlers";
+export { registerReaHandlers } from "./rea-handlers";
 export { registerCopilotCliHandlers } from "./copilot-cli-handlers";
 export { registerCopilotOAuthHandlers } from "./copilot-oauth-handlers";
 export { registerCostHandlers } from "./cost-handlers";
@@ -206,7 +240,9 @@ export { registerFlakyTestsHandlers } from "./flaky-tests-handlers";
 export { registerGitHubCopilotHandlers } from "./github-copilot-handlers";
 export { registerGitSurgeonHandlers } from "./git-surgeon-handlers";
 export { registerGithubHandlers } from "./github-handlers";
-export { registerGitlabHandlers } from "./gitlab-handlers";
+export { registerGitlabHandlers } from "./gitlab";
+export { registerBitbucketHandlers } from "./bitbucket";
+export { registerGovernanceHandlers } from "./governance-handlers";
 export { registerGuardrailsHandlers } from "./guardrails-handlers";
 export { registerI18nAgentHandlers } from "./i18n-agent-handlers";
 export { registerIdeationHandlers } from "./ideation-handlers";
@@ -257,6 +293,11 @@ export { registerTerminalWorktreeIpcHandlers } from "./terminal";
 export { registerTerminalHandlers } from "./terminal-handlers";
 export { setupTestGenerationHandlers } from "./test-generation-handlers";
 export { registerTimeTravelHandlers } from "./time-travel-handlers";
+export { registerReplayHandlers } from "./replay-handlers";
+export { registerReplayShareHandlers } from "./replay-share-handlers";
+export { registerReplayTeamShareHandlers } from "./replay-team-share-handlers";
+export { registerReplayUsageHandlers } from "./replay-usage-handlers";
+export { registerReplayVideoHandlers } from "./replay-video-handlers";
 export {
 	registerVisualProgrammingHandlers,
 	setupVisualProgrammingEventForwarding,
@@ -327,12 +368,18 @@ export function setupIpcHandlers(
 	registerJevHandlers();
 	registerSecureStorageHandlers();
 
-	// Multi-user server mode: connection + login (local / Entra ID)
+	// Multi-user server mode: connection + login (local / Entra ID / any OIDC)
 	registerServerAuthHandlers(getMainWindow);
+	registerServerSsoHandlers(getMainWindow);
 	// Multi-tenant administration console (orgs, roles, members, quotas, audit)
 	registerServerAdminHandlers();
+	registerServerUsageHandlers();
 	registerServerProjectHandlers();
 	registerServerWorkspaceHandlers();
+	// Spec Approval of a server card: criticality, approvals, lent approvals
+	registerServerApprovalHandlers();
+	// Build Analytics, "How you compare": a project of this computer
+	registerBuildCompareHandlers();
 	registerTeamRoomHandlers();
 
 	// File explorer handlers
@@ -346,6 +393,13 @@ export function setupIpcHandlers(
 
 	// Environment configuration handlers
 	registerEnvHandlers(getMainWindow);
+
+	// A project's forge settings checked against its git remotes
+	registerForgeBindingHandlers();
+	registerForgeAccountsHandlers();
+	registerAiAccountsHandlers();
+	registerAiAccountUsageHandlers();
+	registerApprovalsHandlers();
 
 	// Linear integration handlers
 	registerLinearHandlers(agentManager, getMainWindow);
@@ -364,7 +418,10 @@ export function setupIpcHandlers(
 	registerGithubHandlers(agentManager, getMainWindow);
 
 	// GitLab integration handlers
-	registerGitlabHandlers(agentManager, getMainWindow);
+	registerGitlabHandlers(getMainWindow);
+
+	// Bitbucket Cloud integration handlers
+	registerBitbucketHandlers();
 
 	// Ideation handlers
 	registerIdeationHandlers(agentManager, getMainWindow);
@@ -417,6 +474,9 @@ export function setupIpcHandlers(
 	// Agent CLIs driven as providers (OpenCode, Google Antigravity): installed?
 	registerAgentCliHandlers();
 
+	// REA (static reader of shipped artifacts): the pinned release installed?
+	registerReaHandlers();
+
 	// GitHub Copilot CLI handlers (CLI-based authentication)
 	registerGitHubCopilotHandlers();
 
@@ -425,6 +485,7 @@ export function setupIpcHandlers(
 
 	// Smart Estimation handlers
 	setupSmartEstimationHandlers();
+	registerSmartEstimationCalibrationHandlers();
 
 	// Conflict Predictor handlers
 	setupConflictPredictorHandlers();
@@ -440,6 +501,8 @@ export function setupIpcHandlers(
 
 	// App Emulator handlers
 	registerAppEmulatorHandlers(getMainWindow);
+	// Device matrix: presets rendered and captured by the main (#383)
+	registerDeviceMatrixHandlers();
 	registerMobileHandlers(getMainWindow);
 
 	// Learning Loop handlers (Autonomous Agent Learning Loop)
@@ -454,9 +517,12 @@ export function setupIpcHandlers(
 
 	// Self-Healing Codebase + Incident Responder handlers
 	registerSelfHealingHandlers(getMainWindow);
+	registerSelfHealingBisectHandlers(getMainWindow);
 
 	// Browser Agent handlers (built-in browser for testing and visual validation)
 	registerBrowserAgentHandlers();
+	// Its recorder: a session the person drives, exported as a test (#387)
+	registerBrowserRecorderHandlers();
 
 	// Architecture Visualizer handlers
 	registerArchitectureVisualizerHandlers();
@@ -485,6 +551,14 @@ export function setupIpcHandlers(
 
 	// Arena Mode handlers (Feature 9) — Blind A/B model comparison
 	registerArenaHandlers(getMainWindow);
+
+	// Mission Control: state proxied to the backend, each agent's model call run here
+	registerMissionControlHandlers();
+
+	// Execution waves across specs (#358): plan by task id, started by the renderer
+	registerConflictWavesHandlers();
+	// The same for a server project: planned and run by the server, by project id
+	registerServerConflictWavesHandlers();
 
 	// CI/CD Deployment Triggers handlers (Feature 44)
 	registerCICDTriggersHandlers();
@@ -528,8 +602,19 @@ export function setupIpcHandlers(
 	// Agent Time Travel handlers (Temporal debugger for AI agents)
 	registerTimeTravelHandlers();
 
+	// Agent Replay + Session History (recorded sessions, via the local backend)
+	registerReplayHandlers();
+	registerReplayShareHandlers();
+	registerReplayVideoHandlers();
+	registerReplayTeamShareHandlers();
+	registerReplayUsageHandlers();
+
 	// Phase 3-5 backend feature modules (#3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 3.10, 3.11, 3.12)
 	registerPhase35FeatureHandlers(getMainWindow);
+	registerGenTestsRunHandlers();
+
+	// The local backend for renderer views that read it (closed route list)
+	registerLocalBackendHandlers();
 
 	// Accessibility Agent handlers (WCAG scanner)
 	registerAccessibilityHandlers();
@@ -591,6 +676,8 @@ export function setupIpcHandlers(
 
 	// Guardrails handlers (user-defined agent guardrails)
 	registerGuardrailsHandlers();
+	// Governance panel: hours, files and token budget of workpilot.policy.yaml, audit export
+	registerGovernanceHandlers();
 
 	// Cost Predictor handlers (ex-ante spec cost prediction)
 	registerCostPredictorHandlers();
@@ -603,6 +690,10 @@ export function setupIpcHandlers(
 
 	// workpilot-board MCP server: registered with Claude Code, Codex, Cursor...
 	registerBoardMcpHandlers();
+
+	// « Interroger le tableau »: a question answered with the related tickets
+	registerBoardAskHandlers();
+	registerSprintHandlers();
 
 	// Agent Debugger handlers (Feature 1)
 	registerAgentDebuggerHandlers();
@@ -621,6 +712,9 @@ export function setupIpcHandlers(
 
 	// Team Bot handlers (Feature 4 — Slack / Microsoft Teams notifications)
 	registerTeamBotHandlers();
+
+	// Pixel Office mini-scenes written by the page's model (#350)
+	registerPixelOfficeHandlers();
 
 	// Env Snapshot handlers (Feature 11 — reproducible environment snapshots)
 	registerEnvSnapshotHandlers();

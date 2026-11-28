@@ -37,6 +37,8 @@ import {
 	getPlanPath,
 	persistPlanStatus,
 } from "./plan-file-utils";
+import { getToolPath } from "../../cli-tool-manager";
+import { taskWorkAlreadyMerged } from "./merged-task-branch";
 import { findTaskAndProject } from "./shared";
 import { discardSpecIfStale } from "./stale-spec";
 import { convertTaskMetadataToSpecCreation } from "./resume-task";
@@ -92,8 +94,28 @@ export function registerTaskStatusHandlers(ctx: ExecutionHandlerContext): void {
 				// Check if worktree exists (task.specId matches worktree folder name)
 				const worktreePath = findTaskWorktree(project.path, task.specId);
 				const hasWorktree = worktreePath !== null;
+				// Get base branch from task metadata or project settings
+				const baseBranch =
+					task.metadata?.baseBranch ||
+					project.settings?.mainBranch ||
+					"develop";
+				// Merged locally already ("Merge to <base>"): no PR to open.
+				const alreadyMerged =
+					worktreePath !== null &&
+					taskWorkAlreadyMerged(
+						getToolPath("git"),
+						project.path,
+						worktreePath,
+						task.specId,
+						baseBranch,
+					);
 
-				if (!existingPrUrl && hasWorktree && !options?.skipPrCreation) {
+				if (
+					!existingPrUrl &&
+					hasWorktree &&
+					!alreadyMerged &&
+					!options?.skipPrCreation
+				) {
 					// Worktree exists - create PR for human validation
 					console.warn(
 						`[TASK_UPDATE_STATUS] Creating PR for task ${taskId} (status: done)`,
@@ -163,12 +185,6 @@ print(json.dumps(result))
 						}
 						writeFileSync(tmpScriptPath, scriptContent, "utf-8");
 
-						// Get base branch from task metadata or project settings
-						const baseBranch =
-							task.metadata?.baseBranch ||
-							project.settings?.mainBranch ||
-							"develop";
-
 						// Build the parameters payload. The description is stripped of
 						// HTML so the PR body stays clean (no raw tags) and small
 						// (no inline base64 image), keeping it well under GitHub's
@@ -176,7 +192,10 @@ print(json.dumps(result))
 						const prParams = JSON.stringify({
 							project_path: project.path,
 							spec_id: task.specId,
-							task_title: stripHtml(task.title) || task.title,
+							// A title is one line: stripHtml turns inline tags such as
+							// <b> into line breaks, which a PR title cannot hold.
+							task_title:
+								stripHtml(task.title).replace(/\s+/g, " ").trim() || task.title,
 							task_description: stripHtml(task.description || ""),
 							base_branch: baseBranch,
 						});
@@ -188,24 +207,28 @@ print(json.dumps(result))
 						// `input` is an explicit UTF-8 Buffer (not a string) so accented
 						// characters survive the hand-off intact; PYTHONUTF8/IOENCODING
 						// keep Python's own stdio on UTF-8 regardless of the OS locale.
-						const result = execFileSync(pythonExecutable, [tmpScriptPath], {
-							cwd: backendPath,
-							encoding: "utf-8",
-							timeout: 60000, // 60 seconds timeout for PR creation
-							input: Buffer.from(prParams, "utf-8"),
-							maxBuffer: 10 * 1024 * 1024, // PR output can be sizable
-							env: await pythonRunnerEnv(backendPath, {
-								extra: {
-									APP_LANGUAGE: getAppLanguage(),
-								},
-							}),
-						});
-
-						// Clean up temporary script
+						// The script is removed whether Python answers or fails: a
+						// failed PR must not leave it in the user's project.
+						let result: string;
 						try {
-							unlinkSync(tmpScriptPath);
-						} catch {
-							// Ignore cleanup errors
+							result = execFileSync(pythonExecutable, [tmpScriptPath], {
+								cwd: backendPath,
+								encoding: "utf-8",
+								timeout: 60000, // 60 seconds timeout for PR creation
+								input: Buffer.from(prParams, "utf-8"),
+								maxBuffer: 10 * 1024 * 1024, // PR output can be sizable
+								env: await pythonRunnerEnv(backendPath, {
+									extra: {
+										APP_LANGUAGE: getAppLanguage(),
+									},
+								}),
+							});
+						} finally {
+							try {
+								unlinkSync(tmpScriptPath);
+							} catch {
+								// Ignore cleanup errors
+							}
 						}
 
 						// Parse result
@@ -282,14 +305,15 @@ print(json.dumps(result))
 					}
 				} else if (!existingPrUrl) {
 					// Mark done without creating a PR. Either there is no worktree
-					// (limbo-state recovery) or the user explicitly chose to close
-					// without a PR (skipPrCreation) — e.g. the remote push is blocked
-					// (Azure 403) or the change will be handled outside WorkPilot. The
+					// (limbo-state recovery), its work is already merged into the
+					// base branch, or the user explicitly chose to close without a
+					// PR (skipPrCreation) — e.g. the remote push is blocked (Azure
+					// 403) or the change will be handled outside WorkPilot. The
 					// worktree, if any, is left intact for reference.
 					console.warn(
 						`[TASK_UPDATE_STATUS] Allowing status 'done' for task ${taskId} without PR creation (skipPrCreation=${Boolean(
 							options?.skipPrCreation,
-						)}, hasWorktree=${hasWorktree})`,
+						)}, hasWorktree=${hasWorktree}, alreadyMerged=${alreadyMerged})`,
 					);
 				}
 			}
@@ -367,6 +391,7 @@ print(json.dumps(result))
 						planPath,
 						status,
 						project.id,
+						"user",
 					);
 
 					if (!persisted) {

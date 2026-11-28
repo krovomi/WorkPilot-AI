@@ -90,16 +90,11 @@ const customSanitizeSchema = {
 
 import { useFormatRelativeTime } from "@/hooks/useFormatRelativeTime";
 import {
-	IDEATION_TYPE_LABELS,
 	JSON_ERROR_PREFIX,
 	TASK_CATEGORY_COLORS,
-	TASK_CATEGORY_LABELS,
 	TASK_COMPLEXITY_COLORS,
-	TASK_COMPLEXITY_LABELS,
 	TASK_IMPACT_COLORS,
-	TASK_IMPACT_LABELS,
 	TASK_PRIORITY_COLORS,
-	TASK_PRIORITY_LABELS,
 } from "../../../shared/constants";
 import type { Task, TaskCategory } from "../../../shared/types";
 import { cn } from "../../lib/utils";
@@ -418,7 +413,7 @@ export function TaskMetadata({ task, editable = true }: TaskMetadataProps) {
 				case "ol":
 					element.setAttribute(
 						"class",
-						`${existingClass} my-3 pl-6 space-y-1 list-disc`.trim(),
+						`${existingClass} my-3 pl-6 space-y-1 ${tagName === "ol" ? "list-decimal" : "list-disc"}`.trim(),
 					);
 					break;
 				case "li":
@@ -743,7 +738,9 @@ export function TaskMetadata({ task, editable = true }: TaskMetadataProps) {
 											const Icon = CategoryIcon[task.metadata.category];
 											return <Icon className="h-3 w-3 mr-1" />;
 										})()}
-									{TASK_CATEGORY_LABELS[task.metadata.category]}
+									{t(`tasks:form.classification.values.category.${task.metadata.category}`, {
+										defaultValue: task.metadata.category,
+									})}
 								</Badge>
 							)}
 							{/* Priority */}
@@ -755,7 +752,9 @@ export function TaskMetadata({ task, editable = true }: TaskMetadataProps) {
 										TASK_PRIORITY_COLORS[task.metadata.priority],
 									)}
 								>
-									{TASK_PRIORITY_LABELS[task.metadata.priority]}
+									{t(`tasks:form.classification.values.priority.${task.metadata.priority}`, {
+										defaultValue: task.metadata.priority,
+									})}
 								</Badge>
 							)}
 							{/* Complexity */}
@@ -767,7 +766,9 @@ export function TaskMetadata({ task, editable = true }: TaskMetadataProps) {
 										TASK_COMPLEXITY_COLORS[task.metadata.complexity],
 									)}
 								>
-									{TASK_COMPLEXITY_LABELS[task.metadata.complexity]}
+									{t(`tasks:form.classification.values.complexity.${task.metadata.complexity}`, {
+										defaultValue: task.metadata.complexity,
+									})}
 								</Badge>
 							)}
 							{/* Impact */}
@@ -779,7 +780,9 @@ export function TaskMetadata({ task, editable = true }: TaskMetadataProps) {
 										TASK_IMPACT_COLORS[task.metadata.impact],
 									)}
 								>
-									{TASK_IMPACT_LABELS[task.metadata.impact]}
+									{t(`tasks:form.classification.values.impact.${task.metadata.impact}`, {
+										defaultValue: task.metadata.impact,
+									})}
 								</Badge>
 							)}
 							{/* Security Severity */}
@@ -792,7 +795,7 @@ export function TaskMetadata({ task, editable = true }: TaskMetadataProps) {
 									)}
 								>
 									<Shield className="h-3 w-3 mr-1" />
-									{task.metadata.securitySeverity}
+									{t(`tasks:metadata.securitySeverity.${task.metadata.securitySeverity}`)}
 								</Badge>
 							)}
 							{/* Source Type */}
@@ -800,8 +803,9 @@ export function TaskMetadata({ task, editable = true }: TaskMetadataProps) {
 								<Badge variant="secondary" className="text-xs">
 									{task.metadata.sourceType === "ideation" &&
 									task.metadata.ideationType
-										? IDEATION_TYPE_LABELS[task.metadata.ideationType] ||
-											task.metadata.ideationType
+										? t(`ideation:types.${task.metadata.ideationType}`, {
+												defaultValue: task.metadata.ideationType,
+											})
 										: t(`tasks:metadata.source.${task.metadata.sourceType}`, {
 												defaultValue: task.metadata.sourceType,
 											})}
@@ -1226,11 +1230,7 @@ function AcceptanceCriteriaSection({ task, editable }: AcceptanceCriteriaSection
 		if (ok) {
 			setSavedAt(Date.now());
 		} else {
-			toast({
-				title: t("tasks:metadata.acSaveErrorTitle"),
-				description: t("tasks:metadata.acSaveErrorDesc"),
-				variant: "destructive",
-			});
+			saveFailed();
 		}
 	};
 
@@ -1248,15 +1248,27 @@ function AcceptanceCriteriaSection({ task, editable }: AcceptanceCriteriaSection
 		setOpen(true);
 	};
 
+	const saveFailed = () =>
+		toast({
+			title: t("tasks:metadata.acSaveErrorTitle"),
+			description: t("tasks:metadata.acSaveErrorDesc"),
+			variant: "destructive",
+		});
+
 	const handleSave = async () => {
 		setIsSaving(true);
-		const ok = await persistUpdateTask(task.id, {
-			metadata: {
-				acceptanceCriteria: edited,
-				ignoreDescriptionCriteria:
-					edited.length === 0 && describedCriteria.length > 0 ? true : undefined,
-			},
-		});
+		let ok = false;
+		try {
+			ok = await persistUpdateTask(task.id, {
+				metadata: {
+					acceptanceCriteria: edited,
+					ignoreDescriptionCriteria:
+						edited.length === 0 && describedCriteria.length > 0 ? true : undefined,
+				},
+			});
+		} catch {
+			ok = false;
+		}
 		setIsSaving(false);
 		if (ok) {
 			setSavedAt(Date.now());
@@ -1266,17 +1278,7 @@ function AcceptanceCriteriaSection({ task, editable }: AcceptanceCriteriaSection
 			// Without this toast the button silently bounces back to "Enregistrer"
 			// and the user has no way to know whether the IPC failed, the file
 			// couldn't be written, or something else went wrong.
-			toast({
-				title: t(
-					"tasks:metadata.acSaveErrorTitle",
-					"Échec de l'enregistrement",
-				),
-				description: t(
-					"tasks:metadata.acSaveErrorDesc",
-					"Impossible de sauvegarder les critères d'acceptation. Voir la console pour les détails.",
-				),
-				variant: "destructive",
-			});
+			saveFailed();
 		}
 	};
 
@@ -1295,14 +1297,27 @@ function AcceptanceCriteriaSection({ task, editable }: AcceptanceCriteriaSection
 				task.id,
 				adoWorkItemId,
 			);
-			if (result.success && result.data) {
-				const synced = result.data.acceptanceCriteria;
-				await persistUpdateTask(task.id, {
-					metadata: { acceptanceCriteria: synced },
+			if (!result.success || !result.data) {
+				toast({
+					title: t("tasks:metadata.acSyncErrorTitle"),
+					description: t("tasks:metadata.acSyncErrorDesc"),
+					variant: "destructive",
 				});
+				return;
+			}
+			const synced = result.data.acceptanceCriteria;
+			if (await persistUpdateTask(task.id, { metadata: { acceptanceCriteria: synced } })) {
 				setOpen(synced.length > 0);
 				setSavedAt(Date.now());
+			} else {
+				saveFailed();
 			}
+		} catch {
+			toast({
+				title: t("tasks:metadata.acSyncErrorTitle"),
+				description: t("tasks:metadata.acSyncErrorDesc"),
+				variant: "destructive",
+			});
 		} finally {
 			setIsSyncing(false);
 		}
@@ -1457,6 +1472,7 @@ interface ExtraNoteSectionProps {
 
 function ExtraNoteSection({ task }: ExtraNoteSectionProps) {
 	const { t } = useTranslation(["tasks"]);
+	const { toast } = useToast();
 	const initial = task.metadata?.extraNote ?? "";
 	const [open, setOpen] = useState(initial.length > 0);
 	const [draft, setDraft] = useState(initial);
@@ -1471,12 +1487,23 @@ function ExtraNoteSection({ task }: ExtraNoteSectionProps) {
 
 	const handleSave = async () => {
 		setIsSaving(true);
-		const ok = await persistUpdateTask(task.id, {
-			metadata: { extraNote: draft },
-		});
+		let ok = false;
+		try {
+			ok = await persistUpdateTask(task.id, {
+				metadata: { extraNote: draft },
+			});
+		} catch {
+			ok = false;
+		}
 		setIsSaving(false);
 		if (ok) {
 			setSavedAt(Date.now());
+		} else {
+			toast({
+				title: t("tasks:metadata.extraNoteSaveErrorTitle"),
+				description: t("tasks:metadata.extraNoteSaveErrorDesc"),
+				variant: "destructive",
+			});
 		}
 	};
 
@@ -1504,6 +1531,7 @@ function ExtraNoteSection({ task }: ExtraNoteSectionProps) {
 				<Textarea
 					value={draft}
 					onChange={(e) => setDraft(e.target.value)}
+					aria-label={t("tasks:metadata.extraNote")}
 					placeholder={t("tasks:metadata.extraNotePlaceholder")}
 					rows={4}
 					className="text-sm"

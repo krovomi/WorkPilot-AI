@@ -16,6 +16,17 @@ model it saw resolve less than half of at least three distinct cards is
 passed over, and the choice's reason says so (`bench_scores`). When the
 bench judged the model on enough cards of the task's kind, those cards are
 the evidence (`bench.scores(project, kind)`).
+
+The models come from `models_registry` (`tier_pick`): budget work goes to a
+provider's ``fast`` model, balanced to ``standard``, premium to ``flagship``,
+and the next tier when a provider has none. A router told which providers the
+user has (`available`) never suggests a model of another one: a task that
+runs on Mistral gets a Mistral model or nothing. A provider billed per seat
+(Copilot, Windsurf, Cursor) or running locally (Ollama) has no per-token
+price; its choice costs $0 and says why.
+
+Every choice carries ``reason_code`` and ``reason_params`` beside its English
+``reason``, so the app words the reason in its own language.
 """
 
 from __future__ import annotations
@@ -26,7 +37,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 
 from bench.results import router_verdict
-from cost_intelligence.catalog import PricingCatalog
+from cost_intelligence.catalog import UNPRICED_PROVIDERS, PricingCatalog
+from models_registry import tier_pick
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +74,9 @@ class ModelChoice:
     tier: QualityTier
     estimated_cost_usd: float
     reason: str
+    # ``tier_for_task`` | ``unpriced_provider`` | ``fallback`` | ``no_model``
+    reason_code: str = "tier_for_task"
+    reason_params: dict[str, object] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -71,7 +86,63 @@ class ModelChoice:
             "tier": self.tier.value,
             "estimated_cost_usd": round(self.estimated_cost_usd, 6),
             "reason": self.reason,
+            "reason_code": self.reason_code,
+            "reason_params": self.reason_params,
         }
+
+
+#: Providers the default policy walks, in this order, for every tier.
+ROUTABLE_PROVIDERS: tuple[str, ...] = (
+    "anthropic",
+    "openai",
+    "google",
+    "mistral",
+    "deepseek",
+    "grok",
+    "openrouter",
+    "huggingface",
+    "copilot",
+    "windsurf",
+    "cursor",
+    "aws",
+    "meta",
+    "ollama",
+)
+
+#: Names the app or the task metadata use for a provider of the registry.
+PROVIDER_ALIASES: dict[str, str] = {
+    "claude": "anthropic",
+    "gemini": "google",
+    "local": "ollama",
+    "lmstudio": "ollama",
+    "lm-studio": "ollama",
+    "xai": "grok",
+    "github-copilot": "copilot",
+    "bedrock": "aws",
+}
+
+#: Registry tiers tried for each quality tier, in order.
+_REGISTRY_TIERS: dict[str, tuple[str, ...]] = {
+    "budget": ("fast", "standard", "local", "flagship"),
+    "balanced": ("standard", "flagship", "local", "fast"),
+    "premium": ("flagship", "standard", "local"),
+}
+
+
+def normalize_provider(name: str) -> str:
+    lowered = (name or "").strip().lower()
+    return PROVIDER_ALIASES.get(lowered, lowered)
+
+
+def _registry_chain(tier: str) -> list[tuple[str, str]]:
+    chain: list[tuple[str, str]] = []
+    for provider in ROUTABLE_PROVIDERS:
+        for registry_tier in _REGISTRY_TIERS[tier]:
+            entry = tier_pick(provider, registry_tier)
+            if entry is not None:
+                chain.append((provider, entry.model_id))
+                break
+    return chain
 
 
 @dataclass
@@ -89,30 +160,14 @@ class RoutingPolicy:
 
     @classmethod
     def default(cls) -> RoutingPolicy:
-        # Budget tier — cheap models, good for trivial / simple work.
-        budget_default: list[tuple[str, str]] = [
-            ("anthropic", "claude-haiku-4-5"),
-            ("openai", "gpt-4o-mini"),
-            ("google", "gemini-2.5-flash"),
-            ("ollama", "qwen2.5-coder"),
-        ]
-        # Balanced tier — Sonnet-class models.
-        balanced_default: list[tuple[str, str]] = [
-            ("anthropic", "claude-sonnet-4-6"),
-            ("openai", "gpt-4.1"),
-            ("google", "gemini-2.5-pro"),
-        ]
-        # Premium tier — Opus-class.
-        premium_default: list[tuple[str, str]] = [
-            ("anthropic", "claude-opus-4-6"),
-            ("openai", "gpt-4.1"),
-            ("google", "gemini-2.5-pro"),
-        ]
-        # All task classes share the same fallback chain by tier; callers
-        # can specialise per-class if they want.
-        budget = dict.fromkeys(TaskClass, budget_default)
-        balanced = dict.fromkeys(TaskClass, balanced_default)
-        premium = dict.fromkeys(TaskClass, premium_default)
+        """One chain per tier, read from ``models_registry.tier_pick``.
+
+        All task classes share the chain of their tier; callers can
+        specialise per class with a policy of their own.
+        """
+        budget = dict.fromkeys(TaskClass, _registry_chain("budget"))
+        balanced = dict.fromkeys(TaskClass, _registry_chain("balanced"))
+        premium = dict.fromkeys(TaskClass, _registry_chain("premium"))
         return cls(budget=budget, balanced=balanced, premium=premium)
 
     def chain_for(self, tier: QualityTier, task: TaskClass) -> list[tuple[str, str]]:
@@ -184,7 +239,7 @@ class ModelRouter:
         policy: RoutingPolicy | None = None,
         bench_scores: dict[tuple[str, str], dict] | None = None,
     ) -> None:
-        self.available = {p.lower() for p in (available or [])} or None
+        self.available = {normalize_provider(p) for p in (available or [])} or None
         self.catalog = catalog or PricingCatalog()
         self.policy = policy or RoutingPolicy.default()
         # ``bench.scores(project)``: {(provider, model): {resolved, judged, cases}}.
@@ -192,6 +247,20 @@ class ModelRouter:
 
     def _bench(self, provider: str, model: str) -> dict | None:
         return self.bench_scores.get((provider.lower(), model))
+
+    def _params(
+        self, provider: str, model: str, passed: list[str], **extra: object
+    ) -> dict[str, object]:
+        params: dict[str, object] = {"provider": provider, **extra}
+        score = self._bench(provider, model) if model else None
+        if score:
+            params["bench_resolved"] = score["resolved"]
+            params["bench_judged"] = score["judged"]
+            if score.get("kind"):
+                params["bench_kind"] = score["kind"]
+        if passed:
+            params["passed_over"] = list(passed)
+        return params
 
     def _with_bench(
         self, reason: str, provider: str, model: str, passed: list[str]
@@ -230,10 +299,11 @@ class ModelRouter:
                 )
                 continue
             pricing = self.catalog.get_pricing(provider, model)
-            if pricing is None:
-                # No pricing data — only allow if user explicitly made it
-                # available (probably a local provider like Ollama).
+            if pricing is None or provider in UNPRICED_PROVIDERS:
+                # No per-token price: a local runtime or a seat-billed
+                # provider. Only when the user made it available.
                 if self.available and provider in self.available:
+                    why = "local" if provider == "ollama" else "subscription"
                     return ModelChoice(
                         provider=provider,
                         model=model,
@@ -241,10 +311,14 @@ class ModelRouter:
                         tier=chosen_tier,
                         estimated_cost_usd=0.0,
                         reason=self._with_bench(
-                            f"local provider {provider} (no pricing data)",
+                            f"{why} provider {provider} (no per-token price)",
                             provider,
                             model,
                             passed,
+                        ),
+                        reason_code="unpriced_provider",
+                        reason_params=self._params(
+                            provider, model, passed, billing=why
                         ),
                     )
                 continue
@@ -265,10 +339,35 @@ class ModelRouter:
                     model,
                     passed,
                 ),
+                reason_code="tier_for_task",
+                reason_params=self._params(provider, model, passed),
             )
 
-        # Nothing in the chain is available — fall back to the first entry
-        # of the BALANCED tier so callers always get a non-None choice.
+        # The user named providers and none of them has a model in the
+        # registry (a coding-agent CLI that picks its own, a custom gateway):
+        # suggesting another provider's model would run nowhere.
+        if self.available is not None:
+            provider = sorted(self.available)[0]
+            return ModelChoice(
+                provider=provider,
+                model="",
+                task_class=task,
+                tier=chosen_tier,
+                estimated_cost_usd=0.0,
+                reason=self._with_bench(
+                    "no model of the available providers in the catalog",
+                    provider,
+                    "",
+                    passed,
+                ),
+                reason_code="no_model",
+                reason_params=self._params(
+                    provider, "", passed, providers=sorted(self.available)
+                ),
+            )
+
+        # Nothing in the chain is priced — fall back to the first entry of
+        # the BALANCED tier so callers always get a non-None choice.
         fallback_chain = self.policy.chain_for(QualityTier.BALANCED, task)
         if not fallback_chain:
             raise RuntimeError("RoutingPolicy has no balanced fallback configured")
@@ -285,6 +384,8 @@ class ModelRouter:
                 model,
                 passed,
             ),
+            reason_code="fallback",
+            reason_params=self._params(provider, model, passed),
         )
 
     def compare(

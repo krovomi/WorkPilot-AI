@@ -33,6 +33,7 @@ import {
 import { getOAuthModeClearVars } from "../agent/env-utils";
 import { getAugmentedEnv } from "../env-utils";
 import { pythonEnvManager } from "../python-env-manager";
+import { pinnedClaudeProfileEnv } from "../agent/pinned-claude-profile";
 import { getBestAvailableProfileEnv } from "../rate-limit-detector";
 import {
 	getGlobalProviderEnv,
@@ -78,11 +79,14 @@ const CLAUDE_AUTH_PROVIDERS: ReadonlySet<string> = new Set([
 	"copilot",
 ]);
 
-async function claudeAuthEnv(): Promise<Record<string, string>> {
+async function claudeAuthEnv(
+	plan: TaskProviderPlan | undefined,
+): Promise<Record<string, string>> {
 	const profile = await apiProfileEnv();
 	const usesApiProfile = Object.keys(profile).length > 0;
 	return {
-		...(usesApiProfile ? {} : getBestAvailableProfileEnv().env),
+		// A Claude account pinned by the task's card or project wins.
+		...(usesApiProfile ? {} : (pinnedClaudeProfileEnv(plan) ?? getBestAvailableProfileEnv()).env),
 		...profile,
 		...getOAuthModeClearVars(profile),
 	};
@@ -110,7 +114,7 @@ export async function pythonRunnerEnv(
 	const needsClaudeAuth = plan
 		? plan.usesClaude || plan.providers.includes("copilot")
 		: CLAUDE_AUTH_PROVIDERS.has(provider);
-	const authEnv = needsClaudeAuth ? await claudeAuthEnv() : {};
+	const authEnv = needsClaudeAuth ? await claudeAuthEnv(plan) : {};
 
 	return envWithoutCredentials(
 		{ ...getAugmentedEnv(), ...pythonEnv },

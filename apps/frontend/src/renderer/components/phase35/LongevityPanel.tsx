@@ -6,6 +6,8 @@
  */
 
 import { useTranslation } from "react-i18next";
+import { useShallow } from "zustand/react/shallow";
+import type { HealthGrade } from "../../../shared/types/longevity";
 import { useLongevityStore } from "../../stores/phase35-stores";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -15,7 +17,7 @@ interface LongevityPanelProps {
 	projectPath: string;
 }
 
-const GRADE_COLOR: Record<string, string> = {
+const GRADE_COLOR: Record<HealthGrade, string> = {
 	A: "bg-success/20 text-success border-success/40",
 	B: "bg-success/20 text-success border-success/40",
 	C: "bg-warning/20 text-warning border-warning/40",
@@ -24,8 +26,10 @@ const GRADE_COLOR: Record<string, string> = {
 };
 
 export function LongevityPanel({ projectPath }: LongevityPanelProps) {
-	const { t } = useTranslation("phase35");
-	const { phase, error, report, compute } = useLongevityStore();
+	const { t, i18n } = useTranslation("phase35");
+	const { phase, error, report, compute } = useLongevityStore(
+		useShallow((s) => ({ phase: s.phase, error: s.error, report: s.report, compute: s.compute })),
+	);
 	const isRunning = phase === "running";
 
 	return (
@@ -53,11 +57,11 @@ export function LongevityPanel({ projectPath }: LongevityPanelProps) {
 				<div className="space-y-4">
 					<div className="flex items-center gap-4">
 						<div className="text-4xl font-bold">{report.score.toFixed(1)}</div>
-						<Badge className={GRADE_COLOR[report.grade] ?? "bg-muted"}>
-							{t("longevity.grade")} {report.grade}
+						<Badge className={GRADE_COLOR[report.grade]}>
+							{t("longevity.gradeValue", { grade: report.grade })}
 						</Badge>
 						<div className="text-sm text-muted-foreground">
-							{t("longevity.loc")}: {report.summary.loc.toLocaleString()} ·{" "}
+							{t("longevity.loc")}: {report.summary.loc.toLocaleString(i18n.language)} ·{" "}
 							{t("longevity.debtItems")}: {report.summary.total_debt_items}
 						</div>
 					</div>
@@ -68,7 +72,9 @@ export function LongevityPanel({ projectPath }: LongevityPanelProps) {
 							<ul className="space-y-1">
 								{Object.entries(report.penalties).map(([k, v]) => (
 									<li key={k} className="flex justify-between">
-										<span className="text-muted-foreground">{k}</span>
+										<span className="text-muted-foreground">
+											{t(`longevity.signals.${k}` as never, { defaultValue: k })}
+										</span>
 										<span>−{v.toFixed(2)}</span>
 									</li>
 								))}
@@ -82,7 +88,9 @@ export function LongevityPanel({ projectPath }: LongevityPanelProps) {
 								) : (
 									Object.entries(report.bonuses).map(([k, v]) => (
 										<li key={k} className="flex justify-between">
-											<span className="text-muted-foreground">{k}</span>
+											<span className="text-muted-foreground">
+												{t(`longevity.signals.${k}` as never, { defaultValue: k })}
+											</span>
 											<span>{v >= 0 ? "+" : ""}{v.toFixed(2)}</span>
 										</li>
 									))

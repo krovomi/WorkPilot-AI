@@ -3,19 +3,23 @@ import { useRouter } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { visiblePages } from "../../admin/pages";
+import type { MyPermissions } from "../../api/types";
+import { administers as canAdminister } from "../../admin/pages";
 import { LockSection } from "../../auth/LockSection";
+import { SessionSection } from "../../auth/SessionSection";
 import { useSession } from "../../auth/session";
 import { describeError } from "../../i18n";
 import { Button, ErrorBanner, Section } from "../../ui/components";
-import { RADIUS, SPACE, useTheme } from "../../ui/theme";
+import { Icon } from "../../ui/Icon";
+import { Avatar, Chip, ListRow } from "../../ui/kit";
+import { elevation, RADIUS, SPACE, TYPE, useTheme } from "../../ui/theme";
 import { ThemeSection } from "../../ui/ThemeSection";
 import { orgRoleLabel } from "../../i18n/labels";
 
 export default function Settings() {
 	const { t } = useTranslation();
 	const theme = useTheme();
-	const { user, serverUrl, permissions, switchOrg, signOut, can } = useSession();
+	const { serverUrl, permissions, switchOrg, signOut, can, user } = useSession();
 	const router = useRouter();
 	const [busy, setBusy] = useState<string | null>(null);
 	const [error, setError] = useState<string | null>(null);
@@ -33,33 +37,69 @@ export default function Settings() {
 		}
 	};
 
-	const organizations = permissions?.organizations ?? [];
-	const administers = visiblePages(can).length > 0;
+	// Signed in, so read: the session sets the permissions with the signed-in status.
+	const organizations = (permissions as MyPermissions).organizations;
+	const administers = canAdminister(can);
+	const org = organizations.find((o) => o.id === permissions?.org_id);
 	return (
 		<ScrollView contentContainerStyle={styles.content}>
-			<Section title={t("settings.account")}>
-				<Text style={{ color: theme.text, fontSize: 16, fontWeight: "600" }}>{user?.display_name}</Text>
-				<Text style={{ color: theme.textMuted }}>{user?.email}</Text>
-			</Section>
-			<Section title={t("settings.server")}>
-				<Text style={{ color: theme.text }} selectable>
-					{serverUrl}
-				</Text>
-			</Section>
+			<View style={[styles.profile, { backgroundColor: theme.surface }, elevation(theme)]}>
+				<Avatar name={user?.display_name || user?.email || "?"} size={52} />
+				<View style={{ flex: 1, gap: 2 }}>
+					<Text style={[TYPE.heading, { color: theme.text }]} numberOfLines={1}>
+						{user?.display_name}
+					</Text>
+					<Text style={[TYPE.small, { color: theme.textMuted }]} numberOfLines={1}>
+						{user?.email}
+					</Text>
+					<View style={styles.server}>
+						<Icon name="server" size={12} color={theme.textFaint} />
+						<Text accessibilityLabel={t("settings.server")} style={[TYPE.caption, { color: theme.textFaint }]} numberOfLines={1} selectable>
+							{serverUrl}
+						</Text>
+					</View>
+				</View>
+				{org ? <Chip label={org.name} icon="briefcase" /> : null}
+			</View>
 			<ThemeSection />
+			<View style={{ gap: SPACE.sm }}>
+				{administers ? (
+					<ListRow icon="users" title={t("admin.title")} subtitle={t("admin.summary")} onPress={() => router.push("/admin")} />
+				) : null}
+				<ListRow
+					icon="bell"
+					title={t("needsYou.title")}
+					subtitle={t("needsYou.summary")}
+					onPress={() => router.push("/needs-you")}
+				/>
+				{can("lab.read") ? (
+					<ListRow
+						icon="film"
+						title={t("replays.title")}
+						subtitle={t("replays.summary")}
+						onPress={() => router.push("/replays")}
+					/>
+				) : null}
+				<ListRow icon="key" title={t("tokens.title")} subtitle={t("tokens.summary")} onPress={() => router.push("/tokens")} />
+				{can("settings.account.read") ? (
+					<ListRow
+						icon="cpu"
+						title={t("aiAccounts.title")}
+						subtitle={t("aiAccounts.summary")}
+						onPress={() => router.push("/ai-accounts")}
+					/>
+				) : null}
+				<ListRow
+					icon="bar-chart-2"
+					title={t("myUsage.title")}
+					subtitle={t("myUsage.summary")}
+					onPress={() => router.push("/my-usage")}
+				/>
+			</View>
 			<LockSection />
-			{administers ? (
-				<Section title={t("admin.title")}>
-					<Text style={{ color: theme.textMuted }}>{t("admin.summary")}</Text>
-					<Button label={t("admin.open")} variant="secondary" onPress={() => router.push("/admin")} />
-				</Section>
-			) : null}
-			<Section title={t("tokens.title")}>
-				<Text style={{ color: theme.textMuted }}>{t("tokens.summary")}</Text>
-				<Button label={t("tokens.manage")} variant="secondary" onPress={() => router.push("/tokens")} />
-			</Section>
+			<SessionSection />
 			{organizations.length > 0 ? (
-				<Section title={t("settings.organization")}>
+				<Section title={t("settings.organization")} icon="briefcase">
 					{organizations.map((org) => {
 						const selected = org.id === permissions?.org_id;
 						return (
@@ -81,14 +121,14 @@ export default function Settings() {
 									<Text style={{ color: theme.text, fontWeight: "600" }}>{org.name}</Text>
 									{org.my_role ? <Text style={{ color: theme.textMuted }}>{orgRoleLabel(org.my_role)}</Text> : null}
 								</View>
-								{selected ? <Text style={{ color: theme.accent }}>✓</Text> : null}
+								{selected ? <Icon name="check-circle" size={18} color={theme.accent} /> : null}
 							</Pressable>
 						);
 					})}
 				</Section>
 			) : null}
 			<ErrorBanner message={error} />
-			<Button label={t("settings.signOut")} variant="danger" onPress={() => void signOut()} />
+			<Button label={t("settings.signOut")} icon="log-out" variant="danger" onPress={() => void signOut()} />
 			<Text style={{ color: theme.textFaint, textAlign: "center" }}>
 				{t("settings.version", { version: Constants.expoConfig?.version ?? "?" })}
 			</Text>
@@ -97,7 +137,9 @@ export default function Settings() {
 }
 
 const styles = StyleSheet.create({
-	content: { padding: SPACE.lg, gap: SPACE.lg },
+	content: { padding: SPACE.lg, gap: SPACE.lg, paddingBottom: SPACE.xl * 2 },
+	profile: { flexDirection: "row", alignItems: "center", gap: SPACE.md, borderRadius: RADIUS.lg, padding: SPACE.lg },
+	server: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 },
 	org: {
 		flexDirection: "row",
 		alignItems: "center",

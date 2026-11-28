@@ -257,12 +257,15 @@ except ImportError:
         return {}
 
 
+from code_mode.native import apply as native_code_mode
 from core.custom_mcp_validation import (
     validate_custom_mcp_server as _validate_custom_mcp_server,
 )
 from core.mcp_pinning import custom_servers as _custom_servers
 from core.mcp_pinning import pinned_servers
 from docintel.read_guard import make_read_guard_hook
+from gateway_providers import BASE_URLS as GATEWAY_BASE_URLS
+from gateway_routing import gateway_routing_params
 from harness.application.budget import session_budget_usd
 from harness.application.subagents import (
     SUBAGENT_TOOLS,
@@ -610,14 +613,12 @@ def _claude_transcript_exists(session_id: str, config_dir: str | None) -> bool:
         return False
 
 
-# Permission mode hardening for read-only phases. "plan" lets Claude explore and
-# reason but refuses every write/exec tool call — a strong defense-in-depth
-# complement to the tools allowlist. Only for agent types that have no business
-# modifying files; a prompt that has to write its output (the spec researcher,
-# the spec self-critique) must never be mapped onto one of these, or its phase
-# reports success over a placeholder file. Module-level so tests read the set
-# the client applies instead of a copy of it.
-# See: code.claude.com/docs/en/agent-sdk/permissions
+# Permission mode hardening for read-only phases: "plan" lets Claude explore and
+# reason but refuses every write/exec tool call, on top of the tools allowlist.
+# Only for types with no business modifying files; a prompt that writes its
+# output (spec researcher, spec self-critique) must never be one of these, or its
+# phase reports success over a placeholder file. Module-level so tests read the
+# set the client applies. See: code.claude.com/docs/en/agent-sdk/permissions
 READ_ONLY_AGENT_TYPES = frozenset(
     {
         "analyzer",
@@ -625,6 +626,8 @@ READ_ONLY_AGENT_TYPES = frozenset(
         "spec_validation",
         "pr_reviewer",
         "pr_orchestrator_parallel",
+        "pr_followup_parallel",
+        "issue_triage",
         "insights",
     }
 )
@@ -843,6 +846,7 @@ def create_client(
         options_kwargs["disallowed_tools"] = denied
 
     _add_effort(options_kwargs, model, max_thinking_tokens, agent_type)
+    native_code_mode(options_kwargs, settings_file, agent_type, spec_dir, project_dir)
 
     return ClaudeSDKClient(options=ClaudeAgentOptions(**options_kwargs))
 
@@ -1006,7 +1010,6 @@ def _write_security_settings(
     project_dir: Path, spec_dir: Path, required_servers
 ) -> tuple[Path, list[str]]:
     """Write `.claude_settings.json`; returns it and the worktree rules it holds."""
-    # Determine browser tools for permissions (already in allowed_tools_list)
     browser_tools_permissions = []
     if "electron" in required_servers:
         browser_tools_permissions = ELECTRON_TOOLS
@@ -1083,7 +1086,6 @@ def _write_security_settings(
         },
     }
 
-    # Write settings to a file in the project directory
     settings_file = project_dir / ".claude_settings.json"
     with open(settings_file, "w", encoding="utf-8") as f:
         json.dump(security_settings, f, indent=2)
@@ -1291,10 +1293,10 @@ def _workpilot_servers(
     if "brain" in required_servers:
         from brain.runtime import SERVER_KEY, mcp_server_config, task_ref
 
-        # The task, when there is one, so what the agent learns shows up on
-        # its Kanban card.
+        # The task, so what the agent learns shows up on its Kanban card; the
+        # folder, so it recalls for its branch (`brain.lifecycle.scopes`).
         mcp_servers[SERVER_KEY] = mcp_server_config(
-            task=task_ref(project_dir, spec_dir)
+            task=task_ref(project_dir, spec_dir), project_dir=project_dir
         )
 
     # ui-ux-pro-max (`uiux/integration.py`): offered only on a task whose
@@ -1374,46 +1376,22 @@ def _system_prompt(
 
 
 def _debugger_hooks(project_dir: Path, spec_dir: Path, agent_type: str) -> list:
-    """Agent Debugger (opt-in): a PreToolUse hook that pauses on breakpoints.
+    """Agent Debugger: a PreToolUse hook that pauses on the person's breakpoints.
 
-    It waits for a resume decision issued from the UI. Zero impact on normal
-    runs: the hook is installed ONLY when this run opts in, which happens when
-    either (a) AUTO_CLAUDE_AGENT_DEBUGGER is truthy, or (b) the user has
-    already attached a debugger session for this spec in the UI (a row exists
-    in the file-backed store keyed by the spec name). Both checks are cheap and
-    off the tool-call hot path — session_exists() is a single stat when the
-    store file is absent. Wiring failures must never abort session startup,
-    hence the broad guard.
+    Installed on every run, so a person who attaches while the run is going
+    (it is listed as soon as it starts, ``agents.session_recording``) can stop
+    its next tool call. Zero cost without breakpoints: the hook stats one file
+    per tool call. Wiring failures must never abort session startup.
     """
-    _debugger_hooks: list = []
+    del agent_type  # the run announces itself with its role when it starts
     try:
-        from agents import debugger_store
         from agents.debugger import make_persistent_debugger_hook
 
         _dbg_session_id = spec_dir.name if spec_dir else project_dir.name
-        _dbg_forced = os.environ.get("AUTO_CLAUDE_AGENT_DEBUGGER", "").lower() in (
-            "1",
-            "true",
-            "yes",
-            "on",
-        )
-        if _dbg_forced or debugger_store.session_exists(_dbg_session_id):
-            debugger_store.register_active(
-                _dbg_session_id,
-                {
-                    "project": str(project_dir.resolve()),
-                    "spec": _dbg_session_id,
-                    "agent_type": agent_type,
-                    "pid": os.getpid(),
-                },
-            )
-            _debugger_hooks.append(
-                HookMatcher(hooks=[make_persistent_debugger_hook(_dbg_session_id)])
-            )
-            print(f"   - Agent Debugger: attached to session '{_dbg_session_id}'")
+        return [HookMatcher(hooks=[make_persistent_debugger_hook(_dbg_session_id)])]
     except Exception:
         logger.debug("Agent debugger wiring skipped", exc_info=True)
-    return _debugger_hooks
+        return []
 
 
 def _session_hooks(
@@ -1492,7 +1470,7 @@ def _session_hooks(
                 HookMatcher(matcher=tool, hooks=[_watermarks_hook])
                 for tool in WATERMARK_CLEANED_TOOLS
             ),
-            # Debugger breakpoints (any tool). Empty unless this run opted in.
+            # Debugger breakpoints (any tool), last: a refused call never waits.
             *debugger_hooks,
         ],
         "PostToolUse": [
@@ -1506,15 +1484,15 @@ def _session_hooks(
                 matcher=CLAUDE_TOOLS_MATCHER,
                 hooks=[make_claude_hook(spec_dir, project_dir)],
             ),
-            # MCP Apps (IA4): Claude Code calls the tool and shows no view;
-            # this keeps it for the task panel, as the WorkPilot loop does.
-            # Only when a custom server is started; the hook never changes
-            # the result.
+            # MCP Apps (IA4): keeps a custom server's view for the task panel
+            # (Claude Code shows none); it never changes the result.
             *(
                 [
                     HookMatcher(
                         matcher="mcp__.*",
-                        hooks=[make_app_view_hook(spec_dir, app_view_servers)],
+                        hooks=[
+                            make_app_view_hook(spec_dir, app_view_servers, project_dir)
+                        ],
                     )
                 ]
                 if app_view_servers
@@ -1719,6 +1697,8 @@ _PROVIDER_ALIASES: dict[str, str] = {
     "mistral": "mistral",
     "deepseek": "deepseek",
     "grok": "grok",
+    "openrouter": "openrouter",
+    "huggingface": "huggingface",
     "aws": "aws",
     "windsurf": "windsurf",
     "cursor": "cursor",
@@ -1905,27 +1885,7 @@ def _resolve_active_provider(spec_dir: Path | None = None) -> tuple[str, bool]:
 
     # 2. Environment variable override
     env_provider = os.environ.get("AUTO_CLAUDE_PROVIDER", "").lower().strip()
-    if env_provider in (
-        "claude",
-        "copilot",
-        "openai",
-        "google",
-        "gemini",
-        "ollama",
-        "meta",
-        "mistral",
-        "deepseek",
-        "grok",
-        "aws",
-        "windsurf",
-        "cursor",
-        "custom",
-        "opencode",
-        "antigravity",
-        "agy",
-        "pi",
-        *acp_provider_names(),
-    ):
+    if env_provider in _PROVIDER_ALIASES:
         return _normalize_provider_name(env_provider), True
 
     # 3. Project-level setting from spec's parent project
@@ -1946,26 +1906,7 @@ def _resolve_active_provider(spec_dir: Path | None = None) -> tuple[str, bool]:
                         line = line.strip()
                         if line.startswith("AI_PROVIDER="):
                             value = line.split("=", 1)[1].strip().strip("\"'").lower()
-                            if value in (
-                                "claude",
-                                "copilot",
-                                "openai",
-                                "google",
-                                "ollama",
-                                "meta",
-                                "mistral",
-                                "deepseek",
-                                "grok",
-                                "aws",
-                                "windsurf",
-                                "cursor",
-                                "custom",
-                                "opencode",
-                                "antigravity",
-                                "agy",
-                                "pi",
-                                *acp_provider_names(),
-                            ):
+                            if value in _PROVIDER_ALIASES:
                                 return _normalize_provider_name(value), True
             except Exception:
                 # Une source de provider illisible : on passe a la suivante, c'est le but de la chaine.
@@ -2322,7 +2263,7 @@ def _sandbox_at_launch(
     else:
         # The WorkPilot loop: `run_command` in the tool executor decides the
         # same way on its first command.
-        sandbox = os_sandbox.session_sandbox(project_dir, spec_dir)
+        sandbox = os_sandbox.session_sandbox(project_dir, spec_dir, microvm=True)
     _report_sandbox(spec_dir, client.provider_name(), sandbox)
 
 
@@ -2814,11 +2755,12 @@ _COMPATIBLE_PROVIDER_URLS = {
     "mistral": "https://api.mistral.ai",
     "deepseek": "https://api.deepseek.com",
     "grok": "https://api.x.ai",
+    **GATEWAY_BASE_URLS,  # OpenRouter, Hugging Face (gateway_providers)
 }
 
 
 def _compatible_client(req: _ClientRequest):
-    """Mistral, DeepSeek and Grok: OpenAI-compatible APIs with their own key."""
+    """Mistral, DeepSeek, Grok, OpenRouter, Hugging Face: OpenAI-compatible APIs."""
     from core.agent_client import CompatibleProviderAgentClient
     from core.llm_optimization import compatible_cache_routing, compatible_effort_params
     from provider_models_catalog import _api_key_for
@@ -2847,10 +2789,7 @@ def _compatible_client(req: _ClientRequest):
     logger.info(
         "[create_agent_client] Using CompatibleProviderAgentClient "
         "(provider=%s, model=%s, agent_type=%s, effort=%s)",
-        provider,
-        req.model,
-        req.agent_type,
-        effort_params,
+        *(provider, req.model, req.agent_type, effort_params),
     )
     cache = compatible_cache_routing(provider, req.spec_dir, req.agent_type)
     return CompatibleProviderAgentClient(
@@ -2861,6 +2800,7 @@ def _compatible_client(req: _ClientRequest):
         effort_params=effort_params,
         prompt_cache_key=cache.body_key,
         cache_headers=cache.headers,
+        routing_params=gateway_routing_params(provider, req.model),
         system_prompt=req.prompt(tool_use_hint=True),
         project_dir=str(req.project_dir),
         agent_type=req.agent_type,

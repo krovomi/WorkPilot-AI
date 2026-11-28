@@ -1075,4 +1075,32 @@ Please add credits to continue.`;
 			expect(result.isBillingFailure).toBe(true);
 		});
 	});
+
+	describe("errors of providers other than Claude", () => {
+		it("reads their 429s and spent quotas as limits", async () => {
+			const { detectRateLimit } = await import("../rate-limit-detector");
+			for (const output of [
+				"openai.RateLimitError: Error code: 429 - {'error': {'message': 'slow down'}}",
+				"HTTP status code: 429",
+				"{'error': {'type': 'insufficient_quota'}}",
+				"You exceeded your current quota, please check your plan and billing details.",
+				"google.api_core.exceptions: 429 RESOURCE_EXHAUSTED",
+			]) {
+				expect(detectRateLimit(output).isRateLimited, output).toBe(true);
+			}
+			expect(detectRateLimit("Error code: 4290 - nothing").isRateLimited).toBe(false);
+		});
+
+		it("reads their refused API keys as sign-in failures", async () => {
+			const { detectAuthFailure } = await import("../rate-limit-detector");
+			for (const output of [
+				"openai.AuthenticationError: Error code: 401 - {'error': {'code': 'invalid_api_key'}}",
+				"Incorrect API key provided: sk-proj-****.",
+				"400 API key not valid. Please pass a valid API key.",
+				'{"error": {"code": "invalid_api_key"}}',
+			]) {
+				expect(detectAuthFailure(output).isAuthFailure, output).toBe(true);
+			}
+		});
+	});
 });

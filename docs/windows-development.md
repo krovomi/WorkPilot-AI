@@ -111,6 +111,22 @@ This can cause git diffs to show every line as changed.
    content = "\n".join(content.splitlines())
    ```
 
+## What a Linux run does not see
+
+A session in a Linux container can have every suite green and still turn the
+Windows CI red; pytest runs there with `-x`, so each shard shows only its first
+failure. Seven traps keep coming back, and three are held on Linux too:
+
+| Trap on Windows | What holds it on Linux |
+|---|---|
+| a path made by `str(p.relative_to(root))`, `str(Path(...))` or `os.path.relpath` holds `\` in a report, an event, a prompt or a test | `python scripts/quality_baselines.py check` (per-file ceiling `native-path`): write `.as_posix()` |
+| a runner started by a test dies on an emoji (`cp1252` console) | `tests/conftest.py` gives every test the app's `PYTHONUTF8=1` and `PYTHONIOENCODING=utf-8` |
+| `open` / `read_text` / `write_text` without an encoding | `tests/test_text_io_encoding.py` |
+| a tool started by its bare name (`["claude", ...]`) when it is an npm `.cmd` shim: Windows only looks for `claude.exe` | nothing: start the path `shutil.which` (or `foundation.platform.find_executable`) returned, and pass a minimal env with `SYSTEMROOT` |
+| `write_text("x\n")` writes `\r\n`; a text pipe (`text=True`) changes a patch's line endings; an OS error (`str(exc)`) has other words | nothing: write in bytes what must be bytes (`write_bytes`, `git diff --output=<file>`), and word yourself the message a test reads |
+| `time.time()` moves in ~16 ms steps: two records written one after the other carry the same time, and "newest first" falls back to another order | nothing: never order by a timestamp alone; make the next one strictly greater (`generational_tests/archive.py`) or add a sequence |
+| `os.replace` over a file another handle holds for an instant (a reader, the indexer, an antivirus) raises `PermissionError [WinError 5]`, lock or no lock | nothing: write through `foundation.file_utils` (`atomic_write`, `write_json_atomic`, `replace_file`), which waits it out on Windows |
+
 ## Path Separators
 
 ### Problem
@@ -131,6 +147,13 @@ This can break path operations.
    # Wrong - Unix only
    config_path = "config/settings.json"
    ```
+
+1b. **A path that leaves the process is POSIX:** in a report, an event, a
+   prompt, a JSON file or a test, write `path.relative_to(root).as_posix()`,
+   never `str(path.relative_to(root))`: on Windows the second one is
+   `src\a.cs`. `python scripts/quality_baselines.py check` refuses a new
+   `str(...relative_to(...))`, `str(Path(...))` or `os.path.relpath(...)`
+   (ceiling per file in `tests/baselines/native-path.json`).
 
 2. **Use `os.path.join()` for strings:**
 

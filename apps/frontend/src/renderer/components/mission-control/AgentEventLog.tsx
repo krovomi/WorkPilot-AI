@@ -2,32 +2,39 @@
  * AgentEventLog — Scrollable live event feed for Mission Control.
  *
  * Shows recent orchestrator events with timestamps, types, and agent references.
+ * A live rebalancing (#344) says why and to which model; one not done, why not;
+ * a loop, where it was read.
  */
 
 import {
-	Activity,
+	Ban,
+	CheckCircle2,
 	Pause,
 	Play,
 	Plus,
+	Repeat,
 	RotateCcw,
 	Settings2,
+	Shuffle,
 	Square,
 	Trash2,
+	XCircle,
 } from "lucide-react";
 import { useMemo } from "react";
+import type { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
+import { formatAppTime } from "@/lib/date-format";
 import { cn } from "../../lib/utils";
 import type { AgentSlot, MCEvent } from "../../stores/mission-control-store";
 import { Badge } from "../ui/badge";
 import { ScrollArea } from "../ui/scroll-area";
-import { useTranslation } from "react-i18next";
-import { formatAppTime } from "@/lib/date-format";
 
 interface AgentEventLogProps {
 	readonly events: MCEvent[];
 	readonly agents: AgentSlot[];
 }
 
-const EVENT_ICONS: Record<string, React.ElementType> = {
+const EVENT_ICONS: Record<MCEvent["type"], React.ElementType> = {
 	agent_created: Plus,
 	agent_removed: Trash2,
 	agent_started: Play,
@@ -35,9 +42,14 @@ const EVENT_ICONS: Record<string, React.ElementType> = {
 	agent_resumed: RotateCcw,
 	agent_stopped: Square,
 	agent_config_updated: Settings2,
+	agent_completed: CheckCircle2,
+	agent_failed: XCircle,
+	agent_rebalanced: Shuffle,
+	agent_rebalance_skipped: Ban,
+	agent_loop_detected: Repeat,
 };
 
-const EVENT_COLORS: Record<string, string> = {
+const EVENT_COLORS: Record<MCEvent["type"], string> = {
 	agent_created: "text-success",
 	agent_removed: "text-destructive",
 	agent_started: "text-blue-500",
@@ -45,27 +57,36 @@ const EVENT_COLORS: Record<string, string> = {
 	agent_resumed: "text-cyan-500",
 	agent_stopped: "text-gray-500",
 	agent_config_updated: "text-purple-500",
+	agent_completed: "text-success",
+	agent_failed: "text-destructive",
+	agent_rebalanced: "text-warning",
+	agent_rebalance_skipped: "text-muted-foreground",
+	agent_loop_detected: "text-warning",
 };
 
-function formatTaskDisplay(task: unknown): string {
-	if (typeof task === "string") {
-		return task;
+/** What a rebalancing event says beyond its title; null for other events. */
+function rebalanceLine(event: MCEvent, t: TFunction): string | null {
+	const { reason, action, skipped, from, to, source } = event.data;
+	if (event.type === "agent_loop_detected" && source) {
+		return t(`missionControl:rebalance.loopSources.${source}`);
 	}
-	if (typeof task === "object" && task !== null) {
-		return JSON.stringify(task);
+	if (!reason) return null;
+	const why = t(`missionControl:rebalance.reasons.${reason}`);
+	if (event.type === "agent_rebalanced" && action) {
+		return t("missionControl:rebalance.moved", {
+			reason: why,
+			action: t(`missionControl:rebalance.actions.${action}`),
+			from,
+			to,
+		});
 	}
-	if (typeof task === "number") {
-		return task.toString();
+	if (event.type === "agent_rebalance_skipped" && skipped) {
+		return t("missionControl:rebalance.notMoved", {
+			reason: why,
+			skipped: t(`missionControl:rebalance.skipped.${skipped}`),
+		});
 	}
-	if (typeof task === "boolean") {
-		return task.toString();
-	}
-	// Handle symbol, bigint, undefined (though we check for null/undefined above)
-	if (typeof task === "symbol" || typeof task === "bigint") {
-		return task.toString();
-	}
-	// This should only be reached for function types or other edge cases
-	return "Unsupported task type";
+	return null;
 }
 
 export function AgentEventLog({ events, agents }: AgentEventLogProps) {
@@ -92,12 +113,10 @@ export function AgentEventLog({ events, agents }: AgentEventLogProps) {
 		<ScrollArea className="h-64">
 			<div className="space-y-1 pr-2">
 				{reversedEvents.map((event) => {
-					const Icon = EVENT_ICONS[event.type] ?? Activity;
-					const color = EVENT_COLORS[event.type] ?? "text-muted-foreground";
-					const agentId = event.data?.agent_id as string | undefined;
-					const agentName = agentId ? (agentMap.get(agentId) ?? agentId) : null;
-					const ts = new Date(event.timestamp * 1000);
-					const timeStr = formatAppTime(ts, {
+					const Icon = EVENT_ICONS[event.type];
+					const { agent_id: agentId, error, task } = event.data;
+					const detail = rebalanceLine(event, t);
+					const timeStr = formatAppTime(new Date(event.timestamp * 1000), {
 						hour: "2-digit",
 						minute: "2-digit",
 						second: "2-digit",
@@ -105,31 +124,22 @@ export function AgentEventLog({ events, agents }: AgentEventLogProps) {
 
 					return (
 						<div
-							key={`${event.timestamp}-${event.type}`}
+							// Two agents can log the same event in the same instant: the agent keeps the key unique.
+							key={`${event.timestamp}-${event.type}-${agentId}`}
 							className="flex items-start gap-2 py-1 px-1.5 rounded text-xs hover:bg-muted/30 transition-colors"
 						>
-							<Icon className={cn("h-3.5 w-3.5 shrink-0 mt-0.5", color)} />
+							<Icon className={cn("h-3.5 w-3.5 shrink-0 mt-0.5", EVENT_COLORS[event.type])} />
 							<div className="flex-1 min-w-0">
 								<div className="flex items-center gap-1.5">
-									<span className="font-medium capitalize">
-										{event.type.replaceAll("_", " ")}
-									</span>
-									{agentName && (
-										<Badge variant="outline" className="text-3xs px-1 py-0">
-											{agentName}
-										</Badge>
-									)}
+									<span className="font-medium">{t(`missionControl:events.${event.type}`)}</span>
+									{/* A removed agent is still named by its id. */}
+									<Badge variant="outline" className="text-3xs px-1 py-0">
+										{agentMap.get(agentId) ?? agentId}
+									</Badge>
 								</div>
-								{(() => {
-									const task = event.data?.task;
-									if (task == null) return null;
-
-									return (
-										<p className="text-muted-foreground truncate mt-0.5">
-											{formatTaskDisplay(task)}
-										</p>
-									);
-								})()}
+								{error && <p className="text-destructive truncate mt-0.5">{error}</p>}
+								{task && <p className="text-muted-foreground truncate mt-0.5">{task}</p>}
+								{detail && <p className="text-muted-foreground mt-0.5">{detail}</p>}
 							</div>
 							<span className="text-3xs text-muted-foreground shrink-0 tabular-nums">
 								{timeStr}

@@ -14,10 +14,12 @@
  *  - GitHub Actions: GITHUB_TOKEN (or gh CLI) + GITHUB_REPO (or CICD_GITHUB_TOKEN)
  *  - GitLab CI:      GITLAB_TOKEN (or glab CLI) + GITLAB_PROJECT [+ GITLAB_INSTANCE_URL]
  *                    (or CICD_GITLAB_TOKEN / CICD_GITLAB_PROJECT_ID)
+ *  - Bitbucket:      BITBUCKET_ENABLED + BITBUCKET_WORKSPACE + BITBUCKET_REPO + BITBUCKET_TOKEN
+ *                    [+ BITBUCKET_USERNAME] (ipc-handlers/bitbucket/pipelines-adapter.ts)
  *  - Jenkins:        CICD_JENKINS_URL + CICD_JENKINS_JOB + CICD_JENKINS_TOKEN
  *                    [+ CICD_JENKINS_USER] — multibranch job layout
  *
- * Provider selection: explicit CICD_PROVIDER=azure|github|gitlab|jenkins,
+ * Provider selection: explicit CICD_PROVIDER=azure|github|gitlab|bitbucket|jenkins,
  * otherwise auto-detected in that order from available credentials.
  */
 
@@ -34,6 +36,10 @@ import {
 	getGitLabConfig,
 	normalizeProjectReference,
 } from "./ipc-handlers/gitlab/utils";
+import { foldRuns } from "./ci-run-fold";
+import { bitbucketPipelinesAdapter } from "./ipc-handlers/bitbucket/pipelines-adapter";
+
+export { foldRuns };
 
 const MAX_ERROR_LINES = 40;
 
@@ -56,6 +62,33 @@ export interface PipelineProviderAdapter {
 	readonly label: string;
 	fetchLatestRun(branch: string): Promise<PipelineRun | null>;
 	fetchRunErrors(run: PipelineRun): Promise<string[]>;
+	/**
+	 * Every run of one commit folded into one (`foldRuns`): what the suite of
+	 * a pushed task branch says. Absent: the caller falls back on the latest
+	 * run of the branch queued after the push.
+	 */
+	fetchCommitRun?(branch: string, sha: string): Promise<PipelineRun | null>;
+	/**
+	 * Start the pipelines that validate pull requests on `branch`, for a
+	 * forge whose push trigger skips task branches. Never a deployment: only
+	 * a pipeline already seen validating a pull request (or the branch's own
+	 * pipeline file) is started. True when one started.
+	 */
+	triggerRun?(branch: string): Promise<boolean>;
+}
+
+async function postJson(
+	url: string,
+	headers: Record<string, string>,
+	body: unknown,
+): Promise<number> {
+	const res = await fetch(url, {
+		method: "POST",
+		redirect: "error",
+		headers: { ...headers, "Content-Type": "application/json" },
+		body: JSON.stringify(body),
+	});
+	return res.status;
 }
 
 async function fetchJson(
@@ -79,6 +112,18 @@ export interface AzureDevOpsProviderConfig {
 	project: string;
 }
 
+interface AzureBuild {
+	id: number;
+	buildNumber?: string;
+	status?: string;
+	result?: string;
+	queueTime?: string;
+	finishTime?: string;
+	sourceVersion?: string;
+	definition?: { id?: number; name?: string };
+	_links?: { web?: { href?: string } };
+}
+
 class AzureDevOpsAdapter implements PipelineProviderAdapter {
 	readonly id = "azure-devops" as const;
 	readonly label = "Azure DevOps";
@@ -100,21 +145,48 @@ class AzureDevOpsAdapter implements PipelineProviderAdapter {
 			`${this.baseUrl}/_apis/build/builds` +
 			`?branchName=${encodeURIComponent(`refs/heads/${branch}`)}` +
 			`&$top=1&queryOrder=queueTimeDescending&api-version=7.1`;
-		const body = (await fetchJson(url, this.headers)) as {
-			value?: Array<{
-				id: number;
-				buildNumber?: string;
-				status?: string;
-				result?: string;
-				queueTime?: string;
-				finishTime?: string;
-				definition?: { name?: string };
-				_links?: { web?: { href?: string } };
-			}>;
-		};
+		const body = (await fetchJson(url, this.headers)) as { value?: AzureBuild[] };
 		const build = body.value?.[0];
-		if (!build) return null;
+		return build ? this.toRun(build) : null;
+	}
 
+	async fetchCommitRun(branch: string, sha: string): Promise<PipelineRun | null> {
+		const url =
+			`${this.baseUrl}/_apis/build/builds` +
+			`?branchName=${encodeURIComponent(`refs/heads/${branch}`)}` +
+			`&$top=20&queryOrder=queueTimeDescending&api-version=7.1`;
+		const body = (await fetchJson(url, this.headers)) as { value?: AzureBuild[] };
+		const builds = (body.value ?? []).filter(
+			(build) => build.sourceVersion?.toLowerCase() === sha.toLowerCase(),
+		);
+		return foldRuns(builds.map((build) => this.toRun(build)));
+	}
+
+	async triggerRun(branch: string): Promise<boolean> {
+		// The definitions that validated pull requests lately: never a
+		// release or scheduled pipeline.
+		const recent = (await fetchJson(
+			`${this.baseUrl}/_apis/build/builds?reasonFilter=pullRequest&$top=50&api-version=7.1`,
+			this.headers,
+		)) as { value?: AzureBuild[] };
+		const ids = new Set(
+			(recent.value ?? [])
+				.map((build) => build.definition?.id)
+				.filter((id): id is number => Number.isInteger(id)),
+		);
+		let started = false;
+		for (const id of ids) {
+			const status = await postJson(
+				`${this.baseUrl}/_apis/build/builds?api-version=7.1`,
+				this.headers,
+				{ definition: { id }, sourceBranch: `refs/heads/${branch}` },
+			);
+			if (status === 200) started = true;
+		}
+		return started;
+	}
+
+	private toRun(build: AzureBuild): PipelineRun {
 		let state: PipelineRunState;
 		if (build.status === "completed") {
 			switch (build.result) {
@@ -173,6 +245,17 @@ class AzureDevOpsAdapter implements PipelineProviderAdapter {
 // GitHub Actions
 // ---------------------------------------------------------------------------
 
+interface GitHubRun {
+	id: number;
+	run_number?: number;
+	name?: string;
+	status?: string; // queued | in_progress | completed | waiting | pending
+	conclusion?: string | null; // success | failure | cancelled | timed_out | neutral | skipped | action_required
+	html_url?: string;
+	created_at?: string;
+	updated_at?: string;
+}
+
 interface GitHubProviderConfig {
 	token: string;
 	/** owner/repo */
@@ -198,20 +281,47 @@ class GitHubActionsAdapter implements PipelineProviderAdapter {
 			`https://api.github.com/repos/${this.cfg.repo}/actions/runs` +
 			`?branch=${encodeURIComponent(branch)}&per_page=1`;
 		const body = (await fetchJson(url, this.headers)) as {
-			workflow_runs?: Array<{
-				id: number;
-				run_number?: number;
-				name?: string;
-				status?: string; // queued | in_progress | completed | waiting | pending
-				conclusion?: string | null; // success | failure | cancelled | timed_out | neutral | skipped | action_required
-				html_url?: string;
-				created_at?: string;
-				updated_at?: string;
-			}>;
+			workflow_runs?: GitHubRun[];
 		};
 		const run = body.workflow_runs?.[0];
-		if (!run) return null;
+		return run ? this.toRun(run) : null;
+	}
 
+	async fetchCommitRun(branch: string, sha: string): Promise<PipelineRun | null> {
+		const url =
+			`https://api.github.com/repos/${this.cfg.repo}/actions/runs` +
+			`?branch=${encodeURIComponent(branch)}&head_sha=${encodeURIComponent(sha)}&per_page=50`;
+		const body = (await fetchJson(url, this.headers)) as {
+			workflow_runs?: GitHubRun[];
+		};
+		return foldRuns((body.workflow_runs ?? []).map((run) => this.toRun(run)));
+	}
+
+	async triggerRun(branch: string): Promise<boolean> {
+		// Workflows that validated pull requests lately, and only those a
+		// dispatch can start (GitHub answers 422 for one without the trigger).
+		const recent = (await fetchJson(
+			`https://api.github.com/repos/${this.cfg.repo}/actions/runs?event=pull_request&per_page=50`,
+			this.headers,
+		)) as { workflow_runs?: Array<{ workflow_id?: number }> };
+		const ids = new Set(
+			(recent.workflow_runs ?? [])
+				.map((run) => run.workflow_id)
+				.filter((id): id is number => Number.isInteger(id)),
+		);
+		let started = false;
+		for (const id of ids) {
+			const status = await postJson(
+				`https://api.github.com/repos/${this.cfg.repo}/actions/workflows/${id}/dispatches`,
+				this.headers,
+				{ ref: branch },
+			);
+			if (status === 204) started = true;
+		}
+		return started;
+	}
+
+	private toRun(run: GitHubRun): PipelineRun {
 		let state: PipelineRunState;
 		if (run.status === "completed") {
 			switch (run.conclusion) {
@@ -282,6 +392,16 @@ class GitHubActionsAdapter implements PipelineProviderAdapter {
 // GitLab CI
 // ---------------------------------------------------------------------------
 
+interface GitLabPipeline {
+	id: number;
+	iid?: number;
+	status?: string;
+	web_url?: string;
+	created_at?: string;
+	updated_at?: string;
+	name?: string | null;
+}
+
 interface GitLabProviderConfig {
 	token: string;
 	instanceUrl: string;
@@ -308,18 +428,30 @@ class GitLabCIAdapter implements PipelineProviderAdapter {
 		const url =
 			`${this.projectUrl}/pipelines` +
 			`?ref=${encodeURIComponent(branch)}&per_page=1&order_by=id&sort=desc`;
-		const pipelines = (await fetchJson(url, this.headers)) as Array<{
-			id: number;
-			iid?: number;
-			status?: string;
-			web_url?: string;
-			created_at?: string;
-			updated_at?: string;
-			name?: string | null;
-		}>;
+		const pipelines = (await fetchJson(url, this.headers)) as GitLabPipeline[];
 		const pipeline = pipelines?.[0];
-		if (!pipeline) return null;
+		return pipeline ? this.toRun(pipeline) : null;
+	}
 
+	async fetchCommitRun(branch: string, sha: string): Promise<PipelineRun | null> {
+		const url =
+			`${this.projectUrl}/pipelines` +
+			`?ref=${encodeURIComponent(branch)}&sha=${encodeURIComponent(sha)}&per_page=20`;
+		const pipelines = (await fetchJson(url, this.headers)) as GitLabPipeline[];
+		return foldRuns((pipelines ?? []).map((pipeline) => this.toRun(pipeline)));
+	}
+
+	async triggerRun(branch: string): Promise<boolean> {
+		// The branch's own .gitlab-ci.yml decides which jobs run on it.
+		const status = await postJson(
+			`${this.projectUrl}/pipeline?ref=${encodeURIComponent(branch)}`,
+			this.headers,
+			{},
+		);
+		return status === 201;
+	}
+
+	private toRun(pipeline: GitLabPipeline): PipelineRun {
 		let state: PipelineRunState;
 		switch (pipeline.status) {
 			case "success":
@@ -557,7 +689,7 @@ function resolveJenkinsConfig(env: MergedEnv): JenkinsProviderConfig | null {
  * Resolve the CI provider adapter for a project.
  *
  * Explicit CICD_PROVIDER wins; otherwise the first provider with complete
- * credentials is used (Azure → GitHub → GitLab → Jenkins). Returns null when
+ * credentials is used (Azure → GitHub → GitLab → Bitbucket → Jenkins). Returns null when
  * no provider is configured — the polling service then skips the project.
  */
 export async function resolvePipelineProvider(
@@ -594,6 +726,9 @@ export async function resolvePipelineProvider(
 		case "gitlab":
 		case "gitlab-ci":
 			return buildGitLab();
+		case "bitbucket":
+		case "bitbucket-pipelines":
+			return bitbucketPipelinesAdapter(env);
 		case "jenkins":
 			return buildJenkins();
 		case "none":
@@ -604,6 +739,10 @@ export async function resolvePipelineProvider(
 	}
 
 	return (
-		buildAzure() ?? buildGitHub() ?? (await buildGitLab()) ?? buildJenkins()
+		buildAzure() ??
+		buildGitHub() ??
+		(await buildGitLab()) ??
+		bitbucketPipelinesAdapter(env) ??
+		buildJenkins()
 	);
 }

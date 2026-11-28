@@ -6,8 +6,12 @@ import {
 	waitFor,
 } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+	holdVoiceMicrophone,
+	useVoiceAssistantStore,
+} from "../../stores/voice-assistant-store";
 import { TaskDictation } from "./TaskDictation";
-import { captureDictation } from "./dictation-audio";
+import { captureDictation, type DictationStop } from "./dictation-audio";
 
 vi.mock("./dictation-audio", () => ({ captureDictation: vi.fn() }));
 vi.mock("react-i18next", () => ({
@@ -31,7 +35,7 @@ describe("editable task dictation", () => {
 		});
 		vi.mocked(captureDictation).mockImplementation(async (callback) => {
 			chunk = callback;
-			return stop;
+			return Object.assign(stop, { flush: vi.fn() });
 		});
 	});
 	it("preserves manual corrections and concurrent ticket edits; inserts only once", async () => {
@@ -117,7 +121,7 @@ describe("editable task dictation", () => {
 	});
 
 	it("releases a microphone that opens after the user cancelled", async () => {
-		let opened!: (stop: (discard?: boolean) => void) => void;
+		let opened!: (stop: DictationStop) => void;
 		vi.mocked(captureDictation).mockImplementationOnce(
 			() =>
 				new Promise((resolve) => {
@@ -137,7 +141,7 @@ describe("editable task dictation", () => {
 		await waitFor(() => expect(captureDictation).toHaveBeenCalled());
 		expect(pending).toHaveBeenLastCalledWith(true);
 		fireEvent.click(screen.getByText("dictation.cancel"));
-		await act(async () => opened(stop));
+		await act(async () => opened(Object.assign(stop, { flush: vi.fn() })));
 		expect(stop).toHaveBeenCalledWith(true);
 		expect(pending).toHaveBeenLastCalledWith(false);
 	});
@@ -163,5 +167,30 @@ describe("editable task dictation", () => {
 				"/work/project",
 			),
 		);
+	});
+	it("takes the voice assistant's background microphone first, and gives it back", async () => {
+		useVoiceAssistantStore.setState({ formDictations: 0 });
+		// The assistant lets go before each of this dictation's sessions starts.
+		const startsSeen: number[] = [];
+		const release = vi.fn(() => startsSeen.push(start.mock.calls.length));
+		const unhold = holdVoiceMicrophone(release);
+		const view = render(
+			<TaskDictation description="" onChange={vi.fn()} richText={false} />,
+		);
+		fireEvent.click(screen.getByText("dictation.start"));
+		expect(release).toHaveBeenCalledOnce();
+		expect(useVoiceAssistantStore.getState().formDictations).toBe(1);
+		await screen.findByText("dictation.recording", { exact: false });
+		fireEvent.click(screen.getByText("dictation.stop"));
+		await waitFor(() =>
+			expect(useVoiceAssistantStore.getState().formDictations).toBe(0),
+		);
+		// Closing the form mid-dictation gives it back too.
+		fireEvent.click(screen.getByText(/dictation\.(start|resume)/));
+		expect(useVoiceAssistantStore.getState().formDictations).toBe(1);
+		expect(startsSeen).toEqual([0, 1]);
+		view.unmount();
+		expect(useVoiceAssistantStore.getState().formDictations).toBe(0);
+		unhold();
 	});
 });

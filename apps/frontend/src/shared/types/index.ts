@@ -7,16 +7,23 @@ export * from "./app-update";
 export * from "./automations";
 // Repo bench (finished cards replayed and judged by their own tests)
 export * from "./bench";
+// Bitbucket Cloud views (main/ipc-handlers/bitbucket/)
+export * from "./bitbucket";
 // workpilot-board MCP server registered with other AI apps
 export * from "./board-mcp";
+// « Interroger le tableau »: a question answered with the related tickets
+export * from "./board-ask";
 export * from "./changelog";
 export * from "./cli";
 // Common types
 export * from "./common";
+export * from "./sprint";
 // Context Mesh types (Cross-Project Intelligence)
 export * from "./context-mesh";
 // Live context-window telemetry (CONTEXT_USAGE / CONTEXT_ACTION_APPLIED)
 export * from "./context-usage";
+// Execution waves across specs (Conflict Predictor, #358)
+export * from "./conflict-waves";
 export * from "./insights";
 export * from "./integrations";
 // IPC types (must be last to use types from other modules)
@@ -34,6 +41,7 @@ export * from "./mcp-marketplace";
 export * from "./multi-repo";
 // Domain-specific types
 export * from "./project";
+export * from "./memory-lifecycle";
 // PR follow-through (the card drives its PR to merge)
 export * from "./pr-followup";
 export * from "./roadmap";
@@ -42,6 +50,7 @@ export * from "./smart-estimation";
 export * from "./task";
 export * from "./team-room";
 export * from "./task-sandbox";
+export * from "./suite-placement";
 export * from "./task-permission";
 export * from "./test-generation";
 export * from "./terminal";
@@ -49,6 +58,12 @@ export * from "./terminal";
 export * from "./time-travel";
 // Goal mode (a command decides when the task is done)
 export * from "./goal";
+export * from "./applied-lessons";
 export * from "./best-of-n";
 // Dashboard, analytics, costs and session history (local or server project)
 export * from "./workspace";
+// Cost budgets (project, task) enforced by the backend
+export * from "./cost-budget";
+export * from "./agent-safety";
+export * from "./governance";
+export * from "./forge-binding";

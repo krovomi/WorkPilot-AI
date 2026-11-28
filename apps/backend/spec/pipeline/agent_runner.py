@@ -48,6 +48,9 @@ PROMPT_AGENT_TYPES = {
 }
 
 
+_RATE_LIMIT_MARKERS = ("rate_limit", "rate limit", "limit_event")
+
+
 def agent_type_for(prompt_file: str) -> str:
     """The `AGENT_CONFIGS` entry a spec prompt runs under."""
     return PROMPT_AGENT_TYPES.get(prompt_file, "spec_writer")
@@ -154,7 +157,7 @@ class AgentRunner:
             )
 
         # Determine which provider to use
-        from core.client import _get_active_provider, _normalize_provider_name
+        from core.client import _normalize_provider_name, peek_active_provider
         from phase_config import get_phase_provider, is_engine_locked
 
         # A task that owns its engine names the spec phase's provider itself;
@@ -168,7 +171,7 @@ class AgentRunner:
         active_provider = (
             _normalize_provider_name(locked_provider)
             if locked_provider
-            else _get_active_provider(self.spec_dir)
+            else peek_active_provider(self.spec_dir)
         )
         debug("agent_runner", f"Active provider resolved: {active_provider}")
 
@@ -228,9 +231,12 @@ class AgentRunner:
                     "Use absolute paths for project source files. Modify the failed files "
                     "with tools; describing commands does not execute them.\n"
                 )
-            return await self._run_with_agent_client(
-                client, prompt, working_directory=working_directory
-            )
+            try:
+                return await self._run_with_agent_client(
+                    client, prompt, working_directory=working_directory
+                )
+            finally:
+                self._record_usage(client, agent_type)
 
         # Claude/Anthropic provider: use raw SDK client (create_client) for full
         # SDK message type compatibility (AssistantMessage, ToolUseBlock, etc.)
@@ -263,7 +269,7 @@ class AgentRunner:
 
         from context_mgmt.sdk_usage import SdkUsageProbe
 
-        usage_probe = SdkUsageProbe()
+        usage_probe = SdkUsageProbe(model=self.model or "")
         context_gauge = self._context_gauge(
             usage_probe, active_provider, self.model, prompt
         )
@@ -390,6 +396,7 @@ class AgentRunner:
                             )
 
                 print()
+                self._record_usage(usage_probe, agent_type)
 
                 # Detect empty sessions: if the agent didn't call any tools
                 # and produced no meaningful output, something went wrong
@@ -428,59 +435,70 @@ class AgentRunner:
                 return True, response_text
 
         except Exception as e:
-            error_str = str(e).lower()
             debug_error(
                 "agent_runner",
                 f"Agent session error: {e}",
                 exception_type=type(e).__name__,
             )
+            return self._session_error_outcome(e, "Claude SDK")
 
-            # Detect "prompt too long" errors — these are permanent for the
-            # current conversation, so we surface a sentinel the orchestrator
-            # recognises to halt the pipeline instead of looping.
-            if (
-                "prompt is too long" in error_str
-                or "prompt too long" in error_str
-                or "context length exceeded" in error_str
-                or "context_length_exceeded" in error_str
-                or "maximum context length" in error_str
-                or "input is too long" in error_str
-            ):
-                halt_msg = (
-                    f"Prompt too long for the LLM context window: {e}. "
-                    f"Reset the conversation or switch to a provider with a "
-                    f"larger context."
-                )
-                debug_error("agent_runner", halt_msg)
-                print(f"\n⛔ {halt_msg}", flush=True)
-                if self.task_logger:
-                    self.task_logger.log_error(halt_msg, LogPhase.PLANNING)
-                return False, f"PROMPT_TOO_LONG_HALT::{halt_msg}::{e}"
+    def _session_error_outcome(self, e: Exception, source: str) -> tuple[bool, str]:
+        """What a failed session answers the orchestrator, for every provider.
 
-            # Detect rate/usage limit exceptions from the SDK.
-            # The Claude Agent SDK may raise exceptions like:
-            #   "Unknown message type: rate_limit_event"
-            # when the account has hit its usage cap. We need to surface
-            # this clearly so the frontend rate-limit-detector picks it up.
-            if "rate_limit" in error_str or "limit_event" in error_str:
-                # Use "hit your limit" phrasing so frontend rate-limit-detector.ts
-                # matches via /hit your limit/i pattern and triggers proper UI.
-                cap_msg = (
-                    f"You've hit your limit — Claude SDK error: {e}. "
-                    f"Please wait for the limit to reset or switch to a different Claude profile."
-                )
-                debug_error("agent_runner", cap_msg)
-                print(f"\n⚠️  {cap_msg}", flush=True)
-                if self.task_logger:
-                    self.task_logger.log_error(cap_msg, LogPhase.PLANNING)
-                # Prefix with a sentinel the orchestrator recognises so it can
-                # invoke the rate-limit shield and retry the same phase instead
-                # of failing the spec pipeline outright.
-                return False, f"RATE_LIMIT_RETRY_REQUIRED::{cap_msg}::{e}"
+        A prompt too long for the context window is permanent: the
+        ``PROMPT_TOO_LONG_HALT::`` sentinel makes the orchestrator write the
+        halt marker instead of retrying. A rate or usage limit gets the
+        ``RATE_LIMIT_RETRY_REQUIRED::`` sentinel, so the rate-limit shield
+        pauses and retries the phase. Only the Claude stream recognised them:
+        the same errors from any other provider failed the spec outright.
+        """
+        from agents.session import is_prompt_too_long_error
 
+        # The same test as the shield's handle_prompt_too_long, which the
+        # orchestrator calls on this sentinel: a narrower list here missed
+        # Ollama's "available context size" and retried the oversized prompt.
+        if is_prompt_too_long_error(e):
+            halt_msg = (
+                f"Prompt too long for the LLM context window: {e}. "
+                f"Reset the conversation or switch to a provider with a "
+                f"larger context."
+            )
+            debug_error("agent_runner", halt_msg)
+            print(f"\n⛔ {halt_msg}", flush=True)
             if self.task_logger:
-                self.task_logger.log_error(f"Agent error: {e}", LogPhase.PLANNING)
-            return False, str(e)
+                self.task_logger.log_error(halt_msg, LogPhase.PLANNING)
+            return False, f"PROMPT_TOO_LONG_HALT::{halt_msg}::{e}"
+
+        # The Claude Agent SDK may raise "Unknown message type: rate_limit_event"
+        # when the account has hit its usage cap; other providers say
+        # "rate_limit_exceeded" or "Rate limit reached".
+        if any(marker in str(e).lower() for marker in _RATE_LIMIT_MARKERS):
+            # "hit your limit" is what the frontend rate-limit-detector.ts
+            # matches (/hit your limit/i) to show the right UI.
+            cap_msg = (
+                f"You've hit your limit — {source} error: {e}. "
+                f"Please wait for the limit to reset or switch to a different "
+                f"profile or provider."
+            )
+            debug_error("agent_runner", cap_msg)
+            print(f"\n⚠️  {cap_msg}", flush=True)
+            if self.task_logger:
+                self.task_logger.log_error(cap_msg, LogPhase.PLANNING)
+            return False, f"RATE_LIMIT_RETRY_REQUIRED::{cap_msg}::{e}"
+
+        if self.task_logger:
+            self.task_logger.log_error(f"Agent error: {e}", LogPhase.PLANNING)
+        return False, str(e)
+
+    def _record_usage(self, source, agent_type: str) -> None:
+        """A spec session counts in the project's usage ledgers, like a build's.
+
+        ``source`` is the AgentClient, or the ``SdkUsageProbe`` of a raw SDK
+        stream. Never raises: ``record_client_usage`` swallows its errors.
+        """
+        from agents.session import record_client_usage
+
+        record_client_usage(source, self.spec_dir, "spec", agent_type=agent_type)
 
     def _context_gauge(self, usage_source, provider: str, model: str, prompt: str):
         """A measure-only context guard for this spec session, or None.
@@ -673,9 +691,7 @@ class AgentRunner:
                 f"Agent client session error: {e}",
                 exception_type=type(e).__name__,
             )
-            if self.task_logger:
-                self.task_logger.log_error(f"Agent error: {e}", LogPhase.PLANNING)
-            return False, str(e)
+            return self._session_error_outcome(e, client.provider_name())
 
     @staticmethod
     def _extract_tool_input_display(inp: dict) -> str | None:

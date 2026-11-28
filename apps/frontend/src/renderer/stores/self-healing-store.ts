@@ -5,13 +5,18 @@
  */
 
 import type {
+	BisectProgressEvent,
+	BisectResult,
+	BisectStep,
 	CICDConfig,
 	FragilityReport,
 	HealingOperation,
 	Incident,
+	IncidentCluster,
 	IncidentMode,
 	ProactiveConfig,
 	ProductionConfig,
+	RiskTrendReport,
 	SelfHealingDashboardData,
 	SelfHealingStats,
 } from "@shared/types/self-healing";
@@ -20,12 +25,23 @@ import { persist } from "zustand/middleware";
 
 // ── Store State ─────────────────────────────────────────────
 
+/** One incident's bisect, as the view shows it while it runs and after. */
+export interface BisectRun {
+	running: boolean;
+	steps: Array<BisectStep & { tested: number }>;
+	result?: BisectResult;
+	error?: string;
+}
+
 interface SelfHealingState {
 	// Data
 	incidents: Incident[];
 	activeOperations: HealingOperation[];
 	fragilityReports: FragilityReport[];
 	stats: SelfHealingStats;
+	riskTrends: RiskTrendReport | null;
+	incidentClusters: IncidentCluster[];
+	bisects: Record<string, BisectRun>;
 
 	// Configuration
 	cicdConfig: CICDConfig;
@@ -63,6 +79,12 @@ interface SelfHealingState {
 	triggerFix: (projectPath: string, incidentId: string) => Promise<void>;
 	dismissIncident: (projectPath: string, incidentId: string) => Promise<void>;
 	retryIncident: (projectPath: string, incidentId: string) => Promise<void>;
+	startBisect: (
+		projectPath: string,
+		incidentId: string,
+		goodSha?: string,
+	) => Promise<void>;
+	applyBisectProgress: (event: BisectProgressEvent) => void;
 }
 
 // ── Default Values ──────────────────────────────────────────
@@ -79,7 +101,6 @@ const defaultCICDConfig: CICDConfig = {
 	enabled: false,
 	watchBranches: ["main", "develop"],
 	autoFixEnabled: true,
-	autoCreatePR: true,
 };
 
 const defaultProductionConfig: ProductionConfig = {
@@ -107,6 +128,9 @@ export const useSelfHealingStore = create<SelfHealingState>()(
 			activeOperations: [],
 			fragilityReports: [],
 			stats: defaultStats,
+			riskTrends: null,
+			incidentClusters: [],
+			bisects: {},
 			cicdConfig: defaultCICDConfig,
 			productionConfig: defaultProductionConfig,
 			proactiveConfig: defaultProactiveConfig,
@@ -127,6 +151,8 @@ export const useSelfHealingStore = create<SelfHealingState>()(
 					activeOperations: data.activeOperations,
 					fragilityReports: data.fragilityReports,
 					stats: data.stats,
+					riskTrends: data.riskTrends ?? null,
+					incidentClusters: data.incidentClusters ?? [],
 				}),
 
 			setIncidents: (incidents) => set({ incidents }),
@@ -255,6 +281,53 @@ export const useSelfHealingStore = create<SelfHealingState>()(
 					set({ error: String(error) });
 				}
 			},
+
+			startBisect: async (projectPath, incidentId, goodSha) => {
+				set((state) => ({
+					bisects: {
+						...state.bisects,
+						[incidentId]: { running: true, steps: [] },
+					},
+				}));
+				let run: Partial<BisectRun>;
+				try {
+					const response =
+						await globalThis.electronAPI.selfHealing.bisectIncident(
+							projectPath,
+							incidentId,
+							goodSha || undefined,
+						);
+					run = response.success
+						? { result: response.result }
+						: { error: response.error ?? "bisect failed" };
+				} catch (error) {
+					run = { error: String(error) };
+				}
+				set((state) => ({
+					bisects: {
+						...state.bisects,
+						[incidentId]: { ...state.bisects[incidentId], ...run, running: false },
+					},
+				}));
+				if (run.result) await get().fetchDashboard(projectPath);
+			},
+
+			applyBisectProgress: (event) =>
+				set((state) => {
+					const current = state.bisects[event.incidentId] ?? {
+						running: true,
+						steps: [],
+					};
+					return {
+						bisects: {
+							...state.bisects,
+							[event.incidentId]: {
+								...current,
+								steps: [...current.steps, event.step].slice(-50),
+							},
+						},
+					};
+				}),
 		}),
 		{
 			name: "self-healing-config",
@@ -266,3 +339,12 @@ export const useSelfHealingStore = create<SelfHealingState>()(
 		},
 	),
 );
+
+/** Registered once for the window by `global-listeners.ts`. */
+export function setupSelfHealingListeners(): () => void {
+	const api = globalThis.electronAPI?.selfHealing;
+	if (!api?.onBisectProgress) return () => undefined;
+	return api.onBisectProgress((event) =>
+		useSelfHealingStore.getState().applyBisectProgress(event),
+	);
+}

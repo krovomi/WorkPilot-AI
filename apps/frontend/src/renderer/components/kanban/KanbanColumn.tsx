@@ -16,16 +16,9 @@ import {
 	Archive,
 	Ban,
 	Check,
-	CheckCircle2,
-	ChevronLeft,
 	ChevronRight,
-	Eye,
 	Gauge,
-	GitPullRequest,
 	GripVertical,
-	Inbox,
-	ListPlus,
-	Loader2,
 	Lock,
 	MoreHorizontal,
 	Plus,
@@ -33,29 +26,53 @@ import {
 	Unlock,
 	X,
 } from "lucide-react";
-import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { TASK_STATUS_LABELS } from "../../../shared/constants";
 import type { Task, TaskStatus } from "../../../shared/types";
+import type { TaskStatusColumn } from "../../../shared/constants/task";
+import { columnPulse } from "../../lib/column-pulse";
+import { isQuickAddColumn, type QuickAddColumn } from "../../lib/kanban-columns";
+import { QUICK_ADD_LABELS } from "../../lib/quick-add";
+import { columnCapacity } from "../../lib/kanban-column-meta";
+import { installColumnStylesheet } from "../../lib/kanban-column-tokens";
 import { cn } from "../../lib/utils";
+import { useQuickAddShortcut } from "../../hooks/useQuickAddShortcut";
 import {
 	COLLAPSED_COLUMN_WIDTH,
 	DEFAULT_COLUMN_WIDTH,
 	MAX_COLUMN_WIDTH,
 	MIN_COLUMN_WIDTH,
 } from "../../stores/kanban-settings-store";
+import { useSettingsStore } from "../../stores/settings-store";
 import { SortableTaskCard } from "../SortableTaskCard";
+import {
+	type ColumnMenuActions,
+	ColumnMenuItems,
+	hasColumnMenuItems,
+} from "./ColumnMenuItems";
+import { PointerMenu, useContextMenuAt } from "./PointerMenu";
+import type { SelectGesture } from "../../hooks/useBoardSelection";
+import { useLaneOverStore } from "../../hooks/useLaneDrag";
+import { parseLaneDropId } from "../../lib/kanban-lanes";
 import { Button } from "../ui/button";
 import { Checkbox } from "../ui/checkbox";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
-	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
 import { Input } from "../ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { ScrollArea } from "../ui/scroll-area";
+import {
+	ColumnCount,
+	ColumnEmptyState,
+	ColumnGauge,
+	ColumnPulse,
+	ColumnIcon,
+} from "./ColumnBand";
+import { QuickAddComposer } from "./QuickAddComposer";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 
 // Max cards a single column renders before collapsing the tail behind a
@@ -65,8 +82,21 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 // visible slice — no change to drag-and-drop behaviour.
 export const COLUMN_RENDER_CAP = 60;
 
+// A double-click on these is theirs (a card, a control, the quick-add box),
+// never a request for a new card.
+const QUICK_ADD_IGNORED_TARGETS =
+	'.kanban-card, button, a, input, textarea, [role="menu"], [data-quick-add]';
+
+// A click with a modifier on these keeps its own meaning.
+const SELECT_GESTURE_IGNORED_TARGETS = 'button, a, input, textarea, [role="checkbox"]';
+
+// A right-click on these keeps its own menu (a card's, a text field's).
+const COLUMN_MENU_IGNORED_TARGETS =
+	'.kanban-card, input, textarea, [contenteditable="true"], [data-quick-add]';
+
 export interface DroppableColumnProps {
-	status: TaskStatus;
+	/** The column: a status, or an outcome column (« Échec », « Abandonnée »). */
+	status: TaskStatusColumn;
 	tasks: Task[];
 	onTaskClick: (task: Task) => void;
 	onStatusChange: (taskId: string, newStatus: TaskStatus) => unknown;
@@ -89,6 +119,12 @@ export interface DroppableColumnProps {
 	onSelectAll?: () => void;
 	onDeselectAll?: () => void;
 	onToggleSelect?: (taskId: string) => void;
+	/** Ctrl/Cmd+click (toggle) or Shift+click (range) on a card of the column. */
+	onCardSelectGesture?: (
+		taskId: string,
+		gesture: SelectGesture,
+		columnTaskIds: readonly string[],
+	) => void;
 	onDeleteTask?: (taskId: string) => void;
 	onDuplicateTask?: (taskId: string) => void;
 	onViewPRFiles?: (prUrl: string, taskId: string) => void;
@@ -105,6 +141,8 @@ export interface DroppableColumnProps {
 	isLocked?: boolean;
 	onToggleLocked?: () => void;
 	// Column drag handle props (for column reordering)
+	/** The drop target's id when the column sits in a lane (`laneDropId`); the status otherwise. */
+	droppableId?: string;
 	dragHandleProps?: {
 		listeners: SyntheticListenerMap | undefined;
 		attributes: DraggableAttributes;
@@ -144,6 +182,7 @@ export function droppableColumnPropsAreEqual(
 ): boolean {
 	// Quick checks first
 	if (prevProps.status !== nextProps.status) return false;
+	if (prevProps.droppableId !== nextProps.droppableId) return false;
 	if (prevProps.isOver !== nextProps.isOver) return false;
 	if (prevProps.isImportForbidden !== nextProps.isImportForbidden) return false;
 	if (prevProps.onTaskClick !== nextProps.onTaskClick) return false;
@@ -161,6 +200,7 @@ export function droppableColumnPropsAreEqual(
 	if (prevProps.onSelectAll !== nextProps.onSelectAll) return false;
 	if (prevProps.onDeselectAll !== nextProps.onDeselectAll) return false;
 	if (prevProps.onToggleSelect !== nextProps.onToggleSelect) return false;
+	if (prevProps.onCardSelectGesture !== nextProps.onCardSelectGesture) return false;
 	if (prevProps.isCollapsed !== nextProps.isCollapsed) return false;
 	if (prevProps.columnWidth !== nextProps.columnWidth) return false;
 	if (prevProps.isResizing !== nextProps.isResizing) return false;
@@ -183,78 +223,10 @@ export function droppableColumnPropsAreEqual(
 		}
 	}
 
-	// Deep compare tasks
-	const tasksEqual = tasksAreEquivalent(prevProps.tasks, nextProps.tasks);
-
-	// Only log when re-rendering (reduces noise)
-	if (globalThis.DEBUG && !tasksEqual) {
-		// noop
-	}
-
-	return tasksEqual;
+	return tasksAreEquivalent(prevProps.tasks, nextProps.tasks);
 }
 
-// Empty state content for each column
-export const getEmptyStateContent = (
-	status: TaskStatus,
-	t: (key: string) => string,
-): { icon: React.ReactNode; message: string; subtext?: string } => {
-	switch (status) {
-		case "backlog":
-			return {
-				icon: <Inbox className="h-6 w-6 text-muted-foreground/50" />,
-				message: t("kanban.emptyBacklog"),
-				subtext: t("kanban.emptyBacklogHint"),
-			};
-		case "queue":
-			return {
-				icon: <Loader2 className="h-6 w-6 text-muted-foreground/50" />,
-				message: t("kanban.emptyQueue"),
-				subtext: t("kanban.emptyQueueHint"),
-			};
-		case "in_progress":
-			return {
-				icon: <Loader2 className="h-6 w-6 text-muted-foreground/50" />,
-				message: t("kanban.emptyInProgress"),
-				subtext: t("kanban.emptyInProgressHint"),
-			};
-		case "ai_review":
-			return {
-				icon: <Eye className="h-6 w-6 text-muted-foreground/50" />,
-				message: t("kanban.emptyAiReview"),
-				subtext: t("kanban.emptyAiReviewHint"),
-			};
-		case "human_review":
-			return {
-				icon: <Eye className="h-6 w-6 text-muted-foreground/50" />,
-				message: t("kanban.emptyHumanReview"),
-				subtext: t("kanban.emptyHumanReviewHint"),
-			};
-		case "build_failed":
-			return {
-				icon: <CheckCircle2 className="h-6 w-6 text-success/50" />,
-				message: t("kanban.emptyBuildFailed"),
-				subtext: t("kanban.emptyBuildFailedHint"),
-			};
-		case "pr_created":
-			return {
-				icon: <GitPullRequest className="h-6 w-6 text-muted-foreground/50" />,
-				message: t("kanban.emptyPrOpen"),
-				subtext: t("kanban.emptyPrOpenHint"),
-			};
-		case "done":
-			return {
-				icon: <CheckCircle2 className="h-6 w-6 text-muted-foreground/50" />,
-				message: t("kanban.emptyDone"),
-				subtext: t("kanban.emptyDoneHint"),
-			};
-		default:
-			return {
-				icon: <Inbox className="h-6 w-6 text-muted-foreground/50" />,
-				message: t("kanban.emptyDefault"),
-			};
-	}
-};
+export { getEmptyStateContent } from "./ColumnBand";
 
 export interface WipLimitPopoverProps {
 	wipLimit?: number;
@@ -378,6 +350,7 @@ export const DroppableColumn = memo(function DroppableColumn({
 	onSelectAll,
 	onDeselectAll,
 	onToggleSelect,
+	onCardSelectGesture,
 	onDeleteTask,
 	onDuplicateTask,
 	onViewPRFiles,
@@ -390,11 +363,12 @@ export const DroppableColumn = memo(function DroppableColumn({
 	onResizeEnd,
 	isLocked,
 	onToggleLocked,
+	droppableId,
 	dragHandleProps,
 }: DroppableColumnProps) {
 	const { t } = useTranslation(["tasks", "common"]);
 	const { setNodeRef } = useDroppable({
-		id: status,
+		id: droppableId ?? status,
 	});
 
 	// Calculate selection state for this column
@@ -439,8 +413,102 @@ export const DroppableColumn = memo(function DroppableColumn({
 	);
 	const hiddenCardCount = tasks.length - visibleTasks.length;
 
+	// Quick add (Planification and File d'attente only): the box at the top
+	// of the list, opened by "+", the row under the cards, a double-click on
+	// the column's empty space, or N for Planification.
+	const canQuickAdd = isQuickAddColumn(status) && !!onAddClick;
+	const [isQuickAdding, setIsQuickAdding] = useState(false);
+	const openQuickAdd = useCallback(() => {
+		if (isCollapsed) onToggleCollapsed?.();
+		setIsQuickAdding(true);
+	}, [isCollapsed, onToggleCollapsed]);
+	const closeQuickAdd = useCallback(() => setIsQuickAdding(false), []);
+	useQuickAddShortcut(canQuickAdd && status === "backlog", openQuickAdd);
+
+	// One list of column actions, for the header "⋯" menu and the right-click
+	// menu; an action that does not apply here is left out.
+	const columnActions: ColumnMenuActions = {
+		onToggleSelectAll:
+			onSelectAll && onDeselectAll && taskCount > 0
+				? handleSelectAllChange
+				: undefined,
+		isAllSelected,
+		onQueueAll:
+			status === "backlog" && tasks.length > 0 ? onQueueAll : undefined,
+		onQueueSettings: status === "queue" ? onQueueSettings : undefined,
+		onArchiveAll:
+			status === "done" && tasks.length > 0 && !showArchived
+				? onArchiveAll
+				: undefined,
+		onToggleArchived:
+			status === "done" && (archivedCount ?? 0) > 0
+				? onToggleArchived
+				: undefined,
+		showArchived,
+		onToggleLocked,
+		isLocked,
+		onToggleCollapsed,
+	};
+	const columnRef = useRef<HTMLDivElement | null>(null);
+	const setColumnRef = useCallback(
+		(node: HTMLDivElement | null) => {
+			columnRef.current = node;
+			setNodeRef(node);
+		},
+		[setNodeRef],
+	);
+	const columnMenu = useContextMenuAt(
+		columnRef,
+		!isCollapsed && (canQuickAdd || hasColumnMenuItems(columnActions)),
+		COLUMN_MENU_IGNORED_TARGETS,
+	);
+	const listAreaRef = useRef<HTMLDivElement>(null);
+	useEffect(() => {
+		const area = listAreaRef.current;
+		if (!area || !canQuickAdd) return;
+		const onDoubleClick = (e: MouseEvent) => {
+			const target = e.target as Element | null;
+			if (target?.closest(QUICK_ADD_IGNORED_TARGETS)) return;
+			openQuickAdd();
+		};
+		area.addEventListener("dblclick", onDoubleClick);
+		return () => area.removeEventListener("dblclick", onDoubleClick);
+	}, [canQuickAdd, openQuickAdd]);
+
 	// Memoize taskIds to prevent SortableContext from re-rendering unnecessarily
 	const taskIds = useMemo(() => visibleTasks.map((t) => t.id), [visibleTasks]);
+
+	// Ctrl/Cmd+click and Shift+click on a card select instead of opening it:
+	// caught before the card's own click (a native capture listener).
+	useEffect(() => {
+		const area = listAreaRef.current;
+		if (!area || !onCardSelectGesture || isCollapsed) return;
+		const cardOf = (e: MouseEvent) => {
+			if (!(e.ctrlKey || e.metaKey || e.shiftKey)) return null;
+			const target = e.target as Element | null;
+			if (target?.closest(SELECT_GESTURE_IGNORED_TARGETS)) return null;
+			return target?.closest<HTMLElement>("[data-task-id]") ?? null;
+		};
+		const onClick = (e: MouseEvent) => {
+			const card = cardOf(e);
+			if (!card) return;
+			e.preventDefault();
+			e.stopPropagation();
+			// The selector above guarantees the attribute.
+			const taskId = card.getAttribute("data-task-id") as string;
+			onCardSelectGesture(taskId, e.shiftKey ? "range" : "toggle", taskIds);
+		};
+		// Shift+press would otherwise select the text between two cards.
+		const onMouseDown = (e: MouseEvent) => {
+			if (e.shiftKey && cardOf(e)) e.preventDefault();
+		};
+		area.addEventListener("click", onClick, true);
+		area.addEventListener("mousedown", onMouseDown, true);
+		return () => {
+			area.removeEventListener("click", onClick, true);
+			area.removeEventListener("mousedown", onMouseDown, true);
+		};
+	}, [onCardSelectGesture, taskIds, isCollapsed]);
 
 	// Create stable onClick handlers for each task to prevent unnecessary re-renders
 	const onClickHandlers = useMemo(() => {
@@ -582,16 +650,38 @@ export const DroppableColumn = memo(function DroppableColumn({
 				return "column-ai-review";
 			case "human_review":
 				return "column-human-review";
+			case "build_failed":
+				return "column-build-failed";
 			case "pr_created":
 				return "column-pr-open";
 			case "done":
 				return "column-done";
+			case "failed":
+				return "column-failed";
+			case "abandoned":
+				return "column-abandoned";
 			default:
 				return "border-t-muted-foreground/30";
 		}
 	};
 
-	const emptyState = getEmptyStateContent(status, t);
+	useEffect(() => {
+		installColumnStylesheet();
+	}, []);
+	// « En cours » counts its parallel-task slots, any other column its
+	// optional WIP limit (kanban-columns.md).
+	const capacity =
+		status === "in_progress" && maxParallelTasks
+			? columnCapacity(tasks.length, maxParallelTasks, "slots")
+			: columnCapacity(tasks.length, wipLimit, "wip");
+	const isBusy = status === "in_progress" && tasks.length > 0;
+	const showPulse = useSettingsStore(
+		(s) => s.settings.kanbanColumnSummary !== false,
+	);
+	const pulse = useMemo(
+		() => (showPulse ? columnPulse(status, tasks) : []),
+		[showPulse, status, tasks],
+	);
 
 	// Collapsed state: show narrow vertical strip with rotated title and task count
 	if (isCollapsed) {
@@ -636,57 +726,29 @@ export const DroppableColumn = memo(function DroppableColumn({
 					</Tooltip>
 				</div>
 
-				{/* Rotated title and task count */}
-				<div className="flex-1 flex flex-col items-center justify-center">
-					<div
-						className="flex items-center gap-2 whitespace-nowrap"
+				{/* Icon, count and rotated title, in the column's accent */}
+				<div className="kanban-col-collapsed flex flex-1 flex-col items-center gap-2 pt-2">
+					<ColumnIcon status={status} busy={isBusy} />
+					<ColumnCount count={tasks.length} capacity={capacity} />
+					<h2
+						className="whitespace-nowrap font-semibold text-sm text-foreground"
 						style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
 					>
-						<span className="column-count-badge">{tasks.length}</span>
-						<h2 className="font-semibold text-sm text-foreground">
-							{t(TASK_STATUS_LABELS[status])}
-						</h2>
-					</div>
+						{t(TASK_STATUS_LABELS[status])}
+					</h2>
 				</div>
 
 				{/* Task list */}
 				<div className="flex-1 min-h-0">
-					<ScrollArea className="h-full px-3 pb-3 pt-2">
+					<ScrollArea className="kanban-col-collapsed-list h-full px-1 pb-3 pt-2">
 						<SortableContext
 							items={taskIds}
 							strategy={verticalListSortingStrategy}
 						>
 							<div className="space-y-3 min-h-0">
 								{tasks.length === 0 ? (
-									<div
-										className={cn(
-											"empty-column-dropzone flex flex-col items-center justify-center py-6",
-											isOver && "active",
-										)}
-									>
-										{isOver ? (
-											<>
-												<div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center mb-2">
-													<Plus className="h-4 w-4 text-primary" />
-												</div>
-												<span className="text-sm font-medium text-primary">
-													{t("kanban.dropHere")}
-												</span>
-											</>
-										) : (
-											<>
-												{emptyState.icon}
-												<span className="mt-2 text-sm font-medium text-muted-foreground/70">
-													{emptyState.message}
-												</span>
-												{emptyState.subtext && (
-													<span className="mt-0.5 text-xs text-muted-foreground/50">
-														{emptyState.subtext}
-													</span>
-												)}
-											</>
-										)}
-									</div>
+									// Too narrow for the message: only the drop target shows.
+									isOver ? <ColumnEmptyState status={status} isOver /> : null
 								) : (
 									taskCards
 								)}
@@ -708,7 +770,7 @@ export const DroppableColumn = memo(function DroppableColumn({
 			}}
 		>
 			<div
-				ref={setNodeRef}
+				ref={setColumnRef}
 				className={cn(
 					"kanban-column relative flex min-w-0 flex-1 flex-col rounded-xl transition-colors duration-200",
 					getColumnBorderColor(),
@@ -727,49 +789,31 @@ export const DroppableColumn = memo(function DroppableColumn({
 				    or the keyboard focus is on the column, so a resting board reads
 				    as six names and six numbers. State worth seeing (a locked
 				    column, a partial selection) stays visible. */}
-				<div className="flex items-center justify-between gap-2 px-3 pt-3 pb-2">
-					<div className="flex min-w-0 items-center gap-1.5">
-						<span
-							aria-hidden="true"
-							className="kanban-column-dot h-2 w-2 shrink-0 rounded-full"
-						/>
+				<div className="kanban-col-band grid gap-2 px-3 pt-2.5 pb-2.5">
+				<div className="flex items-center justify-between gap-2">
+					<div className="flex min-w-0 flex-1 items-center gap-2">
+						<ColumnIcon status={status} busy={isBusy} />
 						<h2 className="truncate font-semibold text-sm text-foreground">
 							{t(TASK_STATUS_LABELS[status])}
 						</h2>
-						{status === "in_progress" && maxParallelTasks ? (
-							<span
-								className={cn(
-									"column-count-badge",
-									tasks.length >= maxParallelTasks &&
-										"bg-warning/20 text-warning border-warning/30",
-								)}
-							>
-								{tasks.length}/{maxParallelTasks}
-							</span>
-						) : wipLimit ? (
+						{capacity?.kind === "wip" && capacity.state === "over" ? (
 							<Tooltip delayDuration={200}>
 								<TooltipTrigger asChild>
-									<span
-										className={cn(
-											"column-count-badge",
-											tasks.length > wipLimit &&
-												"bg-warning/20 text-warning border-warning/30",
-										)}
-									>
-										{tasks.length}/{wipLimit}
+									<span className="ml-auto">
+										<ColumnCount count={tasks.length} capacity={capacity} />
 									</span>
 								</TooltipTrigger>
-								{tasks.length > wipLimit && (
-									<TooltipContent>
-										{t("kanban.wipLimit.exceeded", {
-											count: tasks.length,
-											limit: wipLimit,
-										})}
-									</TooltipContent>
-								)}
+								<TooltipContent>
+									{t("kanban.wipLimit.exceeded", {
+										count: tasks.length,
+										limit: capacity.limit,
+									})}
+								</TooltipContent>
 							</Tooltip>
 						) : (
-							<span className="column-count-badge">{tasks.length}</span>
+							<span className="ml-auto">
+								<ColumnCount count={tasks.length} capacity={capacity} />
+							</span>
 						)}
 					</div>
 					<div className="flex shrink-0 items-center gap-0.5">
@@ -845,21 +889,21 @@ export const DroppableColumn = memo(function DroppableColumn({
 								onSetWipLimit={onSetWipLimit}
 							/>
 						)}
-						{status === "backlog" && onAddClick && (
+						{canQuickAdd && (
 									<Tooltip delayDuration={200}>
 										<TooltipTrigger asChild>
 											<Button
 												variant="ghost"
 												size="icon"
 												className="h-6 w-6 hover:bg-primary/10 hover:text-primary transition-colors"
-												onClick={onAddClick}
-												aria-label={t("kanban.addTaskAriaLabel")}
+												onClick={openQuickAdd}
+												aria-label={t(QUICK_ADD_LABELS[status as QuickAddColumn].header)}
 											>
 												<Plus className="h-4 w-4" />
 											</Button>
 										</TooltipTrigger>
 										<TooltipContent side="left">
-											{t("kanban.addTaskAriaLabel")}
+											{t(QUICK_ADD_LABELS[status as QuickAddColumn].tooltip)}
 										</TooltipContent>
 									</Tooltip>
 						)}
@@ -922,9 +966,9 @@ export const DroppableColumn = memo(function DroppableColumn({
 									</TooltipContent>
 								</Tooltip>
 							)}
-						{/* Column menu: width lock and collapse, rarely used, so out of
-						    the header. */}
-						{(onToggleLocked || onToggleCollapsed) && (
+						{/* Column menu: the same list as the right-click menu (rarely used
+						    actions, so out of the header). */}
+						{hasColumnMenuItems(columnActions) && (
 							<DropdownMenu>
 								<DropdownMenuTrigger asChild>
 									<Button
@@ -938,30 +982,7 @@ export const DroppableColumn = memo(function DroppableColumn({
 									</Button>
 								</DropdownMenuTrigger>
 								<DropdownMenuContent align="end">
-									{onToggleLocked && (
-										<DropdownMenuItem onClick={onToggleLocked}>
-											{isLocked ? (
-												<Unlock className="mr-2 h-4 w-4" />
-											) : (
-												<Lock className="mr-2 h-4 w-4" />
-											)}
-											{isLocked
-												? t("kanban.unlockColumn")
-												: t("kanban.lockColumn")}
-										</DropdownMenuItem>
-									)}
-									{status === "backlog" && onQueueAll && tasks.length > 0 && (
-										<DropdownMenuItem onClick={onQueueAll}>
-											<ListPlus className="mr-2 h-4 w-4" />
-											{t("queue.queueAll")}
-										</DropdownMenuItem>
-									)}
-									{onToggleCollapsed && (
-										<DropdownMenuItem onClick={onToggleCollapsed}>
-											<ChevronLeft className="mr-2 h-4 w-4" />
-											{t("kanban.collapseColumn")}
-										</DropdownMenuItem>
-									)}
+									<ColumnMenuItems {...columnActions} />
 								</DropdownMenuContent>
 							</DropdownMenu>
 						)}
@@ -984,54 +1005,63 @@ export const DroppableColumn = memo(function DroppableColumn({
 						)}
 					</div>
 				</div>
+				{/* In a lane (BoardLanes) the summary line would repeat lane after lane. */}
+				{(capacity || showPulse) && !droppableId && (
+					<div className="kanban-col-meta">
+						{showPulse && <ColumnPulse items={pulse} />}
+						{capacity && <ColumnGauge count={tasks.length} capacity={capacity} />}
+					</div>
+				)}
+				</div>
 
 				{/* Task list */}
-				<div className="flex-1 min-h-0">
-					<ScrollArea className="h-full px-2.5 pb-2.5 pt-1">
+				<div ref={listAreaRef} className="flex-1 min-h-0">
+					<ScrollArea className="h-full px-2.5 pb-2.5 pt-2">
+						{canQuickAdd && isQuickAdding && isQuickAddColumn(status) && (
+							<div className="mb-2">
+								<QuickAddComposer
+									status={status}
+									onClose={closeQuickAdd}
+									onOpenWizard={onAddClick}
+								/>
+							</div>
+						)}
 						<SortableContext
 							items={taskIds}
 							strategy={verticalListSortingStrategy}
 						>
 							<div className="space-y-2 min-h-0">
-								{tasks.length === 0 ? (
-									<div
-										className={cn(
-											"empty-column-dropzone flex flex-col items-center justify-center py-6",
-											isOver && "active",
-										)}
-									>
-										{isOver ? (
-											<>
-												<div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center mb-2">
-													<Plus className="h-4 w-4 text-primary" />
-												</div>
-												<span className="text-sm font-medium text-primary">
-													{t("kanban.dropHere")}
-												</span>
-											</>
-										) : (
-											<>
-												<span className="opacity-60 [&>svg]:h-5 [&>svg]:w-5">
-													{emptyState.icon}
-												</span>
-												<span className="mt-2 text-xs font-medium text-muted-foreground/80">
-													{emptyState.message}
-												</span>
-												{emptyState.subtext && (
-													<span className="mt-0.5 max-w-[22ch] text-2xs leading-snug text-muted-foreground/50">
-														{emptyState.subtext}
-													</span>
-												)}
-											</>
-										)}
-									</div>
+								{tasks.length === 0 && (isQuickAdding || (droppableId && !isOver)) ? null : tasks.length === 0 ? (
+									<ColumnEmptyState status={status} isOver={isOver} />
 								) : (
 									taskCards
 								)}
 							</div>
 						</SortableContext>
+						{canQuickAdd && !isQuickAdding && (
+							<button
+								type="button"
+								onClick={openQuickAdd}
+								className="kanban-quick-add-row mt-2"
+							>
+								<Plus className="h-3.5 w-3.5" aria-hidden="true" />
+								{t(QUICK_ADD_LABELS[status as QuickAddColumn].row)}
+							</button>
+						)}
 					</ScrollArea>
 				</div>
+				{columnMenu.at && (
+					<PointerMenu
+						at={columnMenu.at}
+						onClose={columnMenu.close}
+						label={t("kanban.columnOptions")}
+					>
+						<ColumnMenuItems
+							onAddCard={canQuickAdd ? openQuickAdd : undefined}
+							{...columnActions}
+						/>
+					</PointerMenu>
+				)}
 			</div>
 
 			{/* Resize handle on right edge */}
@@ -1083,7 +1113,29 @@ export interface SortableColumnWrapperProps
 	sortableId: string;
 }
 
-export function SortableColumnWrapper({
+/**
+ * A column of the board: sortable (dragged by its handle to reorder the
+ * columns), or, inside a lane (kanban/BoardLanes.tsx), a plain drop target
+ * that lights up only for its own lane.
+ */
+export function SortableColumnWrapper(props: SortableColumnWrapperProps) {
+	return props.droppableId ? <LaneColumn {...props} /> : <SortableColumn {...props} />;
+}
+
+function LaneColumn({ sortableId: _sortableId, ...columnProps }: SortableColumnWrapperProps) {
+	const overLane = useLaneOverStore((s) => s.lane);
+	const lane = columnProps.droppableId ? parseLaneDropId(columnProps.droppableId)?.lane : undefined;
+	const here = overLane !== null && overLane === lane;
+	return (
+		<DroppableColumn
+			{...columnProps}
+			isOver={columnProps.isOver && here}
+			isImportForbidden={columnProps.isImportForbidden && here}
+		/>
+	);
+}
+
+function SortableColumn({
 	sortableId,
 	...columnProps
 }: SortableColumnWrapperProps) {

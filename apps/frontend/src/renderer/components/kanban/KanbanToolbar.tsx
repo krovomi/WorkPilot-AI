@@ -3,6 +3,7 @@ import {
 	ArrowUpNarrowWide,
 	Bookmark,
 	Check,
+	Keyboard,
 	Plus,
 	Scissors,
 	SlidersHorizontal,
@@ -18,27 +19,36 @@ import {
 	TASK_PRIORITY_COLORS,
 	TASK_PRIORITY_LABELS,
 } from "../../../shared/constants";
-import type { TaskCategory, TaskPriority } from "../../../shared/types";
+import type { Task, TaskCategory, TaskPriority } from "../../../shared/types";
 import {
 	activeFilterCount,
 	hasActiveFilters,
+	QUICK_FILTERS,
 	type TaskSortField,
 	TASK_SOURCES,
 	type TaskSource,
 } from "../../lib/kanban-filter";
+import { boardLabels } from "../../../shared/utils/task-labels";
 import { splitGroupTone } from "../../../shared/utils/task-split";
 import { cn } from "../../lib/utils";
+import { useShortcutsHelpStore } from "../../stores/shortcuts-help-store";
 import { toneClass } from "../charter";
 import { TeamRoomBar } from "../collaboration";
 import { useKanbanFilterStore } from "../../stores/kanban-filter-store";
+import { useCollaborationStore } from "../../stores/collaboration-store";
 import { useProjectStore } from "../../stores/project-store";
-import { MultiRepoButton } from "../multi-repo/MultiRepoButton";
+import { useTaskStore } from "../../stores/task-store";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { Separator } from "../ui/separator";
+import { BoardAskButton } from "./board-ask/BoardAskButton";
+import { BoardLayoutToggle } from "./BoardLayoutToggle";
+import { BoardReportsButton } from "./reports/BoardReports";
+import { KanbanMoreMenu } from "./KanbanMoreMenu";
+import { LaneGroupingMenu } from "./LaneGroupingMenu";
+import { SprintMenu } from "./SprintMenu";
 import { QuickCommandBar } from "./QuickCommandBar";
-import { WorktreePurgeButton } from "./WorktreePurgeButton";
 import { ServerBoardNotice, useSelectedServerProject } from "./ServerBoardNotice";
 
 const CATEGORY_OPTIONS = Object.keys(TASK_CATEGORY_LABELS) as TaskCategory[];
@@ -112,14 +122,17 @@ function FilterSection({ title, activeCount, children }: FilterSectionProps) {
 
 interface KanbanToolbarProps {
 	projectPath?: string;
+	/** Opens a card's details (a ticket found by « Interroger le tableau »). */
+	onOpenTask?: (task: Task) => void;
 }
 
 /**
  * Unified board toolbar: search, a single filter+sort panel (colored chips), and
  * the quick-command bar — grouped with vertical separators so each affordance
- * reads as its own zone rather than a flat row of mystery buttons.
+ * reads as its own zone rather than a flat row of mystery buttons. Occasional
+ * actions sit in the "⋯" menu at the end, so the toolbar keeps to one line.
  */
-export function KanbanToolbar({ projectPath }: KanbanToolbarProps) {
+export function KanbanToolbar({ projectPath, onOpenTask }: KanbanToolbarProps) {
 	const { t } = useTranslation(["tasks", "common"]);
 	const filters = useKanbanFilterStore((s) => s.filters);
 	const sort = useKanbanFilterStore((s) => s.sort);
@@ -128,9 +141,15 @@ export function KanbanToolbar({ projectPath }: KanbanToolbarProps) {
 	const toggleCategory = useKanbanFilterStore((s) => s.toggleCategory);
 	const togglePriority = useKanbanFilterStore((s) => s.togglePriority);
 	const toggleGroup = useKanbanFilterStore((s) => s.toggleGroup);
+	const toggleLabel = useKanbanFilterStore((s) => s.toggleLabel);
+	const toggleQuick = useKanbanFilterStore((s) => s.toggleQuick);
+	const tasks = useTaskStore((s) => s.tasks);
+	// « Mes tâches »: on a server board, whose team room says who I am.
+	const signedIn = useCollaborationStore((s) => s.me !== null);
 	const setSortField = useKanbanFilterStore((s) => s.setSortField);
 	const toggleSortDirection = useKanbanFilterStore((s) => s.toggleSortDirection);
 	const clearFilters = useKanbanFilterStore((s) => s.clearFilters);
+	const setShortcutsOpen = useShortcutsHelpStore((s) => s.setOpen);
 	const savedViews = useKanbanFilterStore((s) => s.savedViews);
 	const saveCurrentView = useKanbanFilterStore((s) => s.saveCurrentView);
 	const applyView = useKanbanFilterStore((s) => s.applyView);
@@ -140,6 +159,9 @@ export function KanbanToolbar({ projectPath }: KanbanToolbarProps) {
 	const projectId = useProjectStore((s) => s.selectedProjectId);
 
 	const count = activeFilterCount(filters);
+	const labels = boardLabels(tasks);
+	const labelOn = (label: string) =>
+		(filters.labels ?? []).some((item) => item.toLocaleLowerCase() === label.toLocaleLowerCase());
 	const filtersActive = hasActiveFilters(filters);
 
 	const commitSaveView = () => {
@@ -176,6 +198,12 @@ export function KanbanToolbar({ projectPath }: KanbanToolbarProps) {
 					</button>
 				)}
 			</div>
+
+			{/* A question about the board, answered with its related tickets. A
+			    server board's cards are read from the server, with the person's rights. */}
+			{projectId && (
+				<BoardAskButton projectId={projectId} onOpenTask={onOpenTask} serverBoard={Boolean(serverProject)} />
+			)}
 
 			{/* One split group shown alone (a click on a part's badge) */}
 			{filters.group && (
@@ -248,6 +276,18 @@ export function KanbanToolbar({ projectPath }: KanbanToolbarProps) {
 					</div>
 
 					<div className="space-y-4 p-4">
+						{/* Jira's quick filters: one click, then the finer dimensions below */}
+						<FilterSection title={t("kanban.filter.quickLabel")} activeCount={filters.quick?.length}>
+							{[...QUICK_FILTERS, ...(signedIn && serverProject ? (["mine"] as const) : [])].map((quick) => (
+								<FilterChip
+									key={quick}
+									label={t(`kanban.filter.quick.${quick}`)}
+									active={filters.quick?.includes(quick) ?? false}
+									onToggle={() => toggleQuick(quick)}
+								/>
+							))}
+						</FilterSection>
+
 						{/* Priority — short and high-value, so first */}
 						<FilterSection
 							title={t("kanban.filter.priorityLabel")}
@@ -256,7 +296,7 @@ export function KanbanToolbar({ projectPath }: KanbanToolbarProps) {
 							{PRIORITY_OPTIONS.map((priority) => (
 								<FilterChip
 									key={priority}
-									label={TASK_PRIORITY_LABELS[priority]}
+									label={t(`form.classification.values.priority.${priority}`)}
 									active={filters.priorities.includes(priority)}
 									activeClassName={TASK_PRIORITY_COLORS[priority]}
 									onToggle={() => togglePriority(priority)}
@@ -272,7 +312,7 @@ export function KanbanToolbar({ projectPath }: KanbanToolbarProps) {
 							{CATEGORY_OPTIONS.map((category) => (
 								<FilterChip
 									key={category}
-									label={TASK_CATEGORY_LABELS[category]}
+									label={t(`form.classification.values.category.${category}`)}
 									active={filters.categories.includes(category)}
 									activeClassName={TASK_CATEGORY_COLORS[category]}
 									onToggle={() => toggleCategory(category)}
@@ -294,6 +334,14 @@ export function KanbanToolbar({ projectPath }: KanbanToolbarProps) {
 								/>
 							))}
 						</FilterSection>
+
+						{labels.length > 0 && (
+							<FilterSection title={t("kanban.filter.labelsLabel")} activeCount={filters.labels?.length}>
+								{labels.map((label) => (
+									<FilterChip key={label} label={label} active={labelOn(label)} onToggle={() => toggleLabel(label)} />
+								))}
+							</FilterSection>
+						)}
 
 						<Separator />
 
@@ -377,9 +425,19 @@ export function KanbanToolbar({ projectPath }: KanbanToolbarProps) {
 										<button
 											type="button"
 											onClick={() => applyView(view.id)}
-											className="flex-1 truncate rounded px-2 py-1.5 text-left text-sm hover:bg-muted/60 transition-colors"
+											className="flex min-w-0 flex-1 flex-col rounded px-2 py-1.5 text-left text-sm hover:bg-muted/60 transition-colors"
 										>
-											{view.name}
+											<span className="truncate">{view.name}</span>
+											{view.layout && (
+												<span className="truncate text-2xs text-muted-foreground">
+													{view.grouping && view.grouping !== "none"
+														? t("kanban.views.summary", {
+																layout: t(`kanban.layout.${view.layout}`),
+																lanes: t(`kanban.lanes.groupings.${view.grouping}`),
+															})
+														: t(`kanban.layout.${view.layout}`)}
+												</span>
+											)}
 										</button>
 										<Button
 											variant="ghost"
@@ -420,17 +478,12 @@ export function KanbanToolbar({ projectPath }: KanbanToolbarProps) {
 				</PopoverContent>
 			</Popover>
 
-			<Separator orientation="vertical" className="h-5" />
+			<BoardLayoutToggle />
+			<SprintMenu />
+			<LaneGroupingMenu />
+			<BoardReportsButton />
 
-			{/* A change across several repositories: one card per repository,
-			    run on this computer, so not on a server board. */}
-			{!serverProject && projectId && (
-				<>
-					<MultiRepoButton projectId={projectId} />
-					<WorktreePurgeButton projectId={projectId} />
-					<Separator orientation="vertical" className="h-5" />
-				</>
-			)}
+			<Separator orientation="vertical" className="h-5" />
 
 			{/* Quick Commands run on this computer: a server board has its notice
 			    instead, until commands run on the server. */}
@@ -447,6 +500,24 @@ export function KanbanToolbar({ projectPath }: KanbanToolbarProps) {
 					variant="compact"
 				/>
 			)}
+
+			{/* Occasional actions run on this computer, so not on a server board. */}
+			{!serverProject && projectId && (
+				<>
+					<Separator orientation="vertical" className="h-5" />
+					<KanbanMoreMenu projectId={projectId} />
+				</>
+			)}
+			<Button
+				variant="ghost"
+				size="icon"
+				className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
+				onClick={() => setShortcutsOpen(true)}
+				title={t("kanban.shortcuts.open")}
+				aria-label={t("kanban.shortcuts.open")}
+			>
+				<Keyboard className="h-4 w-4" />
+			</Button>
 		</div>
 	);
 }

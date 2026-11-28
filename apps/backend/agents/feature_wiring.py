@@ -8,7 +8,8 @@ All three integrations are **opt-in** and **non-overriding**:
   what to do with the suggestion (typically: log a divergence audit event).
 * :func:`maybe_optimize_context` is a no-op unless ``WORKPILOT_COGNITIVE_CONTEXT_ENABLED``
   is truthy in the environment. Default = OFF (the user's project context is
-  already finely tuned in most setups).
+  already finely tuned in most setups). When on, :func:`optimized_subtask_context`
+  packs the coder's inlined file context into a budget.
 * :func:`load_domain_addendum` reads ``requirements.json`` from the spec dir,
   looks for a top-level ``domain`` key, and returns the matching
   :class:`DomainAgentBundle.prompt_addendum`. Returns ``""`` when no domain
@@ -31,6 +32,9 @@ logger = logging.getLogger(__name__)
 
 # Env var to opt into Cognitive Context Optimizer in the agent pipeline.
 COGNITIVE_CONTEXT_ENV_VAR = "WORKPILOT_COGNITIVE_CONTEXT_ENABLED"
+# Token budget of the coder's packed file context (default 8 000).
+COGNITIVE_CONTEXT_BUDGET_ENV_VAR = "WORKPILOT_COGNITIVE_CONTEXT_BUDGET"
+COGNITIVE_CONTEXT_DEFAULT_BUDGET = 8_000
 
 # Env var to let the Model Router *substitute* the resolved phase model.
 # Default OFF — the user's UI / CLI / spec choice always wins. When ON, the
@@ -74,6 +78,25 @@ def _bench_scores(project_dir: Path | None, kind: str | None = None) -> dict:
         return {}
 
 
+def task_provider(spec_dir: Path | None, phase: str | None = None) -> str:
+    """The provider the task runs this phase on; Claude when nothing says otherwise.
+
+    The router must stay on it: a model of another provider would be handed
+    to this provider's client and fail (or run nowhere for a coding-agent CLI).
+    """
+    if spec_dir is not None:
+        try:
+            from phase_config import get_phase_provider
+
+            provider = get_phase_provider(Path(spec_dir), phase=phase)  # type: ignore[arg-type]
+        except (OSError, ValueError) as exc:
+            logger.debug("phase provider unreadable: %s", exc)
+            provider = None
+        if provider:
+            return provider
+    return "anthropic"
+
+
 def suggest_routed_model(
     *,
     prompt: str = "",
@@ -81,6 +104,8 @@ def suggest_routed_model(
     available_providers: list[str] | None = None,
     project_dir: Path | None = None,
     kind: str | None = None,
+    spec_dir: Path | None = None,
+    phase: str | None = None,
 ) -> dict[str, Any] | None:
     """Ask the ModelRouter for a cheaper/cheapest acceptable model.
 
@@ -89,6 +114,11 @@ def suggest_routed_model(
     ``task_class``, ``tier``. Always returns a *suggestion* — the caller is
     responsible for deciding whether to use it (default policy: respect the
     user's UI choice + log divergence to the audit trail).
+
+    With ``spec_dir``, the suggestion stays on the task's provider for
+    ``phase`` (``task_provider``) unless ``available_providers`` says
+    otherwise, the project is the one of the spec, and the card's kind is
+    read from it. ``None`` when that provider has no model to suggest.
 
     With ``project_dir``, the project's repo bench results take part: a model
     the bench saw fail is passed over (``model_router.router``), judged on the
@@ -99,12 +129,23 @@ def suggest_routed_model(
     except ImportError:
         return None
 
+    if spec_dir is not None:
+        if available_providers is None:
+            available_providers = [task_provider(spec_dir, phase)]
+        if project_dir is None:
+            # <project>/.workpilot/specs/<spec>
+            project_dir = Path(spec_dir).parent.parent.parent
+        if kind is None:
+            kind = card_kind(spec_dir)
+
     try:
         router = ModelRouter(
             available=available_providers,
             bench_scores=_bench_scores(project_dir, kind),
         )
         choice = router.route(prompt=prompt, hint=task_hint)
+        if not choice.model:
+            return None
         return {
             "provider": choice.provider,
             "model": choice.model,
@@ -198,9 +239,8 @@ def apply_router_override(
         prompt=prompt_hint or f"{phase} phase",
         task_hint=task_hint or phase,
         available_providers=available_providers,
-        # <project>/.workpilot/specs/<spec>
-        project_dir=Path(spec_dir).parent.parent.parent if spec_dir else None,
-        kind=card_kind(spec_dir),
+        spec_dir=spec_dir,
+        phase=phase,
     )
     if not suggestion:
         return current_model, None
@@ -213,43 +253,87 @@ def maybe_optimize_context(
     *,
     prompt: str,
     candidate_files: list[Path | str],
-    project_dir: Path | None = None,
-    token_budget: int = 8_000,
+    project_dir: Path,
+    token_budget: int = COGNITIVE_CONTEXT_DEFAULT_BUDGET,
     explicit_mentions: list[str] | None = None,
     recent_files: list[str] | None = None,
 ) -> dict[str, Any] | None:
     """Run the Cognitive Context Optimizer when enabled, else no-op.
 
-    Returns the optimizer's structured output (a dict) when it ran, ``None``
-    when it was skipped (env flag off, module missing, or empty input).
+    Only files inside ``project_dir`` are read. Returns the optimizer's
+    structured output (a dict) when it ran, ``None`` when it was skipped
+    (env flag off or no readable candidate).
     """
     if not cognitive_context_enabled():
         return None
     if not candidate_files:
         return None
 
-    try:
-        from cognitive_context import CognitiveContextOptimizer
-    except ImportError:
-        logger.debug("cognitive_context module missing — skipping optimization")
-        return None
+    from cognitive_context import CognitiveContextOptimizer
+    from cognitive_context.project_files import resolve_candidates
 
+    root = Path(project_dir).resolve()
+    candidates, _refused = resolve_candidates(root, candidate_files)
+    if not candidates:
+        return None
     try:
-        optimizer = CognitiveContextOptimizer(token_budget=token_budget)
-        result = optimizer.optimize(
+        result = CognitiveContextOptimizer(project_dir=root).optimize(
             prompt=prompt,
-            candidate_files=[str(f) for f in candidate_files],
-            project_dir=project_dir,
+            candidate_files=candidates,
+            token_budget=token_budget,
             explicit_mentions=explicit_mentions or [],
             recent_files=recent_files or [],
         )
-        # Most optimizers return a dataclass — normalise to a dict.
-        if hasattr(result, "to_dict"):
-            return result.to_dict()
-        return result if isinstance(result, dict) else {"result": str(result)}
-    except Exception as exc:  # noqa: BLE001
+    except (OSError, ValueError) as exc:
         logger.debug("CognitiveContextOptimizer.optimize failed: %s", exc)
         return None
+    return result.to_dict()
+
+
+def optimized_subtask_context(project_dir: Path, subtask: dict) -> str | None:
+    """The coder's inlined file context, packed by the optimizer.
+
+    Replaces the first-200-lines excerpt of each file the subtask declares
+    (``files_to_modify``, ``patterns_from``) with the slices that match the
+    subtask's wording, under one token budget. ``None`` when the flag is off
+    or nothing could be packed: the caller then inlines as before.
+    """
+    to_modify = [str(f) for f in subtask.get("files_to_modify") or []]
+    patterns = [str(f) for f in subtask.get("patterns_from") or []]
+    if not to_modify and not patterns:
+        return None
+    wording = " ".join(
+        str(subtask.get(key) or "") for key in ("description", "details", "title")
+    )
+    packed = maybe_optimize_context(
+        prompt=wording,
+        candidate_files=[*to_modify, *patterns],
+        project_dir=project_dir,
+        token_budget=_budget_from_env(),
+        explicit_mentions=to_modify,
+    )
+    if not packed or not packed.get("slices"):
+        return None
+    sections = ["## Relevant File Context (packed to the task's wording)\n"]
+    for item in packed["slices"]:
+        note = " (excerpt)" if item.get("truncated") else ""
+        sections.append(
+            f"### `{item['file_path']}`{note}\n```\n{item['content']}\n```\n"
+        )
+    skipped = packed.get("files_skipped") or []
+    if skipped:
+        names = ", ".join(f"`{name}`" for name in skipped)
+        sections.append(f"Not inlined (over budget, read them if needed): {names}\n")
+    return "\n".join(sections)
+
+
+def _budget_from_env() -> int:
+    raw = os.environ.get(COGNITIVE_CONTEXT_BUDGET_ENV_VAR, "")
+    try:
+        value = int(raw)
+    except ValueError:
+        return COGNITIVE_CONTEXT_DEFAULT_BUDGET
+    return value if value >= 100 else COGNITIVE_CONTEXT_DEFAULT_BUDGET
 
 
 # ---------------------------------------------------------------------------
@@ -257,18 +341,32 @@ def maybe_optimize_context(
 
 
 def _read_spec_domain(spec_dir: Path) -> str | None:
-    """Look for a ``domain`` key in ``requirements.json`` at the spec root."""
+    """The spec's ``domain`` (``requirements.json``), else the project's.
+
+    The project's is the one saved from the Domain Agents tab
+    (``domain_agents.project_domain``), read in the project the user picked
+    even when the task runs in its worktree.
+    """
     req_file = spec_dir / "requirements.json"
-    if not req_file.exists():
-        return None
     try:
         data = json.loads(req_file.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
-        return None
-    domain = data.get("domain")
+        data = None
+    domain = data.get("domain") if isinstance(data, dict) else None
     if isinstance(domain, str) and domain.strip():
         return domain.strip()
-    return None
+    from domain_agents.project_domain import project_root_of, read_project_domain
+
+    root = project_root_of(spec_dir)
+    return read_project_domain(root) if root else None
+
+
+def _spec_languages(spec_dir: Path) -> list[str]:
+    """The stacks of the code the task works on, for stack-specific advice."""
+    from project.stack import detect_languages
+
+    # <worktree or project>/.workpilot/specs/<spec>
+    return detect_languages(Path(spec_dir).parent.parent.parent)
 
 
 def load_domain_addendum(
@@ -278,18 +376,16 @@ def load_domain_addendum(
 ) -> str:
     """Return the prompt addendum for the spec's domain (or ``""``).
 
-    Reads the top-level ``domain`` field from ``requirements.json``. If the
-    field is missing or unrecognised, returns an empty string — the agent
-    keeps its baseline prompt. Never raises.
+    Reads the top-level ``domain`` field from ``requirements.json``, else the
+    project's saved domain. If neither is set or the value is unrecognised,
+    returns an empty string — the agent keeps its baseline prompt. Library
+    advice follows the stacks of the code the task works on. Never raises.
     """
     domain = _read_spec_domain(spec_dir)
     if not domain:
         return ""
 
-    try:
-        from domain_agents import AgentRole, DomainAgentFactory, DomainTag
-    except ImportError:
-        return ""
+    from domain_agents import AgentRole, DomainAgentFactory, DomainTag
 
     try:
         # Normalise to enums; reject silently if they don't match the catalog.
@@ -300,7 +396,9 @@ def load_domain_addendum(
         return ""
 
     try:
-        bundle = DomainAgentFactory().build(domain=domain, role=role)
+        bundle = DomainAgentFactory().build(
+            domain=domain, role=role, languages=_spec_languages(spec_dir)
+        )
         return bundle.prompt_addendum or ""
     except Exception as exc:  # noqa: BLE001
         logger.debug("Failed to build domain bundle for %r/%r: %s", domain, role, exc)

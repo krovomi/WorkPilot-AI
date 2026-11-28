@@ -596,6 +596,10 @@ def _path_values(
         "name": "roadmap.json",
         "rule_id": "r-000000000001",
         "subtask_id": "subtask-1",
+        "delegation_id": str(uuid.uuid4()),
+        "request_id": str(uuid.uuid4()),
+        "share_id": str(uuid.uuid4()),
+        "review_id": str(uuid.uuid4()),
     }
 
 
@@ -650,6 +654,13 @@ def test_every_project_route_answers_the_other_org_as_if_the_project_did_not_exi
             params = {p["name"]: p["in"] for p in operation.get("parameters", [])}
             if "project_id" not in params:
                 continue
+            # A new route's own identifier (``<thing>_id``) is an unknown row
+            # of the same project, like the ``uuid4`` values above: the route
+            # is still called, on both projects, and must answer the same. A
+            # name of another shape needs a real value written above.
+            for n, where in params.items():
+                if where == "path" and n.endswith("_id") and n not in values:
+                    values[n] = str(uuid.uuid4())
             missing = [
                 n
                 for n, where in params.items()

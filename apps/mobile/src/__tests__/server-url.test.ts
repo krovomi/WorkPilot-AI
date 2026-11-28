@@ -13,7 +13,14 @@ describe("normaliseServerUrl", () => {
 		expect(normaliseServerUrl("http://workpilot.example.com")).toEqual({ ok: false, reason: "insecure" });
 	});
 
-	it.each(["http://localhost:9000", "http://192.168.1.20:9000", "http://10.0.2.2:9000", "http://box.local"])(
+	it.each([
+		"http://localhost:9000",
+		"http://192.168.1.20:9000",
+		"http://10.0.2.2:9000",
+		"http://box.local",
+		"http://build-box",
+		"http://WorkPilot-Server:8080",
+	])(
 		"accepts plain http on the local network: %s",
 		(input) => {
 			expect(normaliseServerUrl(input).ok).toBe(true);
@@ -22,6 +29,13 @@ describe("normaliseServerUrl", () => {
 
 	it.each(["", "ftp://x.io", "https://user:pw@x.io", "https://x.io/?a=1", "https://x.io/#frag", "not a url at all"])(
 		"refuses %p",
+		(input) => {
+			expect(normaliseServerUrl(input)).toEqual({ ok: false, reason: expect.any(String) });
+		},
+	);
+
+	it.each(["http://workpilot.example.com", "http://srv.company.lan", "http://8.8.8.8", "http://-box", "http://box-"])(
+		"still refuses plain http to a name with a domain or a public address: %s",
 		(input) => {
 			expect(normaliseServerUrl(input)).toEqual({ ok: false, reason: expect.any(String) });
 		},
@@ -42,5 +56,6 @@ describe("streamBase", () => {
 	it("falls back to the API host on the stream port, wss behind https", () => {
 		expect(streamBase("https://x.io:8443", null)).toBe("wss://x.io:8765");
 		expect(streamBase("http://localhost:9000", "javascript:alert(1)")).toBe("ws://localhost:8765");
+		expect(streamBase("not a url", null)).toBeNull();
 	});
 });

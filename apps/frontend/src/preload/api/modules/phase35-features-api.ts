@@ -43,6 +43,26 @@ export interface AgentHealthScoreData {
 	diagnostics: Record<string, number>;
 }
 
+/** One agent role on one provider and model, scored from the project's own tasks. */
+export interface ProjectAgentHealthScore extends AgentHealthScoreData {
+	role: "planner" | "coder" | "qa";
+	provider: string;
+	model: string;
+}
+export interface ProjectAgentHealthPending {
+	agent_name: string;
+	role: "planner" | "coder" | "qa";
+	provider: string;
+	model: string;
+	runs: number;
+}
+export interface ProjectAgentHealth {
+	scores: ProjectAgentHealthScore[];
+	pending: ProjectAgentHealthPending[];
+	tasks_read: number;
+	min_runs: number;
+}
+
 // #3.1 Model Routing
 export interface ModelChoice {
 	provider: string;
@@ -50,7 +70,11 @@ export interface ModelChoice {
 	task_class: string;
 	tier: "budget" | "balanced" | "premium";
 	estimated_cost_usd: number;
+	/** English, for the audit trail; the app words `reason_code` instead. */
 	reason: string;
+	/** `tier_for_task` | `unpriced_provider` | `fallback` | `no_model`. */
+	reason_code?: string;
+	reason_params?: Record<string, unknown>;
 }
 export interface RouteRequest {
 	prompt?: string;
@@ -71,7 +95,8 @@ export interface DomainProfile extends DomainSummary {
 	required_skills: string[];
 	forbidden_patterns: string[];
 	validation_rules: string[];
-	suggested_libraries: string[];
+	/** Per stack (`project.stack.detect_languages` names: "python", "c#"…). */
+	suggested_libraries: Record<string, string[]>;
 }
 export interface DomainAgentBundle {
 	domain: string;
@@ -82,6 +107,13 @@ export interface DomainAgentBundle {
 	guardrails: string[];
 	forbidden_patterns: string[];
 	validation_rules: string[];
+	/** The project's stacks only when built for a project, else every stack. */
+	suggested_libraries: Record<string, string[]>;
+}
+export interface ProjectDomain {
+	/** The domain every task of the project gets, unless its spec names one. */
+	domain: string | null;
+	languages: string[];
 }
 
 // #3.4 CI/CD Anomaly
@@ -91,13 +123,22 @@ export interface AnomalySignal {
 	matching_line: string;
 	line_number: number;
 	suggested_fix: string;
+	/** Stable id of the fix; the app words it from `cicdAnomaly.fixes.<fix_id>`. */
+	fix_id?: string;
 	log_label: string;
+}
+export interface AnomalyRecommendation {
+	kind: string;
+	fix_id: string;
+	suggested_fix: string;
+	recurring: boolean;
 }
 export interface AnomalyReport {
 	signals: AnomalySignal[];
 	recurring_kinds: string[];
 	summary: { samples: number; total_signals: number; by_kind: Record<string, number>; by_severity: Record<string, number> };
 	fix_recommendations: string[];
+	recommendations?: AnomalyRecommendation[];
 	has_critical: boolean;
 }
 
@@ -109,23 +150,52 @@ export interface LicenseScanReport {
 		ecosystem: string;
 		declared_license: string | null;
 		is_direct: boolean;
+		/** manifest | installed | registry | override, or "" when unresolved. */
+		license_source?: string;
 	}>;
 	conflicts: Array<{
-		dependency: { name: string; version: string; ecosystem: string };
+		dependency: {
+			name: string;
+			version: string;
+			ecosystem: string;
+			declared_license?: string | null;
+		};
 		category: string;
 		reason: string;
 		remediation: string;
 	}>;
 	by_category: Record<string, number>;
-	summary: Record<string, unknown>;
+	summary: {
+		total_dependencies?: number;
+		by_ecosystem?: Record<string, number>;
+		unresolved?: number;
+		by_source?: Record<string, number>;
+		[k: string]: unknown;
+	};
 	passed: boolean;
 }
 
 // #3.9 Architecture Drift
+export interface ArchViolation {
+	type: string;
+	severity: string;
+	file: string;
+	line?: number | null;
+	import_target?: string;
+	rule?: string;
+	description?: string;
+	fingerprint?: string;
+	/** Layer violation: the importing layer and the layer it must not reach. */
+	source_layer?: string;
+	target_layer?: string;
+	/** Built-in forbidden pattern (`domain_framework`), empty for a project's own rule. */
+	rule_id?: string;
+}
 export interface ArchitectureScanReport {
 	status: string;
-	violations: unknown[];
-	warnings: unknown[];
+	violations: ArchViolation[];
+	warnings: ArchViolation[];
+	files_analyzed?: number;
 	violation_count: number;
 	warning_count: number;
 	summary: string;
@@ -134,9 +204,9 @@ export interface ArchitectureScanReport {
 export interface DriftReport {
 	has_baseline: boolean;
 	severity: "none" | "low" | "medium" | "high" | "critical";
-	new_violations: unknown[];
-	resolved_violations: unknown[];
-	persistent_violations: unknown[];
+	new_violations: ArchViolation[];
+	resolved_violations: ArchViolation[];
+	persistent_violations: ArchViolation[];
 	summary: Record<string, number | string>;
 }
 
@@ -155,6 +225,27 @@ export interface RegressionReport {
 	}>;
 	summary: Record<string, number>;
 	regression_count: number;
+}
+
+/** A stored generation, as the archive lists it (newest first). */
+export interface GenerationSummary {
+	label: string;
+	/** Unix seconds. */
+	captured_at: number;
+	/** `trx:<hash>`, `junit:<hash>`… for an imported report, `run:<command>` for a run. */
+	source: string;
+	total: number;
+	passed: number;
+	failed: number;
+	error: number;
+	skipped: number;
+}
+
+/** A test command the project's stack has, detected by the runner. */
+export interface GenTestCommand {
+	id: string;
+	label: string;
+	command: string;
 }
 
 // #3.12 i18n Scaler
@@ -273,6 +364,10 @@ export interface OptimizedContext {
 	tokens_used: number;
 	files_skipped: string[];
 	summary: Record<string, unknown>;
+	/** True when the project's own sources were proposed (no list sent). */
+	discovered?: boolean;
+	/** Paths not read, with why: outside | missing | binary | too_large. */
+	refused?: Array<{ path: string; reason: string }>;
 }
 
 // #3.3 Audit Trail
@@ -337,6 +432,7 @@ export interface Phase35FeaturesAPI {
 		Phase35Result<{ scores: AgentHealthScoreData[]; agents_known: string[] }>
 	>;
 	resetAgentHealth: (agentName?: string) => Promise<Phase35Result<{}>>;
+	scoreProjectAgentHealth: (projectPath: string) => Promise<Phase35Result<ProjectAgentHealth>>;
 
 	// #3.1 Model Router
 	routeModel: (req: RouteRequest) => Promise<Phase35Result<{ choice: ModelChoice }>>;
@@ -350,7 +446,13 @@ export interface Phase35FeaturesAPI {
 	buildDomainBundle: (
 		domain: string,
 		role: string,
+		projectPath?: string,
 	) => Promise<Phase35Result<{ bundle: DomainAgentBundle }>>;
+	getProjectDomain: (projectPath: string) => Promise<Phase35Result<ProjectDomain>>;
+	setProjectDomain: (
+		projectPath: string,
+		domain: string | null,
+	) => Promise<Phase35Result<{ domain: string | null }>>;
 
 	// #3.4 CI/CD Anomaly
 	scanCicdLog: (
@@ -366,7 +468,8 @@ export interface Phase35FeaturesAPI {
 		projectPath: string,
 		policy?: "permissive_only" | "open_source_friendly" | "saas_safe",
 		licenseOverrides?: { name: string; license: string | null }[],
-	) => Promise<Phase35Result<{ report: LicenseScanReport }>>;
+		online?: boolean,
+	) => Promise<Phase35Result<{ report: LicenseScanReport; online?: boolean }>>;
 	classifyLicense: (
 		license: string,
 	) => Promise<
@@ -379,25 +482,50 @@ export interface Phase35FeaturesAPI {
 	) => Promise<Phase35Result<{ config_source: string; report: ArchitectureScanReport }>>;
 	saveArchBaseline: (
 		projectPath: string,
-	) => Promise<Phase35Result<{ baseline_path: string; violation_count: number }>>;
+	) => Promise<
+		Phase35Result<{ baseline_path: string; violation_count: number; config_source: string }>
+	>;
 	compareArchDrift: (
 		projectPath: string,
-	) => Promise<Phase35Result<{ drift: DriftReport }>>;
+	) => Promise<Phase35Result<{ drift: DriftReport; config_source: string }>>;
 
 	// #3.10 Generational Tests
 	listGenerations: (
 		projectPath: string,
-	) => Promise<Phase35Result<{ generations: string[] }>>;
+	) => Promise<Phase35Result<{ generations: string[]; details: GenerationSummary[] }>>;
+	/** `report`: the text of a test report of any supported format. */
 	captureGeneration: (
 		projectPath: string,
 		label: string,
-		junitXml: string,
-	) => Promise<Phase35Result<{ label: string; outcome_count: number; passing_count: number }>>;
+		report: string,
+	) => Promise<
+		Phase35Result<{ label: string; format: string; outcome_count: number; passing_count: number }>
+	>;
 	compareGeneration: (
 		projectPath: string,
 		baselineLabel: string,
-		currentJunitXml: string,
-	) => Promise<Phase35Result<{ report: RegressionReport }>>;
+		report: string,
+	) => Promise<Phase35Result<{ format: string; report: RegressionReport }>>;
+	detectGenTestCommands: (
+		projectPath: string,
+	) => Promise<Phase35Result<{ commands: GenTestCommand[] }>>;
+	/** Runs the project's suite once, then stores it as `label` or diffs it against it. */
+	runGenTests: (
+		projectPath: string,
+		mode: "capture" | "compare",
+		label: string,
+		commandId: string,
+	) => Promise<
+		Phase35Result<{
+			command: string;
+			label?: string;
+			outcome_count?: number;
+			report?: RegressionReport;
+		}>
+	>;
+	cancelGenTests: () => Promise<boolean>;
+	/** The text of a report file the person picks; `cancelled` when they close the dialog. */
+	importGenTestsReport: () => Promise<Phase35Result<{ name: string; content: string }>>;
 	deleteGeneration: (
 		projectPath: string,
 		label: string,
@@ -425,8 +553,11 @@ export interface Phase35FeaturesAPI {
 			report: I18nScalingReport;
 			/** The directory the locales were actually read from. */
 			locales_dir: string;
+			/** The catalog formats read when layout is "catalogs" (resx, android, gettext…). */
+			formats?: string[];
 			locales_found: string[];
-			layout: "nested" | "flat" | "none";
+			/** "nested" | "flat" (i18next JSON), or "catalogs" (another stack's files). */
+			layout: "nested" | "flat" | "catalogs" | "none";
 			/**
 			 * Set when the picked directory was one language rather than the
 			 * root of all of them, and the search moved up to its parent.
@@ -591,6 +722,14 @@ export interface Phase35FeaturesAPI {
 	unsubscribePairRoom: (
 		subscriptionId: string,
 	) => Promise<Phase35Result<{ closed: boolean }>>;
+	/** The AI participant's turn in a room, with the page's provider. */
+	pairAskAi: (
+		roomId: string,
+		projectPath: string,
+	) => Promise<
+		| { success: true; suggested: boolean }
+		| { success: false; error: "room" | "unavailable" | "empty" | "invalid" }
+	>;
 	onPairOpEvent: (
 		callback: (data: { subscriptionId: string; op: PairOperation }) => void,
 	) => () => void;
@@ -614,6 +753,8 @@ export const createPhase35FeaturesAPI = (): Phase35FeaturesAPI => ({
 	scoreAllAgentHealth: () => ipcRenderer.invoke(IPC_CHANNELS.AGENT_HEALTH_SCORES),
 	resetAgentHealth: (agentName) =>
 		ipcRenderer.invoke(IPC_CHANNELS.AGENT_HEALTH_RESET, { agentName }),
+	scoreProjectAgentHealth: (projectPath) =>
+		ipcRenderer.invoke(IPC_CHANNELS.AGENT_HEALTH_PROJECT, { projectPath }),
 
 	// #3.1
 	routeModel: (req) => ipcRenderer.invoke(IPC_CHANNELS.MODEL_ROUTER_ROUTE, req),
@@ -623,8 +764,12 @@ export const createPhase35FeaturesAPI = (): Phase35FeaturesAPI => ({
 	listDomains: () => ipcRenderer.invoke(IPC_CHANNELS.DOMAIN_AGENTS_LIST),
 	getDomainProfile: (domain) =>
 		ipcRenderer.invoke(IPC_CHANNELS.DOMAIN_AGENTS_PROFILE, { domain }),
-	buildDomainBundle: (domain, role) =>
-		ipcRenderer.invoke(IPC_CHANNELS.DOMAIN_AGENTS_BUILD, { domain, role }),
+	buildDomainBundle: (domain, role, projectPath) =>
+		ipcRenderer.invoke(IPC_CHANNELS.DOMAIN_AGENTS_BUILD, { domain, role, projectPath }),
+	getProjectDomain: (projectPath) =>
+		ipcRenderer.invoke(IPC_CHANNELS.DOMAIN_AGENTS_PROJECT_GET, { projectPath }),
+	setProjectDomain: (projectPath, domain) =>
+		ipcRenderer.invoke(IPC_CHANNELS.DOMAIN_AGENTS_PROJECT_SET, { projectPath, domain }),
 
 	// #3.4
 	scanCicdLog: (log, label) =>
@@ -633,11 +778,12 @@ export const createPhase35FeaturesAPI = (): Phase35FeaturesAPI => ({
 		ipcRenderer.invoke(IPC_CHANNELS.CICD_ANOMALY_ANALYSE, { samples }),
 
 	// #3.7
-	scanLicenses: (projectPath, policy, licenseOverrides) =>
+	scanLicenses: (projectPath, policy, licenseOverrides, online) =>
 		ipcRenderer.invoke(IPC_CHANNELS.LICENSE_GOV_SCAN, {
 			projectPath,
 			policy,
 			licenseOverrides,
+			online,
 		}),
 	classifyLicense: (license) =>
 		ipcRenderer.invoke(IPC_CHANNELS.LICENSE_GOV_CLASSIFY, { license }),
@@ -653,18 +799,16 @@ export const createPhase35FeaturesAPI = (): Phase35FeaturesAPI => ({
 	// #3.10
 	listGenerations: (projectPath) =>
 		ipcRenderer.invoke(IPC_CHANNELS.GEN_TESTS_LIST, { projectPath }),
-	captureGeneration: (projectPath, label, junitXml) =>
-		ipcRenderer.invoke(IPC_CHANNELS.GEN_TESTS_CAPTURE, {
-			projectPath,
-			label,
-			junitXml,
-		}),
-	compareGeneration: (projectPath, baselineLabel, currentJunitXml) =>
-		ipcRenderer.invoke(IPC_CHANNELS.GEN_TESTS_COMPARE, {
-			projectPath,
-			baselineLabel,
-			currentJunitXml,
-		}),
+	captureGeneration: (projectPath, label, report) =>
+		ipcRenderer.invoke(IPC_CHANNELS.GEN_TESTS_CAPTURE, { projectPath, label, report }),
+	compareGeneration: (projectPath, baselineLabel, report) =>
+		ipcRenderer.invoke(IPC_CHANNELS.GEN_TESTS_COMPARE, { projectPath, baselineLabel, report }),
+	detectGenTestCommands: (projectPath) =>
+		ipcRenderer.invoke(IPC_CHANNELS.GEN_TESTS_DETECT, { projectPath }),
+	runGenTests: (projectPath, mode, label, commandId) =>
+		ipcRenderer.invoke(IPC_CHANNELS.GEN_TESTS_RUN, { projectPath, mode, label, commandId }),
+	cancelGenTests: () => ipcRenderer.invoke(IPC_CHANNELS.GEN_TESTS_CANCEL),
+	importGenTestsReport: () => ipcRenderer.invoke(IPC_CHANNELS.GEN_TESTS_IMPORT_FILE),
 	deleteGeneration: (projectPath, label) =>
 		ipcRenderer.invoke(IPC_CHANNELS.GEN_TESTS_DELETE, { projectPath, label }),
 
@@ -783,6 +927,8 @@ export const createPhase35FeaturesAPI = (): Phase35FeaturesAPI => ({
 		ipcRenderer.invoke(IPC_CHANNELS.PAIR_RT_SUBSCRIBE, { roomId, sinceSequence }),
 	unsubscribePairRoom: (subscriptionId) =>
 		ipcRenderer.invoke(IPC_CHANNELS.PAIR_RT_UNSUBSCRIBE, { subscriptionId }),
+	pairAskAi: (roomId, projectPath) =>
+		ipcRenderer.invoke(IPC_CHANNELS.PAIR_RT_ASK_AI, { roomId, projectPath }),
 	onPairOpEvent: (callback) => {
 		const listener = (
 			_event: unknown,

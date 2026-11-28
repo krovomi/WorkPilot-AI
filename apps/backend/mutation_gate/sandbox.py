@@ -88,11 +88,17 @@ def _copy_untracked(project_dir: Path, copy: Path) -> None:
 
 
 @contextlib.contextmanager
-def scratch_copy(project_dir: Path, *, timeout: int = 300) -> Iterator[Path]:
+def scratch_copy(
+    project_dir: Path, *, timeout: int = 300, revision: str | None = None
+) -> Iterator[Path]:
     """A detached copy of ``project_dir`` as QA saw it; removed on exit.
 
-    Raises ``OSError`` when the copy cannot be made.
+    With ``revision``, the copy is that commit as git holds it, without the
+    task's pending changes or untracked files: the base a change is measured
+    against. Raises ``OSError`` when the copy cannot be made.
     """
+    if revision is not None and (not revision or revision.startswith("-")):
+        raise OSError(f"not a revision: {revision!r}")
     project_dir = Path(project_dir).resolve()
     holder = Path(tempfile.mkdtemp(prefix="workpilot-mutation-"))
     copy = holder / "copy"
@@ -100,23 +106,31 @@ def scratch_copy(project_dir: Path, *, timeout: int = 300) -> Iterator[Path]:
     added = False
     try:
         made = run_git(
-            ["worktree", "add", "--detach", str(copy), "HEAD"],
+            ["worktree", "add", "--detach", str(copy), revision or "HEAD"],
             cwd=project_dir,
             timeout=timeout,
         )
         if made.returncode != 0:
             raise OSError(f"git worktree add failed: {made.stderr.strip()[:200]}")
         added = True
+        if revision is not None:
+            yield copy
+            return
+        # The patch goes through a file, byte for byte: through a text pipe,
+        # reading turned a CRLF line into LF and, on Windows, writing turned
+        # every LF into CRLF, and git refused the patch.
+        patch = holder / "pending.patch"
         pending = run_git(
-            ["diff", "--binary", "HEAD"], cwd=project_dir, timeout=timeout
+            ["diff", "--binary", f"--output={patch}", "HEAD"],
+            cwd=project_dir,
+            timeout=timeout,
         )
         if pending.returncode != 0:
             raise OSError("git diff failed")
-        if pending.stdout.strip():
+        if patch.is_file() and patch.stat().st_size:
             applied = run_git(
-                ["apply", "--whitespace=nowarn", "-"],
+                ["apply", "--whitespace=nowarn", str(patch)],
                 cwd=copy,
-                input_data=pending.stdout,
                 timeout=timeout,
             )
             if applied.returncode != 0:

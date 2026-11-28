@@ -1,6 +1,6 @@
 {
 	"name": "workpilot-ai",
-	"version": "1.5.0",
+	"version": "1.6.0",
 	"description": "Autonomous multi-agent coding framework",
 	"license": "AGPL-3.0",
 	"author": "WorkPilot AI Team",
@@ -15,7 +15,7 @@
 		"install:frontend": "cd apps/frontend && pnpm install",
 		"install:all": "pnpm run install:backend && pnpm run install:frontend",
 		"start": "cd apps/frontend && pnpm run build && pnpm run start",
-		"dev": "concurrently \"pnpm --filter ./apps/backend dev\" \"pnpm --filter ./apps/frontend dev\"",
+		"dev": "node scripts/dev.mjs",
 		"dev:debug": "cd apps/frontend && pnpm run dev:debug",
 		"dev:mcp": "cd apps/frontend && pnpm run dev:mcp",
 		"build": "cd apps/frontend && pnpm run build",
@@ -44,7 +44,7 @@
 		"node": ">=22.12.0",
 		"pnpm": ">=8.0.0"
 	},
-	"packageManager": "pnpm@12.16.1",
+	"packageManager": "pnpm@12.21.0",
 	"repository": {
 		"type": "git",
 		"url": "https://github.com/krovomi/WorkPilot-AI.git"
@@ -58,13 +58,15 @@
 		"electron"
 	],
 	"devDependencies": {
-		"concurrently": "^10.0.6"
+		"concurrently": "^10.0.7"
 	},
 	"dependencies": {
 		"@lydell/node-pty": "1.1.0",
-		"@lydell/node-pty-darwin-arm64": "1.2.0-beta.18",
-		"lucide-react": "^1.68.0",
-		"tar": "^7.5.22",
+		"lucide-react": "^1.78.0",
+		"tar": "^7.5.23",
 		"unzipper": "^0.12.5"
+	},
+	"optionalDependencies": {
+		"@lydell/node-pty-darwin-arm64": "1.2.0-beta.18"
 	}
 }

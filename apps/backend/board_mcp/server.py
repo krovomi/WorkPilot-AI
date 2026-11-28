@@ -94,6 +94,22 @@ COLUMNS = {
     "error": "error",
 }
 COLUMN_NAMES = tuple(dict.fromkeys(COLUMNS.values()))
+#: A review that ended on a failure: the board draws it in « Échec »
+#: (`apps/frontend/src/renderer/lib/kanban-columns.ts`, FAILED_REVIEW_REASONS).
+FAILED_REVIEW_REASONS = frozenset({"errors", "prompt_too_long", "qa_rejected"})
+
+
+def outcome(column: str, review_reason: Any, meta: dict[str, Any]) -> str | None:
+    """« abandoned » for a card set aside, « failed » for a run that ended badly."""
+    if meta.get("abandoned") is True:
+        return "abandoned"
+    if column == "error" or (
+        column == "human_review" and review_reason in FAILED_REVIEW_REASONS
+    ):
+        return "failed"
+    return None
+
+
 KINDS = ("feature", "bug_fix", "refactoring", "investigation", "docs", "test")
 
 SERVER_INSTRUCTIONS = (
@@ -171,6 +187,13 @@ def summary(directory: Path) -> dict[str, Any]:
         "kind": meta.get("kind") if meta.get("kind") in KINDS else None,
         "updatedAt": plan.get("updated_at") or None,
     }
+    ended = outcome(card["column"], plan.get("reviewReason"), meta)
+    if ended:
+        card["outcome"] = ended
+    if meta.get("flagged") is True:
+        # « Bloquée »: a person said the card cannot move on (no reason here,
+        # it is a person's free text; get_card does not carry it either).
+        card["flagged"] = True
     group = _split_group(meta.get("splitGroup"))
     if group:
         card["group"] = group
@@ -604,7 +627,11 @@ def read_resource(root: Path, uri: Any) -> dict[str, Any] | None:
 TOOLS: list[dict[str, Any]] = [
     {
         "name": "list_cards",
-        "description": "The cards of this project's board, newest first (100 at most).",
+        "description": (
+            "The cards of this project's board, newest first (100 at most). "
+            "A card whose run failed or that was set aside has an `outcome`: "
+            "failed or abandoned."
+        ),
         "inputSchema": {
             "type": "object",
             "properties": {"column": {"type": "string", "enum": list(COLUMN_NAMES)}},

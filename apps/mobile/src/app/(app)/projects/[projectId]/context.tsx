@@ -1,18 +1,15 @@
 import { useLocalSearchParams } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
-import { useApi } from "../../../../auth/session";
 import { INDEX_FILE, readIndex } from "../../../../context/index-file";
+import { MemoriesTab, TrashTab } from "../../../../context/MemoryViews";
 import { JobBar } from "../../../../features/JobBar";
 import { useFeature } from "../../../../features/useFeature";
-import { useLoad } from "../../../../hooks/useLoad";
-import { describeError } from "../../../../i18n";
-import { ErrorBanner, Field, Loading, Section } from "../../../../ui/components";
-import { formatDate } from "../../../../ui/format";
+import { ErrorBanner, Loading, Section } from "../../../../ui/components";
 import { RADIUS, SPACE, useTheme } from "../../../../ui/theme";
 
-type Tab = "index" | "memories";
+type Tab = "index" | "memories" | "trash";
 
 export default function Context() {
 	const { projectId } = useLocalSearchParams<{ projectId: string }>();
@@ -22,13 +19,13 @@ export default function Context() {
 	return (
 		<View style={{ flex: 1 }}>
 			<View style={[styles.tabs, { borderColor: theme.border }]} accessibilityRole="tablist">
-				{(["index", "memories"] as const).map((key) => {
+				{(["index", "memories", "trash"] as const).map((key) => {
 					const selected = key === tab;
 					return (
 						<Pressable
 							key={key}
 							accessibilityRole="tab"
-							accessibilityState={{ selected }}
+							aria-selected={selected}
 							onPress={() => setTab(key)}
 							style={[styles.tab, { borderColor: selected ? theme.accent : "transparent" }]}
 						>
@@ -39,7 +36,9 @@ export default function Context() {
 					);
 				})}
 			</View>
-			{tab === "index" ? <IndexTab projectId={projectId} /> : <MemoriesTab projectId={projectId} />}
+			{tab === "index" ? <IndexTab projectId={projectId} /> : null}
+			{tab === "memories" ? <MemoriesTab projectId={projectId} /> : null}
+			{tab === "trash" ? <TrashTab projectId={projectId} /> : null}
 		</View>
 	);
 }
@@ -58,7 +57,7 @@ function IndexTab({ projectId }: { projectId: string }) {
 			contentContainerStyle={styles.content}
 			refreshControl={<RefreshControl refreshing={refreshing} onRefresh={reload} tintColor={theme.accent} />}
 		>
-			<ErrorBanner message={error ? describeError(error) : null} />
+			<ErrorBanner error={error} />
 			<JobBar
 				job={feature.job}
 				active={feature.active}
@@ -107,62 +106,6 @@ function IndexTab({ projectId }: { projectId: string }) {
 						) : null,
 					)}
 				</>
-			)}
-		</ScrollView>
-	);
-}
-
-/** The brain's memories, the latest first, or ranked against what the person searches. */
-function MemoriesTab({ projectId }: { projectId: string }) {
-	const { t, i18n } = useTranslation();
-	const theme = useTheme();
-	const api = useApi();
-	const [typed, setTyped] = useState("");
-	const [query, setQuery] = useState("");
-	// Search once the person pauses typing, not at each letter.
-	useEffect(() => {
-		const timer = setTimeout(() => setQuery(typed.trim()), 400);
-		return () => clearTimeout(timer);
-	}, [typed]);
-	const load = useCallback(() => api.memories(projectId, query), [api, projectId, query]);
-	const { data, error, loading, refreshing, reload } = useLoad(load);
-	return (
-		<ScrollView
-			contentContainerStyle={styles.content}
-			keyboardShouldPersistTaps="handled"
-			refreshControl={<RefreshControl refreshing={refreshing} onRefresh={reload} tintColor={theme.accent} />}
-		>
-			<Field
-				label={t("context.search")}
-				value={typed}
-				onChangeText={setTyped}
-				maxLength={500}
-				autoCapitalize="none"
-				returnKeyType="search"
-			/>
-			<ErrorBanner message={error ? describeError(error) : null} />
-			{loading && !data ? (
-				<Loading />
-			) : !data?.available ? (
-				<Text style={{ color: theme.textMuted }}>{t("context.noBrain")}</Text>
-			) : !data.memories.length ? (
-				<Text style={{ color: theme.textMuted }}>{query ? t("context.noMatch") : t("context.noMemories")}</Text>
-			) : (
-				data.memories.map((m) => (
-					<View key={m.id} style={[styles.card, { borderColor: theme.border, backgroundColor: theme.surface }]}>
-						<Text style={{ color: theme.textFaint, fontSize: 12 }}>
-							{[
-								i18n.exists(`context.memoryType.${m.type}`) ? t(`context.memoryType.${m.type}`) : m.type,
-								m.timestamp ? formatDate(m.timestamp, i18n.language) : null,
-							]
-								.filter(Boolean)
-								.join(" · ")}
-						</Text>
-						<Text style={{ color: theme.text, lineHeight: 21 }} selectable numberOfLines={12}>
-							{m.content}
-						</Text>
-					</View>
-				))
 			)}
 		</ScrollView>
 	);

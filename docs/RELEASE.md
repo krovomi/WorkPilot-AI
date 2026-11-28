@@ -74,7 +74,72 @@ Leave the repository-wide merge buttons as they are: squash stays available for 
 `develop`. `main-history-guard.yml` turns a push to `main` red when its head commit has a single
 parent, which is how a squash or a rebase that slipped through shows up.
 
+## Automatic Releases (release autopilot)
+
+Since 2026-11-14 nobody cuts a release by hand: `release-autopilot.yml` runs
+`scripts/release_autopilot.py` every hour and at the end of every CI, Lint, CodeQL, Quality
+Security and Mobile run. The steps below ("Creating a Release") are what it does, and stay the
+fallback when it is switched off.
+
+**When.** At most one version a day, never in the middle of a burst of merges: a version starts
+once `develop` has had **no merge for 2 hours**, the previous version is **at least 24 hours old**
+and every push workflow of `develop`'s head is green. Merges batch up in between. Pull requests
+that only touch docs, CI, tests or style (`docs:`, `ci:`, `test:`, `style:`, other `chore:`) ride
+along with the next version but never start one. This replaces the earlier rule of releasing only
+when no feature was in flight.
+
+**Which version.** The strongest change since the last tag wins (semantic versioning):
+
+| Level | From the pull request | From `changelog.d/` |
+|---|---|---|
+| **major** | `type!:` (`feat!:`, `fix(api)!:`), a `BREAKING CHANGE:` footer, `**Breaking:** Yes` in the template, label `breaking` | `⚠️ Changement incompatible` |
+| **minor** | `feat:` (label `feature` when the title is not conventional) | `✨ Nouveautés` |
+| **patch** | `fix:`, `perf:`, `refactor:`, `revert:`, `build:`, `chore(deps):` (label `bug`) | any other section |
+| none | `docs:`, `ci:` (including `ci(deps):`), `test:`, `style:`, other `chore:` | — |
+
+A `semver:major`, `semver:minor`, `semver:patch` or `semver:none` label on a pull request overrides
+its level. A manifest already bumped by hand past the computed version is kept.
+
+**How.**
+
+1. Branch `release/vX.Y.Z` = `develop` + one commit `chore(release): X.Y.Z`: the version in the
+   five manifests (`package.json`, `apps/frontend/package.json`, `apps/mobile/package.json`,
+   `apps/mobile/app.json`, `apps/backend/__init__.py`), the fragments folded into
+   `## X.Y.Z - Title` of `CHANGELOG.md` (the merged pull requests when there is no fragment), and
+   **the version's documentation**.
+2. The documentation is written by Claude Code on that branch (`scripts/release_docs.py`): the
+   changelog title and intro, what changed in `README.md` and its twin `README.fr.md` (features,
+   tour, architecture), the `docs/` files a changed behaviour makes wrong, and a wiki patch
+   (`scripts/wiki/patches/NNNN-release-X.Y.Z.patch`: Home "What's new", Roadmap "Recent
+   releases"). It reads the notes as data and has file tools only; what it writes outside those
+   files, a new file, an AUTOGEN block of the wiki, or a broken changelog section is put back, and
+   a token in the text discards everything. Patches the wiki already has are deleted on the way.
+   Without `CLAUDE_CODE_OAUTH_TOKEN` (or `ANTHROPIC_API_KEY`), or when the run fails, the pull
+   request carries `release-autopilot/documentation` and is not merged until a person writes the
+   documentation on the branch and removes the label.
+3. A pull request `Release vX.Y.Z` into `main`, label `release-autopilot`, with the list of changes
+   and their levels. Once every check of its head is green and GitHub says it is mergeable, it is
+   merged with a **merge commit**; `prepare-release.yml` tags, `release.yml` builds, publishes,
+   moves the README version and refreshes the wiki (which applies the patch).
+4. `main` is merged back into `develop` (`chore(release): merge vX.Y.Z back into develop`), so the
+   version commit and the folded changelog reach `develop` and the next release has nothing to
+   reconcile. The same merge runs before preparing a version if `main` has moved since (the README
+   pull request).
+
+**When it is stuck.** A red check labels the pull request `release-autopilot/rouge`, a merge GitHub
+refuses (an unresolved review thread such as a CodeQL alert, an approval) `release-autopilot/bloquee`,
+each with one comment. A fix merged into `develop` is enough: once `develop` is green and quiet
+again, the stuck pull request is closed and the version prepared again from the new `develop`.
+
+**Settings.** Secrets `PAT_TOKEN` (pushes, pull request, merge: a push with the default token
+starts no CI) and `CLAUDE_CODE_OAUTH_TOKEN`. Repository variables: `RELEASE_AUTOPILOT=off` stops it,
+`RELEASE_AUTOPILOT_QUIET_HOURS` (2) and `RELEASE_AUTOPILOT_MIN_INTERVAL_HOURS` (24) change the
+cadence, `RELEASE_AUTOPILOT_MODEL` picks the documentation model. **Run workflow** with `dry_run`
+says what it would do; with `now`, it skips the cadence once (never a red `develop`).
+
 ## For Maintainers: Creating a Release
+
+When the release autopilot is off, or for a hotfix:
 
 ### Step 1: Bump the Version
 
@@ -222,6 +287,7 @@ The release workflow **validates** that `CHANGELOG.md` has an entry for the vers
 | `release.yml` | Tag `v*` pushed | Builds binaries, extracts changelog, creates release |
 | `update-readme` (in release.yml) | After release | Updates README with new version, on `develop` and `main` through one shared commit |
 | `main-history-guard.yml` | Push to `main` | Fails when `main` moved by a commit with a single parent (squash or rebase) |
+| `release-autopilot.yml` | Hourly, end of CI / Lint / CodeQL / Quality Security / Mobile, by hand | Prepares `release/vX.Y.Z` (version, changelog, documentation), merges it into `main` by merge commit when green, merges `main` back into `develop` |
 
 ## Troubleshooting
 

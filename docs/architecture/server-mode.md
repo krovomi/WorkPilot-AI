@@ -1,3 +1,11 @@
+---
+feature: Mode serveur
+summary: >-
+  Une équipe sur un serveur : organisations, rôles, groupes, sans fuite entre tenants ; features
+  partagées par `project_id` ; runs confinés à leur clone (Landlock). Exploitation :
+  `docs/server-operations.md`.
+---
+
 # Mode serveur multi-utilisateurs
 
 Une équipe se connecte au même serveur WorkPilot depuis l'app de bureau. Chacun voit les mêmes
@@ -15,7 +23,7 @@ Règles : [`rules/security.md`](../rules/security.md#s5--mode-serveur--authentif
 
 | Pièce | Où | Rôle |
 |---|---|---|
-| Identité | `server/auth/` | comptes locaux et Microsoft Entra, jetons d'accès courts, sessions de refresh révocables, invitations |
+| Identité | `server/auth/` | comptes locaux, Microsoft Entra et tout fournisseur OpenID Connect ([spec-approval-sso.md](spec-approval-sso.md)), jetons d'accès courts, sessions de refresh révocables, invitations |
 | Tenant et droits | `server/authz/` | l'organisation où agit la requête, les permissions de ses rôles, une permission sur chaque route (`mount_guarded`), le projet résolu depuis un `project_id` (`scope.py`) |
 | Groupes | `server/authz/groups.py`, `server/routers/admin/groups.py` | des personnes d'une organisation réunies pour recevoir ensemble un rôle d'organisation et un rôle sur des projets |
 | Projets | `server/routers/projects.py`, `services/repos.py` | un projet est un dépôt distant que le serveur clone sous `WORKPILOT_REPOS_ROOT/<id>` ; ses membres et leur rôle (`viewer`, `member`, `owner`) |
@@ -77,6 +85,10 @@ l'erreur citerait le jeton. Un run reçoit les jetons de qui l'a lancé (`USER_S
 sien remplace celui que l'opérateur aurait posé pour le déploiement : ce qu'il fait sur une forge
 ou un outil de tickets est fait au nom de cette personne.
 
+**Ses comptes IA aussi** (`server/services/ai_accounts.py`, table `user_ai_accounts`, révision
+`0049`) : plusieurs clés par provider, une par défaut, que ses runs et ses jobs reçoivent à la
+place de celle du déploiement ; détail dans [ai-accounts.md](ai-accounts.md#en-mode-serveur).
+
 **Le thème de la personne la suit d'un appareil à l'autre** (`server/routers/preferences.py`,
 table `user_preferences`, révision `0009`). `GET /users/me/preferences` rend le mode (`light`,
 `dark`, `system`) et le thème de couleur (un des sept du bureau), `null` tant qu'elle n'a rien
@@ -85,6 +97,15 @@ choisi ; `PUT` les remplace. La route ne nomme personne : chacun ne lit et n'éc
 Toute autre valeur, un champ en trop ou manquant est refusé (422). L'app de bureau la lit à la
 connexion et l'écrit quand le thème change (`main/server-ui-preferences.ts`), le téléphone de
 même ([mobile-app.md](mobile-app.md#les-thèmes)).
+
+**Le menu qu'elle a arrangé la suit de même** (table `user_menu_layouts`, révision `0015`).
+`GET /users/me/preferences/menu` rend `{"layout": …}` (`null` tant qu'elle n'en a enregistré
+aucun) : l'ordre des espaces et de leurs pages, les pages déplacées vers un autre espace, les
+épingles et les pages masquées, sous les noms des réglages du bureau. `PUT` le remplace. Seuls
+des identifiants du menu (minuscules, chiffres, tirets, 64 caractères au plus) dans des listes
+bornées passent (`MenuLayout`, `server/services/preferences.py`), le reste est refusé (422).
+Le bureau le lit à la connexion, où il remplace le sien, donne le sien à un serveur qui n'en a
+pas, et l'envoie quand la personne réarrange le menu (`main/server-menu-layout.ts`).
 
 ## Ce qu'un run voit sur le disque
 
@@ -114,6 +135,27 @@ Docker. Il faut Linux 5.13 ou plus avec Landlock actif (Docker 23 ou plus l'auto
 confinement, pour un déploiement où chacun peut lire tous les projets, et le serveur le journalise.
 Git joint la forge comme le serveur : avec ses identifiants, qui servent à tous les projets.
 
+## Ce qu'un run a consommé
+
+Chaque session d'agent d'un run ou d'un job compte ses tokens et son coût
+(`core/usage_tracker.record_session_usage`, tous providers). Sur un serveur, ce compte va aussi au
+serveur, par un tube : le run démarre avec l'extrémité d'écriture ouverte (`WORKPILOT_USAGE_FD`,
+`foundation/usage_channel.py`), écrit une ligne JSON par session, et le serveur lit l'autre extrémité
+(`services/usage_records.py`) pour ranger chaque ligne dans `usage_records`, avec la personne qui a
+lancé le run, son organisation, son projet et son run ou job.
+
+Un tube et pas un fichier : le run est confiné à son clone, et un fichier qu'il peut écrire, les
+commandes de son agent peuvent le réécrire. Le descripteur devient non héritable dès que le run
+charge `foundation.usage_channel` : ni le CLI du modèle ni les commandes qu'il lance ne le
+reçoivent. Le serveur traite chaque ligne comme une entrée (forme fermée, bornes sur chaque champ,
+2 000 lignes par processus au plus) et n'y garde que des totaux : ni prompt, ni réponse, ni chemin.
+Un compte supprimé garde ses lignes sans son nom (`user_id` vidé), pour que les totaux de
+l'organisation restent justes.
+
+Le budget mensuel de tokens des quotas (`quotas.tokens_used_this_month`) somme ces lignes depuis le
+1er du mois. Le passage d'un descripteur à un processus est POSIX : sur un poste Windows de
+développement, le canal est vide et rien n'est compté (le serveur tourne sous Linux).
+
 ## Le tableau partagé
 
 Les cartes d'un projet serveur sont les fichiers que l'app et les agents lisent déjà :
@@ -128,20 +170,24 @@ du backend. Après chaque écriture, l'index du serveur est relu et un événeme
 | Lister les cartes résumées (l'app mobile, [mobile-app.md](mobile-app.md)) | `GET /api/board/cards` | `task.read`, un rôle sur le projet |
 | Lire une carte (texte, spec, rapport QA, approbation ; la copie de l'espace de build pendant un build) | `GET /api/board/cards/{id}` | `task.read`, un rôle sur le projet |
 | Créer | `POST /api/board/cards` | `task.write`, rôle `member` ou plus |
+| Interroger le tableau (le téléphone, [board-ask.md](board-ask.md#sur-le-téléphone-lot-4)) : une question, répondue par un job sur le clone ; sa réponse, à qui l'a posée seulement ; l'arrêter | `POST /api/board/ask`, `GET /api/board/ask/jobs/{id}`, `POST /api/board/ask/jobs/{id}/cancel` | `task.read`, un rôle sur le projet |
 | Lister les moteurs qu'une carte peut demander (l'écran Nouvelle carte du téléphone) | `GET /api/board/engines` | `task.read`, un rôle sur le projet ; en lecture seule : les providers de `capabilities/providers.yaml` qui ont un adaptateur, avec leur nom, leur façon de prendre l'effort et les modèles du catalogue (`services/provider_registry.py`) qui passent `MODEL_PATTERN` (`shared_board/engines.py`). Ne dit pas si les identifiants du déploiement sont configurés |
 | Modifier le titre ou la description | `PATCH /api/board/cards/{id}` | idem ; refusé (409) dès qu'une spec ou un espace de build existe |
 | Joindre des images à une carte | `images` de `request-changes`, `attachments` de la création | Au plus 10 images de 5 Mo, PNG, JPEG, GIF ou WebP dont les octets sont vérifiés (pas de SVG, qui peut porter du script) ; nom réduit à un nom de base sûr, rendu unique, jamais d'écrasement ; un dossier qui est un lien est refusé (`shared_board/attachments.py`) |
 | Régler le moteur, la priorité, la catégorie, l'objectif | `PATCH /api/board/cards/{id}/settings`, ou `settings` à la création | `task.write`, rôle `member` ou plus ; permis après le début du travail, refusé (409) pendant un run. Le provider doit être dans `capabilities/providers.yaml` (ses identifiants sont ceux du déploiement), le modèle est un identifiant borné, l'objectif est validé par `goal/spec.py`. Écrits dans `task_metadata.json` (`engineLocked`) et `.workpilot-goal.json`, dans le dossier de spec et sa copie de l'espace de build (`shared_board/settings.py`). Un champ omis est gardé, `null` l'efface ; `GET /api/board/cards/{id}` les rend sous `settings` |
 | Supprimer | `DELETE /api/board/cards/{id}` | `task.delete` ; refusé pendant un run, sur une carte réservée par un autre (sauf `owner`), ou tant que son espace de build existe |
-| Approuver la spec et le plan | `POST /api/board/cards/{id}/approve` | `review.approve` ; l'approbation porte l'empreinte de la spec et tombe si elle change |
+| Approuver la spec et le plan | `POST /api/board/cards/{id}/approve` | `review.approve` ; l'approbation porte l'empreinte de la spec et du plan, et tombe si une personne les change. Un build parti approuvé la garde sur le plan qu'il a écrit (`run_manager.set_approval_carry`, `ReviewState.carry_over`) : sa progression n'est pas une modification |
 | Lire ce que le build a changé | `GET /api/board/cards/{id}/changes` | `task.read` ; fichiers, lignes et patch de la branche `workpilot/<carte>` contre la branche du projet, lus dans l'espace de build du clone |
 | Lire le journal du build | `GET /api/board/cards/{id}/logs` | `task.read` ; `task_logs.json` du dossier de spec fusionné avec celui de l'espace de build comme l'app le fait en local (`shared_board/logs.py`), borné (1 000 lignes par phase, 8 000 caractères par ligne) et masqué ; `null` tant qu'aucun run n'a écrit ; un lien symbolique ou un fichier hors du clone n'est pas lu |
-| Renvoyer le travail avec des demandes | `POST /api/board/cards/{id}/request-changes` | `review.approve`, rôle `member` ou plus ; refusé (409) sans espace de build ou pendant un run. Les `images` jointes vont dans `feedback_images/` de l'espace de build, listées sous la demande comme le fait l'app |
+| Renvoyer le travail avec des demandes | `POST /api/board/cards/{id}/request-changes` | `review.approve`, rôle `member` ou plus ; refusé (409) sans espace de build ou pendant un run. La demande vaut approbation, par son auteur, du build qu'elle relance (comme Démarrer). Les `images` jointes vont dans `feedback_images/` de l'espace de build, listées sous la demande comme le fait l'app |
 | Lancer une phase | `POST /projects/{id}/specs/{spec}/runs` | `agent.execute` ; `merge` demande aussi `task.merge`, `pr` aussi `vcs.pr.create`. Avec `pr`, un objet `pr` facultatif (titre d'une ligne, corps, branche cible, brouillon, passer outre la revue croisée, `PullRequestOptions`) devient les arguments de `run.py --create-pr` ; le corps passe par un fichier du dossier temporaire du run, jamais par argv, et le titre en un seul jeton |
 
 Une carte peut demander une revue avant le code (`require_review`, vrai par défaut, comme dans
 l'app). Sans revue, la phase `spec` approuve ce qu'elle écrit et enchaîne le build, comme dans
-l'app ; avec, elle s'arrête à la spec et le build attend l'approbation d'un membre. Le serveur ne
+l'app ; avec, elle s'arrête à la spec et le build attend l'approbation d'un membre. Se passer de
+revue revient à approuver, donc demande `review.approve` : une carte créée sans ce droit demande
+une revue, et la phase `spec` n'enchaîne le build que si la personne qui la lance a ce droit
+(`may_skip_review` de `run_manager.build_command`) ; sinon elle s'arrête à la spec. Le serveur ne
 passe jamais `--force` : l'approbation est une décision d'une personne, pas un drapeau. Une phase ne lit jamais l'entrée standard : une question qui
 attendrait une réponse bloquerait le run sans fin.
 
@@ -168,7 +214,8 @@ toujours, sans le jeton de la session. Seul `authedFetch` (`server-connection.ts
 
 La barre latérale n'offre pour un projet du serveur que les vues qui passent par le serveur
 (`sidebar/server-gates.ts` : le Kanban, l'espace de travail, les features partagées, les vues de sa
-forge, les analyses, le changelog et l'administration) ; les autres agiraient sur le miroir. Un hub de la barre latérale
+forge, les analyses, le changelog, Mission Control réduit aux vagues d'exécution du serveur et
+l'administration) ; les autres agiraient sur le miroir. Un hub de la barre latérale
 (`sidebar/hubs.ts`) suit la même liste onglet par onglet : il n'apparaît que si l'un de ses onglets
 est offert, et n'affiche que ceux-là (pour « Historique des agents », seul « Historique des
 sessions »). La liste des projets est relue quand la session change (connexion, déconnexion, autre
@@ -365,6 +412,13 @@ jamais lu pour un projet du serveur.
 | Reconstruire l'index | `POST /api/features/context/jobs` | `agent.execute`, rôle `member` ou plus |
 | Lire, chercher les mémoires | `GET /api/features/context/memories` | `insight.read` |
 
+**La gouvernance d'un projet se lit sur le serveur.** Son `workpilot.policy.yaml`, son journal
+d'audit, les appels qu'attendent ses agents et son arrêt d'urgence sont servis par
+`/api/features/governance` (`shared_features/governance.py`, domaine `audit`) : une approbation y
+est donnée au nom du compte et de ses rôles, et `files.reviewers` peut en exiger un ; « Arrêter
+tous les agents » de l'app y arrête les runs et les jobs de la personne. Routes, permissions et
+délai mesuré : [governance-policy.md](governance-policy.md#un-projet-du-mode-serveur-shared_featuresgovernancepy).
+
 **Les vues GitHub d'un projet serveur passent par le serveur, avec le jeton de la personne.** Un
 projet cloné depuis github.com montre ses issues et ses pull requests. L'app n'a ni clone ni
 `gh` pour lui : `getGitHubConfig` lui donne pour jeton une poignée qui nomme le projet, pas un
@@ -376,7 +430,9 @@ au dépôt du projet, lu dans son `repo_url` et jamais dans la requête : un app
 l'un de ceux que font les vues (`_ROUTES` : lectures sous `/repos/<dépôt>` et de `/user`, et les
 changements du tableau ci-dessous), et l'URL envoyée est reconstruite à partir des mots de la
 route, du dépôt du projet et de nombres, sans rien recopier de la requête ; la chaîne de requête
-ne garde que les clés des vues, passées en paramètres ; GraphQL ne sert qu'une requête, la liste des PR ouvertes, écrite par le serveur. Ce que l'app
+ne garde que les clés des vues, passées en paramètres ; la seule recherche, le compte des issues
+ouvertes du test de connexion (`/search/issues`), est réécrite par le serveur pour le dépôt du
+projet ; GraphQL ne sert qu'une requête, la liste des PR ouvertes, écrite par le serveur. Ce que l'app
 faisait avec `gh` (diff, commentaire, fusion, mise à jour de la branche) devient l'appel REST
 équivalent (`pr-actions.ts`). « Créer une tâche » sur une issue en fait une carte du tableau
 partagé. L'investigation, l'auto-fix et l'analyse groupée des issues tournent sur l'ordinateur,
@@ -475,6 +531,21 @@ le domaine des analyses. Le détail : [changelog.md](changelog.md).
 | Lire les commits d'une plage | `GET /api/features/changelog/commits?mode=&type=&…` | `insight.read` ; plage refusée (422) hors du modèle fermé |
 | Corriger le changelog partagé | `PUT /api/features/changelog/report` | `insight.write`, rôle `member` ou plus ; refusé (409) pendant une génération |
 
+**Les avis sur un serveur MCP du catalogue sont ceux de l'organisation.** Dans le Marketplace MCP
+d'un projet du serveur, chaque membre laisse un avis par serveur du catalogue et par organisation
+(sûr, prudence, dangereux, et un commentaire en texte brut), depuis n'importe lequel de ses
+projets ; les membres de l'organisation les lisent depuis chacun de ses projets, aucune autre
+organisation ne les voit. L'auteur ou un administrateur de l'organisation en supprime un. Table
+`mcp_server_reviews` (Alembic `0041`, rattachée à l'organisation par `0043`), feature
+`mcp_reviews` (`shared_features/mcp_reviews.py`), domaine `marketplace` ; l'app passe par
+`main/mcp-reviews.ts`. Conception : [mcp-security-score.md](mcp-security-score.md#avis-de-lorganisation-mode-serveur-lots-5-et-6).
+
+| Action | Route | Il faut |
+|---|---|---|
+| Lire les avis de l'organisation du projet, ou d'un serveur | `GET /api/features/mcp-reviews?server_id=` | `marketplace.read` ; la réponse dit aussi si l'appelant peut écrire (`can_write`) |
+| Écrire son avis (le remplace) | `PUT /api/features/mcp-reviews` | `marketplace.write` (mainteneur, administrateur, propriétaire) |
+| Supprimer un avis | `DELETE /api/features/mcp-reviews/{review_id}` | `marketplace.write` ; le sien, ou administrateur de l'organisation (`org.member.write`) ; l'avis d'une autre organisation répond 404 |
+
 **Les automatisations tournent sur le serveur.** Les règles d'un projet du serveur (une issue
 GitHub ou GitLab étiquetée, la CI de la forge au rouge, une heure, une PR ou une MR d'un autre)
 sont enregistrées en base (`project_automations`, Alembic `0010`) et le processus de l'API les
@@ -528,8 +599,11 @@ de ce qu'il tient : les cartes indexées (`specs_index`, relues comme le tableau
 sur elles (`agent_runs`) et les jobs du projet (`project_jobs`), avec le nom de qui les a lancés.
 
 Ce qu'ont dépensé les agents, le serveur ne l'enregistre pas en base : chaque session d'agent
-l'écrit (`core/usage_tracker.py`) dans le dossier où elle travaille, le clone pour la phase `spec`
-et les jobs, l'espace de build d'une carte pour son build et sa QA. `shared_features/usage_ledger.py`
+l'écrit (`core/usage_tracker.py`) dans le `.workpilot` du clone, même quand elle travaille dans
+l'espace de build d'une carte (`ledger_root` remonte du worktree au clone, car la fusion supprime
+l'espace de build et ses relevés avec lui ; `foundation/json_ledger.py` sérialise les processus).
+Les builds d'avant ce changement ont écrit dans l'espace de build : il est encore lu. L'ordinateur
+lit les mêmes fichiers de la même façon (`main/workspace-ledgers.ts`). `shared_features/usage_ledger.py`
 lit ces relevés par liste fermée : `cost_data.json` et `dashboard_snapshot.json` du `.workpilot` du
 clone et de chaque espace de build nommé comme une carte, chacun un fichier régulier sous sa taille,
 résolu dans le clone, avec un plafond sur le tout. Un relevé est écrit par un run, donc par un agent
@@ -543,9 +617,9 @@ moyen par complexité n'est enregistré nulle part, sur l'ordinateur non plus.
 Dans l'app, ces vues reconnaissent un projet du serveur (`useServerProjectId`) et demandent au main
 ses données par son id (`main/server-workspace.ts`, canaux `SERVER_WORKSPACE_*`), qui ne répond que
 pour un projet du serveur listé et revérifie chaque nombre et chaque libellé ; ni le miroir, ni le
-backend local, ni les fichiers de l'ordinateur ne sont lus pour lui. Les routes du tableau de bord
-écrites pour l'ordinateur (`dashboard/api.py` : `/api/dashboard/*`, `/api/sessions/*`), qui lisent
-la machine et non un projet, ne répondent qu'en mode local (404 sur un serveur).
+backend local, ni les fichiers de l'ordinateur ne sont lus pour lui. La route de l'historique
+écrite pour l'ordinateur (`dashboard/api.py` : `/api/sessions/*`), qui lit la machine et non un
+projet, ne répond qu'en mode local (404 sur un serveur).
 
 | Action | Route | Il faut |
 |---|---|---|

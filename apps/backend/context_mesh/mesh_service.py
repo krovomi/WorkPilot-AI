@@ -9,6 +9,7 @@ for AI-powered analysis.
 
 import json
 import logging
+import re
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -126,6 +127,8 @@ class ContextMeshService:
     def register_project(self, project_path: str) -> ProjectSummary:
         """Register a project in the context mesh."""
         path = Path(project_path).resolve()
+        if not path.is_dir():
+            raise ValueError(f"Project directory not found: {path}")
         project = ProjectSummary(
             project_path=str(path),
             project_name=path.name,
@@ -141,8 +144,12 @@ class ContextMeshService:
         return project
 
     def unregister_project(self, project_path: str) -> bool:
-        """Remove a project from the context mesh."""
-        return self.storage.remove_project(project_path)
+        """Remove a project from the context mesh (registered paths are resolved)."""
+        removed_raw = self.storage.remove_project(project_path)
+        resolved = str(Path(project_path).resolve())
+        if resolved == project_path:
+            return removed_raw
+        return self.storage.remove_project(resolved)
 
     def get_projects(self) -> list[ProjectSummary]:
         """Get all registered projects."""
@@ -231,8 +238,12 @@ class ContextMeshService:
         task_description: str = "",
     ) -> list[ContextualRecommendation]:
         """Get contextual recommendations for a specific project and phase."""
-        recs = self.storage.get_recommendations(target_project=project_path)
-        active_recs = [r for r in recs if r.status == "active"]
+        targets = {project_path, str(Path(project_path).resolve())}
+        active_recs = [
+            r
+            for r in self.storage.get_recommendations()
+            if r.status == "active" and r.target_project in targets
+        ]
 
         if phase:
             active_recs = [r for r in active_recs if not r.phase or r.phase == phase]
@@ -250,8 +261,8 @@ class ContextMeshService:
     ) -> str:
         """Run AI analysis using the Claude Agent SDK (works with any configured provider)."""
         try:
+            from agents.session import run_agent_session
             from core.client import create_client
-            from core.session import run_agent_session
             from phase_config import get_thinking_budget, resolve_model_id
 
             model_id = resolve_model_id(self.model)
@@ -268,7 +279,9 @@ class ContextMeshService:
             )
 
             async with client:
-                status, response = await run_agent_session(client, prompt)
+                _status, response, _error = await run_agent_session(
+                    client, prompt, None
+                )
 
             return response or ""
 
@@ -279,79 +292,76 @@ class ContextMeshService:
     # ── Context Gathering ────────────────────────────────────────
 
     def _gather_projects_context(self, projects: list[ProjectSummary]) -> str:
-        """Gather context from all registered projects for analysis."""
+        """Gather context from all registered projects for analysis.
+
+        Everything read from a project (names, manifests, learning patterns,
+        folder names) is the project's content, so each section enters the
+        prompt cleaned and fenced as data (rule S2).
+        """
+        from security.untrusted import quote_untrusted
+
         sections = []
         for proj in projects:
-            path = Path(proj.project_path)
-            section = f"### {proj.project_name}\n"
-            section += f"- Path: {proj.project_path}\n"
-            section += f"- Tech stack: {', '.join(proj.tech_stack) or 'unknown'}\n"
-            section += f"- Languages: {', '.join(proj.languages) or 'unknown'}\n"
-            section += f"- Frameworks: {', '.join(proj.frameworks) or 'unknown'}\n"
-
-            # Read package.json if exists
-            pkg_json = path / "package.json"
-            if pkg_json.exists():
-                try:
-                    pkg = json.loads(pkg_json.read_text(encoding="utf-8"))
-                    deps = list(pkg.get("dependencies", {}).keys())[:20]
-                    dev_deps = list(pkg.get("devDependencies", {}).keys())[:15]
-                    section += f"- Dependencies: {', '.join(deps)}\n"
-                    section += f"- Dev dependencies: {', '.join(dev_deps)}\n"
-                except Exception:
-                    pass
-
-            # Read requirements.txt / pyproject.toml if exists
-            req_file = path / "requirements.txt"
-            if req_file.exists():
-                try:
-                    lines = req_file.read_text(encoding="utf-8").strip().splitlines()
-                    deps = [
-                        line.split("==")[0].split(">=")[0].strip()
-                        for line in lines[:20]
-                        if line.strip() and not line.startswith("#")
-                    ]
-                    section += f"- Python deps: {', '.join(deps)}\n"
-                except Exception:
-                    pass
-
-            # The project's learning patterns, from its memory in the vault
-            try:
-                from learning_loop.pattern_storage import PatternStorage
-
-                patterns = PatternStorage(path).load_patterns()
-                if patterns:
-                    section += f"- Learning patterns ({len(patterns)}):\n"
-                    for p in patterns[:5]:
-                        section += f"  - [{p.category.value}] {p.description[:100]}\n"
-            except Exception as exc:  # noqa: BLE001 - patterns are optional context
-                logger.debug("learning patterns unavailable for %s: %s", path, exc)
-
-            # Read project structure (top-level dirs)
-            if path.is_dir():
-                dirs = sorted(
-                    [
-                        d.name
-                        for d in path.iterdir()
-                        if d.is_dir()
-                        and not d.name.startswith(".")
-                        and d.name
-                        not in (
-                            "node_modules",
-                            "__pycache__",
-                            ".git",
-                            "venv",
-                            ".venv",
-                            "dist",
-                            "build",
-                        )
-                    ]
-                )[:15]
-                section += f"- Top-level dirs: {', '.join(dirs)}\n"
-
-            sections.append(section)
-
+            sections.append(
+                quote_untrusted(
+                    self._project_section(proj),
+                    kind="file_content",
+                    source=f"context mesh: {proj.project_name}",
+                )
+            )
         return "\n".join(sections)
+
+    def _project_section(self, proj: ProjectSummary) -> str:
+        path = Path(proj.project_path)
+        section = f"### {proj.project_name}\n"
+        section += f"- Path: {proj.project_path}\n"
+        section += f"- Tech stack: {', '.join(proj.tech_stack) or 'unknown'}\n"
+        section += f"- Languages: {', '.join(proj.languages) or 'unknown'}\n"
+        section += f"- Frameworks: {', '.join(proj.frameworks) or 'unknown'}\n"
+
+        pkg = _read_package_json(path)
+        if pkg:
+            deps = list(_mapping(pkg.get("dependencies")))[:20]
+            dev_deps = list(_mapping(pkg.get("devDependencies")))[:15]
+            section += f"- Dependencies: {', '.join(deps)}\n"
+            section += f"- Dev dependencies: {', '.join(dev_deps)}\n"
+
+        req_file = path / "requirements.txt"
+        if req_file.is_file():
+            try:
+                lines = req_file.read_text(encoding="utf-8").strip().splitlines()
+            except (OSError, UnicodeDecodeError):
+                lines = []
+            deps = [
+                re.split(r"[=<>!~;\[ ]", line.strip(), maxsplit=1)[0]
+                for line in lines[:20]
+                if line.strip() and not line.lstrip().startswith(("#", "-"))
+            ]
+            if deps:
+                section += f"- Python deps: {', '.join(deps)}\n"
+
+        # The project's learning patterns, from its memory in the vault
+        try:
+            from learning_loop.pattern_storage import PatternStorage
+
+            patterns = PatternStorage(path).load_patterns()
+            if patterns:
+                section += f"- Learning patterns ({len(patterns)}):\n"
+                for p in patterns[:5]:
+                    section += f"  - [{p.category.value}] {p.description[:100]}\n"
+        except Exception as exc:  # noqa: BLE001 - patterns are optional context
+            logger.debug("learning patterns unavailable for %s: %s", path, exc)
+
+        if path.is_dir():
+            dirs = sorted(
+                d.name
+                for d in path.iterdir()
+                if d.is_dir()
+                and not d.name.startswith(".")
+                and d.name not in IGNORED_DIRS
+            )[:15]
+            section += f"- Top-level dirs: {', '.join(dirs)}\n"
+        return section
 
     def _gather_existing_knowledge(self) -> str:
         """Gather existing mesh knowledge for context."""
@@ -371,7 +381,14 @@ class ContextMeshService:
             for e in handbook[:10]:
                 sections.append(f"- [{e.domain.value}] {e.title}")
 
-        return "\n".join(sections) if sections else "No existing knowledge yet."
+        if not sections:
+            return "No existing knowledge yet."
+        from security.untrusted import quote_untrusted
+
+        # Earlier model answers about the projects: data as well.
+        return quote_untrusted(
+            "\n".join(sections), kind="file_content", source="context mesh: knowledge"
+        )
 
     # ── Result Parsing ───────────────────────────────────────────
 
@@ -383,7 +400,7 @@ class ContextMeshService:
         """Parse the AI analysis response into structured data."""
         # Extract JSON from response
         parsed = self._extract_json(ai_response)
-        if not parsed:
+        if not isinstance(parsed, dict) or not parsed:
             return MeshAnalysisReport(
                 analyzed_projects=[p.project_name for p in projects],
                 patterns_found=[],
@@ -394,7 +411,7 @@ class ContextMeshService:
 
         # Parse patterns
         patterns = []
-        for p_data in parsed.get("patterns", []):
+        for p_data in _records(parsed, "patterns"):
             try:
                 pattern = CrossProjectPattern(
                     pattern_id=CrossProjectPattern.generate_id(),
@@ -409,12 +426,12 @@ class ContextMeshService:
                 )
                 if pattern.confidence >= 0.5:
                     patterns.append(pattern)
-            except (ValueError, KeyError) as e:
+            except (ValueError, KeyError, TypeError) as e:
                 logger.warning(f"Failed to parse pattern: {e}")
 
         # Parse handbook entries
         handbook_entries = []
-        for e_data in parsed.get("handbook_entries", []):
+        for e_data in _records(parsed, "handbook_entries"):
             try:
                 entry = HandbookEntry(
                     entry_id=HandbookEntry.generate_id(),
@@ -426,12 +443,12 @@ class ContextMeshService:
                     tags=e_data.get("tags", []),
                 )
                 handbook_entries.append(entry)
-            except (ValueError, KeyError) as e:
+            except (ValueError, KeyError, TypeError) as e:
                 logger.warning(f"Failed to parse handbook entry: {e}")
 
         # Parse skill transfers
         skill_transfers = []
-        for s_data in parsed.get("skill_transfers", []):
+        for s_data in _records(parsed, "skill_transfers"):
             try:
                 transfer = SkillTransfer(
                     transfer_id=SkillTransfer.generate_id(),
@@ -445,12 +462,12 @@ class ContextMeshService:
                     confidence=float(s_data.get("confidence", 0.5)),
                 )
                 skill_transfers.append(transfer)
-            except (ValueError, KeyError) as e:
+            except (ValueError, KeyError, TypeError) as e:
                 logger.warning(f"Failed to parse skill transfer: {e}")
 
         # Parse recommendations
         recommendations = []
-        for r_data in parsed.get("recommendations", []):
+        for r_data in _records(parsed, "recommendations"):
             try:
                 rec = ContextualRecommendation(
                     recommendation_id=ContextualRecommendation.generate_id(),
@@ -460,13 +477,15 @@ class ContextMeshService:
                     title=r_data.get("title", ""),
                     description=r_data.get("description", ""),
                     source_project=r_data.get("source_project", ""),
-                    target_project=r_data.get("target_project", ""),
+                    target_project=self._project_key(
+                        r_data.get("target_project", ""), projects
+                    ),
                     relevance_score=float(r_data.get("relevance_score", 0.5)),
                     phase=r_data.get("phase", ""),
                     action_suggestion=r_data.get("action_suggestion", ""),
                 )
                 recommendations.append(rec)
-            except (ValueError, KeyError) as e:
+            except (ValueError, KeyError, TypeError) as e:
                 logger.warning(f"Failed to parse recommendation: {e}")
 
         return MeshAnalysisReport(
@@ -511,111 +530,118 @@ class ContextMeshService:
 
         return None
 
-    # ── Tech Stack Detection ─────────────────────────────────────
+    @staticmethod
+    def _project_key(name: str, projects: list[ProjectSummary]) -> str:
+        """The registered path of the project the model named, else the name.
+
+        The model is shown project names; recommendations are looked up by
+        the project's path.
+        """
+        for project in projects:
+            if name in (project.project_name, project.project_path):
+                return project.project_path
+        return name
+
+    # ── Tech Stack Detection (the shared detector, project/stack.py) ─────
 
     def _detect_tech_stack(self, path: Path) -> list[str]:
-        stack = []
-        if (path / "package.json").exists():
-            stack.append("node")
-        if (path / "requirements.txt").exists() or (path / "pyproject.toml").exists():
-            stack.append("python")
-        if (path / "Cargo.toml").exists():
-            stack.append("rust")
-        if (path / "go.mod").exists():
-            stack.append("go")
-        if (path / "pom.xml").exists() or (path / "build.gradle").exists():
-            stack.append("java")
-        if (path / "Gemfile").exists():
-            stack.append("ruby")
-        if (path / "composer.json").exists():
-            stack.append("php")
-        if (path / ".csproj").exists() or any(path.glob("*.csproj")):
-            stack.append("dotnet")
-        if (path / "Dockerfile").exists():
-            stack.append("docker")
-        return stack
+        from project.stack import detect_project_stack
+
+        stack = detect_project_stack(path)
+        found = sorted(stack.get("languages") or [])
+        if stack.get("has_docker"):
+            found.append("docker")
+        return found
 
     def _detect_languages(self, path: Path) -> list[str]:
+        """Languages of the source files at the root and one level down."""
         langs = set()
-        extensions_map = {
-            ".ts": "TypeScript",
-            ".tsx": "TypeScript",
-            ".js": "JavaScript",
-            ".jsx": "JavaScript",
-            ".py": "Python",
-            ".rs": "Rust",
-            ".go": "Go",
-            ".java": "Java",
-            ".cs": "C#",
-            ".rb": "Ruby",
-            ".php": "PHP",
-            ".swift": "Swift",
-            ".kt": "Kotlin",
-        }
-        # Check top-level + one level deep
-        for f in path.iterdir():
-            if f.is_file() and f.suffix in extensions_map:
-                langs.add(extensions_map[f.suffix])
-            elif (
-                f.is_dir()
-                and not f.name.startswith(".")
-                and f.name not in ("node_modules", "__pycache__", "venv", ".venv")
-            ):
+        candidates: list[Path] = []
+        for entry in path.iterdir():
+            if entry.is_file():
+                candidates.append(entry)
+            elif not entry.name.startswith(".") and entry.name not in IGNORED_DIRS:
                 try:
-                    for sf in f.iterdir():
-                        if sf.is_file() and sf.suffix in extensions_map:
-                            langs.add(extensions_map[sf.suffix])
-                except PermissionError:
-                    pass
+                    candidates.extend(child for child in entry.iterdir())
+                except OSError:
+                    continue
+        for candidate in candidates:
+            language = LANGUAGE_BY_EXTENSION.get(candidate.suffix.lower())
+            if language and candidate.is_file():
+                langs.add(language)
         return sorted(langs)
 
     def _detect_frameworks(self, path: Path) -> list[str]:
-        frameworks = []
-        pkg_json = path / "package.json"
-        if pkg_json.exists():
-            try:
-                pkg = json.loads(pkg_json.read_text(encoding="utf-8"))
-                deps = {
-                    **pkg.get("dependencies", {}),
-                    **pkg.get("devDependencies", {}),
-                }
-                framework_map = {
-                    "react": "React",
-                    "next": "Next.js",
-                    "vue": "Vue",
-                    "nuxt": "Nuxt",
-                    "angular": "Angular",
-                    "@angular/core": "Angular",
-                    "svelte": "Svelte",
-                    "express": "Express",
-                    "fastify": "Fastify",
-                    "nestjs": "NestJS",
-                    "@nestjs/core": "NestJS",
-                    "electron": "Electron",
-                    "tailwindcss": "Tailwind CSS",
-                }
-                for dep, name in framework_map.items():
-                    if dep in deps:
-                        frameworks.append(name)
-            except Exception:
-                pass
+        from project.stack import detect_project_stack, frameworks
 
-        # Python frameworks
-        req_file = path / "requirements.txt"
-        if req_file.exists():
-            try:
-                content = req_file.read_text(encoding="utf-8").lower()
-                py_frameworks = {
-                    "django": "Django",
-                    "flask": "Flask",
-                    "fastapi": "FastAPI",
-                    "pytest": "pytest",
-                    "sqlalchemy": "SQLAlchemy",
-                }
-                for key, name in py_frameworks.items():
-                    if key in content:
-                        frameworks.append(name)
-            except Exception:
-                pass
+        found = list(frameworks(path))
+        for name in detect_project_stack(path).get("frameworks") or []:
+            if name not in found:
+                found.append(name)
+        return found
 
-        return frameworks
+
+IGNORED_DIRS = frozenset(
+    {
+        "node_modules",
+        "__pycache__",
+        ".git",
+        "venv",
+        ".venv",
+        "dist",
+        "build",
+        "bin",
+        "obj",
+        "target",
+        "vendor",
+    }
+)
+
+LANGUAGE_BY_EXTENSION = {
+    ".ts": "TypeScript",
+    ".tsx": "TypeScript",
+    ".js": "JavaScript",
+    ".jsx": "JavaScript",
+    ".mjs": "JavaScript",
+    ".py": "Python",
+    ".rs": "Rust",
+    ".go": "Go",
+    ".java": "Java",
+    ".kt": "Kotlin",
+    ".kts": "Kotlin",
+    ".cs": "C#",
+    ".fs": "F#",
+    ".vb": "Visual Basic",
+    ".rb": "Ruby",
+    ".php": "PHP",
+    ".swift": "Swift",
+    ".dart": "Dart",
+    ".scala": "Scala",
+    ".ex": "Elixir",
+    ".exs": "Elixir",
+    ".c": "C",
+    ".h": "C",
+    ".cpp": "C++",
+    ".cc": "C++",
+    ".hpp": "C++",
+}
+
+
+def _mapping(value: Any) -> dict:
+    return value if isinstance(value, dict) else {}
+
+
+def _records(parsed: dict, key: str) -> list[dict]:
+    """The objects listed under ``key`` in the model's answer, nothing else."""
+    value = parsed.get(key)
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, dict)]
+
+
+def _read_package_json(path: Path) -> dict:
+    try:
+        data = json.loads((path / "package.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return data if isinstance(data, dict) else {}

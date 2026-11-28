@@ -7,6 +7,10 @@ import { useToast } from "../../hooks/use-toast";
 import { cn } from "../../lib/utils";
 import { pauseTask, resumeTask } from "../../stores/task-store";
 import { Button } from "../ui/button";
+import { TaskBreakerPause } from "./TaskBreakerPause";
+import { TaskPolicyPause } from "./TaskPolicyPause";
+import { TaskSafetyPause } from "./TaskSafetyPause";
+import { TaskBudgetPause } from "./TaskBudgetPause";
 import {
 	Tooltip,
 	TooltipContent,
@@ -123,6 +127,11 @@ export function TaskRunControls({
 	};
 
 	return (
+		<div className="inline-flex items-center gap-2">
+			{pauseState === "paused" && <TaskBudgetPause task={task} />}
+			{pauseState === "paused" && <TaskBreakerPause task={task} />}
+			{pauseState === "paused" && <TaskSafetyPause task={task} />}
+			{pauseState === "paused" && <TaskPolicyPause task={task} />}
 		<div className="inline-flex items-center gap-1 rounded-xl border border-border/60 bg-background/50 p-1 shadow-sm backdrop-blur-sm">
 			{pauseState === "paused" ? (
 				<Tooltip>
@@ -221,6 +230,7 @@ export function TaskRunControls({
 					)}
 				</TooltipContent>
 			</Tooltip>
+		</div>
 		</div>
 	);
 }

@@ -17,6 +17,7 @@ import type {
 	ProjectContextData,
 	ProjectEnvConfig,
 	ProjectSettings,
+	ProjectForgeBindings,
 	RepoProviderDetectionResult,
 	ServerLiveView,
 	ServerViewChange,
@@ -222,6 +223,14 @@ export interface ProjectAPI {
 	detectRepoProvider: (
 		projectPath: string,
 	) => Promise<IPCResult<RepoProviderDetectionResult>>;
+	/**
+	 * The project's forge settings checked against its git remotes; `current`
+	 * holds the page's unsaved values (repository fields only).
+	 */
+	getForgeBindings: (
+		projectId: string,
+		current?: Partial<ProjectEnvConfig>,
+	) => Promise<IPCResult<ProjectForgeBindings>>;
 	/** `identity` is saved as the global git name/email before the first commit. */
 	initializeGit: (
 		projectPath: string,
@@ -615,6 +624,12 @@ export const createProjectAPI = (): ProjectAPI => ({
 		projectPath: string,
 	): Promise<IPCResult<RepoProviderDetectionResult>> =>
 		ipcRenderer.invoke(IPC_CHANNELS.GIT_DETECT_PROVIDER, projectPath),
+
+	getForgeBindings: (
+		projectId: string,
+		current?: Partial<ProjectEnvConfig>,
+	): Promise<IPCResult<ProjectForgeBindings>> =>
+		ipcRenderer.invoke(IPC_CHANNELS.GIT_FORGE_BINDINGS, projectId, current),
 
 	initializeGit: (
 		projectPath: string,

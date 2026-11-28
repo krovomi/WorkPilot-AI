@@ -20,6 +20,12 @@ key (``secrets.py``), never returned by a route (only that they are set),
 never logged. Sending runs in the background, is off unless the operator
 turns it on (``WORKPILOT_NEEDS_YOU_ENABLED``), and never fails a run.
 
+Two moments come from elsewhere, through :func:`notify_people`: a plan
+that waited too long (``approval_escalated``, ``approval_escalation.py``) and
+a member's rejection of a review finding waiting for a maintainer
+(``review_feedback_held``, ``shared_features/forge_review_feedback_notify.py``),
+which names the pull request's number in place of a card.
+
 Whether a plan still waits for approval is the board's answer
 (``review.state``): the server imports no feature unit, so the board installs
 it with :func:`set_approval_check`, as it does for push.
@@ -47,7 +53,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
-EVENTS: tuple[str, ...] = ("plan_review", "review_ready", "failed")
+EVENTS: tuple[str, ...] = (
+    "plan_review",
+    "review_ready",
+    "failed",
+    "approval_escalated",
+    "review_feedback_held",
+)
 LOCALES = frozenset({"en", "fr"})
 #: What a route shows in place of a stored secret: that it is set, nothing of it.
 MASK = "********"
@@ -75,6 +87,16 @@ _STRINGS: dict[str, dict[str, tuple[str, str]]] = {
             "Task stopped on an error",
             "{project}, card {card} stopped on an error.",
         ),
+        "approval_escalated": (
+            "A plan waits for an approver",
+            "{project}, card {card}: its plan has waited for approval longer "
+            "than your team allows.",
+        ),
+        "review_feedback_held": (
+            "A rejection waits for you",
+            "{project}: a member rejected a review finding on pull request "
+            "#{card}. It counts once a maintainer approves it.",
+        ),
         "test": ("WorkPilot test", "Notifications from the server reach you here."),
     },
     "fr": {
@@ -89,6 +111,16 @@ _STRINGS: dict[str, dict[str, tuple[str, str]]] = {
         "failed": (
             "Tâche arrêtée sur une erreur",
             "{project}, carte {card} : arrêtée sur une erreur.",
+        ),
+        "approval_escalated": (
+            "Un plan attend un approbateur",
+            "{project}, carte {card} : son plan attend une approbation depuis "
+            "plus longtemps que ton équipe ne le permet.",
+        ),
+        "review_feedback_held": (
+            "Un rejet t'attend",
+            "{project} : un membre a rejeté une remarque de revue sur la pull "
+            "request #{card}. Il compte dès qu'un mainteneur l'approuve.",
         ),
         "test": ("Test WorkPilot", "Les notifications du serveur t'arrivent bien ici."),
     },
@@ -424,6 +456,42 @@ async def _notify(
             return
         name = project.name if project else "WorkPilot"
     await _send_all(rows, message(event, locale, name, card_id))
+
+
+async def notify_people(
+    db: AsyncSession,
+    user_ids: list[str],
+    event: str,
+    project_name: str,
+    card_id: str,
+    client: httpx.AsyncClient | None = None,
+    resolver: channels.Resolver = channels.system_resolver,
+) -> int:
+    """Tell each of these people of ``event`` on their channels; how many were.
+
+    Each in their language, unless they muted the moment. Nothing leaves while
+    the operator has not turned sending on.
+    """
+    if not get_settings().needs_you_enabled or event not in EVENTS:
+        return 0
+    told = 0
+    for user_id in user_ids:
+        rows = list(
+            await db.scalars(
+                select(NeedsYouChannel).where(
+                    NeedsYouChannel.user_id == user_id,
+                    NeedsYouChannel.enabled.is_(True),
+                )
+            )
+        )
+        muted, locale = await _preferences(db, user_id)
+        if not rows or event in muted:
+            continue
+        results = await _send_all(
+            rows, message(event, locale, project_name, card_id), client, resolver
+        )
+        told += "sent" in results.values()
+    return told
 
 
 def notify_needs_you(

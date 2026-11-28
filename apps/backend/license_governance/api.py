@@ -22,8 +22,9 @@ from .attribution import (
     render_attribution,
     write_attribution,
 )
+from .local_metadata import LocalLicenseResolver
+from .resolvers import LicenseResolution
 from .scanner import (
-    DependencyRecord,
     LicenseCategory,
     LicensePolicy,
     LicenseScanner,
@@ -68,6 +69,36 @@ class ScanRequest(BaseModel):
             "a dep's licence (e.g. fetched from the registry). Maps name → licence."
         ),
     )
+    online: bool = Field(
+        True,
+        description=(
+            "Ask the public registries (deps.dev, npm, PyPI, Packagist, RubyGems, "
+            "pub.dev) for licences no installed copy gives. Ignored (off) under a "
+            "strict offline policy."
+        ),
+    )
+
+
+def _resolution(
+    project: Path, overrides: list[LicenseOverride] | None, online: bool
+) -> LicenseResolution:
+    """Manifest, installed copy, then registry — the last only when allowed.
+
+    A project under a strict offline policy (``airgapStrict``) never reaches
+    a registry, whatever the request says; an unreadable policy counts as
+    strict.
+    """
+    try:
+        from offline_policy import airgap_status
+
+        airgapped = bool(airgap_status(project).get("airgapStrict"))
+    except (OSError, ValueError):
+        airgapped = True
+    return LicenseResolution(
+        local=LocalLicenseResolver(project),
+        online=online and not airgapped,
+        overrides={o.name: o.license for o in (overrides or [])},
+    )
 
 
 class ClassifyRequest(BaseModel):
@@ -87,11 +118,7 @@ def scan(req: ScanRequest):
             "error": f"Unknown policy preset {req.policy!r}; choose one of {sorted(_POLICY_PRESETS)}.",
         }
 
-    overrides = {o.name: o.license for o in (req.license_overrides or [])}
-
-    def resolver(dep: DependencyRecord) -> str | None:
-        return overrides.get(dep.name, dep.declared_license)
-
+    resolver = _resolution(path, req.license_overrides, req.online)
     try:
         scanner = LicenseScanner(
             project_dir=path,
@@ -99,7 +126,7 @@ def scan(req: ScanRequest):
             resolver=resolver,
         )
         report = scanner.scan()
-        return {"success": True, "report": report.to_dict()}
+        return {"success": True, "online": resolver.online, "report": report.to_dict()}
     except Exception as e:  # noqa: BLE001
         logger.exception("license scan failed")
         return {"success": False, "error": safe_error(e, logger, "resolver")}
@@ -107,18 +134,15 @@ def scan(req: ScanRequest):
 
 @router.post("/classify")
 def classify(req: ClassifyRequest):
-    try:
-        cat = classify_license(req.license)
-        return {
-            "success": True,
-            "license": req.license,
-            "category": cat.value,
-            "is_permissive": cat
-            in (LicenseCategory.PERMISSIVE, LicenseCategory.PUBLIC_DOMAIN),
-        }
-    except Exception as e:  # noqa: BLE001
-        logger.exception("classify failed")
-        return {"success": False, "error": safe_error(e, logger, "classify")}
+    # Pure string work on a validated string: nothing here raises.
+    cat = classify_license(req.license)
+    return {
+        "success": True,
+        "license": req.license,
+        "category": cat.value,
+        "is_permissive": cat
+        in (LicenseCategory.PERMISSIVE, LicenseCategory.PUBLIC_DOMAIN),
+    }
 
 
 class AttributionRequest(BaseModel):
@@ -134,6 +158,7 @@ class AttributionRequest(BaseModel):
         description=f"If true, write {ATTRIBUTION_FILENAME} at the project root.",
     )
     license_overrides: list[LicenseOverride] | None = None
+    online: bool = True
 
 
 @router.post("/attribution")
@@ -143,11 +168,7 @@ def attribution(req: AttributionRequest):
     except ValueError as e:
         return {"success": False, "error": safe_error(e, logger, "attribution")}
 
-    overrides = {o.name: o.license for o in (req.license_overrides or [])}
-
-    def resolver(dep: DependencyRecord) -> str | None:
-        return overrides.get(dep.name, dep.declared_license)
-
+    resolver = _resolution(path, req.license_overrides, req.online)
     try:
         scanner = LicenseScanner(project_dir=path, resolver=resolver)
         report = scanner.scan()

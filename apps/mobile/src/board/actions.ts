@@ -33,7 +33,8 @@ export function availableActions(
 	details: CardDetails | null,
 	runs: readonly AgentRun[],
 ): CardAction[] {
-	if (!card.specId) return [];
+	// A card set aside is resumed from the desktop board.
+	if (!card.specId || card.outcome === "abandoned") return [];
 	if (activeRun(runs)) return ["stop"];
 	// The column says an agent works on it, but no run is queued or running:
 	// the build crashed, the server restarted, or sending it back could not
@@ -58,6 +59,31 @@ export function availableActions(
 	}
 }
 
+/**
+ * Approval recorded, but the card needs more (its criticality asks for
+ * several approvers): its build does not start yet.
+ */
+export class ApprovalWaiting extends Error {
+	constructor(
+		readonly count: number,
+		readonly needed: number,
+	) {
+		super("approval_waiting");
+	}
+}
+
+/**
+ * Add this person's approval; throws {@link ApprovalWaiting} when the card
+ * still waits for others. A server older than the quorum says nothing of it:
+ * its approval was the only one.
+ */
+export async function approveCard(client: Api, projectId: string, cardId: string): Promise<void> {
+	const result = await client.approve(projectId, cardId);
+	if (result?.approved === false) {
+		throw new ApprovalWaiting(result.approval?.count ?? 0, result.approval?.needed ?? 1);
+	}
+}
+
 /** Start the card's next step: its spec, or its build. */
 export async function startCard(
 	client: Api,
@@ -71,7 +97,8 @@ export async function startCard(
 		return;
 	}
 	if (details.requireReview && !details.approval.approved) {
-		await client.approve(projectId, card.id);
+		// Building after a partial approval only stopped on "review required".
+		await approveCard(client, projectId, card.id);
 	}
 	await client.startRun(projectId, card.specId, "build");
 }
@@ -86,6 +113,17 @@ export async function stopCard(client: Api, projectId: string, card: BoardCard):
 	if (!run) throw new Error("nothing_to_stop");
 	const result = await client.cancelRun(projectId, card.specId, run.id);
 	if (!result.cancelled) throw new Error("nothing_to_stop");
+}
+
+/** Run one of the card's later phases again: its build, its merge, or its pull request. */
+export async function runPhase(
+	client: Api,
+	projectId: string,
+	card: BoardCard,
+	phase: "build" | "merge" | "pr",
+): Promise<void> {
+	if (!card.specId) throw new Error("card_not_indexed");
+	await client.startRun(projectId, card.specId, phase);
 }
 
 /** Send the work back with what to change, then build again. */

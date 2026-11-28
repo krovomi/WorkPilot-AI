@@ -48,6 +48,8 @@ class EventType(str, Enum):
     SPEC_UPDATED = "spec_updated"
     SPEC_DELETED = "spec_deleted"
     SPEC_APPROVED = "spec_approved"
+    # The project's sprints changed (``shared_board/sprints.py``).
+    SPRINTS_UPDATED = "sprints_updated"
     # A shared feature of the project (``shared_features``): a file a member
     # rewrote, and a job's status as it starts and ends.
     FEATURE_UPDATED = "feature_updated"
@@ -92,8 +94,6 @@ class StreamingManager:
         self._subscribers: dict[
             str, set[Any]
         ] = {}  # session_id -> set of websocket connections
-        self._event_queue: asyncio.Queue = asyncio.Queue()
-        self._is_broadcasting = False
 
     async def start_session(self, session_id: str, metadata: dict[str, Any]) -> None:
         """Start a new streaming session."""
@@ -139,157 +139,6 @@ class StreamingManager:
         )
         await self._broadcast_event(event)
 
-    async def emit_code_change(
-        self,
-        session_id: str,
-        file_path: str,
-        change_type: str,
-        content: str | None = None,
-        diff: str | None = None,
-    ) -> None:
-        """Emit a code change event."""
-        event = StreamingEvent(
-            event_type=EventType.CODE_CHANGE,
-            timestamp=time.time(),
-            data={
-                "file_path": file_path,
-                "change_type": change_type,
-                "content": content,
-                "diff": diff,
-            },
-            session_id=session_id,
-        )
-        await self._broadcast_event(event)
-
-    async def emit_file_operation(
-        self,
-        session_id: str,
-        operation: str,
-        file_path: str,
-        content: str | None = None,
-    ) -> None:
-        """Emit a file operation event (create/update/delete)."""
-        event_type_map = {
-            "create": EventType.FILE_CREATE,
-            "update": EventType.FILE_UPDATE,
-            "delete": EventType.FILE_DELETE,
-        }
-
-        event = StreamingEvent(
-            event_type=event_type_map.get(operation, EventType.FILE_UPDATE),
-            timestamp=time.time(),
-            data={
-                "file_path": file_path,
-                "content": content,
-            },
-            session_id=session_id,
-        )
-        await self._broadcast_event(event)
-
-    async def emit_command(
-        self,
-        session_id: str,
-        command: str,
-        cwd: str | None = None,
-    ) -> None:
-        """Emit a command execution event."""
-        event = StreamingEvent(
-            event_type=EventType.COMMAND_RUN,
-            timestamp=time.time(),
-            data={
-                "command": command,
-                "cwd": cwd,
-            },
-            session_id=session_id,
-        )
-        await self._broadcast_event(event)
-
-    async def emit_command_output(
-        self,
-        session_id: str,
-        output: str,
-        is_error: bool = False,
-    ) -> None:
-        """Emit command output event."""
-        event = StreamingEvent(
-            event_type=EventType.COMMAND_OUTPUT,
-            timestamp=time.time(),
-            data={
-                "output": output,
-                "is_error": is_error,
-            },
-            session_id=session_id,
-        )
-        await self._broadcast_event(event)
-
-    async def emit_agent_thinking(
-        self,
-        session_id: str,
-        thinking: str,
-    ) -> None:
-        """Emit agent thinking/reasoning event."""
-        event = StreamingEvent(
-            event_type=EventType.AGENT_THINKING,
-            timestamp=time.time(),
-            data={
-                "thinking": thinking,
-            },
-            session_id=session_id,
-        )
-        await self._broadcast_event(event)
-
-    async def emit_agent_response(
-        self,
-        session_id: str,
-        response: str,
-        tokens_used: int | None = None,
-    ) -> None:
-        """Emit agent response event."""
-        event = StreamingEvent(
-            event_type=EventType.AGENT_RESPONSE,
-            timestamp=time.time(),
-            data={
-                "response": response,
-                "tokens_used": tokens_used,
-            },
-            session_id=session_id,
-        )
-        await self._broadcast_event(event)
-
-    async def emit_test_run(
-        self,
-        session_id: str,
-        test_command: str,
-    ) -> None:
-        """Emit test run event."""
-        event = StreamingEvent(
-            event_type=EventType.TEST_RUN,
-            timestamp=time.time(),
-            data={
-                "test_command": test_command,
-            },
-            session_id=session_id,
-        )
-        await self._broadcast_event(event)
-
-    async def emit_test_result(
-        self,
-        session_id: str,
-        success: bool,
-        details: str | None = None,
-    ) -> None:
-        """Emit test result event."""
-        event = StreamingEvent(
-            event_type=EventType.TEST_RESULT,
-            timestamp=time.time(),
-            data={
-                "success": success,
-                "details": details,
-            },
-            session_id=session_id,
-        )
-        await self._broadcast_event(event)
-
     async def emit_chat_message(
         self,
         session_id: str,
@@ -305,26 +154,6 @@ class StreamingManager:
                 "message": message,
                 "author": author,
                 "author_type": author_type,
-            },
-            session_id=session_id,
-        )
-        await self._broadcast_event(event)
-
-    async def emit_progress(
-        self,
-        session_id: str,
-        progress: float,
-        status: str,
-        current_step: str | None = None,
-    ) -> None:
-        """Emit a progress update event."""
-        event = StreamingEvent(
-            event_type=EventType.PROGRESS_UPDATE,
-            timestamp=time.time(),
-            data={
-                "progress": progress,
-                "status": status,
-                "current_step": current_step,
             },
             session_id=session_id,
         )

@@ -1,4 +1,4 @@
-import { Loader2, Mic, Sparkles, Square } from "lucide-react";
+import { Loader2, Mic, Radio, Sparkles, Square } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { VoiceDestination, VoiceIntent } from "@shared/types/voice-assistant";
@@ -26,17 +26,22 @@ import { Input } from "../ui/input";
 import { NativeSelect } from "../ui/native-select";
 import { Textarea } from "../ui/textarea";
 import { useVoiceCapture } from "./use-voice-capture";
-import { VIEW_HINTS } from "./voice-destinations";
-import { readVoiceCommand } from "./voice-intent";
+import { voiceSensitivity } from "./voice-activity";
+import { initialLanguage, LANGUAGE_KEY, LANGUAGES } from "./voice-language";
+import { VoiceContinuous } from "./VoiceContinuous";
+import { VoiceWake } from "./VoiceWake";
+import { offeredDestinations } from "./voice-destinations";
+import { VoiceNarration } from "./voice-narration";
+import { resolveSentence, stopAgentsAfterStep } from "./voice-resolve";
+import { sayFeedback } from "./voice-speech";
 import "../charter/charter.css";
 
-const LANGUAGES = ["auto", "fr-FR", "en-US", "en-GB", "es-ES", "de-DE", "it-IT", "pt-BR", "nl-NL"];
-const LANGUAGE_KEY = "voice-assistant-language";
 
 type Stage =
 	| { kind: "capture" }
 	| { kind: "thinking" }
 	| { kind: "confirm"; title: string; description: string; saving: boolean }
+	| { kind: "confirm-stop"; stopping: boolean }
 	| { kind: "message"; key: string; text?: string };
 
 interface VoiceAssistantProps {
@@ -45,16 +50,6 @@ interface VoiceAssistantProps {
 	readonly onNavigate: (view: string) => void;
 	readonly onNewTask: () => void;
 	readonly onOpenSettings: () => void;
-}
-
-function initialLanguage(appLanguage: string): string {
-	try {
-		const saved = localStorage.getItem(LANGUAGE_KEY);
-		if (saved && LANGUAGES.includes(saved)) return saved;
-	} catch {
-		/* Storage can be disabled. */
-	}
-	return LANGUAGES.find((lang) => lang.startsWith(appLanguage.split("-")[0])) ?? "auto";
 }
 
 /**
@@ -93,6 +88,15 @@ export function VoiceAssistant({
 	}, [shortcut, mac, press]);
 
 	return (
+		<>
+		<VoiceNarration />
+		<VoiceWake />
+		<VoiceContinuous
+			destinations={destinations}
+			onNavigate={onNavigate}
+			onNewTask={onNewTask}
+			onOpenSettings={onOpenSettings}
+		/>
 		<Dialog open={isOpen} onOpenChange={(open) => !open && close()}>
 			<DialogContent className="wp-scope max-w-xl">
 				<DialogHeader>
@@ -125,6 +129,7 @@ export function VoiceAssistant({
 				)}
 			</DialogContent>
 		</Dialog>
+		</>
 	);
 }
 
@@ -147,17 +152,24 @@ function VoiceAssistantBody({
 	const [language, setLanguage] = useState(() => initialLanguage(appLanguage));
 	const [text, setText] = useState("");
 	const [stage, setStage] = useState<Stage>({ kind: "capture" });
+	// With « auto », the language Whisper heard: the model reads the sentence in it.
+	const [heard, setHeard] = useState<string | undefined>(undefined);
 	const textRef = useRef("");
 	textRef.current = text;
+	const heardRef = useRef<string | undefined>(undefined);
+	heardRef.current = heard;
+	const feedback = useSettingsStore((s) => s.settings.voiceAssistantFeedback);
+	const tell = useCallback(
+		(line: string) => sayFeedback(feedback, "short", line, appLanguage),
+		[feedback, appLanguage],
+	);
 	const projectId = useProjectStore((s) => s.activeProjectId ?? s.selectedProjectId);
 	const project = useProjectStore((s) => s.projects.find((p) => p.id === projectId));
-	const offered = useMemo<VoiceDestination[]>(
-		() =>
-			destinations
-				.filter((d) => d.id !== "voice-control")
-				.map((d) => (VIEW_HINTS[d.id] ? { ...d, hint: VIEW_HINTS[d.id].hint } : d)),
-		[destinations],
+	const sensitivity = voiceSensitivity(
+		useSettingsStore((s) => s.settings.voiceAssistantSensitivity),
 	);
+	const startContinuous = useVoiceAssistantStore((s) => s.startContinuous);
+	const offered = useMemo(() => offeredDestinations(destinations), [destinations]);
 
 	// An answer that arrives after the panel closed does nothing.
 	const alive = useRef(true);
@@ -175,6 +187,11 @@ function VoiceAssistantBody({
 				case "navigate":
 					onClose();
 					onNavigate(intent.view);
+					tell(
+						t("voiceAssistant:speech.opening", {
+							view: destinations.find((d) => d.id === intent.view)?.label ?? intent.view,
+						}),
+					);
 					return;
 				case "new-task":
 					onClose();
@@ -200,52 +217,65 @@ function VoiceAssistantBody({
 					setStage({ kind: "message", key: "results.unknown", text: said });
 			}
 		},
-		[onClose, onNavigate, onNewTask, onOpenSettings, projectId],
+		[destinations, onClose, onNavigate, onNewTask, onOpenSettings, projectId, t, tell],
 	);
 
 	const interpret = useCallback(
 		async (said: string) => {
-			const sentence = said.trim();
-			if (!sentence) {
-				setStage({ kind: "message", key: "results.nothingHeard" });
-				return;
-			}
-			const local = readVoiceCommand(sentence, offered);
-			if (local.confident) {
-				act(local.intent, sentence);
-				return;
-			}
-			setStage({ kind: "thinking" });
-			const answer = await window.electronAPI
-				.interpretVoiceCommand(sentence, offered, language, projectId ?? undefined)
-				.catch(() => ({ success: false as const, error: "unavailable" as const }));
-			if (answer.success) {
-				act(answer.intent, sentence);
-				return;
-			}
-			if (local.intent.kind !== "unknown") {
-				act(local.intent, sentence);
-				return;
-			}
-			setStage({
-				kind: "message",
-				key: answer.error === "unavailable" ? "results.noModel" : "results.unknown",
-				text: sentence,
-			});
+			const outcome = await resolveSentence(
+				said,
+				offered,
+				heardRef.current ?? language,
+				projectId ?? undefined,
+				() => setStage({ kind: "thinking" }),
+			);
+			if (outcome.kind === "intent") act(outcome.intent, said.trim());
+			else if (outcome.kind === "stop") setStage({ kind: "confirm-stop", stopping: false });
+			else setStage({ kind: "message", key: outcome.key, text: outcome.text });
 		},
 		[act, language, offered, projectId],
 	);
+	const interpretRef = useRef(interpret);
+	interpretRef.current = interpret;
+
+	// What the panel asks or answers is said too, with spoken feedback on.
+	const spokenStage =
+		stage.kind === "message"
+			? t(`voiceAssistant:${stage.key}`, { text: stage.text })
+			: stage.kind === "confirm"
+				? t("voiceAssistant:confirm.heading")
+				: stage.kind === "confirm-stop"
+					? t("voiceAssistant:stop.confirm")
+					: "";
+	useEffect(() => {
+		if (spokenStage) tell(spokenStage);
+	}, [spokenStage, tell]);
 
 	const capture = useVoiceCapture({
 		language,
+		sensitivity,
 		projectPath: project?.path,
-		onText: (phrase) => setText((current) => (current ? `${current} ${phrase}` : phrase)),
+		onText: (phrase, language) => {
+			if (language) setHeard(language);
+			setText((current) => (current ? `${current} ${phrase}` : phrase));
+		},
 		onDone: () => void interpret(textRef.current),
 	});
 	const { phase, start, finish, cancel } = capture;
 
-	// Opening the panel starts listening (`start` does nothing while a session runs).
+	// Opening the panel starts listening (`start` does nothing while a session
+	// runs), unless the wake word already brought the sentence.
+	const openedOn = useRef(false);
 	useEffect(() => {
+		if (!openedOn.current) {
+			openedOn.current = true;
+			const command = useVoiceAssistantStore.getState().takePendingCommand();
+			if (command) {
+				setText(command);
+				void interpretRef.current(command);
+				return;
+			}
+		}
 		void start();
 	}, [start]);
 
@@ -254,9 +284,12 @@ function VoiceAssistantBody({
 	useEffect(() => {
 		if (pressCount === handledPress.current) return;
 		handledPress.current = pressCount;
+		// A pending stop is answered with its buttons, not by listening over it.
+		if (stage.kind === "confirm-stop") return;
 		if (phase === "listening") finish();
 		else if (phase === "idle" && stage.kind !== "confirm" && stage.kind !== "thinking") {
 			setText("");
+			setHeard(undefined);
 			setStage({ kind: "capture" });
 			void start();
 		}
@@ -273,6 +306,7 @@ function VoiceAssistantBody({
 
 	const listenAgain = () => {
 		setText("");
+		setHeard(undefined);
 		setStage({ kind: "capture" });
 		void start();
 	};
@@ -286,10 +320,21 @@ function VoiceAssistantBody({
 			toast({ variant: "destructive", title: t("voiceAssistant:results.createFailed") });
 			return;
 		}
+		const created = t("voiceAssistant:results.created", { title: task.title || stage.title });
+		toast({ variant: "success", title: created });
+		tell(created);
+		onClose();
+	};
+
+	const confirmStop = async () => {
+		setStage({ kind: "confirm-stop", stopping: true });
+		const { key, count } = await stopAgentsAfterStep();
+		const said = t(`voiceAssistant:${key}`, { count });
 		toast({
-			variant: "success",
-			title: t("voiceAssistant:results.created", { title: task.title || stage.title }),
+			variant: key === "stop.stopping" ? "success" : key === "stop.none" ? "default" : "destructive",
+			title: said,
 		});
+		tell(said);
 		onClose();
 	};
 
@@ -298,6 +343,32 @@ function VoiceAssistantBody({
 	const busy = phase !== "idle" || stage.kind === "thinking";
 	const statusKey =
 		stage.kind === "thinking" ? "thinking" : phase === "idle" ? "idle" : phase;
+
+	if (stage.kind === "confirm-stop") {
+		return (
+			<div className="mt-4 space-y-3" role="alertdialog" aria-labelledby={`${id}-stop`}>
+				<p id={`${id}-stop`} className="text-sm font-medium">
+					{t("voiceAssistant:stop.confirm")}
+				</p>
+				<p className="text-xs text-muted-foreground">{t("voiceAssistant:stop.explain")}</p>
+				<div className="flex justify-end gap-2">
+					<Button type="button" variant="ghost" onClick={listenAgain}>
+						{t("voiceAssistant:stop.no")}
+					</Button>
+					<Button
+						type="button"
+						variant="destructive"
+						autoFocus
+						disabled={stage.stopping}
+						onClick={() => void confirmStop()}
+					>
+						{stage.stopping && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+						{t("voiceAssistant:stop.yes")}
+					</Button>
+				</div>
+			</div>
+		);
+	}
 
 	if (stage.kind === "confirm") {
 		return (
@@ -402,6 +473,11 @@ function VoiceAssistantBody({
 					))}
 				</NativeSelect>
 			</div>
+			{language === "auto" && heard && (
+				<p className="text-xs text-muted-foreground">
+					{t("voiceAssistant:heard", { language: names.of(heard) })}
+				</p>
+			)}
 
 			<form
 				className="flex gap-2"
@@ -460,6 +536,23 @@ function VoiceAssistantBody({
 				</p>
 			)}
 
+			<div className="flex items-center justify-between gap-3 rounded-lg border border-border p-3">
+				<p className="text-xs text-muted-foreground">{t("voiceAssistant:continuous.offer")}</p>
+				<Button
+					type="button"
+					variant="outline"
+					size="sm"
+					className="shrink-0"
+					onClick={() => {
+						cancel();
+						startContinuous();
+					}}
+				>
+					<Radio className="mr-2 h-4 w-4" />
+					{t("voiceAssistant:continuous.start")}
+				</Button>
+			</div>
+
 			<div className="rounded-lg border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
 				<p className="mb-1 font-medium text-foreground">{t("voiceAssistant:examples.heading")}</p>
 				<ul className="space-y-0.5">
@@ -467,6 +560,7 @@ function VoiceAssistantBody({
 					<li>{t("voiceAssistant:examples.open")}</li>
 					<li>{t("voiceAssistant:examples.draw")}</li>
 					<li>{t("voiceAssistant:examples.settings")}</li>
+					<li>{t("voiceAssistant:examples.stop")}</li>
 				</ul>
 			</div>
 		</div>

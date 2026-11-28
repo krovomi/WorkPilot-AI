@@ -12,12 +12,30 @@
  * is supported on every call (for useEffect cleanup).
  */
 
+import { localBackendFetch } from "./local-backend";
+
 export type ApiResult<T> =
 	| { ok: true; data: T }
-	/** `detail`: the backend's own words, when it has any worth showing. */
-	| { ok: false; error: string; detail?: string };
+	/**
+	 * `detail`: the backend's own words, when it has any worth showing.
+	 * `unreachable`: nothing answered (the local backend is stopped, or did not
+	 * start in time); `error` is then the bare "Failed to fetch".
+	 */
+	| { ok: false; error: string; detail?: string; unreachable?: true };
 
-const backendUrl = (): string => import.meta.env?.VITE_BACKEND_URL ?? "";
+/** A request that reached nothing, said so rather than as "Failed to fetch". */
+function failure(err: unknown): { ok: false; error: string; unreachable?: true } {
+	if ((err as { name?: string })?.name === "AbortError") {
+		return { ok: false, error: "aborted" };
+	}
+	return {
+		ok: false,
+		error: err instanceof Error ? err.message : "network error",
+		...(err instanceof TypeError ? { unreachable: true as const } : {}),
+	};
+}
+
+// Main reaches the backend for the renderer, which has no URL for it.
 
 async function _post<T>(
 	path: string,
@@ -25,9 +43,8 @@ async function _post<T>(
 	signal?: AbortSignal,
 ): Promise<ApiResult<T>> {
 	try {
-		const res = await fetch(`${backendUrl()}${path}`, {
+		const res = await localBackendFetch(path, {
 			method: "POST",
-			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify(body),
 			signal,
 		});
@@ -44,13 +61,7 @@ async function _post<T>(
 			...(typeof json.detail === "string" ? { detail: json.detail } : {}),
 		};
 	} catch (err) {
-		if ((err as { name?: string })?.name === "AbortError") {
-			return { ok: false, error: "aborted" };
-		}
-		return {
-			ok: false,
-			error: err instanceof Error ? err.message : "network error",
-		};
+		return failure(err);
 	}
 }
 
@@ -61,7 +72,7 @@ async function _get<T>(
 ): Promise<ApiResult<T>> {
 	try {
 		const qs = new URLSearchParams(params).toString();
-		const res = await fetch(`${backendUrl()}${path}?${qs}`, { signal });
+		const res = await localBackendFetch(`${path}?${qs}`, { signal });
 		const json = (await res.json()) as Record<string, unknown>;
 		if (json.success === true) {
 			return { ok: true, data: json as T };
@@ -74,13 +85,7 @@ async function _get<T>(
 					: `request failed with HTTP ${res.status}`,
 		};
 	} catch (err) {
-		if ((err as { name?: string })?.name === "AbortError") {
-			return { ok: false, error: "aborted" };
-		}
-		return {
-			ok: false,
-			error: err instanceof Error ? err.message : "network error",
-		};
+		return failure(err);
 	}
 }
 
@@ -1404,6 +1409,29 @@ export interface BrainSettings {
 	readonly homeRoots?: readonly string[];
 	/** Where the folder picker opens under WSL: the Windows profile, else drive C. */
 	readonly browseRoot?: string | null;
+	/** A local embeddings model finding memory conflicts in other words. */
+	readonly conflictEmbeddings?: BrainConflictEmbeddings;
+}
+
+export interface BrainConflictEmbeddings {
+	readonly enabled: boolean;
+	/** The local model; "" for the first embeddings model the server has. */
+	readonly model: string;
+	/** Set by `BRAIN_CONFLICT_EMBEDDINGS`: the switch does not win. */
+	readonly enabledLocked: boolean;
+	/** Set by `BRAIN_CONFLICT_EMBEDDINGS_MODEL`. */
+	readonly modelLocked: boolean;
+	/** The local server asked; "" for Ollama, else LM Studio. Absent from an older backend. */
+	readonly provider?: BrainEmbeddingsProvider | "";
+	/** Set by `BRAIN_CONFLICT_EMBEDDINGS_PROVIDER`. */
+	readonly providerLocked?: boolean;
+}
+
+export type BrainEmbeddingsProvider = "ollama" | "lm-studio";
+
+/** The local server and model a sync would ask now; null when none has one. */
+export interface BrainEmbeddingsFound {
+	readonly found: { readonly provider: BrainEmbeddingsProvider; readonly model: string } | null;
 }
 
 export interface BrainSettingsUpdate {
@@ -1414,6 +1442,11 @@ export interface BrainSettingsUpdate {
 	enabled?: boolean;
 	/** Create, clone or adopt the brain now. */
 	connect?: boolean;
+	conflict_embeddings?: boolean;
+	/** "" goes back to the first embeddings model the server has. */
+	conflict_embeddings_model?: string;
+	/** "" goes back to Ollama, else LM Studio. */
+	conflict_embeddings_provider?: BrainEmbeddingsProvider | "";
 }
 
 export interface BrainNoteSummary {
@@ -1459,6 +1492,45 @@ export async function fetchBrainSettings(
 	signal?: AbortSignal,
 ): Promise<ApiResult<{ settings: BrainSettings }>> {
 	return _get<{ settings: BrainSettings }>("/api/brain/settings", {}, signal);
+}
+
+/** Asks the local servers, so it is its own call: the settings do not wait on it. */
+export async function fetchBrainEmbeddingsFound(
+	signal?: AbortSignal,
+): Promise<ApiResult<BrainEmbeddingsFound>> {
+	return _get<BrainEmbeddingsFound>("/api/brain/settings/embeddings", {}, signal);
+}
+
+/** A key of the vault's trusted list: its name and fingerprint, never the key. */
+export interface BrainVaultSigner {
+	readonly name: string;
+	readonly kind: "ssh" | "gpg";
+	readonly fingerprint: string;
+}
+
+/** The vault's trusted signers, for the notes outside every project. */
+export interface BrainVaultSigners {
+	readonly signers: readonly BrainVaultSigner[];
+	/** Changes to the list someone pushed that no listed key signed. */
+	readonly rejected: number;
+	/** Whether this machine's git signs its commits. */
+	readonly signing: boolean;
+	/** The notes outside the projects that no trusted key signed. */
+	readonly unverified: number;
+}
+
+export async function fetchBrainVaultSigners(
+	signal?: AbortSignal,
+): Promise<ApiResult<BrainVaultSigners>> {
+	return _get<BrainVaultSigners>("/api/brain/signers", {}, signal);
+}
+
+/** One `<name> <key>` per line; an empty list trusts every note again. */
+export async function saveBrainVaultSigners(
+	lines: readonly string[],
+	signal?: AbortSignal,
+): Promise<ApiResult<BrainVaultSigners>> {
+	return _post<BrainVaultSigners>("/api/brain/signers", { lines }, signal);
 }
 
 export async function saveBrainSettings(
@@ -1781,7 +1853,10 @@ export function compareVerify(
 	return _post<VerifyPayload>("/api/verify/compare", specAddress(query), signal);
 }
 
-/** The URL of one screenshot the record names — by index, never by path. */
+/**
+ * The backend URL of one screenshot the record names — by index, never by path.
+ * Backend-relative: render it through `useLocalBackendFile`, which asks main.
+ */
 export function verifyScreenshotUrl(
 	query: SpecTraceabilityQuery,
 	index: number,
@@ -1790,19 +1865,19 @@ export function verifyScreenshotUrl(
 		...specAddress(query),
 		index: String(index),
 	}).toString();
-	return `${backendUrl()}/api/verify/screenshot?${qs}`;
+	return `/api/verify/screenshot?${qs}`;
 }
 
 /** The Playwright trace of the card's scenario, served by the record, never by path. */
 export function verifyTraceUrl(query: SpecTraceabilityQuery): string {
 	const qs = new URLSearchParams(specAddress(query)).toString();
-	return `${backendUrl()}/api/verify/trace?${qs}`;
+	return `/api/verify/trace?${qs}`;
 }
 
 /** The scenario's video or GIF, served by the record, never by path. */
 export function verifyMediaUrl(query: SpecTraceabilityQuery, kind: "video" | "walkthrough"): string {
 	const qs = new URLSearchParams(specAddress(query)).toString();
-	return `${backendUrl()}/api/verify/${kind}?${qs}`;
+	return `/api/verify/${kind}?${qs}`;
 }
 
 // ── Red team (`red_team/`, `qa/red_team_api.py`) ─────────────────────────────

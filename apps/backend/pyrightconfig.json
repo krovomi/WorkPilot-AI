@@ -1,15 +1,20 @@
 {
   "include": [
+    "agent_snapshots",
     "best_of_n",
     "bench",
+    "design_to_code",
+    "deploy_watch",
     "dotnet_upgrade",
     "genai_trace",
     "goal",
     "mcp_tasks",
+    "mission_control",
     "os_sandbox",
     "schema_guard",
     "red_team",
     "security",
+    "security_reach",
     "simulation",
     "suite_runner"
   ],

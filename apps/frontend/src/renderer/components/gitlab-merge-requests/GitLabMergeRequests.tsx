@@ -1,6 +1,5 @@
 import { AlertCircle, Plus } from "lucide-react";
-import { useEffect, useState } from "react";
-import { initializeMRReviewListeners } from "../../stores/gitlab";
+import { useState } from "react";
 import { Button } from "../ui/button";
 import { CreateMergeRequestDialog } from "./components/CreateMergeRequestDialog";
 import { MergeRequestList } from "./components/MergeRequestList";
@@ -15,18 +14,13 @@ interface GitLabMergeRequestsProps {
 
 export function GitLabMergeRequests({
 	projectId,
-	onOpenSettings: _onOpenSettings,
+	onOpenSettings,
 }: GitLabMergeRequestsProps) {
 	const { t } = useTranslation();
 	const [stateFilter, setStateFilter] = useState<
 		"opened" | "closed" | "merged" | "all"
 	>("opened");
 	const [showCreateDialog, setShowCreateDialog] = useState(false);
-
-	// Initialize MR review listeners on mount
-	useEffect(() => {
-		initializeMRReviewListeners();
-	}, []);
 
 	// Use the new hook for MR state management
 	const {
@@ -45,9 +39,7 @@ export function GitLabMergeRequests({
 		checkNewCommits,
 		cancelReview,
 		postReview,
-		postNote,
 		mergeMR,
-		assignMR,
 		approveMR,
 	} = useGitLabMRs(projectId, { stateFilter });
 
@@ -62,9 +54,17 @@ export function GitLabMergeRequests({
 			<div className="flex flex-col items-center justify-center h-full p-8">
 				<AlertCircle className="h-12 w-12 text-destructive mb-4" />
 				<p className="text-sm text-muted-foreground text-center">{error}</p>
-				<Button variant="outline" onClick={refresh} className="mt-4">
-					{t("gitlab:mergeRequests.tryAgain")}
-				</Button>
+				<div className="flex gap-2 mt-4">
+					<Button variant="outline" onClick={refresh}>
+						{t("gitlab:mergeRequests.tryAgain")}
+					</Button>
+					{/* The usual cause is a project without GitLab set up. */}
+					{onOpenSettings && (
+						<Button variant="outline" onClick={onOpenSettings}>
+							{t("gitlab:notConnected.openSettings")}
+						</Button>
+					)}
+				</div>
 			</div>
 		);
 	}
@@ -98,7 +98,7 @@ export function GitLabMergeRequests({
 			<div className="flex-1 flex flex-col">
 				{selectedMR ? (
 					<MRDetail
-                        projectId={projectId}
+						projectId={projectId}
 						mr={selectedMR}
 						reviewResult={reviewResult}
 						reviewProgress={reviewProgress}
@@ -110,9 +110,7 @@ export function GitLabMergeRequests({
 						onPostReview={(selectedFindingIds) =>
 							postReview(selectedMR.iid, selectedFindingIds)
 						}
-						onPostNote={(body) => postNote(selectedMR.iid, body)}
 						onMergeMR={(mergeMethod) => mergeMR(selectedMR.iid, mergeMethod)}
-						onAssignMR={(userIds) => assignMR(selectedMR.iid, userIds)}
 						onApproveMR={() => approveMR(selectedMR.iid)}
 					/>
 				) : (

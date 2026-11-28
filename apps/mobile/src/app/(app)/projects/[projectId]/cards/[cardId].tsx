@@ -10,11 +10,14 @@ import {
 	allowedActions,
 	availableActions,
 	type CardAction,
+	runPhase,
 	sendBack,
 	startCard,
 	stopCard,
 } from "../../../../../board/actions";
-import { ACTIVE_COLUMNS } from "../../../../../board/columns";
+import { ACTION_ICONS } from "../../../../../board/actionIcons";
+import { ACTIVE_COLUMNS, boardColumn } from "../../../../../board/columns";
+import { ApprovalSection } from "../../../../../card/ApprovalSection";
 import { ChangesSection } from "../../../../../card/ChangesSection";
 import { LogsSection } from "../../../../../card/LogsSection";
 import { canEditCard, EditCard } from "../../../../../card/EditCard";
@@ -24,10 +27,13 @@ import { SteeringSection } from "../../../../../card/SteeringSection";
 import { useCard } from "../../../../../board/useCard";
 import { describeError } from "../../../../../i18n";
 import { Button, ErrorBanner, Field, Loading, Section } from "../../../../../ui/components";
-import { formatDate } from "../../../../../ui/format";
-import { columnColor, SPACE, useTheme } from "../../../../../ui/theme";
+import { formatDate, timeAgo } from "../../../../../ui/format";
+import { Icon, type IconName } from "../../../../../ui/Icon";
+import { Avatar, Chip } from "../../../../../ui/kit";
+import { columnColor, RADIUS, SPACE, TYPE, useTheme } from "../../../../../ui/theme";
 
 const WORKING_POLL_MS = 5_000;
+
 
 export default function CardScreen() {
 	const { projectId, cardId } = useLocalSearchParams<{ projectId: string; cardId: string }>();
@@ -42,6 +48,8 @@ export default function CardScreen() {
 	const [feedbackOpen, setFeedbackOpen] = useState(false);
 	const [feedback, setFeedback] = useState("");
 	const [editing, setEditing] = useState(false);
+	// Bumped after each action, so the approval section reads the server again.
+	const [revision, setRevision] = useState(0);
 	const working = !!data && (!!activeRun(data.runs) || ACTIVE_COLUMNS.has(data.card.column));
 
 	// While an agent works on the card, read it again: its column, runs and
@@ -79,6 +87,7 @@ export default function CardScreen() {
 			return false;
 		} finally {
 			setBusy(null);
+			setRevision((n) => n + 1);
 		}
 	};
 
@@ -97,11 +106,11 @@ export default function CardScreen() {
 			case "stop":
 				return run(action, () => stopCard(api, projectId, card));
 			case "retry":
-				return run(action, () => api.startRun(projectId, card.specId ?? "", "build"));
+				return run(action, () => runPhase(api, projectId, card, "build"));
 			case "merge":
-				return runConfirmed(action, () => api.startRun(projectId, card.specId ?? "", "merge"));
+				return runConfirmed(action, () => runPhase(api, projectId, card, "merge"));
 			case "createPr":
-				return runConfirmed(action, () => api.startRun(projectId, card.specId ?? "", "pr"));
+				return runConfirmed(action, () => runPhase(api, projectId, card, "pr"));
 			case "requestChanges":
 				setFeedbackOpen(true);
 				return;
@@ -143,21 +152,32 @@ export default function CardScreen() {
 			refreshControl={<RefreshControl refreshing={refreshing} onRefresh={reload} tintColor={theme.accent} />}
 		>
 			<Stack.Screen options={{ headerTitle: card.id.split("-")[0] }} />
-			<View style={{ gap: SPACE.sm }}>
-				<View style={styles.columnRow}>
-					<View style={[styles.dot, { backgroundColor: columnColor(theme, card.column) }]} />
-					<Text style={{ color: theme.textMuted }}>{t(`columns.${card.column}`)}</Text>
-					{card.kind ? <Text style={{ color: theme.textFaint }}>· {t(`kinds.${card.kind}`)}</Text> : null}
-				</View>
-				<Text accessibilityRole="header" style={[styles.title, { color: theme.text }]}>
+      <View style={{ gap: SPACE.sm }}>
+        <View style={styles.columnRow}>
+          <View style={[styles.status, { backgroundColor: theme.elevated }]}>
+            <View style={[styles.dot, { backgroundColor: columnColor(theme, boardColumn(card)) }]} />
+            <Text style={[TYPE.caption, { color: theme.text, fontWeight: "700" }]}>
+              {t(`columns.${boardColumn(card)}`)}
+            </Text>
+          </View>
+          {card.kind ? <Chip label={t(`kinds.${card.kind}`)} /> : null}
+          {working ? <Chip label={t("card.working")} icon="activity" color={theme.accent} /> : null}
+        </View>
+				<Text accessibilityRole="header" style={[TYPE.title, { color: theme.text }]}>
 					{card.title}
 				</Text>
 				{card.claimedByName ? (
-					<Text style={{ color: theme.textFaint }}>{t("board.claimedBy", { name: card.claimedByName })}</Text>
+					<View style={styles.columnRow}>
+						<Avatar name={card.claimedByName} size={22} />
+						<Text style={[TYPE.small, { color: theme.textMuted, flexShrink: 1 }]}>
+							{t("board.claimedBy", { name: card.claimedByName })}
+							{card.updatedAt ? ` · ${timeAgo(card.updatedAt, t, i18n.language)}` : ""}
+						</Text>
+					</View>
 				) : null}
 			</View>
 
-			<ErrorBanner message={actionError ?? (error ? describeError(error) : null)} />
+			<ErrorBanner message={actionError} error={error} />
 
 			{actions.length > 0 ? (
 				<View style={styles.actions}>
@@ -165,6 +185,7 @@ export default function CardScreen() {
 						<Button
 							key={action}
 							label={t(`actions.${action}`)}
+							icon={ACTION_ICONS[action]}
 							variant={action === "delete" || action === "stop" ? "danger" : action === actions[0] ? "primary" : "secondary"}
 							busy={busy === action}
 							disabled={!!busy}
@@ -208,19 +229,19 @@ export default function CardScreen() {
 					}}
 				/>
 			) : (
-				<Section title={t("card.description")}>
+				<Section title={t("card.description")} icon="align-left">
 					<Text style={{ color: theme.text, lineHeight: 22 }} selectable>
 						{details.description}
 					</Text>
 					{editable ? (
-						<Button label={t("card.edit")} variant="secondary" onPress={() => setEditing(true)} />
+						<Button label={t("card.edit")} icon="edit-3" variant="secondary" onPress={() => setEditing(true)} />
 					) : null}
 				</Section>
 			)}
 
 			<SettingsSection settings={details.settings} />
 
-			<Section title={t("card.spec")}>
+			<Section title={t("card.spec")} icon="file-text">
 				{details.spec ? (
 					<LongText text={details.spec} showLabel={t("card.showSpec")} hideLabel={t("card.hideSpec")} />
 				) : (
@@ -229,22 +250,34 @@ export default function CardScreen() {
 			</Section>
 
 			{details.spec ? (
-				<Section title={t("card.approval")}>
-					<Text style={{ color: details.approval.approved ? theme.success : theme.textMuted }}>
-						{details.approval.approved
+				<ApprovalSection
+					// Read again after each action on the card (an approval, a change of plan).
+					key={`${cardId}-${revision}`}
+					projectId={projectId}
+					cardId={cardId}
+					fallback={
+						details.approval.approved
 							? t("card.approvedBy", { name: details.approval.approvedBy ?? "?" })
-							: t("card.notApproved")}
-					</Text>
-				</Section>
+							: t("card.notApproved")
+					}
+				/>
 			) : null}
 
 			{details.qaReport ? (
-				<Section title={t("card.qaReport")}>
+				<Section title={t("card.qaReport")} icon="check-square">
 					<LongText text={details.qaReport} showLabel={t("card.showReport")} hideLabel={t("card.hideReport")} />
 				</Section>
 			) : null}
 
-			<ChangesSection changes={changes} />
+			<ChangesSection
+				changes={changes}
+				onOpenFile={(file) =>
+					router.push({
+						pathname: "/projects/[projectId]/cards/[cardId]/files",
+						params: { projectId, cardId, file: String(file) },
+					})
+				}
+			/>
 
 			{data.card.column !== "done" ? (
 				<SteeringSection
@@ -255,9 +288,12 @@ export default function CardScreen() {
 				/>
 			) : null}
 
-			<LogsSection logs={logs} />
+			<LogsSection
+				logs={logs}
+				onOpen={() => router.push({ pathname: "/projects/[projectId]/cards/[cardId]/logs", params: { projectId, cardId } })}
+			/>
 
-			<Section title={t("card.runs")}>
+			<Section title={t("card.runs")} icon="play-circle">
 				{runs.length === 0 ? (
 					<Text style={{ color: theme.textMuted }}>{t("card.noRuns")}</Text>
 				) : (
@@ -275,8 +311,10 @@ function RunRow({ run, locale }: { run: AgentRun; locale: string }) {
 	const phase = i18n.exists(`runPhase.${run.phase}`) ? t(`runPhase.${run.phase}`) : run.phase;
 	const color =
 		run.status === "succeeded" ? theme.success : run.status === "failed" ? theme.danger : theme.textMuted;
+	const icon: IconName = run.status === "succeeded" ? "check-circle" : run.status === "failed" ? "x-circle" : "loader";
 	return (
 		<View style={[styles.run, { borderColor: theme.border }]}>
+			<Icon name={icon} size={18} color={color} />
 			<View style={{ flex: 1 }}>
 				<Text style={{ color: theme.text, fontWeight: "600" }}>{phase}</Text>
 				<Text style={{ color: theme.textFaint, fontSize: 12 }}>{formatDate(run.started_at, locale)}</Text>
@@ -293,9 +331,16 @@ function RunRow({ run, locale }: { run: AgentRun; locale: string }) {
 
 const styles = StyleSheet.create({
 	content: { padding: SPACE.lg, gap: SPACE.lg, paddingBottom: SPACE.xl * 2 },
-	columnRow: { flexDirection: "row", alignItems: "center", gap: SPACE.sm },
+	columnRow: { flexDirection: "row", alignItems: "center", gap: SPACE.sm, flexWrap: "wrap" },
+	status: {
+		flexDirection: "row",
+		alignItems: "center",
+		gap: 6,
+		borderRadius: RADIUS.pill,
+		paddingHorizontal: SPACE.sm + 2,
+		paddingVertical: 4,
+	},
 	dot: { width: 8, height: 8, borderRadius: 4 },
-	title: { fontSize: 24, fontWeight: "700" },
 	actions: { gap: SPACE.sm },
 	inline: { flexDirection: "row", gap: SPACE.sm },
 	run: {

@@ -64,6 +64,15 @@ ROUTE_OVERRIDES: dict[tuple[str, str], str] = {
     ("POST", "/api/board/cards/{card_id}/approve"): "review.approve",
     # Sending a card's work back is the other answer to the same review.
     ("POST", "/api/board/cards/{card_id}/request-changes"): "review.approve",
+    # How critical a card is sets how many approve it; lending one's
+    # approval, or ending that, is the approver's.
+    ("PUT", "/api/board/cards/{card_id}/criticality"): "review.approve",
+    ("POST", "/api/board/delegations"): "review.approve",
+    ("DELETE", "/api/board/delegations/{delegation_id}"): "review.approve",
+    # Asking the board a question (« Interroger le tableau ») reads it: who
+    # may see the cards may ask about them, and stop their own question.
+    ("POST", "/api/board/ask"): "task.read",
+    ("POST", "/api/board/ask/jobs/{job_id}/cancel"): "task.read",
     # A message to a running card's agent changes what the agent does.
     ("POST", "/api/board/cards/{card_id}/steering"): "agent.execute",
     # A shared feature's job runs its agent on the project's clone; stopping
@@ -95,10 +104,43 @@ ROUTE_OVERRIDES: dict[tuple[str, str], str] = {
     # A question to Insights runs the insights agent on the clone.
     ("POST", "/api/features/insights/sessions/{session_id}/messages"): "agent.execute",
     ("POST", "/api/features/insights/jobs/{job_id}/cancel"): "agent.cancel",
+    # Opening a shared replay reads it; the POST carries its link's token in
+    # the body, out of the URL.
+    ("POST", "/api/features/replay-shares/{share_id}/open"): "lab.read",
+    # Saying yes or no to showing one's own name on Pixel Office's leaderboard
+    # writes only the caller's consent: whoever may read the board decides it.
+    ("PUT", "/api/features/pixel-office/consent"): "analytics.read",
+    # A server project's governance: the export of its policy trail names
+    # people; answering an agent's request is a review; its kill switch is
+    # the right to stop a run.
+    ("GET", "/api/features/governance/audit"): "audit.export",
+    ("POST", "/api/features/governance/approvals/{request_id}"): "review.approve",
+    ("POST", "/api/features/governance/stop"): "agent.cancel",
+    # "Execute in optimal order" starts the cards of a wave as the caller.
+    ("POST", "/api/features/execution-waves/run"): "agent.execute",
+    ("POST", "/api/features/execution-waves/run/step"): "agent.execute",
     # Audit trail is append-only and its exports carry personal data.
     ("GET", "/api/audit-trail/export/soc2"): "audit.export",
     ("GET", "/api/audit-trail/export/gdpr"): "audit.export",
 }
+
+
+#: The routes an approval lent by a delegation reaches (``server/authz/
+#: delegation.py``): the two answers to a card's review, on the project the
+#: delegation names. Lending it on or setting a criticality stays the
+#: approver's.
+DELEGATED_ROUTES: frozenset[tuple[str, str]] = frozenset(
+    {
+        ("POST", "/api/board/cards/{card_id}/approve"),
+        ("POST", "/api/board/cards/{card_id}/request-changes"),
+    }
+)
+
+
+def _delegated(request: Request, principal: Principal, route_path: str) -> bool:
+    if (request.method.upper(), route_path) not in DELEGATED_ROUTES:
+        return False
+    return principal.acting_for(request.query_params.get("project_id")) is not None
 
 
 def permission_for(method: str, route_path: str, domain: str) -> str:
@@ -130,7 +172,7 @@ def _feature_guard(feature: str):
         route = request.scope.get("route")
         route_path = getattr(route, "path", request.url.path)
         needed = permission_for(request.method, route_path, domain)
-        if not principal.has(needed):
+        if not principal.has(needed) and not _delegated(request, principal, route_path):
             raise HTTPException(status_code=403, detail=f"Missing permission: {needed}")
         return principal
 

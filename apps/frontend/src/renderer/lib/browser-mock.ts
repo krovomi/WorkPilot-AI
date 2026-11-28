@@ -7,14 +7,17 @@
  */
 
 import type { ElectronAPI } from "../../shared/types";
+import { REA_PIN } from "../../shared/types/rea";
 import {
 	changelogMock,
 	claudeProfileMock,
 	contextMock,
 	insightsMock,
 	integrationMock,
+	memoryLifecycleMock,
 	phase35Mock,
 	projectMock,
+	selfHealingMock,
 	settingsMock,
 	taskMock,
 	terminalMock,
@@ -60,6 +63,9 @@ const browserMockAPI: Partial<ElectronAPI> = {
 
 	// Settings
 	...settingsMock,
+
+	// Self-healing (the desktop app scans, groups and bisects)
+	...selfHealingMock,
 
 	// Roadmap Operations
 	getRoadmap: async () => ({
@@ -135,6 +141,7 @@ const browserMockAPI: Partial<ElectronAPI> = {
 
 	// Context Operations
 	...contextMock,
+	...memoryLifecycleMock,
 
 	// Environment Configuration & Integration Operations
 	...integrationMock,
@@ -299,6 +306,30 @@ const browserMockAPI: Partial<ElectronAPI> = {
 		mergePR: async () => true,
 		assignPR: async () => true,
 		markReviewPosted: async () => true,
+		setReviewFindingFeedback: async () => ({
+			success: true as const,
+			feedback: {},
+		}),
+		getReviewFindingFeedback: async () => ({
+			success: true as const,
+			feedback: {},
+		}),
+		getReviewFeedbackStats: async () => ({
+			success: true as const,
+			stats: { threshold: 3, categories: [], rules: [], months: [] },
+		}),
+		resetReviewFeedbackRule: async () => ({
+			success: false as const,
+			error: "not_found" as const,
+		}),
+		decideHeldReviewFeedback: async () => ({
+			success: false as const,
+			error: "not_found" as const,
+		}),
+		writeReviewConventions: async () => ({
+			success: false as const,
+			error: "write_failed" as const,
+		}),
 		getPRReview: async () => null,
 		getPRReviewsBatch: async () => ({}),
 		deletePRReview: async () => true,
@@ -483,9 +514,10 @@ const browserMockAPI: Partial<ElectronAPI> = {
 		success: true,
 		data: [],
 	}),
+	// No desktop to capture in browser mode: a code the picker translates
 	capture: async (_options: { sourceId: string }) => ({
 		success: false,
-		error: "Screenshot capture not available in browser mode",
+		error: "capture_failed" as const,
 	}),
 
 	// Debug Operations
@@ -677,6 +709,10 @@ const browserMockAPI: Partial<ElectronAPI> = {
 		success: false,
 		error: "Not available in browser mode",
 	}),
+	saveDetectedWindsurfToken: async () => ({
+		success: false,
+		error: "Not available in browser mode",
+	}),
 	checkClaudeOAuth: async () => ({ isAuthenticated: false }),
 	checkOpenAICodexOAuth: async () => ({ isAuthenticated: false }),
 	checkAgentCli: async (tool) => ({ tool, installed: false }),
@@ -684,6 +720,8 @@ const browserMockAPI: Partial<ElectronAPI> = {
 	installAgentCli: async (tool) => ({ tool, success: false, error: "node_required" }),
 	checkCliUpdate: async (tool) => ({ tool, installed: false, isOutdated: false }),
 	updateCli: async (tool) => ({ tool, success: false, error: "not_installed" }),
+	checkRea: async () => ({ state: "absent", pinned: REA_PIN.version }),
+	installRea: async () => ({ success: false, error: "node_required" }),
 	listTaskPermissions: async () => [],
 	answerTaskPermission: async () => ({ ok: false, reason: "not_pending" }),
 	onTaskPermissionRequest: () => () => {
@@ -776,6 +814,13 @@ const browserMockAPI: Partial<ElectronAPI> = {
 		throw new Error("Smart estimation is unavailable in the browser preview");
 	},
 	cancelSmartEstimation: async () => false,
+	// La calibration vit dans le depot : sans backend, rien a ecrire.
+	adjustSmartEstimate: async () => {
+		throw new Error("Smart estimation is unavailable in the browser preview");
+	},
+	resetEstimationCalibration: async () => {
+		throw new Error("Smart estimation is unavailable in the browser preview");
+	},
 	onSmartEstimationEvent: () => () => {
 		/* noop */
 	},
@@ -801,6 +846,7 @@ const browserMockAPI: Partial<ElectronAPI> = {
 	getTaskStackStatus: async () => ({ success: true, data: { stacked: false } }),
 	updateTaskStack: async () => ({ success: false, error: "Not available in browser mode" }),
 	listTaskSandboxes: async () => [],
+	getMicrovmStatus: async () => ({ installed: false, ready: false, version: null, vms: 0, reason: null }),
 	onTaskSandboxStatus: () => () => {
 		/* nothing to remove in the browser mock */
 	},

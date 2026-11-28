@@ -8,6 +8,11 @@
  *   cicdTriggers:trigger        — Manually trigger a pipeline for a PR
  *   cicdTriggers:getRunStatus   — Get status of a specific pipeline run
  *   cicdTriggers:cancelRun      — Cancel a running pipeline
+ *   cicdTriggers:rollback       — Roll a watched deployment back (#366), and the
+ *                                 services linked to it (`cicd-deploy-handlers.ts`)
+ *
+ * A triggered run is then watched when the settings name a health check or
+ * Prometheus (`main/cicd/deploy-watch.ts`, `apps/backend/deploy_watch/`).
  *
  * Supported providers: GitHub Actions, GitLab CI, Azure DevOps Pipelines, Jenkins
  */
@@ -28,16 +33,50 @@ import { parsePythonCommand } from "../python-detector";
 import { getConfiguredPythonPath } from "../python-env-manager";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
 import { envWithoutCredentials } from "../utils/child-env";
+import { pythonRunnerEnv } from "../utils/python-runner-env";
+import { getAppLanguage } from "../app-language";
+import { notificationService } from "../notification-service";
+import {
+	DEPLOY_WATCH_RUNNER,
+	LiveDeployWatches,
+	RUN_ID,
+	deployAlertText,
+	readDeployWatch,
+	watchConfigured,
+} from "../cicd/deploy-watch";
+import {
+	isCicdSecret,
+	MASKED_TOKEN,
+	WATCH_ALERT_KEYS,
+	WATCH_FLAG_KEYS,
+	WATCH_SOURCE_KEYS,
+	watchSettingsView,
+} from "../cicd/watch-settings";
+import { readReviews } from "../cicd/deploy-figures";
+import { readLinkedRollbacks } from "../cicd/linked-rollback";
+import { registerCicdDeployHandlers, rollBackLinkedOf } from "./cicd-deploy-handlers";
+import {
+	CICD_PROVIDERS,
+	isProviderRunId,
+	runsLimit,
+	type TriggerParams,
+	triggerParams,
+} from "../cicd/trigger-inputs";
+
+export { CICD_PROVIDERS };
 
 
-function getRunnerPath(): string {
+function getBackendPath(): string {
 	// Bundled resources once packaged, `apps/backend` in dev (app path is
 	// `apps/frontend`). Walking up from `import.meta.dirname` (`out/main`)
 	// left the repository and the runner was never found.
-	const backendPath = app.isPackaged
+	return app.isPackaged
 		? path.resolve(process.resourcesPath, "backend")
 		: path.resolve(app.getAppPath(), "..", "backend");
-	return path.join(backendPath, "runners", "cicd_triggers_runner.py");
+}
+
+function getRunnerPath(runner = "cicd_triggers_runner.py"): string {
+	return path.join(getBackendPath(), "runners", runner);
 }
 
 /**
@@ -55,6 +94,8 @@ export function findKnownProject(projectDir: unknown): Project | null {
 }
 
 const UNKNOWN_PROJECT = { success: false, error: "Project not found" } as const;
+const INVALID_TRIGGER = { success: false, error: "Invalid trigger request" } as const;
+const INVALID_RUN_ID = { success: false, error: "Invalid run id" } as const;
 
 /** Renderer field → `.workpilot/.env` key. Nothing outside this list is written. */
 export const CICD_CONFIG_KEYS: Readonly<Record<string, string>> = {
@@ -75,10 +116,21 @@ export const CICD_CONFIG_KEYS: Readonly<Record<string, string>> = {
 	jenkins_url: "CICD_JENKINS_URL",
 	jenkins_token: "CICD_JENKINS_TOKEN",
 	jenkins_job: "CICD_JENKINS_JOB",
+	// The watch after a deployment (#366).
+	monitor_health_url: "CICD_MONITOR_HEALTH_URL",
+	monitor_prometheus_url: "CICD_MONITOR_PROMETHEUS_URL",
+	monitor_prometheus_token: "CICD_MONITOR_PROMETHEUS_TOKEN",
+	monitor_window_minutes: "CICD_MONITOR_WINDOW_MINUTES",
+	monitor_deploy_wait_minutes: "CICD_MONITOR_DEPLOY_WAIT_MINUTES",
+	auto_rollback: "CICD_AUTO_ROLLBACK",
+	// Other metric sources and the alert channels (#366, lot 3).
+	...WATCH_SOURCE_KEYS,
+	...WATCH_ALERT_KEYS,
+	// The feature flag the rollback turns off first (#366, lot 4).
+	...WATCH_FLAG_KEYS,
 };
 
-/** What getConfig shows for a token that is set; sent back, it means "unchanged". */
-export const MASKED_TOKEN = "***";
+export { MASKED_TOKEN };
 
 /** The CI/CD settings of a project, tokens decrypted — main process only. */
 function readCicdConfig(project: Project): Record<string, string> {
@@ -105,7 +157,7 @@ export function toCicdEnvUpdate(
 		if (!key) continue;
 		const value = String(raw ?? "");
 		if (/[\r\n\0]/.test(value)) return { ok: false, error: "invalid-value" };
-		if (key.endsWith("_TOKEN") && value === MASKED_TOKEN) continue;
+		if ((key.endsWith("_TOKEN") || isCicdSecret(key)) && value === MASKED_TOKEN) continue;
 		update[key] = value;
 	}
 	return { ok: true, update };
@@ -152,15 +204,17 @@ async function writeCicdConfig(
 async function runRunner(
 	project: Project,
 	args: string[],
+	runner?: string,
+	runnerEnv?: Record<string, string>,
 ): Promise<{ success: boolean; data?: unknown; error?: string }> {
 	const pythonPath = getConfiguredPythonPath();
 	const [cmd, pythonBaseArgs] = parsePythonCommand(pythonPath);
-	const cmdArgs = [...pythonBaseArgs, getRunnerPath(), ...args];
+	const cmdArgs = [...pythonBaseArgs, getRunnerPath(runner), ...args];
 
 	return new Promise((resolve) => {
 		// Only the CI/CD settings, decrypted: the project's files are never
 		// spread whole into the child's environment.
-		const env = envWithoutCredentials(process.env, readCicdConfig(project));
+		const env = runnerEnv ?? envWithoutCredentials(process.env, readCicdConfig(project));
 
 		const proc = spawn(cmd, cmdArgs, { env, cwd: project.path });
 		const stdout: string[] = [];
@@ -211,14 +265,6 @@ function saveRun(projectDir: string, run: object): void {
 	);
 }
 
-interface TriggerParams {
-	provider: string;
-	pr_url?: string;
-	branch?: string;
-	workflow?: string;
-	ref?: string;
-}
-
 /** Where a run came from, and the task an automatic one was started for. */
 interface RunOrigin {
 	source?: "manual" | "auto";
@@ -228,6 +274,54 @@ interface RunOrigin {
 }
 
 type RunnerResult = Awaited<ReturnType<typeof runRunner>>;
+
+const liveWatches = new LiveDeployWatches();
+
+/** A linked project's rollback: its own CI/CD settings, never the root's. */
+const linkedRunner = (linked: Project, args: string[]) => runRunner(linked, args, DEPLOY_WATCH_RUNNER);
+
+/** Starts the watch of a triggered run when the settings name something to watch. */
+function startDeployWatch(project: Project, runId: string): void {
+	let config: Record<string, string>;
+	try {
+		config = readCicdConfig(project);
+	} catch {
+		return;
+	}
+	if (!watchConfigured(config)) return;
+	liveWatches.start(project.path, runId, async () => {
+		// The environment of a Python runner (the user's provider and its key,
+		// for the incident report) plus the CI/CD settings: no more than any
+		// view runner gets (docs/rules/security.md, S4).
+		const env = await pythonRunnerEnv(getBackendPath(), { extra: config });
+		// The project's name and the app's language, for the alerts sent to
+		// Slack, PagerDuty and e-mail; argv, never a shell.
+		const language = getAppLanguage() === "fr" ? "fr" : "en";
+		await runRunner(
+			project,
+			[
+				"--action",
+				"watch",
+				"--project",
+				project.path,
+				"--run-id",
+				runId,
+				"--project-name",
+				project.name.slice(0, 100),
+				"--language",
+				language,
+			],
+			DEPLOY_WATCH_RUNNER,
+			env,
+		);
+		// The rollback started: the services linked to this one go back too.
+		await rollBackLinkedOf(project, runId, linkedRunner);
+		// A warning or critical verdict reaches the person on the app's
+		// notification channels (desktop, ntfy, Telegram).
+		const alert = deployAlertText(getAppLanguage(), project.name, readDeployWatch(project.path, runId, true));
+		if (alert) notificationService.announce(project.id, alert);
+	});
+}
 
 /**
  * Triggers the configured pipeline and records the run in
@@ -274,10 +368,9 @@ async function triggerPipeline(
 		(runs[idx] as Record<string, unknown>).run_data = result.data;
 		fs.writeFileSync(getRunsLogPath(project.path), JSON.stringify(runs, null, 2), "utf-8");
 	}
+	if (result.success) startDeployWatch(project, run.id);
 	return { id: run.id, triggeredAt: run.triggered_at, result };
 }
-
-export const CICD_PROVIDERS = ["github", "gitlab", "azure", "jenkins"] as const;
 
 /**
  * Whether the CI/CD settings of `project` ask for a pipeline on `event` (an
@@ -350,7 +443,23 @@ export async function autoTriggerForTask(
 	}
 }
 
+/**
+ * A run of the log with its deployment watch, when it has one: what its
+ * rollback took back with it, and what the person said of its verdict.
+ */
+function withWatch(projectPath: string, run: object, reviews: Record<string, string>): object {
+	const id = (run as { id?: unknown }).id;
+	if (typeof id !== "string") return run;
+	const watch = readDeployWatch(projectPath, id, liveWatches.isLive(projectPath, id));
+	if (!watch) return run;
+	const linked = readLinkedRollbacks(projectPath, id);
+	const review = reviews[id];
+	return { ...run, watch: { ...watch, ...(linked ? { linked } : {}), ...(review ? { review } : {}) } };
+}
+
 export function registerCICDTriggersHandlers(): void {
+	registerCicdDeployHandlers(findKnownProject);
+
 	ipcMain.handle(IPC_CHANNELS.CICD_TRIGGERS_GET_CONFIG, (_event, projectDir: unknown) => {
 		const project = findKnownProject(projectDir);
 		if (!project) return UNKNOWN_PROJECT;
@@ -380,6 +489,14 @@ export function registerCICDTriggersHandlers(): void {
 					jenkins_url: cfg.CICD_JENKINS_URL ?? "",
 					jenkins_token: cfg.CICD_JENKINS_TOKEN ? "***" : "",
 					jenkins_job: cfg.CICD_JENKINS_JOB ?? "",
+					// Watch after a deployment
+					monitor_health_url: cfg.CICD_MONITOR_HEALTH_URL ?? "",
+					monitor_prometheus_url: cfg.CICD_MONITOR_PROMETHEUS_URL ?? "",
+					monitor_prometheus_token: cfg.CICD_MONITOR_PROMETHEUS_TOKEN ? "***" : "",
+					monitor_window_minutes: cfg.CICD_MONITOR_WINDOW_MINUTES ?? "",
+					monitor_deploy_wait_minutes: cfg.CICD_MONITOR_DEPLOY_WAIT_MINUTES ?? "",
+					auto_rollback: cfg.CICD_AUTO_ROLLBACK === "true",
+					...watchSettingsView(cfg),
 				},
 			};
 		} catch (err) {
@@ -406,11 +523,14 @@ export function registerCICDTriggersHandlers(): void {
 
 	ipcMain.handle(
 		IPC_CHANNELS.CICD_TRIGGERS_LIST_RUNS,
-		(_event, projectDir: unknown, limit: number = 50) => {
+		(_event, projectDir: unknown, limit?: unknown) => {
 			const project = findKnownProject(projectDir);
 			if (!project) return UNKNOWN_PROJECT;
 			try {
-				const runs = loadRuns(project.path).slice(0, limit);
+				const reviews = readReviews(project.path);
+				const runs = loadRuns(project.path)
+					.slice(0, runsLimit(limit))
+					.map((run) => withWatch(project.path, run, reviews));
 				return { success: true, data: runs };
 			} catch (err) {
 				return { success: false, error: String(err) };
@@ -420,9 +540,11 @@ export function registerCICDTriggersHandlers(): void {
 
 	ipcMain.handle(
 		IPC_CHANNELS.CICD_TRIGGERS_TRIGGER,
-		async (_event, projectDir: unknown, params: TriggerParams) => {
+		async (_event, projectDir: unknown, raw: unknown) => {
 			const project = findKnownProject(projectDir);
 			if (!project) return UNKNOWN_PROJECT;
+			const params = triggerParams(raw);
+			if (!params) return INVALID_TRIGGER;
 			const { result } = await triggerPipeline(project, params);
 			return result;
 		},
@@ -430,9 +552,10 @@ export function registerCICDTriggersHandlers(): void {
 
 	ipcMain.handle(
 		IPC_CHANNELS.CICD_TRIGGERS_GET_RUN_STATUS,
-		async (_event, projectDir: unknown, runId: string) => {
+		async (_event, projectDir: unknown, runId: unknown) => {
 			const project = findKnownProject(projectDir);
 			if (!project) return UNKNOWN_PROJECT;
+			if (!isProviderRunId(runId)) return INVALID_RUN_ID;
 			return runRunner(project, [
 				"--action",
 				"status",
@@ -447,9 +570,10 @@ export function registerCICDTriggersHandlers(): void {
 
 	ipcMain.handle(
 		IPC_CHANNELS.CICD_TRIGGERS_CANCEL_RUN,
-		async (_event, projectDir: unknown, runId: string) => {
+		async (_event, projectDir: unknown, runId: unknown) => {
 			const project = findKnownProject(projectDir);
 			if (!project) return UNKNOWN_PROJECT;
+			if (!isProviderRunId(runId)) return INVALID_RUN_ID;
 			return runRunner(project, [
 				"--action",
 				"cancel",
@@ -459,6 +583,26 @@ export function registerCICDTriggersHandlers(): void {
 				project.path,
 				"--output-json",
 			]);
+		},
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.CICD_TRIGGERS_ROLLBACK,
+		async (_event, projectDir: unknown, runId: unknown) => {
+			const project = findKnownProject(projectDir);
+			if (!project) return UNKNOWN_PROJECT;
+			if (typeof runId !== "string" || !RUN_ID.test(runId)) return INVALID_RUN_ID;
+			if (liveWatches.isLive(project.path, runId)) {
+				return { success: false, error: "watch-running" };
+			}
+			const result = await runRunner(
+				project,
+				["--action", "rollback", "--project", project.path, "--run-id", runId],
+				DEPLOY_WATCH_RUNNER,
+			);
+			if (!result.success) return { success: false, error: result.error };
+			await rollBackLinkedOf(project, runId, linkedRunner);
+			return { success: true, data: readDeployWatch(project.path, runId, false) };
 		},
 	);
 }

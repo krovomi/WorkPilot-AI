@@ -46,6 +46,8 @@ SUBSCRIBERS: list[str | Subscriber] = [
     "brain.learn:on_merge",
     "uiux.knowledge:on_merge",
     "agent_coach.style_observer:on_merge",
+    "estimation_calibration.capture:on_merge",
+    "merge.preview:on_merge",
 ]
 """Who hears about a merge, in the order they are told. ``module:function``."""
 

@@ -47,4 +47,16 @@ describe("TaskSandboxRegistry", () => {
 			["claude", "delegated"],
 		]);
 	});
+
+	it("says whether a task ran in its microVM", () => {
+		const registry = new TaskSandboxRegistry();
+		const vm = parseSandboxStatus("t1", { sandbox: { ...SANDBOX, state: "isolated", backend: "microvm", reason: null } });
+		const os = parseSandboxStatus("t2", { sandbox: { ...SANDBOX, state: "isolated", backend: "bubblewrap", reason: null } });
+		if (!vm || !os) throw new Error("fixture rejected");
+		registry.set(vm);
+		registry.set(os);
+		expect(registry.runsInMicrovm("t1")).toBe(true);
+		expect(registry.runsInMicrovm("t2")).toBe(false);
+		expect(registry.runsInMicrovm("unknown")).toBe(false);
+	});
 });

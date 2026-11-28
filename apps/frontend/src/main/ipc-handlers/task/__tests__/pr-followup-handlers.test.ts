@@ -61,13 +61,17 @@ vi.mock("../../../utils/python-runner-env", () => ({
 	},
 }));
 vi.mock("../../../agent/task-provider-env", () => ({
-	readTaskMetadataFor: () => ({ provider: "openai" }),
+	readTaskMetadataFor: () => ({ provider: "openai", aiAccounts: { openai: "client" } }),
 	taskEngineFromMetadata: () => ({ qa: { provider: "openai" } }),
+	taskAccountPins: (metadata?: { aiAccounts?: Record<string, string> }) => metadata?.aiAccounts,
 	planTaskProviders: () => ({
 		providers: ["openai"],
 		startProvider: "openai",
 		usesClaude: false,
 	}),
+}));
+vi.mock("../../../agent/approvals-env", () => ({
+	approvalsEnv: () => ({ WORKPILOT_APPROVALS: "enforce" }),
 }));
 vi.mock("../../../app-logger", () => ({ appLog: { debug: vi.fn() } }));
 
@@ -146,7 +150,15 @@ describe("PR follow-through handlers", () => {
 		expect(args[args.indexOf("--max-rounds") + 1]).toBe("10");
 		expect(args).toContain("--no-review-threads");
 		expect(state.runnerEnvOptions[0]).toEqual({
-			taskProviders: { providers: ["openai"], startProvider: "openai", usesClaude: false },
+			// The card's pinned account goes with the run.
+			taskProviders: {
+				providers: ["openai"],
+				startProvider: "openai",
+				usesClaude: false,
+				accounts: { openai: "client" },
+			},
+			// The app's approval tier switch, for the green PR.
+			extra: { WORKPILOT_APPROVALS: "enforce" },
 		});
 	});
 

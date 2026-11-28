@@ -48,6 +48,13 @@ const RATE_LIMIT_INDICATORS = [
 	/limit\s*reached/i,
 	/exceeded.*limit/i,
 	/too\s*many\s*requests/i,
+	// Other providers (OpenAI, Google, Mistral, DeepSeek, OpenRouter): a 429
+	// in their SDKs' error shapes, or a spent quota.
+	/error\s*code:\s*429\b/i,
+	/status(?:\s*code)?[:\s]+429\b/i,
+	/insufficient_quota/i,
+	/exceeded\s+your\s+current\s+quota/i,
+	/resource[_\s]exhausted/i,
 ];
 
 /**
@@ -80,6 +87,13 @@ const AUTH_FAILURE_PATTERNS = [
 	/^Error:\s*.*?(?:unauthorized|authentication_error|invalid\s*(?:bearer\s+)?token|authentication\s+required)/im,
 	// Match · Please run /login format from Claude CLI
 	/·\s*Please\s+run\s+\/login/i,
+	// API keys refused by other providers, in their SDKs' error shapes
+	// (OpenAI "Error code: 401", "Incorrect API key provided", Google
+	// "API key not valid", the invalid_api_key code).
+	/error\s*code:\s*401\b/i,
+	/incorrect\s+api\s+key\s+provided/i,
+	/api\s+key\s+not\s+valid/i,
+	/["']?code["']?\s*:\s*["']?invalid_api_key/i,
 ];
 
 /**
@@ -722,7 +736,7 @@ export function getBestAvailableProfileEnv(): BestProfileEnvResult {
  * @param env - Profile environment from getProfileEnv() or getActiveProfileEnv()
  * @returns Environment with CLAUDE_CODE_OAUTH_TOKEN cleared if CLAUDE_CONFIG_DIR is set
  */
-function ensureCleanProfileEnv(
+export function ensureCleanProfileEnv(
 	env: Record<string, string>,
 ): Record<string, string> {
 	if (env.CLAUDE_CONFIG_DIR && !env.CLAUDE_CODE_OAUTH_TOKEN) {

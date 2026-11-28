@@ -1,3 +1,10 @@
+---
+feature: Suivi de la PR
+summary: >-
+  La carte fait avancer sa PR jusqu'au merge : check rouge ou fil de revue au QA fixer, commit
+  vérifié (aucun test sauté, aucune CI modifiée), push jamais forcé.
+---
+
 # Suivi de la PR jusqu'au merge (`pr_followup`)
 
 Une tâche qui avait ouvert sa pull request s'arrêtait à « PR créée » : un check
@@ -13,7 +20,7 @@ apps/backend/pr_followup/
   policy.py    decide() : la prochaine étape, sans effet de bord
   guards.py    ce qu'un correctif n'a pas le droit de faire pour obtenir du vert
   forge.py     GitHub par `gh`, en liste d'arguments
-  state.py     <spec>/pr_followup.json : tours dépensés, dernier push, fils traités
+  state.py     <spec>/pr_followup.json : tours dépensés, dernier push, fils traités, first_ci
   loop.py      run_round() : un regard sur la PR, et le tour de correction
 apps/backend/runners/pr_followup_runner.py      boucle, une ligne JSON par regard
 apps/frontend/src/main/ipc-handlers/task/pr-followup-handlers.ts
@@ -32,7 +39,7 @@ la suivante écarte un faux positif.
 | 2 | PR mergée ou fermée | `merged`, `closed` | fin du suivi |
 | 3 | aucun check sur la tête, après `no_checks_grace` regards | `no_checks` | rien ne prouve que le code marche : ce n'est pas du vert |
 | 4 | un check tourne encore | `pending` | on ne juge pas une CI à moitié lue |
-| 5 | tout est passé et aucun fil n'attend | `green` | le merge reste à une personne |
+| 5 | tout est passé et aucun fil n'attend | `green` | le niveau de validation décide ; sans lui, le merge reste à une personne |
 | 6 | tous les échecs sont rouges aussi sur la branche de base | `base_red` | ce n'est pas à cette PR de les « corriger » |
 | 7 | un tour sur cette même tête n'a produit aucun commit | `stuck` | rejouer la même tête dépense un tour pour rien |
 | 8 | le plafond de tours est atteint (3 par défaut) | `exhausted` | une boucle sans fin coûte sans rien prouver |
@@ -87,6 +94,11 @@ tout push, et le suivi s'arrête pour une personne. Rien n'a quitté la machine.
 5. Sans commit, la tête est notée (`no_progress_heads`). Avec un commit, les
    gardes sont lues ; puis `WorktreeManager.push_branch(force=False)`.
 
+Avant le premier tour de correction, le premier regard où chaque check de la tête est fini écrit
+`first_ci` (`passed` ou `failed`, `policy.first_ci_verdict`) : ce que la CI disait de la PR telle
+qu'elle a été ouverte. « Où vous en êtes » en tire le taux de CI verte du premier coup
+([build-compare.md](build-compare.md)).
+
 ## Frontières
 
 - Le renderer ne nomme que la tâche. L'URL de la PR, le dossier de spec et le
@@ -99,7 +111,26 @@ tout push, et le suivi s'arrête pour une personne. Rien n'a quitté la machine.
   GitHub est refusée.
 - Chaque appel `gh` est une liste d'arguments qui nomme le dépôt (`-R`), sans
   shell.
-- Jamais de push forcé, jamais de merge, aucun commentaire posté sur la PR.
+- Jamais de push forcé, aucun commentaire posté sur la PR. Un merge seulement quand le niveau
+  de validation le permet en mode `enforce` (section suivante), à la tête jugée exactement.
+
+## Le niveau de validation d'une PR verte
+
+Sur `green`, `pr_followup/approval.py` demande son niveau (N0 à N3) au moteur
+[`approvals`](approval-tiers.md) : fichiers changés de la base à la tête jugée par la forge, titre
+et labels de la PR, type de la carte, verdict de la revue croisée **sur cet arbre-là** (un accord
+donné avant un tour de correction ne compte plus), plus bas score de confiance des sessions de la
+tâche (`agent_safety.json`). La décision est gardée dans `approval_decision.json` et résumée dans
+`implementation_plan.json` (`approval`) pour le badge de la carte. La PR n'est fusionnée que si
+`Decision.merges` est vrai (mode `enforce` des Paramètres, action `merge`) : `gh pr merge
+--match-head-commit` avec la première méthode que le dépôt accepte (squash, merge, rebase), donc
+jamais une tête arrivée après le jugement. Le main passe le réglage par `WORKPILOT_APPROVALS`
+(`main/agent/approvals-env.ts`) ; `off` et `observe` ne fusionnent rien.
+
+Avec Claude Ship allumé (`WORKPILOT_CLAUDE_SHIP=1`, voir [approval-tiers.md](approval-tiers.md#claude-ship-en-option-lot-a3)),
+les checks Claude Code Review et Claude Approvals de la tête entrent dans ce jugement, et une PR que
+PR Steward suit (label `claude-pr-steward-watching`) ne reçoit plus de tour de correction de
+WorkPilot (`steward` dans l'historique, aucun tour dépensé).
 
 ## Limites connues
 

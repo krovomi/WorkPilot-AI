@@ -51,7 +51,7 @@ import type { SetupDeepLink } from "./components/setup-hub/useSetupStatus";
 import { GuidedTourOverlay } from "./components/guided-tour/GuidedTourOverlay";
 import { useGuidedTourStore } from "./components/guided-tour/guided-tour-store";
 import { useSetupHubStore } from "./stores/setup-hub-store";
-import { ServerLoginScreen } from "./components/auth/ServerLoginScreen";
+import { ServerGate } from "./components/auth/ServerGate";
 import { TerminalGrid } from "./components/TerminalGrid";
 import { Toaster } from "./components/ui/toaster";
 import { CliStatusProvider } from "./contexts/CliStatusContext";
@@ -90,6 +90,11 @@ const GitHubPRs = lazy(() =>
 const GitLabMergeRequests = lazy(() =>
 	import("./components/gitlab-merge-requests").then((m) => ({
 		default: m.GitLabMergeRequests,
+	})),
+);
+const BitbucketViews = lazy(() =>
+	import("./components/bitbucket/BitbucketViews").then((m) => ({
+		default: m.BitbucketViews,
 	})),
 );
 const Changelog = lazy(() =>
@@ -384,9 +389,7 @@ import {
 } from "@/hooks";
 import { AddProjectModal } from "./components/AddProjectModal";
 import { AuthFailureModal } from "./components/AuthFailureModal";
-import { AzureDevOpsSetupModal } from "./components/AzureDevOpsSetupModal";
 import { CommandPalette } from "./components/CommandPalette";
-import { GitHubSetupModal } from "./components/GitHubSetupModal";
 import { GlobalDownloadIndicator } from "./components/GlobalDownloadIndicator";
 import { FormulaLab } from "./components/formula-lab/FormulaLab";
 import { HubMain } from "./components/sidebar/HubMain";
@@ -412,7 +415,7 @@ import { useNeedsYou } from "./hooks/useNeedsYou";
 import { useTaskNotifications } from "./hooks/useTaskNotifications";
 import type { Activity } from "./stores/activity-store";
 import { setActivityActiveView } from "./stores/activity-store";
-import { recordViewVisit } from "./stores/view-usage-store";
+import { noteViewOpened } from "./lib/view-opened";
 import { useCommandPaletteStore } from "./stores/command-palette-store";
 import { setupGlobalListeners } from "./stores/global-listeners";
 import {
@@ -451,11 +454,41 @@ import {
 	getKanbanOrderedTasks,
 	getKanbanSiblings,
 } from "./lib/kanban-navigation";
-import {
-	restoreTerminalSessions,
-	useTerminalStore,
-} from "./stores/terminal-store";
+import { restoreTerminalSessions } from "./stores/terminal-store";
 import { autoDetectAndUpdateProject } from "./utils/repositoryDetector";
+
+// A project whose Git provider is already enabled needs no detection.
+// `project.settings.provider` is the AI provider (e.g. "anthropic"), NOT the
+// repo provider: it must not gate the detection, or the Azure DevOps / GitHub
+// import button never appears.
+async function hasRepoProvider(project: Project): Promise<boolean> {
+	try {
+		const envResult = await globalThis.electronAPI.getProjectEnv(project.id);
+		return !!(
+			envResult.success &&
+			(envResult.data?.azureDevOpsEnabled || envResult.data?.githubEnabled)
+		);
+	} catch {
+		return false;
+	}
+}
+
+// One project after the other, 100 ms apart, to keep the system responsive.
+async function detectProjectProviders(projects: Project[]): Promise<void> {
+	for (const project of projects) {
+		try {
+			if (!(await hasRepoProvider(project))) {
+				await autoDetectAndUpdateProject(project);
+			}
+		} catch (error) {
+			console.error(
+				`[App] Failed to auto-detect provider for project ${project.name}:`,
+				error,
+			);
+		}
+		await new Promise((resolve) => setTimeout(resolve, 100));
+	}
+}
 
 // Version constant for version-specific warnings (e.g., reauthentication notices)
 const VERSION_WARNING_275 = "2.7.5";
@@ -569,23 +602,6 @@ export function App() {
 	// Initialize dialog state
 	const [showAddProjectModal, setShowAddProjectModal] = useState(false);
 
-	// GitHub setup state (shown after WorkPilot AI init)
-	const [showGitHubSetup, setShowGitHubSetup] = useState(false);
-	const [gitHubSetupProject, setGitHubSetupProject] = useState<Project | null>(
-		null,
-	);
-
-	// Repo provider setup state (GitHub vs Azure DevOps)
-	const [_showRepoProviderSetup, setShowRepoProviderSetup] = useState(false);
-	const [_repoProviderProject, setRepoProviderProject] =
-		useState<Project | null>(null);
-	const [_pendingRepoProvider, setPendingRepoProvider] = useState<
-		"github" | "azure_devops" | null
-	>(null);
-	const [showAzureDevOpsSetup, setShowAzureDevOpsSetup] = useState(false);
-	const [azureDevOpsSetupProject, setAzureDevOpsSetupProject] =
-		useState<Project | null>(null);
-
 	// UI State
 	const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 	const [isNewTaskDialogOpen, setIsNewTaskDialogOpen] = useState(false);
@@ -612,6 +628,11 @@ export function App() {
 		setSettingsInitialProjectSection("general");
 		setIsSettingsDialogOpen(true);
 	}, []);
+	// A view's "open settings": the dialog on that view's section.
+	const openSectionSettings = (section: ProjectSettingsSection) => () => {
+		setSettingsInitialProjectSection(section);
+		setIsSettingsDialogOpen(true);
+	};
 	const [activeView, setActiveView] = useState<SidebarView>("kanban");
 	const [hasRestoredView, setHasRestoredView] = useState(false);
 	const isRestoringView = useRef(false);
@@ -680,7 +701,7 @@ export function App() {
 	// Which page is on screen decides whether a result needs a badge at all.
 	useEffect(() => {
 		setActivityActiveView(activeView);
-		recordViewVisit(activeView);
+		noteViewOpened(activeView);
 	}, [activeView]);
 
 	// Programmatic main-view navigation (e.g. the visual canvas jumps to the
@@ -854,85 +875,15 @@ export function App() {
 		};
 	}, []);
 
-	const getProjectsToDetect = useCallback(() => {
-		if (projects.length > 0) {
-			return projects;
-		}
-
-		if (activeProjectId) {
-			return projects.filter((p) => p.id === activeProjectId);
-		}
-
-		return [];
-	}, [projects, activeProjectId]);
-
-	// Helper function to check if project should be skipped.
-	// Note: project.settings.provider is the AI provider (e.g. "anthropic"), NOT the repo provider —
-	// it must not gate repo auto-detection, otherwise the Azure DevOps / GitHub import button never appears.
-	const shouldSkipProjectDetection = async (
-		project: Project,
-	): Promise<boolean> => {
-		try {
-			const envResult = await globalThis.electronAPI.getProjectEnv(project.id);
-			if (envResult.success && envResult.data) {
-				return (
-					envResult.data.azureDevOpsEnabled || envResult.data.githubEnabled
-				);
-			}
-		} catch {
-			return false;
-		}
-		return false;
-	};
-
-	// Helper function to detect a single project
-	const detectSingleProject = async (project: Project): Promise<void> => {
-		try {
-			const shouldSkip = await shouldSkipProjectDetection(project);
-			if (shouldSkip) {
-				return;
-			}
-
-			await autoDetectAndUpdateProject(project);
-		} catch (error) {
-			console.error(
-				`[App] Failed to auto-detect provider for project ${project.name}:`,
-				error,
-			);
-		}
-	};
-
-	// Helper function to detect multiple projects with delays
-	const detectProjectsWithDelay = useCallback(
-		async (projectsToDetect: Project[]): Promise<void> => {
-			for (const project of projectsToDetect) {
-				await detectSingleProject(project);
-				// Small delay between projects to avoid overwhelming the system
-				await new Promise((resolve) => setTimeout(resolve, 100));
-			}
-		},
-		// biome-ignore lint/correctness/useExhaustiveDependencies: detectSingleProject is a stable local helper
-		[detectSingleProject],
-	);
-
-	// Auto-detect repository types for loaded projects
+	// Auto-detect the Git provider (GitHub, Azure DevOps…) of the loaded
+	// projects when the project list changes. The helpers used to be created
+	// on each render, so every App render scheduled the detection again (an
+	// env read per project); they now live outside the component.
 	useEffect(() => {
-		if (projects.length > 0 || activeProjectId) {
-			const projectsToDetect = getProjectsToDetect();
-
-			if (projectsToDetect.length === 0) {
-				return;
-			}
-
-			// Run detection with a small delay to ensure UI is responsive
-			setTimeout(() => detectProjectsWithDelay(projectsToDetect), 500);
-		}
-	}, [
-		projects.length,
-		activeProjectId,
-		detectProjectsWithDelay,
-		getProjectsToDetect,
-	]); // Trigger when projects change or active project changes
+		if (projects.length === 0) return;
+		const timer = setTimeout(() => void detectProjectProviders(projects), 500);
+		return () => clearTimeout(timer);
+	}, [projects]);
 
 	// Restore tab state and open tabs for loaded projects
 	useEffect(() => {
@@ -1150,7 +1101,7 @@ export function App() {
 						const project = added?.project;
 						if (added?.warning) {
 							toast({
-								title: "Possible misconfiguration",
+								title: t("addProject.gitRootWarningTitle"),
 								description: added.warning,
 								variant: "default",
 							});
@@ -1170,7 +1121,7 @@ export function App() {
 
 		globalThis.addEventListener("keydown", handleKeyDown);
 		return () => globalThis.removeEventListener("keydown", handleKeyDown);
-	}, [activeView, openProjectTab, openProjectSettings, toast]);
+	}, [activeView, openProjectTab, openProjectSettings, toast, t]);
 
 	// Load tasks when project changes
 	useEffect(() => {
@@ -1350,9 +1301,7 @@ export function App() {
 		setSelectedTask(task);
 	};
 
-	const handleRefreshTasks = async () => {
-		const currentProjectId = activeProjectId || selectedProjectId;
-		if (!currentProjectId) return;
+	const handleRefreshTasks = async (currentProjectId: string) => {
 		setIsRefreshingTasks(true);
 		try {
 			// Pass forceRefresh: true to invalidate cache and get fresh data from disk
@@ -1391,64 +1340,19 @@ export function App() {
 		}
 	}, [taskSiblings.next]);
 
-	const _handleOpenInbuiltTerminal = (_id: string, cwd: string) => {
-		// Note: _id parameter is intentionally unused - terminal ID is auto-generated by addTerminal()
-		// Parameter kept for callback signature consistency with callers
-		console.warn("[App] Opening inbuilt terminal:", { cwd });
-
-		// Switch to terminals view
-		setActiveView("terminals");
-
-		// Close modal
-		setSelectedTask(null);
-
-		// Add terminal to store - this will trigger Terminal component to mount
-		// which will then create the backend PTY via usePtyProcess
-		// Note: TerminalGrid is always mounted (just hidden), so no need to wait
-		const terminal = useTerminalStore
-			.getState()
-			.addTerminal(cwd, selectedProject?.path);
-
-		if (terminal) {
-			console.warn("[App] Terminal added to store:", terminal.id);
-		} else {
-			console.error(
-				"[App] Failed to add terminal to store (max terminals reached?)",
-			);
-		}
-	};
-
 	const handleAddProject = () => {
 		setShowAddProjectModal(true);
 	};
 
-	const handleProjectAdded = async (project: Project, needsInit: boolean) => {
+	const handleProjectAdded = (project: Project, needsInit: boolean) => {
 		openProjectTab(project.id);
 		// `autoBuildPath` is what the sidebar and the task dialog check: without
 		// it no task can be created. The add-project modal passes
 		// `needsInit: false` for an existing folder, so the flag alone missed it.
+		// The Git provider is enabled by the auto-detection that runs when the
+		// project list changes (autoDetectAndUpdateProject).
 		if (needsInit || !project.autoBuildPath) {
 			openProjectSettings(project.id);
-			return;
-		}
-		try {
-			const envResult = await globalThis.electronAPI.getProjectEnv(project.id);
-			const envConfig = envResult.success ? envResult.data : null;
-			const hasProvider = !!(
-				envConfig?.githubEnabled || envConfig?.azureDevOpsEnabled
-			);
-			if (!hasProvider) {
-				setRepoProviderProject(project);
-				setShowRepoProviderSetup(true);
-			}
-		} catch {
-			setShowGitHubSetup(false);
-			setGitHubSetupProject(null);
-			setShowAzureDevOpsSetup(false);
-			setAzureDevOpsSetupProject(null);
-			setPendingRepoProvider(null);
-			setRepoProviderProject(project);
-			setShowRepoProviderSetup(true);
 		}
 	};
 
@@ -1471,31 +1375,24 @@ export function App() {
 
 	const handleProjectTabSettingsClick = openProjectSettings;
 
-	// Handle confirm remove project
-	const handleConfirmRemoveProject = () => {
-		if (projectToRemove) {
-			try {
-				// Clear any previous error
-				setRemoveProjectError(null);
-				const isLastProject = projects.length === 1;
-				// Remove the project from the app (files are preserved on disk for re-adding later)
-				removeProject(projectToRemove.id);
-				// If we just closed the last project, navigate to kanban to show the NoProjectPage
-				if (isLastProject) {
-					setActiveView("kanban");
-				}
-				// Only clear dialog state on success
-				setShowRemoveProjectDialog(false);
-				setProjectToRemove(null);
-			} catch (err) {
-				// Log error and keep dialog open so user can retry or cancel
-				console.error("[App] Failed to remove project:", err);
-				// Show error in dialog
-				setRemoveProjectError(
-					err instanceof Error ? err.message : t("common:errors.unknownError"),
-				);
-			}
+	// Handle confirm remove project. `removeProject` reports a refusal by
+	// resolving false, never by throwing: the dialog stays open on it, with the
+	// error, so the user can retry or cancel.
+	const handleConfirmRemoveProject = async (project: Project) => {
+		setRemoveProjectError(null);
+		const isLastProject = projects.length === 1;
+		// Files are preserved on disk, so the project can be re-added later.
+		const removed = await removeProject(project.id);
+		if (!removed) {
+			setRemoveProjectError(t("removeProject.error"));
+			return;
 		}
+		// The last project closed: the Kanban shows the NoProjectPage.
+		if (isLastProject) {
+			setActiveView("kanban");
+		}
+		setShowRemoveProjectDialog(false);
+		setProjectToRemove(null);
 	};
 
 	const handleCancelRemoveProject = () => {
@@ -1528,67 +1425,6 @@ export function App() {
 		}
 	};
 
-	const handleGitHubSetupComplete = async (settings: {
-		githubToken: string;
-		githubRepo: string;
-		mainBranch: string;
-		githubAuthMethod?: "oauth" | "pat";
-	}) => {
-		if (!gitHubSetupProject) return;
-
-		try {
-			// NOTE: settings.githubToken is a GitHub access token (from gh CLI),
-			// NOT a Claude Code OAuth token. They are different things:
-			// - GitHub token: for GitHub API access (repo operations)
-			// - Claude token: for Claude AI access (run.py, roadmap, etc.)
-			// The user needs to separately authenticate with Claude using 'claude setup-token'
-
-			// Update project env config with GitHub settings
-			await globalThis.electronAPI.updateProjectEnv(gitHubSetupProject.id, {
-				githubEnabled: true,
-				githubToken: settings.githubToken, // GitHub token for repo access
-				githubRepo: settings.githubRepo,
-				githubAuthMethod: settings.githubAuthMethod, // Track how user authenticated
-				azureDevOpsEnabled: false,
-			});
-
-			// Update project settings with mainBranch
-			await globalThis.electronAPI.updateProjectSettings(
-				gitHubSetupProject.id,
-				{
-					mainBranch: settings.mainBranch,
-				},
-			);
-
-			// Refresh projects to get updated data
-			await loadProjects();
-		} catch (error) {
-			console.error("Failed to save GitHub settings:", error);
-		}
-
-		setShowGitHubSetup(false);
-		setGitHubSetupProject(null);
-		setPendingRepoProvider(null);
-	};
-
-	const handleGitHubSetupSkip = () => {
-		setShowGitHubSetup(false);
-		setGitHubSetupProject(null);
-		setPendingRepoProvider(null);
-	};
-
-	const handleAzureDevOpsSetupComplete = async () => {
-		setShowAzureDevOpsSetup(false);
-		setAzureDevOpsSetupProject(null);
-		setPendingRepoProvider(null);
-		await loadProjects();
-	};
-
-	const handleAzureDevOpsSetupSkip = () => {
-		setShowAzureDevOpsSetup(false);
-		setAzureDevOpsSetupProject(null);
-		setPendingRepoProvider(null);
-	};
 	const handleGoToTask = (taskId: string) => {
 		// Switch to the kanban view
 		setActiveView("kanban");
@@ -1599,7 +1435,7 @@ export function App() {
 		}
 	};
 
-	const getKanbanContent = () => {
+	const getKanbanContent = (project: Project) => {
 		if (isLoadingTasks && tasks.length === 0) {
 			return <KanbanSkeleton />;
 		}
@@ -1613,16 +1449,10 @@ export function App() {
 				tasks={tasks}
 				onTaskClick={handleTaskClick}
 				onNewTaskClick={() => setIsNewTaskDialogOpen(true)}
-				onRefresh={handleRefreshTasks}
+				onRefresh={() => handleRefreshTasks(project.id)}
 				isRefreshing={isRefreshingTasks}
-				onOpenJiraSettings={() => {
-					setSettingsInitialProjectSection("jira");
-					setIsSettingsDialogOpen(true);
-				}}
-				onOpenAzureDevOpsSettings={() => {
-					setSettingsInitialProjectSection("azure-devops");
-					setIsSettingsDialogOpen(true);
-				}}
+				onOpenJiraSettings={openSectionSettings("jira")}
+				onOpenAzureDevOpsSettings={openSectionSettings("azure-devops")}
 			/>
 		);
 	};
@@ -1633,7 +1463,7 @@ export function App() {
 				<CliStatusProvider>
 					<TooltipProvider>
 						{/* Multi-user server mode: connection gate */}
-						{showServerLogin && <ServerLoginScreen />}
+						<ServerGate showLogin={showServerLogin} />
 						<div className="flex h-screen bg-background">
 							{/* Sidebar */}
 							<Sidebar
@@ -1741,7 +1571,7 @@ export function App() {
 											))}
 										{selectedProject ? (
 											<>
-												{activeView === "kanban" && getKanbanContent()}
+												{activeView === "kanban" && getKanbanContent(selectedProject)}
 												{/* TerminalGrid is always mounted but hidden when not active to preserve terminal state */}
 												<div
 													className={
@@ -1794,20 +1624,14 @@ export function App() {
 												{activeView === "github-issues" &&
 													(activeProjectId || selectedProjectId) && (
 														<GitHubIssues
-															onOpenSettings={() => {
-																setSettingsInitialProjectSection("github");
-																setIsSettingsDialogOpen(true);
-															}}
+															onOpenSettings={openSectionSettings("github")}
 															onNavigateToTask={handleGoToTask}
 														/>
 													)}
 												{activeView === "gitlab-issues" &&
 													(activeProjectId || selectedProjectId) && (
 														<GitLabIssues
-															onOpenSettings={() => {
-																setSettingsInitialProjectSection("gitlab");
-																setIsSettingsDialogOpen(true);
-															}}
+															onOpenSettings={openSectionSettings("gitlab")}
 															onNavigateToTask={handleGoToTask}
 														/>
 													)}
@@ -1819,10 +1643,7 @@ export function App() {
 														}
 													>
 														<GitHubPRs
-															onOpenSettings={() => {
-																setSettingsInitialProjectSection("github");
-																setIsSettingsDialogOpen(true);
-															}}
+															onOpenSettings={openSectionSettings("github")}
 															isActive={activeView === "github-prs"}
 														/>
 													</div>
@@ -1833,10 +1654,15 @@ export function App() {
 															projectId={
 																(activeProjectId || selectedProjectId) as string
 															}
-															onOpenSettings={() => {
-																setSettingsInitialProjectSection("gitlab");
-																setIsSettingsDialogOpen(true);
-															}}
+															onOpenSettings={openSectionSettings("gitlab")}
+														/>
+													)}
+												{activeView.startsWith("bitbucket-") &&
+													(activeProjectId || selectedProjectId) && (
+														<BitbucketViews
+															view={activeView}
+															projectId={(activeProjectId || selectedProjectId) as string}
+															onOpenSettings={openSectionSettings("bitbucket")}
 														/>
 													)}
 												{activeView === "changelog" && <Changelog />}
@@ -1895,11 +1721,7 @@ export function App() {
 													)}
 												{activeView === "refactoring" &&
 													(activeProjectId || selectedProjectId) && (
-														<RefactoringView
-															projectId={
-																(activeProjectId || selectedProjectId) as string
-															}
-														/>
+														<RefactoringView />
 													)}
 												{activeView === "documentation" &&
 													(activeProjectId || selectedProjectId) && (
@@ -2228,28 +2050,6 @@ export function App() {
 						onClose={handleVersionWarningClose}
 					/>
 
-					{/* Modals spécifiques à GitHub et Azure DevOps */}
-					{gitHubSetupProject && (
-						<GitHubSetupModal
-							open={showGitHubSetup}
-							onOpenChange={setShowGitHubSetup}
-							onComplete={handleGitHubSetupComplete}
-							onSkip={handleGitHubSetupSkip}
-							project={gitHubSetupProject}
-						/>
-					)}
-
-					{/* Azure DevOps Setup Modal - configure Azure DevOps */}
-					{azureDevOpsSetupProject && (
-						<AzureDevOpsSetupModal
-							open={showAzureDevOpsSetup}
-							onOpenChange={setShowAzureDevOpsSetup}
-							onComplete={handleAzureDevOpsSetupComplete}
-							onSkip={handleAzureDevOpsSetupSkip}
-							project={azureDevOpsSetupProject}
-						/>
-					)}
-
 					<AddProjectModal
 						open={showAddProjectModal}
 						onOpenChange={setShowAddProjectModal}
@@ -2284,7 +2084,9 @@ export function App() {
 								</Button>
 								<Button
 									variant="destructive"
-									onClick={handleConfirmRemoveProject}
+									onClick={() =>
+										projectToRemove && handleConfirmRemoveProject(projectToRemove)
+									}
 								>
 									{t("removeProject.remove")}
 								</Button>

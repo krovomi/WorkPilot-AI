@@ -1,4 +1,9 @@
-import type { IPCResult, UsageSnapshot } from "../../shared/types";
+import type {
+	IPCResult,
+	UsageSnapshot,
+	WindsurfDetection,
+	WindsurfTokenSave,
+} from "../../shared/types";
 import {
 	type AgentAPI,
 	type AzureDevOpsAPI,
@@ -21,6 +26,21 @@ import {
 	type AgentDebuggerAPI,
 	createAgentDebuggerAPI,
 } from "./modules/agent-debugger-api";
+import { createReplayAPI, type ReplayAPI } from "./modules/replay-api";
+import {
+	createLocalBackendAPI,
+	type LocalBackendAPI,
+} from "./modules/local-backend-api";
+import {
+	createForgeAccountsAPI,
+	type ForgeAccountsAPI,
+} from "./modules/forge-accounts-api";
+import { type AiAccountsAPI, createAiAccountsAPI } from "./modules/ai-accounts-api";
+import {
+	type AiAccountUsageAPI,
+	createAiAccountUsageAPI,
+} from "./modules/ai-account-usage-api";
+import { type ApprovalsAPI, createApprovalsAPI } from "./modules/approvals-api";
 import {
 	type BlastRadiusAPI,
 	createBlastRadiusAPI,
@@ -89,6 +109,10 @@ import {
 	createNotebookAgentAPI,
 } from "./modules/notebook-agent-api";
 import {
+	type BrowserRecorderAPI,
+	createBrowserRecorderAPI,
+} from "./modules/browser-recorder-api";
+import {
 	type AgentCoachAPI,
 	createAgentCoachAPI,
 } from "./modules/agent-coach-api";
@@ -116,6 +140,7 @@ import {
 import type { AppEmulatorAPI } from "./modules/app-emulator-api";
 import type { MobileAPI } from "./modules/mobile-api";
 import { createAppEmulatorAPI } from "./modules/app-emulator-api";
+import { type DeviceMatrixAPI, createDeviceMatrixAPI } from "./modules/device-matrix-api";
 import { createMobileAPI } from "./modules/mobile-api";
 import type { ArchitectureVisualizerAPI } from "./modules/architecture-visualizer-api";
 import { createArchitectureVisualizerAPI } from "./modules/architecture-visualizer-api";
@@ -137,6 +162,7 @@ import {
 	type AutomationsAPI,
 	createAutomationsAPI,
 } from "./modules/automations-api";
+import { type BitbucketAPI, createBitbucketAPI } from "./modules/bitbucket-api";
 import { createSwarmAPI, type SwarmAPI } from "./modules/swarm-api";
 import {
 	createGenericIpcAPI,
@@ -147,6 +173,7 @@ import {
 	createAutoRefactorAPI,
 } from "./modules/auto-refactor-api";
 import { type AgentCliAPI, createAgentCliAPI } from "./modules/agent-cli-api";
+import { createReaAPI, type ReaAPI } from "./modules/rea-api";
 import { createTaskSandboxAPI, type TaskSandboxAPI } from "./modules/task-sandbox-api";
 import { type StackAPI, createStackAPI } from "./modules/stack-api";
 import {
@@ -171,7 +198,14 @@ import {
 	type FormulaMatrixAPI,
 } from "./modules/formula-matrix-api";
 import { type BenchAPI, createBenchAPI } from "./modules/bench-api";
+import { type BoardAskAPI, createBoardAskAPI } from "./modules/board-ask-api";
+import { createSprintsAPI, type SprintsAPI } from "./modules/sprints-api";
 import { type BoardMcpAPI, createBoardMcpAPI } from "./modules/board-mcp-api";
+import {
+	createServerApprovalAPI,
+	type ServerApprovalAPI,
+} from "./modules/server-approval-api";
+import { type CicdTriggersAPI, createCicdTriggersAPI } from "./modules/cicd-triggers-api";
 import { createDebugAPI, type DebugAPI } from "./modules/debug-api";
 import { createGitHubAPI, type GitHubAPI } from "./modules/github-api";
 import {
@@ -186,9 +220,14 @@ import {
 	type GuardrailsAPI,
 	createGuardrailsAPI,
 } from "./modules/guardrails-api";
+import { type GovernanceAPI, createGovernanceAPI } from "./modules/governance-api";
 import { invokeIpc } from "./modules/ipc-utils";
 import type { LearningLoopAPI } from "./modules/learning-loop-api";
 import { createLearningLoopAPI } from "./modules/learning-loop-api";
+import {
+	createMemoryLifecycleAPI,
+	type MemoryLifecycleAPI,
+} from "./modules/memory-lifecycle-api";
 import type { McpPinsAPI } from "./modules/mcp-pins-api";
 import { createMcpPinsAPI } from "./modules/mcp-pins-api";
 import { createMcpAPI, type McpAPI } from "./modules/mcp-api";
@@ -198,6 +237,10 @@ import type { PairProgrammingAPI } from "./modules/pair-programming-api";
 import { createPairProgrammingAPI } from "./modules/pair-programming-api";
 import type { QuickCommandAPI } from "./modules/quick-command-api";
 import { createQuickCommandAPI } from "./modules/quick-command-api";
+import type { MissionControlAPI } from "./modules/mission-control-api";
+import { createMissionControlAPI } from "./modules/mission-control-api";
+import type { ConflictWavesAPI } from "./modules/conflict-waves-api";
+import { createConflictWavesAPI } from "./modules/conflict-waves-api";
 import type { PerformanceProfilerAPI } from "./modules/performance-profiler-api";
 import { createPerformanceProfilerAPI } from "./modules/performance-profiler-api";
 import type { PipelineGeneratorAPI } from "./modules/pipeline-generator-api";
@@ -207,6 +250,10 @@ import { createPromptOptimizerAPI } from "./modules/prompt-optimizer-api";
 import { createQualityAPI, type QualityAPI } from "./modules/quality-api";
 import type { SelfHealingAPIObject } from "./modules/self-healing-api";
 import { createSelfHealingAPI } from "./modules/self-healing-api";
+import {
+	createPixelOfficeAPI,
+	type PixelOfficeAPI,
+} from "./modules/pixel-office-api";
 import {
 	createSmartEstimationAPI,
 	type SmartEstimationAPI,
@@ -243,6 +290,10 @@ import {
 	createServerAuthAPI,
 	type ServerAuthAPI,
 } from "./modules/server-auth-api";
+import {
+	createServerUsageAPI,
+	type ServerUsageAPI,
+} from "./modules/server-usage-api";
 import { createJevAPI, type JevAPI } from "./jev-api";
 import {
 	createSecureStorageAPI,
@@ -272,6 +323,7 @@ export interface ElectronAPI
 		ClaudeCodeAPI,
 		CopilotCliAPI,
 		AgentCliAPI,
+		ReaAPI,
 		TaskSandboxAPI,
 		StackAPI,
 		TaskPermissionAPI,
@@ -287,8 +339,10 @@ export interface ElectronAPI
 		SmartEstimationAPI,
 		ContextAwareSnippetsAPI,
 		AppEmulatorAPI,
+		DeviceMatrixAPI,
 		MobileAPI,
 		LearningLoopAPI,
+		MemoryLifecycleAPI,
 		McpPinsAPI,
 		MultiRepoAPI,
 		ArchitectureVisualizerAPI,
@@ -296,6 +350,8 @@ export interface ElectronAPI
 		PerformanceProfilerAPI,
 		PairProgrammingAPI,
 		QuickCommandAPI,
+		MissionControlAPI,
+		ConflictWavesAPI,
 		PipelineGeneratorAPI,
 		ArenaAPI,
 		TestGenerationAPI,
@@ -304,6 +360,10 @@ export interface ElectronAPI
 		FormulaMatrixAPI,
 		BenchAPI,
 		BoardMcpAPI,
+		BoardAskAPI,
+		SprintsAPI,
+		ServerApprovalAPI,
+		CicdTriggersAPI,
 		AccessibilityAPI,
 		SharedAnalysisAPI,
 		I18nAgentAPI,
@@ -317,6 +377,7 @@ export interface ElectronAPI
 		GitSurgeonAPI,
 		ReleaseCoordinatorAPI,
 		NotebookAgentAPI,
+		BrowserRecorderAPI,
 		AgentCoachAPI,
 		OnboardingAgentAPI,
 		SandboxAPI,
@@ -324,7 +385,14 @@ export interface ElectronAPI
 		ConsensusArbiterAPI,
 		InjectionGuardAPI,
 		GuardrailsAPI,
+		GovernanceAPI,
 		AgentDebuggerAPI,
+		LocalBackendAPI,
+		ForgeAccountsAPI,
+		AiAccountsAPI,
+		AiAccountUsageAPI,
+		ApprovalsAPI,
+		ReplayAPI,
 		BlastRadiusAPI,
 		Phase35FeaturesAPI,
 		BountyBoardAPI,
@@ -347,15 +415,21 @@ export interface ElectronAPI
 	swarm: SwarmAPI;
 	/** Automations: an event (issue labelled, CI red, schedule) creates a card */
 	automations: AutomationsAPI;
+	/** Bitbucket Cloud: issues, pull requests and pipelines of a project's repository */
+	bitbucket: BitbucketAPI;
 	/** Multi-user server mode: connection + login (local / Entra ID) */
 	serverAuth: ServerAuthAPI;
 	serverAdmin: ServerAdminAPI;
+	/** Server mode: page activity and the organization's usage settings */
+	serverUsage: ServerUsageAPI;
 	/** Queue routing API for rate limit recovery */
 	queue: QueueAPI;
 	/** Code quality analysis API */
 	quality: QualityAPI;
 	/** Self-Healing Codebase + Incident Responder API */
 	selfHealing: SelfHealingAPIObject;
+	/** Pixel Office mini-scenes written by the page's model */
+	pixelOffice: PixelOfficeAPI;
 	createClaudeProfileDirectory: (
 		profileName: string,
 	) => Promise<{ success: boolean; data?: string; error?: string }>;
@@ -374,20 +448,10 @@ export interface ElectronAPI
 		repo: string;
 		token: string;
 	}) => Promise<{ success: boolean; status?: number; error?: string }>;
-	/** Detect Windsurf API key from local IDE installation (state.vscdb) + account info */
-	detectWindsurfToken: () => Promise<{
-		success: boolean;
-		apiKey?: string;
-		userName?: string;
-		planName?: string;
-		usageInfo?: {
-			usedMessages: number;
-			totalMessages: number;
-			usedFlowActions: number;
-			totalFlowActions: number;
-		};
-		error?: string;
-	}>;
+	/** Whether the local Windsurf IDE holds a key, and its account; the key stays in main */
+	detectWindsurfToken: () => Promise<WindsurfDetection>;
+	/** Save the key the local Windsurf IDE holds as the global Windsurf key (main reads it) */
+	saveDetectedWindsurfToken: () => Promise<WindsurfTokenSave>;
 	/** Check Claude OAuth status from CLI config files on disk */
 	checkClaudeOAuth: () => Promise<{
 		isAuthenticated: boolean;
@@ -427,6 +491,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createClaudeCodeAPI(),
 		...createCopilotCliAPI(),
 		...createAgentCliAPI(),
+		...createReaAPI(),
 		...createTaskPermissionAPI(),
 		...createCopilotOAuthAPI(),
 		...createMcpAPI(),
@@ -440,8 +505,10 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createSmartEstimationAPI(),
 		...createContextAwareSnippetsAPI(),
 		...createAppEmulatorAPI(),
+		...createDeviceMatrixAPI(),
 		...createMobileAPI(),
 		...createLearningLoopAPI(),
+		...createMemoryLifecycleAPI(),
 		...createMcpPinsAPI(),
 		...createMultiRepoAPI(),
 		...createArchitectureVisualizerAPI(),
@@ -449,6 +516,8 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createPerformanceProfilerAPI(),
 		...createPairProgrammingAPI(),
 		...createQuickCommandAPI(),
+		...createMissionControlAPI(),
+		...createConflictWavesAPI(),
 		...createPipelineGeneratorAPI(),
 		...createArenaAPI(),
 		...createTestGenerationAPI(),
@@ -457,6 +526,10 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createFormulaMatrixAPI(),
 		...createBenchAPI(),
 		...createBoardMcpAPI(),
+		...createBoardAskAPI(),
+		...createSprintsAPI(),
+		...createServerApprovalAPI(),
+		...createCicdTriggersAPI(),
 		...createAccessibilityAPI(),
 		...createSharedAnalysisAPI(),
 		...createI18nAgentAPI(),
@@ -470,6 +543,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createGitSurgeonAPI(),
 		...createReleaseCoordinatorAPI(),
 		...createNotebookAgentAPI(),
+		...createBrowserRecorderAPI(),
 		...createAgentCoachAPI(),
 		...createOnboardingAgentAPI(),
 		...createSandboxAPI(),
@@ -477,7 +551,14 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createConsensusArbiterAPI(),
 		...createInjectionGuardAPI(),
 		...createGuardrailsAPI(),
+		...createGovernanceAPI(),
 		...createAgentDebuggerAPI(),
+		...createLocalBackendAPI(),
+		...createForgeAccountsAPI(),
+		...createAiAccountsAPI(),
+		...createAiAccountUsageAPI(),
+		...createApprovalsAPI(),
+		...createReplayAPI(),
 		...createBlastRadiusAPI(),
 		...createPhase35FeaturesAPI(),
 		...createBountyBoardAPI(),
@@ -500,11 +581,14 @@ export const createElectronAPI = (): ElectronAPI => {
 		github: createGitHubAPI(),
 		swarm: createSwarmAPI(),
 		automations: createAutomationsAPI(),
+		bitbucket: createBitbucketAPI(),
 		serverAuth: createServerAuthAPI(), // Multi-user server mode
 		serverAdmin: createServerAdminAPI(), // Multi-tenant administration
+		serverUsage: createServerUsageAPI(), // Page activity, usage settings
 		queue: createQueueAPI(), // Queue routing for rate limit recovery
 		quality: createQualityAPI(), // Code quality analysis
 		selfHealing: createSelfHealingAPI(),
+		pixelOffice: createPixelOfficeAPI(),
 		createClaudeProfileDirectory: (profileName: string) =>
 			invokeIpc<{ success: boolean; data?: string; error?: string }>(
 				IPC_CHANNELS.CLAUDE_PROFILE_CREATE_DIR,
@@ -529,12 +613,13 @@ export const createElectronAPI = (): ElectronAPI => {
 				config,
 			),
 		detectWindsurfToken: () =>
-			invokeIpc<{
-				success: boolean;
-				apiKey?: string;
-				userName?: string;
-				error?: string;
-			}>(IPC_CHANNELS.CREDENTIAL_DETECT_WINDSURF_TOKEN),
+			invokeIpc<WindsurfDetection>(
+				IPC_CHANNELS.CREDENTIAL_DETECT_WINDSURF_TOKEN,
+			),
+		saveDetectedWindsurfToken: () =>
+			invokeIpc<WindsurfTokenSave>(
+				IPC_CHANNELS.CREDENTIAL_SAVE_DETECTED_WINDSURF_TOKEN,
+			),
 		checkClaudeOAuth: () =>
 			invokeIpc<{ isAuthenticated: boolean; profileName?: string }>(
 				IPC_CHANNELS.CREDENTIAL_CHECK_CLAUDE_OAUTH,
@@ -575,6 +660,8 @@ export { createApiExplorerAPI } from "./modules/api-explorer-api";
 export type { AppEmulatorAPI } from "./modules/app-emulator-api";
 export type { MobileAPI } from "./modules/mobile-api";
 export { createAppEmulatorAPI } from "./modules/app-emulator-api";
+export type { DeviceMatrixAPI } from "./modules/device-matrix-api";
+export { createDeviceMatrixAPI } from "./modules/device-matrix-api";
 export { createMobileAPI } from "./modules/mobile-api";
 export type { ArchitectureVisualizerAPI } from "./modules/architecture-visualizer-api";
 export { createArchitectureVisualizerAPI } from "./modules/architecture-visualizer-api";
@@ -583,6 +670,8 @@ export { createArenaAPI } from "./modules/arena-api";
 export { createAutoRefactorAPI } from "./modules/auto-refactor-api";
 export type { AutomationsAPI } from "./modules/automations-api";
 export { createAutomationsAPI } from "./modules/automations-api";
+export type { BitbucketAPI } from "./modules/bitbucket-api";
+export { createBitbucketAPI } from "./modules/bitbucket-api";
 export type { SwarmAPI } from "./modules/swarm-api";
 export { createSwarmAPI } from "./modules/swarm-api";
 export type { ClaudeCodeAPI } from "./modules/claude-code-api";
@@ -595,6 +684,8 @@ export type { ContextAwareSnippetsAPI } from "./modules/context-aware-snippets-a
 export { createContextAwareSnippetsAPI } from "./modules/context-aware-snippets-api";
 export type { AgentCliAPI } from "./modules/agent-cli-api";
 export { createAgentCliAPI } from "./modules/agent-cli-api";
+export type { ReaAPI } from "./modules/rea-api";
+export { createReaAPI } from "./modules/rea-api";
 export type { TaskPermissionAPI } from "./modules/task-permission-api";
 export { createTaskPermissionAPI } from "./modules/task-permission-api";
 export type { CopilotCliAPI } from "./modules/copilot-cli-api";
@@ -613,6 +704,10 @@ export type { PairProgrammingAPI } from "./modules/pair-programming-api";
 export { createPairProgrammingAPI } from "./modules/pair-programming-api";
 export type { QuickCommandAPI } from "./modules/quick-command-api";
 export { createQuickCommandAPI } from "./modules/quick-command-api";
+export type { MissionControlAPI } from "./modules/mission-control-api";
+export { createMissionControlAPI } from "./modules/mission-control-api";
+export type { ConflictWavesAPI } from "./modules/conflict-waves-api";
+export { createConflictWavesAPI } from "./modules/conflict-waves-api";
 export type { PerformanceProfilerAPI } from "./modules/performance-profiler-api";
 export { createPerformanceProfilerAPI } from "./modules/performance-profiler-api";
 export { createPromptOptimizerAPI } from "./modules/prompt-optimizer-api";

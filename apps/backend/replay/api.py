@@ -7,15 +7,40 @@ Provides endpoints for:
 - File heatmap data
 - Breakpoint management
 - A/B session comparison
+- Sharing (#347): export, import, bookmarks, a video, a model's summary,
+  and how this machine shares its replays (counted here, sent nowhere)
 """
 
+import asyncio
+import base64
+import binascii
 import logging
+from typing import Literal
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from foundation.platform.browser import chrome_executable
+from pydantic import BaseModel, Field
 
-from .recorder import get_replay_recorder
+from . import bookmarks as bookmark_store
+from . import mp4 as mp4_module
+from . import summary as summary_module
+from . import usage as usage_module
+from . import video as video_module
+from .bundle import (
+    MAX_BUNDLE_BYTES,
+    BundleError,
+    ExportOptions,
+    build_bundle,
+    decode,
+    encode,
+    file_name,
+    session_from_bundle,
+)
+from .compare_page import render_comparison
+from .models import BreakpointType
+from .recorder import compare, get_replay_recorder
 from .time_travel import get_time_travel_engine
+from .viewer import render_viewer
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +57,7 @@ FORK_NOT_FOUND = "Fork not found"
 
 
 class AddBreakpointRequest(BaseModel):
-    breakpoint_type: str  # tool_call, file_change, decision, error, token_threshold, step_index, pattern_match
+    breakpoint_type: BreakpointType
     condition: str = ""
     description: str = ""
 
@@ -44,6 +69,55 @@ class CompareSessionsRequest(BaseModel):
 
 class DeleteSessionsRequest(BaseModel):
     session_ids: list[str]
+
+
+class ExportSessionRequest(BaseModel):
+    format: Literal["wpreplay", "html"] = "wpreplay"
+    strip_reasoning: bool = False
+    strip_tokens: bool = False
+    include_file_contents: bool = False
+    language: Literal["en", "fr"] = "en"
+
+
+class ImportSessionRequest(BaseModel):
+    # base64 of the file: 4 characters for every 3 bytes, plus padding
+    content_base64: str = Field(max_length=(MAX_BUNDLE_BYTES // 3 + 1) * 4)
+
+
+class AddBookmarkRequest(BaseModel):
+    step_index: int = Field(ge=0)
+    note: str = Field(default="", max_length=4000)
+    author: str = Field(default="", max_length=100)
+
+
+class AddReplyRequest(BaseModel):
+    note: str = Field(min_length=1, max_length=4000)
+    author: str = Field(default="", max_length=100)
+
+
+class ExportVideoRequest(BaseModel):
+    strip_reasoning: bool = False
+    strip_tokens: bool = False
+    language: Literal["en", "fr"] = "en"
+    # WebM is Playwright's own; MP4 is a second encoding by this machine's ffmpeg.
+    format: Literal["webm", "mp4"] = "webm"
+
+
+class CompareVideoRequest(ExportVideoRequest):
+    session_a_id: str
+    session_b_id: str
+
+
+class SummarizeRequest(BaseModel):
+    # A provider name as the clients know it; create_agent_client routes it.
+    provider: str = Field(
+        min_length=1, max_length=40, pattern=r"^[a-z0-9][a-z0-9_.-]*$"
+    )
+    language: Literal["en", "fr"] = "en"
+
+
+class RecordExportRequest(BaseModel):
+    kind: Literal["wpreplay", "html", "video", "team_link"]
 
 
 class AddCheckpointRequest(BaseModel):
@@ -281,7 +355,7 @@ async def add_breakpoint(session_id: str, req: AddBreakpointRequest):
     recorder = get_replay_recorder()
     bp = recorder.add_breakpoint(
         session_id,
-        breakpoint_type=req.breakpoint_type,
+        breakpoint_type=req.breakpoint_type.value,
         condition=req.condition,
         description=req.description,
     )
@@ -304,16 +378,250 @@ async def remove_breakpoint(session_id: str, breakpoint_id: str):
 
 
 # ---------------------------------------------------------------------------
+# Sharing: export, import, bookmarks (#347)
+# ---------------------------------------------------------------------------
+
+_BOOKMARK_REFUSALS = {
+    "recording": (409, "The session is still recording"),
+    "not_found": (404, SESSION_NOT_FOUND),
+    "no_such_step": (422, "The session has no such step"),
+    "too_many": (422, "The session has too many bookmarks"),
+    "no_such_bookmark": (404, "Bookmark not found"),
+    "too_many_replies": (422, "too_many_replies"),
+    "empty_reply": (422, "empty_reply"),
+}
+
+
+@router.post(
+    "/sessions/{session_id}/export",
+    responses={404: {"description": SESSION_NOT_FOUND}},
+)
+async def export_session(session_id: str, req: ExportSessionRequest):
+    """The session as a `.wpreplay` bundle or a standalone page, masked."""
+    session = get_replay_recorder().load_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail=SESSION_NOT_FOUND)
+    options = ExportOptions(
+        strip_reasoning=req.strip_reasoning,
+        strip_tokens=req.strip_tokens,
+        include_file_contents=req.include_file_contents,
+    )
+    bundle = build_bundle(session, options)
+    if req.format == "html":
+        content = render_viewer(bundle, req.language).encode("utf-8")
+        name = file_name(session, ".html")
+    else:
+        content = encode(bundle)
+        name = file_name(session)
+    return {
+        "success": True,
+        "file_name": name,
+        "content_base64": base64.b64encode(content).decode("ascii"),
+    }
+
+
+@router.post("/import", responses={422: {"description": "Not a readable bundle"}})
+async def import_session(req: ImportSessionRequest):
+    """Store the session of a `.wpreplay` bundle as a new local session."""
+    try:
+        data = base64.b64decode(req.content_base64, validate=True)
+        session = session_from_bundle(decode(data))
+    except (binascii.Error, BundleError) as error:
+        code = error.args[0] if isinstance(error, BundleError) else "unreadable"
+        raise HTTPException(status_code=422, detail=code) from error
+    recorder = get_replay_recorder()
+    recorder.save_session(session)
+    return {"success": True, "session": session.to_summary()}
+
+
+@router.post(
+    "/sessions/{session_id}/bookmarks",
+    responses={404: {"description": SESSION_NOT_FOUND}},
+)
+async def add_bookmark(session_id: str, req: AddBookmarkRequest):
+    """Mark a step of a saved session with a note."""
+    try:
+        bookmark = bookmark_store.add_bookmark(
+            get_replay_recorder(), session_id, req.step_index, req.note, req.author
+        )
+    except bookmark_store.BookmarkError as error:
+        status, detail = _BOOKMARK_REFUSALS[error.code]
+        raise HTTPException(status_code=status, detail=detail) from error
+    return {"success": True, "bookmark": bookmark.to_dict()}
+
+
+@router.delete(
+    "/sessions/{session_id}/bookmarks/{bookmark_id}",
+    responses={404: {"description": "Bookmark not found"}},
+)
+async def remove_bookmark(session_id: str, bookmark_id: str):
+    """Remove a bookmark from a saved session."""
+    if not bookmark_store.remove_bookmark(
+        get_replay_recorder(), session_id, bookmark_id
+    ):
+        raise HTTPException(status_code=404, detail="Bookmark not found")
+    return {"success": True}
+
+
+@router.post(
+    "/sessions/{session_id}/bookmarks/{bookmark_id}/replies",
+    responses={404: {"description": "Bookmark not found"}},
+)
+async def add_bookmark_reply(session_id: str, bookmark_id: str, req: AddReplyRequest):
+    """Answer a bookmark's note: the discussion travels with the session."""
+    try:
+        reply = bookmark_store.add_reply(
+            get_replay_recorder(), session_id, bookmark_id, req.note, req.author
+        )
+    except bookmark_store.BookmarkError as error:
+        status, detail = _BOOKMARK_REFUSALS[error.code]
+        raise HTTPException(status_code=status, detail=detail) from error
+    return {"success": True, "reply": reply.to_dict()}
+
+
+@router.delete(
+    "/sessions/{session_id}/bookmarks/{bookmark_id}/replies/{reply_id}",
+    responses={404: {"description": "Reply not found"}},
+)
+async def remove_bookmark_reply(session_id: str, bookmark_id: str, reply_id: str):
+    """Remove a reply from a bookmark of a saved session."""
+    if not bookmark_store.remove_reply(
+        get_replay_recorder(), session_id, bookmark_id, reply_id
+    ):
+        raise HTTPException(status_code=404, detail="Reply not found")
+    return {"success": True}
+
+
+_VIDEO_LOCK = asyncio.Lock()
+
+_SUMMARY_REFUSALS = {
+    "recording": (409, "recording"),
+    "not_found": (404, SESSION_NOT_FOUND),
+    "has_thinking": (409, "has_thinking"),
+    "no_steps": (422, "no_steps"),
+    "no_runtime": (503, "summary_failed"),
+    "failed": (502, "summary_failed"),
+    "empty": (502, "summary_empty"),
+}
+
+
+async def _video_answer(page: str, name: str, video_format: str) -> dict:
+    """Record ``page`` (one recording at a time), as WebM or MP4.
+
+    No Playwright, browser or encoder here is an answer (``available`` false,
+    with the ``refusal``), not an error.
+    """
+    if _VIDEO_LOCK.locked():
+        raise HTTPException(status_code=409, detail="video_busy")
+    async with _VIDEO_LOCK:
+        try:
+            content, played, total = await video_module.record_video(
+                page, executable=chrome_executable()
+            )
+            extension = video_module.EXTENSION
+            if video_format == "mp4":
+                content = await mp4_module.to_mp4(content)
+                extension = mp4_module.EXTENSION
+        except video_module.VideoUnavailable as refusal:
+            return {"success": True, "available": False, "refusal": refusal.code}
+        except video_module.VideoError as error:
+            raise HTTPException(
+                status_code=422, detail=f"video_{error.code}"
+            ) from error
+    return {
+        "success": True,
+        "available": True,
+        "file_name": f"{name}{extension}",
+        "content_base64": base64.b64encode(content).decode("ascii"),
+        "steps_played": played,
+        "steps_total": total,
+    }
+
+
+@router.post(
+    "/sessions/{session_id}/video",
+    responses={
+        404: {"description": SESSION_NOT_FOUND},
+        409: {"description": "A video is already being recorded"},
+        422: {"description": "The recording failed"},
+    },
+)
+async def export_video(session_id: str, req: ExportVideoRequest):
+    """The session's page, masked, played step by step as a video."""
+    session = get_replay_recorder().load_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail=SESSION_NOT_FOUND)
+    options = ExportOptions(
+        strip_reasoning=req.strip_reasoning, strip_tokens=req.strip_tokens
+    )
+    page = render_viewer(build_bundle(session, options), req.language)
+    return await _video_answer(page, file_name(session, ""), req.format)
+
+
+@router.post(
+    "/compare/video",
+    responses={
+        404: {"description": "Session A or B not found"},
+        409: {"description": "A video is already being recorded"},
+        422: {"description": "The recording failed"},
+    },
+)
+async def export_comparison_video(req: CompareVideoRequest):
+    """Two sessions side by side, masked, their steps played at once."""
+    recorder = get_replay_recorder()
+    session_a = recorder.load_session(req.session_a_id)
+    session_b = recorder.load_session(req.session_b_id)
+    if not session_a or not session_b:
+        raise HTTPException(status_code=404, detail="Session A or B not found")
+    options = ExportOptions(
+        strip_reasoning=req.strip_reasoning, strip_tokens=req.strip_tokens
+    )
+    page = render_comparison(
+        build_bundle(session_a, options), build_bundle(session_b, options), req.language
+    )
+    return await _video_answer(page, file_name(session_a, "-compare"), req.format)
+
+
+@router.get("/usage")
+async def get_usage():
+    """How this machine shares its replays, counted here and sent nowhere."""
+    storage = get_replay_recorder().storage_dir
+    report = await asyncio.to_thread(usage_module.usage_report, storage)
+    return {"success": True, **report}
+
+
+@router.post("/usage/exports")
+async def record_export(req: RecordExportRequest):
+    """Count one export the app produced: its kind and its time, nothing else."""
+    storage = get_replay_recorder().storage_dir
+    await asyncio.to_thread(usage_module.record_export, storage, req.kind)
+    return {"success": True}
+
+
+@router.post(
+    "/sessions/{session_id}/summary",
+    responses={404: {"description": SESSION_NOT_FOUND}},
+)
+async def summarize_session(session_id: str, req: SummarizeRequest):
+    """A model's summary of the steps of a session that has no thinking trace."""
+    try:
+        summary = await summary_module.summarize(
+            get_replay_recorder(), session_id, req.provider, req.language
+        )
+    except summary_module.SummaryError as error:
+        status, detail = _SUMMARY_REFUSALS[error.code]
+        raise HTTPException(status_code=status, detail=detail) from error
+    return {"success": True, "summary": summary.to_dict()}
+
+
+# ---------------------------------------------------------------------------
 # A/B Comparison
 # ---------------------------------------------------------------------------
 
 
 @router.post(
     "/compare",
-    responses={
-        404: {"description": "Session A or B not found"},
-        500: {"description": "Failed to compare sessions"},
-    },
+    responses={404: {"description": "Session A or B not found"}},
 )
 async def compare_sessions(req: CompareSessionsRequest):
     """Compare two replay sessions side by side (A/B comparison)."""
@@ -331,13 +639,9 @@ async def compare_sessions(req: CompareSessionsRequest):
             status_code=404, detail=f"Session B not found: {req.session_b_id}"
         )
 
-    comparison = recorder.compare_sessions(req.session_a_id, req.session_b_id)
-    if not comparison:
-        raise HTTPException(status_code=500, detail="Failed to compare sessions")
-
     return {
         "success": True,
-        "comparison": comparison.to_dict(),
+        "comparison": compare(session_a, session_b).to_dict(),
         "session_a": session_a.to_summary(),
         "session_b": session_b.to_summary(),
     }

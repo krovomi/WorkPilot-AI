@@ -5,6 +5,26 @@ import { app, ipcMain, type BrowserWindow } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
 import type { DictationResult } from "../../shared/types/dictation";
 
+/** The languages the runner may say it heard (its own closed list, `dictation_runner.py`). */
+const HEARD_LANGUAGES = new Set(["fr", "en", "es", "de", "it", "pt", "nl", "pl", "ja", "zh", "ar", "uk"]);
+
+/**
+ * One line of the runner's answer, as the renderer gets it: only the known
+ * fields, a detected language only from the closed list, or null when the
+ * line is not an answer.
+ */
+export function runnerAnswer(value: unknown): DictationResult | null {
+	if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+	const record = value as Record<string, unknown>;
+	const answer: DictationResult = {};
+	if (record.ready === true) answer.ready = true;
+	if (typeof record.text === "string") answer.text = record.text;
+	if (typeof record.error === "string") answer.error = record.error.slice(0, 40);
+	if (typeof record.language === "string" && HEARD_LANGUAGES.has(record.language))
+		answer.language = record.language;
+	return answer;
+}
+
 /** One owner and one pending chunk. No audio is written to disk. */
 export function registerDictationHandlers(
 	getPython: () => string | null,
@@ -85,7 +105,8 @@ export function registerDictationHandlers(
 			lines.on("line", (line) => {
 				if (active?.child !== child) return;
 				try {
-					const result = JSON.parse(line) as DictationResult;
+					const result = runnerAnswer(JSON.parse(line));
+					if (!result) throw new Error("answer");
 					clearTimeout(active.timer);
 					const resolve = active.pending;
 					active.pending = undefined;

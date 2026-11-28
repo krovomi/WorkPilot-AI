@@ -11,6 +11,8 @@ import { useBrainStore } from "../../stores/brain-store";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Switch } from "../ui/switch";
+import { BrainConflictEmbeddings } from "./BrainConflictEmbeddings";
+import { BrainTrustedSigners } from "./BrainTrustedSigners";
 import { SettingsSection } from "./SettingsSection";
 
 /**
@@ -50,6 +52,8 @@ const ERROR_KEYS: Record<string, string> = {
 	identity: "brain:settings.errors.identity",
 	rejected: "brain:settings.errors.rejected",
 	"path-too-long": "brain:settings.errors.pathTooLong",
+	"invalid-model": "brain:settings.errors.invalidModel",
+	"invalid-provider": "brain:settings.errors.invalidProvider",
 };
 
 export function BrainSettings() {
@@ -261,6 +265,12 @@ export function BrainSettings() {
 							: t("brain:settings.lastSync.ok")}
 				</p>
 			)}
+
+			{settings.conflictEmbeddings && (
+				<BrainConflictEmbeddings embeddings={settings.conflictEmbeddings} />
+			)}
+
+			{settings.exists && <BrainTrustedSigners />}
 
 			<div className="space-y-1 rounded-lg border p-3">
 				<h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">

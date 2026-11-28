@@ -8,6 +8,7 @@
 
 import * as Notifications from "expo-notifications";
 import type { Api } from "../api/endpoints";
+import { approveCard } from "../board/actions";
 import { ACTION_APPROVE, ACTION_VIEW, type PushCard } from "./push";
 
 export type Response =
@@ -34,7 +35,7 @@ export async function approveAndBuild(api: Api, card: PushCard, ask: () => Promi
 	const specId =
 		card.specId ?? (await api.cards(card.projectId)).find((c) => c.id === card.cardId)?.specId ?? null;
 	if (!specId) throw new Error("card_not_indexed");
-	await api.approve(card.projectId, card.cardId);
+	await approveCard(api, card.projectId, card.cardId);
 	await api.startRun(card.projectId, specId, "build");
 	return true;
 }

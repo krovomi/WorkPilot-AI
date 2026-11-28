@@ -40,6 +40,7 @@ import os
 import sys
 import traceback
 from pathlib import Path
+from typing import NoReturn
 
 # Ensure the backend root (parent of 'runners/') is on sys.path so that
 # 'agents', 'services', etc. are importable regardless of how the script is invoked.
@@ -88,7 +89,7 @@ def _print_error_detail(payload: dict) -> None:
     )
 
 
-def _fail(exc: BaseException, *, stage: str | None = None) -> None:
+def _fail(exc: BaseException, *, stage: str | None = None) -> NoReturn:
     """Report an exception, then exit non-zero.
 
     An exception that already carries an ``ErrorDetail`` (``DetailedError``) is
@@ -474,7 +475,6 @@ def _run_add_packages(agent, args) -> None:  # noqa: ARG001 — no LLM needed
         report = install_missing(selection, args.project_path, args.test_dir)
     except Exception as exc:  # noqa: BLE001 — every failure is reported, not raised
         _fail(exc, stage="write")
-        return
 
     for step in report.steps:
         _status(f"{'ok' if step.ok else 'failed'}: {' '.join(step.command)}")
@@ -534,6 +534,33 @@ _ACTION_HANDLERS = {
     "generate-e2e": _run_generate_e2e,
     "generate-tdd": _run_generate_tdd,
 }
+
+
+def _windev_refusal(args) -> str | None:
+    """Why the studio cannot write tests for this WinDev source or project, or None.
+
+    A WinDev test is a test scenario (`.wxt`), a binary element only the
+    WinDev editor creates and runs, and a new element written outside the
+    editor is not registered in the project (docs/architecture/windev.md).
+    Without this, a WinDev project fell back to Python and got a pytest file.
+    """
+    from test_generation.stacks import SUPPORTED_LANGUAGES
+    from windev.files import is_windev_path
+    from windev.project import detect_project
+
+    source = args.file_path or args.target_module or ""
+    if source and is_windev_path(source):
+        pass
+    elif source or args.language in SUPPORTED_LANGUAGES:
+        return None
+    elif detect_project(args.project_path) is None:
+        return None
+    return (
+        "This is a WinDev project: its automated tests are test scenarios that only "
+        "the WinDev editor creates and runs, so the studio cannot write or run them. "
+        "Create the scenario in the editor; a Kanban task can then write the "
+        "WLangage it calls."
+    )
 
 
 def main() -> None:
@@ -598,6 +625,12 @@ def main() -> None:
     )
 
     args = parser.parse_args()
+
+    if refusal := _windev_refusal(args):
+        from foundation.error_details import UNSUPPORTED_STACK
+
+        _print_error(refusal, code=UNSUPPORTED_STACK)
+        sys.exit(1)
 
     try:
         # The generator reaches the model through the agent_runtime port,

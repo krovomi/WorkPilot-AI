@@ -6,6 +6,7 @@ import {
 	effortLabel,
 	formatCost,
 	providerColor,
+	providerName,
 	shortModel,
 	totalTokens,
 } from "./formula-utils";
@@ -189,8 +190,9 @@ export function EfficiencyFrontier({
 								}}
 							>
 								<title>
-									{`${p.f.provider} ${shortModel(p.f.model)} · ${effortLabel(
+									{`${providerName(p.f.provider)} ${shortModel(p.f.model)} · ${effortLabel(
 										p.f.effort,
+										t,
 									)}\n${formatCost(p.f.expected_cost_usd)} · ${Math.round(
 										p.f.success_probability * 100,
 									)}% ${t("formulaLab:frontier.success")}`}

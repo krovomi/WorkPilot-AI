@@ -1,3 +1,11 @@
+---
+feature: Vue produit
+summary: >-
+  Les features, et une ligne par vue de l'app (`SidebarView`), vérifiée par
+  `tests/test_product_overview_views.py` ; une vue sans conception ni test y est marquée
+  expérimentale, comme dans la barre latérale.
+---
+
 # Product overview
 
 > Design rationale moved verbatim out of [`docs/CLAUDE.md`](../CLAUDE.md),
@@ -12,12 +20,12 @@ WorkPilot AI is a desktop application (+ CLI) where users describe a goal and AI
 **Main features:**
 
 - **Autonomous Tasks** — Multi-agent pipeline (planner, coder, QA) that builds features end-to-end
-- **Kanban Board** — Visual task management from planning through completion with preview/emulator support
+- **Kanban Board** — Visual task management from planning through completion with preview/emulator support; « Ask the board » answers a question in any language with every related ticket ([board-ask.md](board-ask.md))
 - **Agent Terminals** — Up to 12 parallel AI-powered terminals with task context injection
 - **Insights** — AI chat interface for exploring and understanding your codebase
 - **Roadmap** — AI-assisted feature planning with strategic roadmap generation
 - **Ideation** — Discover improvements, performance issues, and security vulnerabilities
-- **GitHub/GitLab Integration** — Import issues, AI-powered investigation, PR/MR review and creation
+- **GitHub/GitLab Integration** — Import issues, AI-powered investigation, PR/MR review and creation; Bitbucket Cloud: issues, pull requests, pipelines and a task's pull request
 - **PR Follow-Through** — A task's open GitHub PR is driven to merge: red checks and review threads go to the QA fixer, the commit is checked for weakened tests or CI edits, then pushed (never forced, never merged)
 - **Best-of-N** — One task built 2 to 4 ways, one worktree and engine each; ranked on finished build, QA, goal, diff size and cost, and the person keeps one
 - **Goal Mode** — A task carries a command and the exit code that means "done"; QA loops until it holds, within a pass and spending cap, and cannot edit the tests it runs
@@ -32,7 +40,7 @@ WorkPilot AI is a desktop application (+ CLI) where users describe a goal and AI
 - **Microsoft Teams Notifications** — Webhook-based notifications for task completion and PR creation
 - **Changelog** — Generate release notes from completed tasks
 - **Memory System** — one Obsidian vault (the shared brain) keeps what every build learns, read by every agent
-- **Isolated Workspaces** — Git worktree isolation for every build; AI-powered semantic merge
+- **Isolated Workspaces** — Git worktree isolation for every build; a git merge where the user's own AI provider merges each file both sides changed, after a preview of the changes two tasks made to the same function
 - **Self-Healing** — Incident response system with CI/CD failure analysis, proactive monitoring, and production responder
 - **Pixel Office** — Multi-agent coordination visualization with task queue UI
 - **Learning Loop** — Analytics and learning system for continuous improvement
@@ -104,7 +112,7 @@ it, inside its hub. The hubs are listed in
 | `bounty-board` | Bounty Board | Agents | [bounty-board.md](bounty-board.md) |  |
 | `consensus-arbiter` | Cross-Agent Consensus Arbiter | Agents › Arena | — |  |
 | `live-companion` | Live Companion | Agents | — |  |
-| `pixel-office` | Pixel Office | Agents | [frontend-architecture.md](frontend-architecture.md) |  |
+| `pixel-office` | Pixel Office | Agents | [pixel-office.md](pixel-office.md) |  |
 | `self-healing` | Self-Healing | Agents | — |  |
 | `terminals` | Agent Terminals | Agents | [frontend-architecture.md](frontend-architecture.md) |  |
 | `code-playground` | Code Playground | Development | — |  |
@@ -170,3 +178,5 @@ it, inside its hub. The hubs are listed in
 | `github-prs` | GitHub Pull Requests | Git & Integrations, when GitHub is enabled | — |  |
 | `gitlab-issues` | GitLab Issues | Git & Integrations, when GitLab is enabled | — |  |
 | `gitlab-merge-requests` | GitLab Merge Requests | Git & Integrations, when GitLab is enabled | — |  |
+| `bitbucket-issues` | Bitbucket Issues | Git & Integrations, when Bitbucket is enabled (local project) | [bitbucket.md](bitbucket.md) |  |
+| `bitbucket-pull-requests` | Bitbucket Pull Requests | Git & Integrations, when Bitbucket is enabled (local project) | [bitbucket.md](bitbucket.md) |  |

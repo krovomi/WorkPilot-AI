@@ -27,6 +27,8 @@
 		"githubPRs": "GitHub PRs",
 		"gitlabIssues": "GitLab issues",
 		"gitlabMRs": "GitLab MRs",
+		"bitbucketIssues": "Bitbucket issues",
+		"bitbucketPRs": "Bitbucket PRs",
 		"worktrees": "Worktrees",
 		"agentTools": "MCP overview",
 		"migration": "Code migration",
@@ -194,7 +196,6 @@
 		"notInstalledShort": "Not installed",
 		"checkingShort": "Checking...",
 		"version": "Version",
-		"notInstalledDescription": "{{name}} is not on your PATH. Install it, sign in once in a terminal, then refresh.",
 		"signInHint": "WorkPilot uses the CLI's own sign-in and never reads its credentials.",
 		"viewDocs": "View {{name}} documentation",
 		"install": {
@@ -262,6 +263,7 @@
 		"latest": "Latest",
 		"lastChecked": "Last checked",
 		"notInstalledDescription": "Codex CLI is not installed. Click \"Install\" to install it in the background:",
+		"updateFailed": "Updating Codex CLI failed.",
 		"installing": "Installing, please wait...",
 		"viewDocs": "View Codex CLI documentation"
 	},
@@ -379,6 +381,8 @@
 		"githubPRs": "github pull requests pr review",
 		"gitlabIssues": "gitlab issues tickets bugs",
 		"gitlabMRs": "gitlab merge requests mr review",
+		"bitbucketIssues": "bitbucket issues tickets bugs",
+		"bitbucketPRs": "bitbucket pull requests pr pipelines",
 		"roadmap": "roadmap planning",
 		"analytics": "statistics charts metrics",
 		"costEstimator": "costs tokens budget price",
@@ -416,7 +420,10 @@
 		"chip": "CLI {{installed}}/{{total}}",
 		"chipTooltip": "CLI tools: {{installed}} of {{total}} installed",
 		"checking": "CLI tools: checking…",
-		"title": "CLI tools"
+		"title": "CLI tools",
+		"updateAll": "Update all ({{count}})",
+		"updateAllTooltip": "Update {{names}}, one after the other",
+		"updatingAll": "Updating {{current}}/{{total}}…"
 	},
 	"rail": {
 		"label": "Menu spaces"
@@ -466,5 +473,78 @@
 		"hideAll_other": "Hide all {{count}}",
 		"count": "Hidden pages ({{count}})",
 		"show": "Show again"
+	},
+	"rea": {
+		"description": "Reads what a shipped build reveals (Electron fuses, binary hardening, .NET public API), without running it. WorkPilot runs release {{version}} only.",
+		"state": {
+			"ready": "Release {{version}} installed",
+			"other_version": "Another version is installed",
+			"absent": "Not installed",
+			"node_missing": "Node.js not found",
+			"node_too_old": "Node.js too old"
+		},
+		"otherVersion": "rea on your PATH is {{installed}}; WorkPilot only runs {{version}}. Installing replaces it with {{version}}.",
+		"otherVersionUnknown": "rea on your PATH is not the rea-agents release WorkPilot runs ({{version}}). Installing puts {{version}} in its place.",
+		"absentHint": "Without it, WorkPilot fetches release {{version}} with npx each time it needs it (refused in strict offline mode).",
+		"nodeTooOld": "REA {{version}} needs Node.js {{ranges}}; the one on PATH is {{node}}, and nvm, fnm, Volta, mise and asdf hold none that fits.",
+		"nodeFromManager": "Node.js {{node}} from {{manager}}: the one on PATH is too old or missing.",
+		"nodeMissing": "REA needs Node.js {{ranges}}. Install Node.js (nodejs.org), then refresh.",
+		"installButton": "Install REA {{version}}",
+		"error": {
+			"node_required": "REA cannot be installed here: it needs npm and Node.js {{ranges}}.",
+			"failed": "Installing REA {{version}} failed.",
+			"not_on_path": "REA was installed but rea on your PATH still does not lead to {{version}}. Restart WorkPilot, then refresh.",
+			"busy": "REA is already being installed."
+		},
+		"noCredentials": "REA runs without your credentials, from a folder of its own, and only reads files.",
+		"docsFailed": "The link did not open: {{error}}",
+		"checkFailed": "The check did not complete: {{error}}"
+	},
+	"cliStatus": {
+		"installFailed": "Installation failed",
+		"terminalUnavailable": "Could not open a terminal.",
+		"pathSwitchUnavailable": "Switching the CLI installation is not available.",
+		"pathSwitchFailed": "Could not switch the CLI installation."
+	},
+	"stopAll": {
+		"label": "Stop all agents",
+		"tooltip": "Stop all agents (Ctrl+Shift+.): every running task is paused, to resume from its card",
+		"done_one": "{{count}} task paused",
+		"done_other": "{{count}} tasks paused",
+		"resumeHint": "Every agent has stopped. Resume each task from its card when you are ready.",
+		"nothing": "No agent was running",
+		"failed": "The agents could not be stopped",
+		"serverDone_one": "{{count}} of your agents stopped on the server.",
+		"serverDone_other": "{{count}} of your agents stopped on the server.",
+		"serverFailed_one": "{{count}} server project could not be reached: stop its agents from its Guardrails page.",
+		"serverFailed_other": "{{count}} server projects could not be reached: stop their agents from their Guardrails page."
+	},
+	"resize": {
+		"label": "Resize the menu",
+		"hint": "Drag to resize the menu, double-click to restore its default width",
+		"width": "{{width}} pixels wide",
+		"folded": "Folded"
+	},
+	"customize": {
+		"start": "Customize the menu",
+		"done": "Done",
+		"title": "Customize your menu",
+		"hint": "Drag a page by its grip to its new place, or onto a space of the rail to move it there. The arrows do the same from the keyboard. Only your menu changes.",
+		"spacePlace": "Its place in the rail",
+		"spaceUp": "Move the space {{name}} up",
+		"spaceDown": "Move the space {{name}} down",
+		"resetOrder": "Restore the original order",
+		"up": "Move {{name}} up",
+		"down": "Move {{name}} down",
+		"moveTo": "Move {{name}} to another space",
+		"moveToTitle": "Move {{name}} to",
+		"announce": {
+			"instructions": "To pick up a menu entry, press Space or Enter. Move it with the arrow keys, press Space or Enter again to drop it, or Escape to cancel.",
+			"start": "Picked up {{name}}.",
+			"over": "{{name}} is over {{target}}.",
+			"outside": "{{name}} is no longer over a place it can go.",
+			"drop": "{{name}} was dropped on {{target}}.",
+			"cancel": "Moving {{name}} was cancelled."
+		}
 	}
 }

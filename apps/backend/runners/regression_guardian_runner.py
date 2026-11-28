@@ -9,7 +9,7 @@ dashboard.
 Output protocol (one JSON object per line, prefixed):
     REGRESSION_GUARDIAN_EVENT:{"type": "progress", "data": {"status": "..."}}
     REGRESSION_GUARDIAN_RESULT:{"results": [...]}
-    REGRESSION_GUARDIAN_ERROR:<message>
+    REGRESSION_GUARDIAN_ERROR:"<message>"   (a JSON string)
 """
 
 from __future__ import annotations
@@ -127,7 +127,9 @@ def run_scan(project_path: Path) -> dict[str, Any]:
 
     # Each incident gets the framework of the stack its faulting file is in.
     handler = WebhookHandler(
-        dedup_checker=DedupChecker(),
+        # The project's own tests: without a folder, the checker had nothing
+        # to compare with and never reported a duplicate.
+        dedup_checker=DedupChecker(test_dirs=[project_path]),
         framework_for=lambda incident: detect_framework(
             project_path, incident.faulting_file
         ),
@@ -142,8 +144,13 @@ def run_scan(project_path: Path) -> dict[str, Any]:
 
         pipeline_result = handler.handle(payload)
         converted = _pipeline_result_to_dict(pipeline_result)
-        if converted is not None:
-            results.append(converted)
+        if converted is None:
+            # Said, like unreadable JSON: a payload the parser refused used
+            # to vanish from the dashboard without a word.
+            reason = pipeline_result.error or "not an incident"
+            _emit_event("progress", {"status": f"Skipped {file_path.name}: {reason}"})
+            continue
+        results.append(converted)
 
     _emit_event("complete", {"results": len(results)})
     return {"results": results}

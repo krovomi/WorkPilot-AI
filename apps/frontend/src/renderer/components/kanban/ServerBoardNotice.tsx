@@ -3,6 +3,7 @@ import { Server } from "lucide-react";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useProjectStore } from "../../stores/project-store";
+import { useSprintStore } from "../../stores/sprint-store";
 import { useTaskStore } from "../../stores/task-store";
 
 /** How often a server board is read again while its live stream is down. */
@@ -64,7 +65,11 @@ export function useServerBoardRefresh(projectId: string): void {
 		const off = api.onServerBoardLive?.((update) => {
 			if (stopped || update.projectId !== projectId) return;
 			live = update.live;
-			if (update.changed) void read();
+			if (update.changed) {
+				void read();
+				// A teammate's sprint change (`sprints_updated`) comes the same way.
+				void useSprintStore.getState().load(projectId);
+			}
 			else schedule();
 		});
 		void api.watchServerBoard?.(projectId);

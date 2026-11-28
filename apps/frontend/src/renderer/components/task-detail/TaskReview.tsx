@@ -26,6 +26,7 @@ import {
 import { useReviewComments } from "./hooks/useReviewComments";
 import { PlanApprovalSection } from "./PlanApprovalSection";
 import { TaskTestGenerator } from "./TaskTestGenerator";
+import { isHeldBySuite } from "../suite-placement/suite-hold";
 
 interface TaskReviewProps {
 	readonly task: Task;
@@ -189,6 +190,9 @@ export function TaskReview({
 					onShowPRDialog={onShowPRDialog}
 					isCompleting={isCompleting}
 					onRequestComplete={() => setShowCompletionDialog(true)}
+					suiteHold={
+						isHeldBySuite(task) ? { webUrl: task.ciSuite?.webUrl } : null
+					}
 				/>
 			);
 		}

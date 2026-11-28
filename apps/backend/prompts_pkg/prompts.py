@@ -43,7 +43,7 @@ def get_planner_prompt(spec_dir: Path) -> str:
     if not prompt_file.exists():
         raise FileNotFoundError(
             f"Planner prompt not found at {prompt_file}\n"
-            "Make sure the auto-claude/prompts/planner.md file exists."
+            "Make sure the backend's prompts/planner.md file exists."
         )
 
     prompt = prompt_file.read_text(encoding="utf-8")
@@ -65,7 +65,7 @@ You MUST use the Write tool to create these files in the spec directory:
 DO NOT just describe what these files should contain. You MUST actually call the Write tool
 with the file path and complete content to create them.
 
-The project root is the parent of auto-claude/. Implement code in the project root, not in the spec directory.
+The project root is the parent of `.workpilot/`. Implement code in the project root, not in the spec directory.
 
 ---
 
@@ -89,7 +89,7 @@ def get_followup_planner_prompt(spec_dir: Path) -> str:
     if not prompt_file.exists():
         raise FileNotFoundError(
             f"Follow-up planner prompt not found at {prompt_file}\n"
-            "Make sure the auto-claude/prompts/followup_planner.md file exists."
+            "Make sure the backend's prompts/followup_planner.md file exists."
         )
 
     prompt = prompt_file.read_text(encoding="utf-8")
@@ -109,7 +109,7 @@ You are adding follow-up work to a **completed** spec.
 
 **Important paths:**
 - Spec directory: `{spec_dir}`
-- Project root: Parent of auto-claude/ (where code should be implemented)
+- Project root: Parent of `.workpilot/` (where code should be implemented)
 
 **Your task:**
 1. Read `{spec_dir}/FOLLOWUP_REQUEST.md` to understand what to add
@@ -144,18 +144,20 @@ def is_first_run(spec_dir: Path) -> bool:
     try:
         with open(plan_file, encoding="utf-8") as f:
             plan = json.load(f)
-
-        # Check if there are any phases with subtasks
-        phases = plan.get("phases", [])
-        if not phases:
-            return True
-
-        # Check if any phase has subtasks
-        total_subtasks = sum(len(phase.get("subtasks", [])) for phase in phases)
-        return total_subtasks == 0
-    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+    except (OSError, ValueError):
         # If we can't read the file, treat as first run
         return True
+
+    # A plan that is not the expected shape has no subtask to resume from.
+    phases = plan.get("phases") if isinstance(plan, dict) else None
+    if not isinstance(phases, list):
+        return True
+    return not any(
+        isinstance(phase, dict)
+        and isinstance(phase.get("subtasks"), list)
+        and phase["subtasks"]
+        for phase in phases
+    )
 
 
 def _min_coverage() -> int:
@@ -164,7 +166,7 @@ def _min_coverage() -> int:
         from qa.coverage_gate import get_min_coverage
 
         return get_min_coverage()
-    except Exception:
+    except ImportError:  # the QA package is absent from a trimmed install
         return 100
 
 
@@ -220,6 +222,37 @@ def mobile_section(project_dir: Path) -> str:
         return _section(project_dir)
     except Exception:  # noqa: BLE001 - a missing section never stops a phase
         return ""
+
+
+def windev_section(
+    project_dir: Path, spec_dir: Path | None = None, *, role: str = "coder"
+) -> str:
+    """What a WinDev, WebDev or WinDev Mobile project adds to a phase's prompt.
+
+    What an agent may write (code blocks of the text format) and may not (the
+    editor's opaque properties, binary elements, new elements), staged skills
+    included when ``spec_dir`` is given. "" for every other project; never
+    raises (`windev.prompt`).
+    """
+    from windev import windev_section as _section
+
+    return _section(project_dir, spec_dir, role=role)
+
+
+def platform_section(
+    project_dir: Path, spec_dir: Path | None = None, *, role: str = "coder"
+) -> str:
+    """The rules of what the project runs on: a phone app, a WinDev application.
+
+    The planner, every coding subtask, the QA reviewer and the workflow's
+    skill phases get both through this one call, each "" when it does not
+    apply.
+    """
+    parts = (
+        mobile_section(project_dir),
+        windev_section(project_dir, spec_dir, role=role),
+    )
+    return "\n\n".join(part for part in parts if part)
 
 
 def dotnet_section(
@@ -416,8 +449,10 @@ This shows only changes made in the spec branch since it diverged from `{base_br
     # URL to open, the evidence is a screenshot from a device, and one of the
     # two platforms may not be buildable on this machine at all. A reviewer
     # that does not know which is which reports "could not verify" as a defect.
-    if mobile := mobile_section(project_dir):
-        spec_context += mobile + "\n\n---\n\n"
+    # A WinDev project is judged on its code alone: the format around it is
+    # checked mechanically, and compiling needs the editor.
+    if platform := platform_section(project_dir, spec_dir, role="qa"):
+        spec_context += platform + "\n\n---\n\n"
 
     # A .NET 11 migration is judged against its procedure: what was retargeted,
     # and which behavioral changes were handled or ruled out. Empty otherwise.
@@ -460,9 +495,19 @@ This shows only changes made in the spec branch since it diverged from `{base_br
         mcp_content += "\n\n---\n\n".join(mcp_sections)
         mcp_content += "\n\n---\n"
 
-        # Replace the multi-line marker comment block
+        # Replace the multi-line marker comment block, or the marker alone when
+        # the block's last line was edited away. A function as replacement: the
+        # tool docs hold shell and regex examples whose backslashes are text.
         marker_pattern = r"<!-- PROJECT-SPECIFIC VALIDATION TOOLS WILL BE INJECTED HERE -->.*?<!-- - API validation \(for projects with API endpoints\) -->"
-        base_prompt = re.sub(marker_pattern, mcp_content, base_prompt, flags=re.DOTALL)
+        base_prompt, replaced = re.subn(
+            marker_pattern,
+            lambda _block: mcp_content,
+            base_prompt,
+            count=1,
+            flags=re.DOTALL,
+        )
+        if not replaced:
+            base_prompt = base_prompt.replace(injection_marker, mcp_content, 1)
     elif mcp_sections:
         # Fallback: append at the end if marker not found
         base_prompt += "\n\n---\n\n## PROJECT-SPECIFIC VALIDATION TOOLS\n\n"
@@ -681,4 +726,8 @@ The project root is: `{project_dir}`
 """
     if verification := verify_section(spec_dir):
         spec_context += verification + "\n\n---\n\n"
+    # The fixer edits code like the coder: on a WinDev project, only inside
+    # the code blocks (the integrity gate rejects anything else).
+    if windev := windev_section(project_dir, spec_dir, role="coder"):
+        spec_context += windev + "\n\n---\n\n"
     return spec_context + base_prompt

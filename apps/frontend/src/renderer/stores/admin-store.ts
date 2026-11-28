@@ -65,6 +65,8 @@ interface AdminState {
 
 	setMemberRole: (userId: string, roleSlug: string) => Promise<boolean>;
 	removeMember: (userId: string) => Promise<boolean>;
+	/** Adds an account the server already has, by its email (platform administrators). */
+	addMemberByEmail: (email: string, roleSlug: string) => Promise<boolean>;
 	setUserActive: (userId: string, active: boolean) => Promise<boolean>;
 	revokeSessions: (userId: string) => Promise<boolean>;
 
@@ -114,7 +116,14 @@ export const useAdminStore = create<AdminState>((set, get) => {
 			return false;
 		}
 		set((s) => ({ loading: { ...s.loading, [key]: true }, error: null }));
-		const result = await run(bridge);
+		let result: { ok: true; data: T } | { ok: false; error: string };
+		try {
+			result = await run(bridge);
+		} catch (err) {
+			// A rejected IPC call (the main process refused the sender, the
+			// handler threw) must not leave the spinner on for ever.
+			result = { ok: false, error: err instanceof Error ? err.message : String(err) };
+		}
 		set((s) => ({ loading: { ...s.loading, [key]: false } }));
 		if (!result.ok) {
 			set({ error: result.error });
@@ -233,6 +242,15 @@ export const useAdminStore = create<AdminState>((set, get) => {
 			const ok = await withLoading(
 				"setMemberRole",
 				(a) => a.updateMemberRole(userId, roleSlug),
+				() => undefined,
+			);
+			if (ok) await get().loadMembers();
+			return ok;
+		},
+		addMemberByEmail: async (email, roleSlug) => {
+			const ok = await withLoading(
+				"addMember",
+				(a) => a.addMember({ email, role_slug: roleSlug }),
 				() => undefined,
 			);
 			if (ok) await get().loadMembers();

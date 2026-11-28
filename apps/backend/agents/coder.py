@@ -19,9 +19,9 @@ from agent_trace import model_id_of, session_start
 from agents.agent_audit import audit_decision, audit_event
 from agents.feature_wiring import (
     apply_router_override,
-    card_kind,
     cognitive_context_enabled,
     load_domain_addendum,
+    optimized_subtask_context,
     suggest_routed_model,
 )
 from context_mgmt.reset_limit import ResetLimit
@@ -35,17 +35,10 @@ from foundation.pause_state import is_paused, read_pause_state
 from foundation.steering import PersonNotes, deliver_notes, person_notes
 
 try:
-    from core.usage_tracker import (
-        finish_build as _ut_finish_build,
-    )
-    from core.usage_tracker import (
-        record_task_status as _ut_record_task,
-    )
-    from core.usage_tracker import (
-        start_build as _ut_start_build,
-    )
+    from core.usage_tracker import record_build_end as _ut_record_build_end
+    from core.usage_tracker import start_build as _ut_start_build
 except ImportError:
-    _ut_start_build = _ut_finish_build = _ut_record_task = None  # type: ignore[assignment]
+    _ut_start_build = _ut_record_build_end = None  # type: ignore[assignment]
 from core.progress import (
     count_subtasks,
     count_subtasks_detailed,
@@ -82,7 +75,7 @@ from prompts_pkg.prompts import (
     docintel_section,
     dotnet_section,
     is_first_run,
-    mobile_section,
+    platform_section,
     uiux_section,
     workflow_reports_section,
 )
@@ -119,14 +112,16 @@ from .base import (
     RESUME_FILE,
     sanitize_error_message,
 )
+from .iteration_guards import guard_iteration
 from .manual_verification import skip_manual_verification, take_human_unblock
 from .memory_manager import debug_memory_system_status, get_memory_context
-from .rate_limit_time import parse_rate_limit_reset_time
+from .rate_limit_time import parse_rate_limit_reset_time, quota_pause
 from .session import (
     is_prompt_too_long_error,
     post_session_processing,
     run_agent_session,
 )
+from .swarm.build_phase import run_swarm_phase
 from .utils import (
     find_phase_for_subtask,
     find_subtask_in_plan,
@@ -512,7 +507,7 @@ def _coding_task_segments(
         # happens to mention a library — so it goes in whole, each time.
         section("constitution", constitution_section(project_dir), Stability.PROJECT),
         # Same reasoning: the platform rules apply to every subtask, not one.
-        section("mobile", mobile_section(project_dir), Stability.PROJECT),
+        section("platform", platform_section(project_dir, spec_dir), Stability.TASK),
         section("dotnet", dotnet_section(project_dir, spec_dir), Stability.TASK),
         section("effort", effort, Stability.TASK),
         # The ADRs bind every subtask too; the attachments come with them
@@ -853,7 +848,7 @@ async def _on_rate_limit(
 ) -> _Next:
     """Wait for the reset when it is known and not too far away."""
     # Rate limit error - intelligent wait for reset
-    reset_timestamp = parse_rate_limit_reset_time(error_info)
+    reset_timestamp = parse_rate_limit_reset_time(error_info) or quota_pause(error_info)
     if reset_timestamp:
         wait_seconds = reset_timestamp - datetime.now().timestamp()
 
@@ -1122,10 +1117,10 @@ async def _planning_prompt(
 
     # A phone app has no URL: the plan says which platform verifies each
     # subtask, and which one this machine cannot build.
-    planner_mobile = mobile_section(project_dir)
+    planner_mobile = platform_section(project_dir, spec_dir, role="planner")
     if planner_mobile:
         prompt += "\n\n" + planner_mobile
-        print_status("Mobile stack and device toolchain applied to planning", "success")
+        print_status("Platform rules (mobile, WinDev) applied to planning", "success")
     # A .NET 11 migration is planned along its procedure (`dotnet_upgrade`).
     if planner_dotnet := dotnet_section(project_dir, spec_dir, role="planner"):
         prompt += "\n\n" + planner_dotnet
@@ -1191,19 +1186,18 @@ async def _coding_prompt(
     if resume_directive:
         prompt += "\n\n" + resume_directive
 
-    # Load and append relevant file context — only when the
-    # (provider, effort) pair benefits from inlining. Claude agents
-    # and high-effort runs re-read files via tools anyway, so inline
-    # content there is duplicated input paid on every turn.
-    # Provider of this phase (get_phase_provider), which a per-phase
-    # override can set apart from the task-wide one.
+    # Inline file context only where this phase's (provider, effort) gains from
+    # it (tool readers pay it twice); packed by the cognitive context optimizer.
     inline_provider = phase_provider or get_phase_provider(
         spec_dir, phase=current_phase
     )
     if should_inline_file_context(inline_provider, phase_thinking_budget):
-        context = load_subtask_context(spec_dir, project_dir, next_subtask)
-        if context.get("patterns") or context.get("files_to_modify"):
-            prompt += "\n\n" + format_context_for_prompt(context)
+        packed = optimized_subtask_context(project_dir, next_subtask)
+        context = (
+            {} if packed else load_subtask_context(spec_dir, project_dir, next_subtask)
+        )
+        if packed or context.get("patterns") or context.get("files_to_modify"):
+            prompt += "\n\n" + (packed or format_context_for_prompt(context))
     else:
         print(
             muted(
@@ -1247,16 +1241,8 @@ def _record_usage(
     project_dir: Path, spec_dir: Path, build_status: str, task_status: str
 ) -> None:
     """Usage tracking is telemetry: it never costs the build anything."""
-    if _ut_finish_build is not None:
-        try:
-            _ut_finish_build(spec_dir, status=build_status)
-        except Exception:
-            pass
-    if _ut_record_task is not None:
-        try:
-            _ut_record_task(project_dir, spec_dir.name, task_status)
-        except Exception:
-            pass
+    if _ut_record_build_end is not None:
+        _ut_record_build_end(project_dir, spec_dir, build_status, task_status)
 
 
 def _report_run_end(
@@ -1765,8 +1751,8 @@ async def run_autonomous_agent(
             suggestion = suggest_routed_model(
                 prompt=f"coder run on spec {spec_dir.name}",
                 task_hint=jev_hint or "coding",
-                project_dir=project_dir,
-                kind=card_kind(spec_dir),
+                spec_dir=spec_dir,
+                phase="coding",
             )
             if suggestion and suggestion["model"] != model:
                 audit_decision(
@@ -2027,55 +2013,11 @@ async def run_autonomous_agent(
     while True:
         iteration += 1
 
-        # Anti-burnout loop detector (opt-in via WORKPILOT_LOOP_DETECTION_ENABLED).
-        # If iteration N produces the same diff as a recent earlier iteration,
-        # we're flip-flopping — pause the agent for human review instead of
-        # burning more tokens.
-        try:
-            from agents.loop_detection import (
-                get_detector,
-                loop_detection_enabled,
-            )
-
-            if loop_detection_enabled() and iteration > 1:
-                detector = get_detector(spec_dir)
-                diff_hash = detector.hash_diff(project_dir)
-                if detector.record_and_check(diff_hash):
-                    audit_event(
-                        project_dir,
-                        kind="policy_violated",
-                        actor="coder",
-                        correlation_id=spec_dir.name,
-                        summary=(
-                            f"Circular fix detected at iteration {iteration} — "
-                            "agent paused for human review"
-                        ),
-                        payload={
-                            "iteration": iteration,
-                            "diff_hash_prefix": diff_hash[:16],
-                            "buffer": detector.buffer_snapshot(),
-                        },
-                    )
-                    print_status(
-                        "Circular fix detected — pausing for human intervention",
-                        "warning",
-                    )
-                    pause_file = spec_dir / HUMAN_INTERVENTION_FILE
-                    pause_file.write_text(
-                        f"Loop detector triggered at iteration {iteration}.\n"
-                        f"The coder produced the same diff it had a few "
-                        f"iterations ago — likely a flip-flop between two "
-                        f"fixes. Inspect the diff and decide whether to:\n"
-                        f"  - delete this PAUSE file to resume,\n"
-                        f"  - or restart with a different approach.\n",
-                        encoding="utf-8",
-                    )
-                    status_manager.update(state=BuildState.PAUSED)
-                    raise BuildPaused("planning" if is_planning_phase else "coding")
-        except BuildPaused:
-            raise
-        except Exception as exc:
-            logger.debug(f"Loop detection check skipped: {exc}")
+        # The loop detector and the cost budget, read before each session
+        # (agents/iteration_guards.py): either can pause the build here.
+        guard_iteration(
+            spec_dir, project_dir, iteration, is_planning_phase, status_manager
+        )
 
         # Cooperative pause. Read from `pause_state.json`, which exists as soon
         # as the spec does — the flag used to live in the implementation plan,
@@ -2142,6 +2084,11 @@ async def run_autonomous_agent(
             print("To continue, run the script again without --max-iterations")
             break
 
+        # The swarm first builds the subtasks that can run side by side, if on.
+        if not first_run and await run_swarm_phase(
+            project_dir, spec_dir, source_spec_dir
+        ):
+            break
         # Get the next subtask to work on (planner sessions shouldn't bind to a subtask)
         next_subtask = None if first_run else get_next_subtask(spec_dir)
         subtask_id = next_subtask.get("id") if next_subtask else None
@@ -2160,7 +2107,6 @@ async def run_autonomous_agent(
                 )
         status_manager.update_subtasks(in_progress=1)
 
-        # Print session header
         print_session_header(
             session_num=iteration,
             is_planner=first_run,
@@ -2172,19 +2118,14 @@ async def run_autonomous_agent(
             else 1,
         )
 
-        # Capture state before session for post-processing
         commit_before = session_start(spec_dir, project_dir, subtask_id, iteration)
         commit_count_before = get_commit_count(project_dir)
 
-        # Get the phase-specific model and thinking level (respects task_metadata.json configuration)
         # first_run means we're in planning phase, otherwise coding phase
         current_phase = "planning" if first_run else "coding"
 
-        # Hot LLM swap: apply any pending live provider/model/effort change for
-        # this phase BEFORE building the client, so the new turn uses it (the
-        # frontend also wrote it to task_metadata.json; consuming the marker makes
-        # the switch explicit + logged and covers the marker-only path). No marker
-        # → no-op.
+        # Hot LLM swap: a pending live provider/model/effort change for this
+        # phase is applied BEFORE the client is built (no marker → no-op).
         try:
             from agents.hot_swap import (
                 apply_hot_swap_to_metadata,
@@ -2545,7 +2486,7 @@ async def run_autonomous_agent(
             if (
                 status == "continue"
                 and response
-                and "should I mark" in response.lower()
+                and "should i mark" in response.lower()
                 and "blocked" in response.lower()
             ):
                 print_status(

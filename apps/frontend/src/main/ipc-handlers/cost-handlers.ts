@@ -3,7 +3,8 @@
  *
  * Reads/writes {projectPath}/.workpilot/cost_data.json directly in Node.js
  * to expose cost summary and budget info to the renderer without needing a
- * Python HTTP server.
+ * Python HTTP server. Spend is read from every ledger of the project, root and
+ * task workspaces (`workspace-ledgers.ts`); budgets live in the root file.
  */
 
 import fs from "node:fs";
@@ -11,6 +12,17 @@ import path from "node:path";
 import { app, BrowserWindow, ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
 import { logger } from "../app-logger";
+import { BUDGET_FILE, budgetStatus, writeBudget, writeTaskBudget } from "../cost-budget";
+import { projectStore } from "../project-store";
+import {
+	buildDashboardSnapshot,
+	COST_DATA_FILE,
+	type LedgerUsage,
+	readUsages,
+	SNAPSHOT_FILE,
+} from "../workspace-ledgers";
+import { allSpecDirs, getSpecPaths } from "./task/resume-task";
+import { findTaskAndProject } from "./task/shared";
 
 // ---------------------------------------------------------------------------
 // Load all configured provider IDs from configured_providers.json
@@ -55,173 +67,74 @@ function loadConfiguredProviderIds(): string[] {
 }
 
 // ---------------------------------------------------------------------------
-// File watchers — push COSTS_DATA_UPDATED when cost_data.json changes
+// Watcher — the project's .workpilot folder, where every task now records its
+// spend: COSTS_DATA_UPDATED when cost_data.json changes, DASHBOARD_SNAPSHOT_UPDATED
+// when it or dashboard_snapshot.json does (the dashboard reads both).
 // ---------------------------------------------------------------------------
 
 const _watchers = new Map<string, fs.FSWatcher>();
 const _debounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
-function watchCostData(projectPath: string): void {
+function notifyWindows(channel: string, projectPath: string): void {
+	for (const win of BrowserWindow.getAllWindows()) {
+		if (!win.isDestroyed()) win.webContents.send(channel, projectPath);
+	}
+}
+
+function debounce(key: string, run: () => void): void {
+	// Coalesce rapid events (an atomic rename fires twice on Windows).
+	const existing = _debounceTimers.get(key);
+	if (existing) clearTimeout(existing);
+	_debounceTimers.set(
+		key,
+		setTimeout(() => {
+			_debounceTimers.delete(key);
+			run();
+		}, 400),
+	);
+}
+
+function watchLedgers(projectPath: string): void {
 	if (_watchers.has(projectPath)) return;
-
-	const filePath = getCostDataPath(projectPath);
-	if (!fs.existsSync(filePath)) return;
-
+	const dir = path.join(projectPath, ".workpilot");
+	if (!fs.existsSync(dir)) return;
 	try {
-		const watcher = fs.watch(filePath, { persistent: false }, () => {
-			// Debounce: coalesce rapid events (e.g. atomic rename fires twice on Windows)
-			const existing = _debounceTimers.get(projectPath);
-			if (existing) clearTimeout(existing);
-			_debounceTimers.set(
-				projectPath,
-				setTimeout(() => {
-					_debounceTimers.delete(projectPath);
-					for (const win of BrowserWindow.getAllWindows()) {
-						if (!win.isDestroyed()) {
-							win.webContents.send(
-								IPC_CHANNELS.COSTS_DATA_UPDATED,
-								projectPath,
-							);
-						}
-					}
-				}, 400),
-			);
+		const watcher = fs.watch(dir, { persistent: false }, (_event, filename) => {
+			const name = filename ? String(filename) : "";
+			if (name === COST_DATA_FILE || name === BUDGET_FILE) {
+				debounce(`${projectPath}:costs`, () =>
+					notifyWindows(IPC_CHANNELS.COSTS_DATA_UPDATED, projectPath),
+				);
+			}
+			if (name === COST_DATA_FILE || name === SNAPSHOT_FILE) {
+				debounce(`${projectPath}:dashboard`, () =>
+					notifyWindows(IPC_CHANNELS.DASHBOARD_SNAPSHOT_UPDATED, projectPath),
+				);
+			}
 		});
-
 		watcher.on("error", () => {
 			watcher.close();
 			_watchers.delete(projectPath);
 		});
-
 		_watchers.set(projectPath, watcher);
 	} catch {
 		// Silently ignore — watcher is best-effort
 	}
 }
 
-// ---------------------------------------------------------------------------
-// File watchers — push DASHBOARD_SNAPSHOT_UPDATED when dashboard_snapshot.json changes
-// ---------------------------------------------------------------------------
-
-const _snapshotWatchers = new Map<string, fs.FSWatcher>();
-const _snapshotDebounceTimers = new Map<
-	string,
-	ReturnType<typeof setTimeout>
->();
-
-function watchDashboardSnapshot(projectPath: string): void {
-	if (_snapshotWatchers.has(projectPath)) return;
-
-	const filePath = path.join(
-		projectPath,
-		".workpilot",
-		"dashboard_snapshot.json",
-	);
-	if (!fs.existsSync(filePath)) return;
-
-	try {
-		const watcher = fs.watch(filePath, { persistent: false }, () => {
-			const existing = _snapshotDebounceTimers.get(projectPath);
-			if (existing) clearTimeout(existing);
-			_snapshotDebounceTimers.set(
-				projectPath,
-				setTimeout(() => {
-					_snapshotDebounceTimers.delete(projectPath);
-					for (const win of BrowserWindow.getAllWindows()) {
-						if (!win.isDestroyed()) {
-							win.webContents.send(
-								IPC_CHANNELS.DASHBOARD_SNAPSHOT_UPDATED,
-								projectPath,
-							);
-						}
-					}
-				}, 400),
-			);
-		});
-
-		watcher.on("error", () => {
-			watcher.close();
-			_snapshotWatchers.delete(projectPath);
-		});
-
-		_snapshotWatchers.set(projectPath, watcher);
-	} catch {
-		// Silently ignore — watcher is best-effort
-	}
+function isRegisteredProject(projectPath: unknown): projectPath is string {
+	if (typeof projectPath !== "string" || !projectPath) return false;
+	const wanted = path.resolve(projectPath);
+	return projectStore.getProjects().some((p) => path.resolve(p.path) === wanted);
 }
 
-// ---------------------------------------------------------------------------
-// JSON file shape (mirrors Python CostEstimator.save_to_file)
-// ---------------------------------------------------------------------------
-
-interface RawUsage {
-	project_id: string;
-	provider: string;
-	model: string;
-	input_tokens: number;
-	output_tokens: number;
-	cost: number;
-	task_id: string;
-	agent_type: string;
-	phase: string;
-	spec_id: string;
-	timestamp: string;
-}
-
-interface RawBudget {
-	project_id: string;
-	limit: number;
-	currency: string;
-	warning_threshold: number;
-	critical_threshold: number;
-	period: string;
-}
-
-interface CostDataFile {
-	usages: RawUsage[];
-	budgets: Record<string, RawBudget>;
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function getCostDataPath(projectPath: string): string {
-	return path.join(projectPath, ".workpilot", "cost_data.json");
-}
-
-function loadCostData(projectPath: string): CostDataFile {
-	const filePath = getCostDataPath(projectPath);
-	if (!fs.existsSync(filePath)) {
-		return { usages: [], budgets: {} };
-	}
-	try {
-		const raw = fs.readFileSync(filePath, "utf-8");
-		return JSON.parse(raw) as CostDataFile;
-	} catch (err) {
-		logger.warn("[costs] Failed to parse cost_data.json", err);
-		return { usages: [], budgets: {} };
-	}
-}
-
-function saveCostData(projectPath: string, data: CostDataFile): void {
-	const filePath = getCostDataPath(projectPath);
-	fs.mkdirSync(path.dirname(filePath), { recursive: true });
-	fs.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf-8");
-}
-
-function getPeriodStart(period: string): Date | null {
-	const now = new Date();
-	if (period === "monthly") {
-		return new Date(now.getFullYear(), now.getMonth(), 1);
-	}
-	if (period === "weekly") {
-		const start = new Date(now);
-		start.setDate(now.getDate() - now.getDay());
-		start.setHours(0, 0, 0, 0);
-		return start;
-	}
-	return null; // 'total' — no filter
+/** The board's tasks of the project at `projectPath`, or none if it is not registered. */
+function boardTasks(projectPath: string) {
+	const wanted = path.resolve(projectPath);
+	const project = projectStore
+		.getProjects()
+		.find((p) => path.resolve(p.path) === wanted);
+	return project ? projectStore.getTasks(project.id) : [];
 }
 
 // ---------------------------------------------------------------------------
@@ -234,15 +147,15 @@ export function registerCostHandlers(): void {
 	 */
 	ipcMain.handle(IPC_CHANNELS.COSTS_GET_SUMMARY, async (_, projectPath: string) => {
 		try {
-			watchCostData(projectPath); // Start watching on first access
-			const data = loadCostData(projectPath);
+			watchLedgers(projectPath); // Start watching on first access
+			const usages = readUsages(projectPath);
 			const since30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 			const since60 = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000);
 
-			const recent = data.usages.filter(
+			const recent = usages.filter(
 				(u) => new Date(u.timestamp) >= since30,
 			);
-			const previous = data.usages.filter(
+			const previous = usages.filter(
 				(u) =>
 					new Date(u.timestamp) >= since60 && new Date(u.timestamp) < since30,
 			);
@@ -311,11 +224,10 @@ export function registerCostHandlers(): void {
 		IPC_CHANNELS.COSTS_GET_CONTEXT_USAGE,
 		async (_, projectPath: string, provider: string) => {
 			try {
-				watchCostData(projectPath);
-				const data = loadCostData(projectPath);
+				watchLedgers(projectPath);
 
-				let latest: RawUsage | null = null;
-				for (const u of data.usages) {
+				let latest: LedgerUsage | null = null;
+				for (const u of readUsages(projectPath)) {
 					if (u.provider !== provider) continue;
 					if (
 						latest === null ||
@@ -347,69 +259,13 @@ export function registerCostHandlers(): void {
 	);
 
 	/**
-	 * costs:getBudget — returns budget info for the current period
+	 * costs:getBudget — the project's budget and where it stands
+	 * (`cost-budget.ts`; the backend enforces the same file).
 	 */
 	ipcMain.handle(IPC_CHANNELS.COSTS_GET_BUDGET, async (_, projectPath: string) => {
 		try {
-			const data = loadCostData(projectPath);
-			// Use project path as key (same convention as Python CostEstimator)
-			const budget = data.budgets[projectPath];
-			if (!budget) {
-				return { success: false, error: "No budget configured" };
-			}
-
-			const periodStart = getPeriodStart(budget.period);
-			const relevant = periodStart
-				? data.usages.filter((u) => new Date(u.timestamp) >= periodStart)
-				: data.usages;
-
-			const spent = relevant.reduce((s, u) => s + u.cost, 0);
-			const remaining = Math.max(0, budget.limit - spent);
-			const utilizationPct =
-				budget.limit > 0 ? (spent / budget.limit) * 100 : 0;
-
-			// Forecast end-of-month
-			let forecastEndOfMonth = 0;
-			if (budget.period === "monthly") {
-				const now = new Date();
-				const daysInMonth = new Date(
-					now.getFullYear(),
-					now.getMonth() + 1,
-					0,
-				).getDate();
-				const dayOfMonth = now.getDate();
-				forecastEndOfMonth =
-					dayOfMonth > 0 ? (spent / dayOfMonth) * daysInMonth : 0;
-			}
-
-			// Build alert messages
-			const alerts: string[] = [];
-			const pct = utilizationPct / 100;
-			if (pct >= 1) {
-				alerts.push(
-					`Budget dépassé ! Dépensé $${spent.toFixed(2)} / $${budget.limit.toFixed(2)}`,
-				);
-			} else if (pct >= budget.critical_threshold) {
-				alerts.push(
-					`Critique : proche du plafond. Dépensé $${spent.toFixed(2)} / $${budget.limit.toFixed(2)} (${utilizationPct.toFixed(0)}%)`,
-				);
-			} else if (pct >= budget.warning_threshold) {
-				alerts.push(
-					`Attention : utilisation élevée. Dépensé $${spent.toFixed(2)} / $${budget.limit.toFixed(2)} (${utilizationPct.toFixed(0)}%)`,
-				);
-			}
-
-			return {
-				success: true,
-				budget: {
-					monthly_budget: budget.limit,
-					spent_this_month: spent,
-					remaining,
-					utilization_pct: utilizationPct,
-					alerts,
-					forecast_end_of_month: forecastEndOfMonth,
-				},
-			};
+			watchLedgers(projectPath);
+			return { success: true, budget: budgetStatus(projectPath) };
 		} catch (err) {
 			logger.error("[costs] getBudget failed", err);
 			return { success: false, error: String(err) };
@@ -417,64 +273,16 @@ export function registerCostHandlers(): void {
 	});
 
 	/**
-	 * dashboard:getSnapshot — reads {projectPath}/.workpilot/dashboard_snapshot.json
+	 * dashboard:getSnapshot — the project's tasks from the board, its spend,
+	 * QA, merges and build times from every ledger it keeps (root and task
+	 * workspaces, `workspace-ledgers.ts`).
 	 */
 	ipcMain.handle(IPC_CHANNELS.DASHBOARD_GET_SNAPSHOT, async (_, projectPath: string) => {
 		try {
-			watchDashboardSnapshot(projectPath); // Start watching on first access
-			const snapPath = path.join(
-				projectPath,
-				".workpilot",
-				"dashboard_snapshot.json",
-			);
-			if (!fs.existsSync(snapPath)) {
-				return {
-					success: true,
-					snapshot: {
-						tasks_by_status: {},
-						avg_completion_by_complexity: {},
-						qa_first_pass_rate: 0,
-						qa_avg_score: 0,
-						total_tokens: 0,
-						tokens_by_provider: {},
-						total_cost: 0,
-						cost_by_model: {},
-						merge_auto_count: 0,
-						merge_manual_count: 0,
-					},
-				};
-			}
-			const raw = fs.readFileSync(snapPath, "utf-8");
-			const snap = JSON.parse(raw);
-
-			// avg_completion_by_complexity may store arrays (list of durations) — convert to means
-			const avgCompletion: Record<string, number> = {};
-			for (const [complexity, val] of Object.entries(
-				snap.avg_completion_by_complexity || {},
-			)) {
-				if (Array.isArray(val)) {
-					const arr = val as number[];
-					avgCompletion[complexity] =
-						arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
-				} else {
-					avgCompletion[complexity] = val as number;
-				}
-			}
-
+			watchLedgers(projectPath); // Start watching on first access
 			return {
 				success: true,
-				snapshot: {
-					tasks_by_status: snap.tasks_by_status || {},
-					avg_completion_by_complexity: avgCompletion,
-					qa_first_pass_rate: snap.qa_first_pass_rate || 0,
-					qa_avg_score: snap.qa_avg_score || 0,
-					total_tokens: snap.total_tokens || 0,
-					tokens_by_provider: snap.tokens_by_provider || {},
-					total_cost: snap.total_cost || 0,
-					cost_by_model: snap.cost_by_model || {},
-					merge_auto_count: snap.merge_auto_count || 0,
-					merge_manual_count: snap.merge_manual_count || 0,
-				},
+				snapshot: buildDashboardSnapshot(projectPath, boardTasks(projectPath)),
 			};
 		} catch (err) {
 			logger.error("[dashboard] getSnapshot failed", err);
@@ -483,30 +291,42 @@ export function registerCostHandlers(): void {
 	});
 
 	/**
-	 * costs:setBudget — create/update budget for a project
+	 * costs:setBudget — the project's budget, revalidated here (`parseBudget`)
 	 */
 	ipcMain.handle(
 		IPC_CHANNELS.COSTS_SET_BUDGET,
-		async (
-			_,
-			projectPath: string,
-			limit: number,
-			period: string = "monthly",
-		) => {
+		async (_, projectPath: string, budget: unknown) => {
 			try {
-				const data = loadCostData(projectPath);
-				data.budgets[projectPath] = {
-					project_id: projectPath,
-					limit,
-					currency: "USD",
-					warning_threshold: 0.75,
-					critical_threshold: 0.9,
-					period,
-				};
-				saveCostData(projectPath, data);
-				return { success: true };
+				if (!isRegisteredProject(projectPath)) {
+					return { success: false, error: "Unknown project" };
+				}
+				return { success: true, budget: writeBudget(projectPath, budget) };
 			} catch (err) {
 				logger.error("[costs] setBudget failed", err);
+				return { success: false, error: String(err) };
+			}
+		},
+	);
+
+	/**
+	 * costs:setTaskBudget — one task's own limit (0 clears it), in every copy of
+	 * its spec directory. A task paused at its budget resumes once it is raised.
+	 */
+	ipcMain.handle(
+		IPC_CHANNELS.COSTS_SET_TASK_BUDGET,
+		async (_, projectId: string, taskId: string, amount: unknown) => {
+			try {
+				if (typeof projectId !== "string" || typeof taskId !== "string") {
+					return { success: false, error: "Invalid task" };
+				}
+				const { task, project } = findTaskAndProject(taskId, projectId);
+				if (!task || !project) return { success: false, error: "Task not found" };
+				const written = writeTaskBudget(allSpecDirs(getSpecPaths(task, project)), amount);
+				return written > 0
+					? { success: true }
+					: { success: false, error: "Task folder not found" };
+			} catch (err) {
+				logger.error("[costs] setTaskBudget failed", err);
 				return { success: false, error: String(err) };
 			}
 		},

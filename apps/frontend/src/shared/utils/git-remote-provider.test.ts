@@ -17,6 +17,8 @@ describe("gitRemoteHost", () => {
 describe("providerFromRemoteUrl", () => {
 	it("names the forge from the host", () => {
 		expect(providerFromRemoteUrl("git@github.com:o/r.git")).toBe("github");
+		expect(providerFromRemoteUrl("git@gitlab.com:g/p.git")).toBe("gitlab");
+		expect(providerFromRemoteUrl("https://gitlab.com/g/s/p")).toBe("gitlab");
 		expect(providerFromRemoteUrl("https://dev.azure.com/o/p/_git/r")).toBe(
 			"azure_devops",
 		);
@@ -28,6 +30,28 @@ describe("providerFromRemoteUrl", () => {
 		);
 	});
 
+	it("names Bitbucket Cloud from bitbucket.org or one of its subdomains", () => {
+		expect(providerFromRemoteUrl("git@bitbucket.org:ws/repo.git")).toBe("bitbucket");
+		expect(providerFromRemoteUrl("https://dev@bitbucket.org/ws/repo.git")).toBe(
+			"bitbucket",
+		);
+		expect(providerFromRemoteUrl("ssh://git@altssh.bitbucket.org:443/ws/repo.git")).toBe(
+			"bitbucket",
+		);
+	});
+
+	it("is not fooled by a spoofed Bitbucket host", () => {
+		for (const url of [
+			"https://bitbucket.org.evil.example/ws/repo",
+			"https://evil.example/bitbucket.org/ws/repo",
+			"https://notbitbucket.org/ws/repo",
+			"https://evil.example/?bitbucket.org/ws/repo",
+			"git@evilbitbucket.org:ws/repo.git",
+		]) {
+			expect(providerFromRemoteUrl(url)).toBe("unknown");
+		}
+	});
+
 	it("is not fooled by a forge name outside the host", () => {
 		expect(providerFromRemoteUrl("https://evil.example/github.com/o/r")).toBe(
 			"unknown",
@@ -36,6 +60,7 @@ describe("providerFromRemoteUrl", () => {
 			"unknown",
 		);
 		expect(providerFromRemoteUrl("https://notgithub.com/o/r")).toBe("unknown");
+		expect(providerFromRemoteUrl("https://gitlab.com.evil.example/g/p")).toBe("unknown");
 		expect(
 			providerFromRemoteUrl("https://evil.example/?dev.azure.com/o/p"),
 		).toBe("unknown");

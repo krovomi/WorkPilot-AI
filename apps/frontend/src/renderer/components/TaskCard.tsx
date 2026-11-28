@@ -3,11 +3,8 @@ import {
 	AlertTriangle,
 	Archive,
 	Ban,
-	Bug,
 	CheckCircle2,
 	Clock,
-	Copy,
-	FileCode,
 	FileText,
 	FlaskConical,
 	Gauge,
@@ -16,52 +13,45 @@ import {
 	Loader2,
 	Lock,
 	Monitor,
-	MoreVertical,
-	Palette,
 	Pause,
 	Play,
 	RotateCcw,
-	Shield,
 	ShieldAlert,
 	ShieldCheck,
 	Smartphone,
 	Square,
-	Target,
 	Undo2,
 	Users,
 	Wrench,
 	X,
 	XCircle,
-	type Zap,
 } from "lucide-react";
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { FlagBanner } from "./kanban/FlagBanner";
 import { AutomationBadge } from "./kanban/AutomationBadge";
+import { ApprovalTierBadge, shownApprovalTier } from "./approval-tiers/ApprovalTierBadge";
 import { ReviewLoadBadge, SplitPartBadge } from "./kanban/SplitPartBadge";
+import { SuitePlacementBadge, shownSuiteState } from "./suite-placement/SuitePlacementBadge";
 import { TaskLockBadge } from "./collaboration/TaskLockBadge";
 import { useFormatRelativeTime } from "@/hooks/useFormatRelativeTime";
+import { toast } from "../hooks/use-toast";
 import AzureDevOpsLogo from "../assets/logos/azure-devops.svg";
 import JiraLogo from "../assets/logos/jira.svg";
 import {
 	EXECUTION_PHASE_BADGE_COLORS,
-	EXECUTION_PHASE_LABELS,
+	EXECUTION_PHASE_LABEL_KEYS,
 	isExecutionPhaseActive,
 	JSON_ERROR_PREFIX,
 	JSON_ERROR_TITLE_SUFFIX,
-	TASK_CATEGORY_COLORS,
-	TASK_CATEGORY_LABELS,
 	TASK_COMPLEXITY_COLORS,
-	TASK_COMPLEXITY_LABELS,
 	TASK_IMPACT_COLORS,
-	TASK_IMPACT_LABELS,
 	TASK_PRIORITY_COLORS,
-	TASK_PRIORITY_LABELS,
-	TASK_STATUS_LABELS,
 } from "../../shared/constants";
 import type {
+	ExecutionPhase,
 	ReviewReason,
 	Task,
-	TaskCategory,
 	TaskStatus,
 } from "../../shared/types";
 import { isTaskEffectivelyComplete } from "../../shared/progress";
@@ -86,7 +76,17 @@ import { PhaseProgressIndicator } from "./PhaseProgressIndicator";
 import { TaskSandboxNotice } from "./task-sandbox/TaskSandboxNotice";
 import { SessionCompactionBadge } from "./SessionCompactionBadge";
 import { StreamingSessionButton } from "./streaming/StreamingSessionButton";
-import { TaskKindBadge } from "./task-detail/TaskKindBadge";
+import { CardLabels } from "./kanban/labels/CardLabels";
+import { CardTypeChip } from "./kanban/CardTypeChip";
+import { TaskCardPreview } from "./kanban/TaskCardPreview";
+import { sameRunFacts, TaskRunFactsRow } from "./kanban/TaskRunFacts";
+import {
+	contextMenuPoint,
+	isFromPortal,
+	type MenuPoint,
+} from "./kanban/PointerMenu";
+import { TaskCardMenus } from "./kanban/TaskCardMenus";
+import { InlineTitleEditor } from "./kanban/InlineTitleEditor";
 import { TaskPermissionPrompt } from "./task-permission/TaskPermissionPrompt";
 import { SyncFromBranchDialog } from "./task-detail/task-review/SyncFromBranchDialog";
 import { Badge } from "./ui/badge";
@@ -95,33 +95,15 @@ import { Card, CardContent } from "./ui/card";
 import { TaskEngineChip } from "./task-engine/TaskEngineChip";
 import { ContextGaugeMini } from "./task-detail/ContextGauge";
 import { FormulaBadge } from "./formula-lab/FormulaBadge";
-import { manualMoveTargets } from "../lib/kanban-columns";
 import { Checkbox } from "./ui/checkbox";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
+import { resolveCardType } from "../../shared/constants/card-types";
+import { installCardTypeStylesheet } from "../lib/card-type-tokens";
+import { useHoverPreview } from "../hooks/useHoverPreview";
+import { useInlineRename } from "../hooks/useInlineRename";
 import { useKanbanBlockerStore } from "../stores/kanban-blocker-store";
-import { openSmartEstimation } from "../stores/smart-estimation-store";
 import { useKanbanConflictStore } from "../stores/kanban-conflict-store";
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuItem,
-	DropdownMenuLabel,
-	DropdownMenuSeparator,
-	DropdownMenuTrigger,
-} from "./ui/dropdown-menu";
 
-// Category icon mapping
-const CategoryIcon: Record<TaskCategory, typeof Zap> = {
-	feature: Target,
-	bug_fix: Bug,
-	refactoring: Wrench,
-	documentation: FileCode,
-	security: Shield,
-	performance: Gauge,
-	ui_ux: Palette,
-	infrastructure: Wrench,
-	testing: FileCode,
-};
 
 // Catastrophic stuck detection interval (ms).
 // XState handles all normal process-exit transitions via PROCESS_EXITED events.
@@ -267,13 +249,14 @@ const TrackerBadge: React.FC<{ task: Task; t: TFunction }> = ({ task, t }) => {
 		return null;
 	}
 
-	const open = (e: React.MouseEvent) => {
-		e.stopPropagation();
-		if (url) {
-			// biome-ignore lint/suspicious/noExplicitAny: electronAPI shape is dynamic
-			(globalThis as any).electronAPI?.openExternal?.(url);
-		}
-	};
+	const href = url;
+	const open = href
+		? (e: React.MouseEvent) => {
+				e.stopPropagation();
+				// biome-ignore lint/suspicious/noExplicitAny: electronAPI shape is dynamic
+				(globalThis as any).electronAPI?.openExternal?.(href);
+			}
+		: undefined;
 
 	return (
 		<Badge
@@ -282,7 +265,7 @@ const TrackerBadge: React.FC<{ task: Task; t: TFunction }> = ({ task, t }) => {
 				"text-3xs px-1.5 py-0.5 flex w-fit items-center gap-1 bg-muted/40 text-muted-foreground border-border font-mono",
 				url && "cursor-pointer hover:bg-muted hover:text-foreground",
 			)}
-			onClick={url ? open : undefined}
+			onClick={open}
 			title={t("labels.openInTracker", { tracker: alt })}
 		>
 			<img src={logo} alt={alt} className="h-3 w-3" />
@@ -297,7 +280,7 @@ interface MetadataBadgesProps {
 	isStuck: boolean;
 	isIncomplete: boolean;
 	hasActiveExecution?: boolean;
-	executionPhase?: string;
+	executionPhase?: ExecutionPhase;
 	reviewReasonInfo: {
 		label: string;
 		variant: "success" | "destructive" | "warning";
@@ -322,6 +305,7 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 	// Unfinished dependencies for this card. Amber in `queue`, where the gate
 	// actually holds the task back; neutral elsewhere, where it is context.
 	const blockers = useKanbanBlockerStore((s) => s.blockers[task.id]);
+	const cardType = resolveCardType(task.metadata);
 
 	// Extract status badge variant and label for non-done tasks
 	let statusBadgeVariant:
@@ -347,13 +331,24 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 		statusBadgeLabel = getStatusLabel(task.status, t);
 	}
 
+	// A verdict or a blocker is worth a badge even on a card without metadata.
+	const hasVerdict =
+		task.verification?.status === "pass" ||
+		task.verification?.status === "fail" ||
+		!!task.crossReview ||
+		shownApprovalTier(task.approval) !== null ||
+		shownSuiteState(task) !== null;
+	const hasBlockers =
+		!!blockers && (blockers.pending.length > 0 || blockers.missing.length > 0);
 	if (
 		!task.metadata &&
 		!isStuck &&
 		!isIncomplete &&
 		!hasActiveExecution &&
 		!reviewReasonInfo &&
-		!conflict
+		!conflict &&
+		!hasVerdict &&
+		!hasBlockers
 	) {
 		return null;
 	}
@@ -442,8 +437,7 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 
 			{/* Task dependencies - unfinished blockers keep this ticket out of the
 			    auto-promotion loop while it sits in `queue`. */}
-			{blockers &&
-				(blockers.pending.length > 0 || blockers.missing.length > 0) && (
+			{blockers && hasBlockers && (
 					<Tooltip>
 						<TooltipTrigger asChild>
 							<Badge
@@ -541,7 +535,7 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 					)}
 				>
 					<Loader2 className="h-2.5 w-2.5 animate-spin" />
-					{EXECUTION_PHASE_LABELS[executionPhase]}
+					{t(EXECUTION_PHASE_LABEL_KEYS[executionPhase])}
 				</Badge>
 			)}
 
@@ -652,30 +646,18 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 				</Badge>
 			) : null}
 
+			{/* The approval tier of the green PR, and what it led to */}
+			<ApprovalTierBadge task={task} />
+
+			{/* Where the full suite runs when not simply here, then the CI's verdict */}
+			<SuitePlacementBadge task={task} />
+
 			{/* Part of a split task (or the task that was split) */}
 			<SplitPartBadge task={task} />
 			<ReviewLoadBadge task={task} />
 
-			{/* Kind of work (bug, hotfix, RUN…), decided without a model */}
-			<TaskKindBadge task={task} className="text-3xs px-1.5 py-0" />
-
-			{/* Category badge with icon */}
-			{task.metadata?.category && (
-				<Badge
-					variant="outline"
-					className={cn(
-						"text-3xs px-1.5 py-0",
-						TASK_CATEGORY_COLORS[task.metadata.category],
-					)}
-				>
-					{CategoryIcon[task.metadata.category] &&
-						(() => {
-							const Icon = CategoryIcon[task.metadata.category];
-							return <Icon className="h-2.5 w-2.5 mr-0.5" />;
-						})()}
-					{TASK_CATEGORY_LABELS[task.metadata.category]}
-				</Badge>
-			)}
+			{/* The card's one type (bug, hotfix, security…), coloured per theme */}
+			{cardType && <CardTypeChip resolved={cardType} />}
 
 			{/* Impact badge - high visibility for important tasks */}
 			{task.metadata?.impact &&
@@ -688,7 +670,9 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 							TASK_IMPACT_COLORS[task.metadata.impact],
 						)}
 					>
-						{TASK_IMPACT_LABELS[task.metadata.impact]}
+						{t(`tasks:form.classification.values.impact.${task.metadata.impact}`, {
+							defaultValue: task.metadata.impact,
+						})}
 					</Badge>
 				)}
 
@@ -701,7 +685,9 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 						TASK_COMPLEXITY_COLORS[task.metadata.complexity],
 					)}
 				>
-					{TASK_COMPLEXITY_LABELS[task.metadata.complexity]}
+					{t(`tasks:form.classification.values.complexity.${task.metadata.complexity}`, {
+							defaultValue: task.metadata.complexity,
+						})}
 				</Badge>
 			)}
 
@@ -716,7 +702,7 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 							TASK_PRIORITY_COLORS[task.metadata.priority],
 						)}
 					>
-						{TASK_PRIORITY_LABELS[task.metadata.priority]}
+						{t(`tasks:form.classification.values.priority.${task.metadata.priority}`)}
 					</Badge>
 				)}
 
@@ -729,7 +715,7 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 						TASK_IMPACT_COLORS[task.metadata.securitySeverity],
 					)}
 				>
-					{task.metadata.securitySeverity} {t("metadata.severity")}
+					{t(`metadata.securitySeverity.${task.metadata.securitySeverity}`)}
 				</Badge>
 			)}
 		</div>
@@ -751,9 +737,8 @@ interface ActionButtonsProps {
 	handleStartStop: (e: React.MouseEvent) => void;
 	handlePause: (e: React.MouseEvent) => void;
 	handleResume: (e: React.MouseEvent) => void;
-	handleViewPR: (e: React.MouseEvent) => void;
+	handleViewPR: (e: React.MouseEvent, prUrl: string) => void;
 	handleArchive: (e: React.MouseEvent) => void;
-	statusMenuItems: React.ReactNode;
 	// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
 	t: any;
 }
@@ -773,10 +758,9 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
 	handleResume,
 	handleViewPR,
 	handleArchive,
-	// biome-ignore lint/correctness/noUnusedFunctionParameters: parameter kept for API compatibility
-	statusMenuItems,
 	t,
 }) => {
+	const prUrl = task.metadata?.prUrl;
 	// A cooperatively-paused task (flag on disk) shows Reprendre instead of Pause.
 	const isPaused = task.metadata?.paused?.enabled === true;
 	// Compact Pause / Reprendre toggle reused by the active-task branches below.
@@ -833,7 +817,7 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
 
 	if (
 		(task.status === "done" || task.status === "pr_created") &&
-		task.metadata?.prUrl
+		prUrl
 	) {
 		return (
 			<div className="flex gap-1">
@@ -851,26 +835,21 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
 						<Monitor className="h-3 w-3" />
 					</Button>
 				)}
-				{task.metadata?.prUrl && (
-					<Button
-						variant="ghost"
-						size="sm"
-						className="h-7 w-7 p-0 cursor-pointer"
-						onClick={handleViewPR}
-						title={t("tooltips.viewPR")}
-					>
-						<GitPullRequest className="h-3 w-3" />
-					</Button>
-				)}
-				{task.metadata?.prUrl && onViewPRFiles && (
+				<Button
+					variant="ghost"
+					size="sm"
+					className="h-7 w-7 p-0 cursor-pointer"
+					onClick={(e) => handleViewPR(e, prUrl)}
+					title={t("tooltips.viewPR")}
+				>
+					<GitPullRequest className="h-3 w-3" />
+				</Button>
+				{onViewPRFiles && (
 					<Button
 						variant="outline"
 						size="sm"
 						className="h-7 w-7 p-0 hover:bg-primary/10 transition-colors"
-						onClick={() =>
-							task.metadata?.prUrl &&
-							onViewPRFiles(task.metadata.prUrl, task.id)
-						}
+						onClick={() => onViewPRFiles(prUrl, task.id)}
 						title={t("tooltips.viewPRFiles")}
 						aria-label={t("tooltips.viewPRFiles")}
 					>
@@ -1059,10 +1038,10 @@ const getStatusBadgeVariant = (
 };
 
 const getReviewReasonLabel = (
-	reason?: ReviewReason,
-	t?: TFunction,
+	reason: ReviewReason | undefined,
+	t: TFunction,
 ): { label: string; variant: "success" | "destructive" | "warning" } | null => {
-	if (!reason || !t) return null;
+	if (!reason) return null;
 	switch (reason) {
 		case "completed":
 			return { label: t("reviewReason.completed"), variant: "success" };
@@ -1082,8 +1061,7 @@ const getReviewReasonLabel = (
 };
 
 // biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-const getStatusLabel = (status: string, t?: any): string => {
-	if (!t) return status;
+const getStatusLabel = (status: string, t: any): string => {
 	switch (status) {
 		case "in_progress":
 			return t("labels.running");
@@ -1148,32 +1126,25 @@ function taskCardPropsAreEqual(
 	prevProps: TaskCardProps,
 	nextProps: TaskCardProps,
 ): boolean {
-	const prevTask = prevProps.task;
-	const nextTask = nextProps.task;
-
-	// Fast path: same reference (include selectable props)
+	// Every prop other than the task is a flag or a handler: a new one must
+	// re-render, or the card keeps calling the handler of an earlier render.
 	if (
-		prevTask === nextTask &&
-		prevProps.onClick === nextProps.onClick &&
-		prevProps.onStatusChange === nextProps.onStatusChange &&
-		prevProps.isSelectable === nextProps.isSelectable &&
-		prevProps.isSelected === nextProps.isSelected &&
-		prevProps.onToggleSelect === nextProps.onToggleSelect &&
-		prevProps.onViewPRFiles === nextProps.onViewPRFiles &&
-		prevProps.onDelete === nextProps.onDelete &&
-		prevProps.onDuplicate === nextProps.onDuplicate &&
-		prevProps.onPreviewApp === nextProps.onPreviewApp
-	) {
-		return true;
-	}
-
-	// Check selectable props first (cheap comparison)
-	if (
+		prevProps.onClick !== nextProps.onClick ||
+		prevProps.onStatusChange !== nextProps.onStatusChange ||
 		prevProps.isSelectable !== nextProps.isSelectable ||
-		prevProps.isSelected !== nextProps.isSelected
+		prevProps.isSelected !== nextProps.isSelected ||
+		prevProps.onToggleSelect !== nextProps.onToggleSelect ||
+		prevProps.onViewPRFiles !== nextProps.onViewPRFiles ||
+		prevProps.onDelete !== nextProps.onDelete ||
+		prevProps.onDuplicate !== nextProps.onDuplicate ||
+		prevProps.onPreviewApp !== nextProps.onPreviewApp
 	) {
 		return false;
 	}
+
+	const prevTask = prevProps.task;
+	const nextTask = nextProps.task;
+	if (prevTask === nextTask) return true;
 
 	// Compare only the fields that affect rendering
 	const isEqual =
@@ -1195,40 +1166,26 @@ function taskCardPropsAreEqual(
 		prevTask.metadata?.complexity === nextTask.metadata?.complexity &&
 		prevTask.metadata?.archivedAt === nextTask.metadata?.archivedAt &&
 		prevTask.metadata?.prUrl === nextTask.metadata?.prUrl &&
+		// The abandon and « Bloquée » banners.
+		prevTask.metadata?.abandoned === nextTask.metadata?.abandoned &&
+		prevTask.metadata?.abandonedResolution === nextTask.metadata?.abandonedResolution &&
+		prevTask.metadata?.flagged === nextTask.metadata?.flagged &&
+		prevTask.metadata?.flaggedReason === nextTask.metadata?.flaggedReason &&
+		// Pause / Reprendre on the card and in its menu.
+		prevTask.metadata?.paused?.enabled === nextTask.metadata?.paused?.enabled &&
 		// The engine chip: a resume on another LLM changes only these.
 		sameEngineFields(prevTask.metadata, nextTask.metadata) &&
 		prevTask.verification?.status === nextTask.verification?.status &&
 		prevTask.crossReview?.verdict === nextTask.crossReview?.verdict &&
 		prevTask.crossReview?.at === nextTask.crossReview?.at &&
+		prevTask.approval?.at === nextTask.approval?.at &&
 		prevTask.verification?.score === nextTask.verification?.score &&
+		// The finished card's run facts (time, spend, people).
+		sameRunFacts(prevTask, nextTask) &&
 		// Check if any subtask statuses changed (compare all subtasks)
 		prevTask.subtasks.every(
 			(s, i) => s.status === nextTask.subtasks[i]?.status,
 		);
-
-	// Only log when actually re-rendering (reduces noise significantly)
-	// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-	if ((globalThis as any).DEBUG && !isEqual) {
-		const changes: string[] = [];
-		if (prevTask.status !== nextTask.status)
-			changes.push(`status: ${prevTask.status} -> ${nextTask.status}`);
-		if (
-			prevTask.executionProgress?.phase !== nextTask.executionProgress?.phase
-		) {
-			changes.push(
-				`phase: ${prevTask.executionProgress?.phase} -> ${nextTask.executionProgress?.phase}`,
-			);
-		}
-		if (prevTask.subtasks.length !== nextTask.subtasks.length) {
-			changes.push(
-				`subtasks: ${prevTask.subtasks.length} -> ${nextTask.subtasks.length}`,
-			);
-		}
-
-		if (changes.length > 0) {
-			/* intentionally empty */
-		}
-	}
 
 	return isEqual;
 }
@@ -1250,7 +1207,10 @@ export const TaskCard = memo(function TaskCard({
 	const [isStuck, setIsStuck] = useState(false);
 	const [isRecovering, setIsRecovering] = useState(false);
 	const [showSyncDialog, setShowSyncDialog] = useState(false);
-	const stuckIntervalRef = useRef<NodeJS.Timeout | null>(null);
+	const [menuAt, setMenuAt] = useState<MenuPoint | null>(null);
+	const [isEditOpen, setIsEditOpen] = useState(false);
+	const closeMenu = useCallback(() => setMenuAt(null), []);
+	const openSyncDialog = useCallback(() => setShowSyncDialog(true), []);
 	const deleteButtonRef = useRef<HTMLButtonElement | null>(null);
 	const cardRef = useRef<HTMLDivElement | null>(null);
 
@@ -1271,12 +1231,16 @@ export const TaskCard = memo(function TaskCard({
 			setIsSpotlit(true);
 			clearJump();
 		}, 120);
-		const clearTimer = setTimeout(() => setIsSpotlit(false), 120 + 2200); // 3 × 0.7s animation
-		return () => {
-			clearTimeout(scrollTimer);
-			clearTimeout(clearTimer);
-		};
+		return () => clearTimeout(scrollTimer);
 	}, [jumpToTaskId, task.id, clearJump]);
+
+	// The spotlight fades on its own clock: clearJump() above re-runs the jump
+	// effect, whose cleanup used to cancel this timer and leave the card lit.
+	useEffect(() => {
+		if (!isSpotlit) return;
+		const clearTimer = setTimeout(() => setIsSpotlit(false), 2200); // 3 × 0.7s animation
+		return () => clearTimeout(clearTimer);
+	}, [isSpotlit]);
 
 	// Get project details from store to access projectPath
 	const projects = useProjectStore((state) => state.projects);
@@ -1326,6 +1290,13 @@ export const TaskCard = memo(function TaskCard({
 		}
 		return stripped;
 	}, [task.title, t]);
+	const rename = useInlineRename({
+		task,
+		// An agent at work owns the title; an error title carries a suffix.
+		canRename: !(isRunning && !isStuck) && !task.title.endsWith(JSON_ERROR_TITLE_SUFFIX),
+		onOpen: onClick,
+		focusCard: () => (cardRef.current as HTMLDivElement).focus(),
+	});
 
 	// Memoize relative time (recalculates only when updatedAt changes)
 	const relativeTime = useMemo(
@@ -1333,17 +1304,6 @@ export const TaskCard = memo(function TaskCard({
 		[task.updatedAt, formatRelativeTime],
 	);
 
-	// Memoize status menu items to avoid recreating on every render
-	const prUrl = task.metadata?.prUrl;
-	const statusMenuItems = useMemo(() => {
-		if (!onStatusChange) return null;
-		const targets = manualMoveTargets({ status: task.status, metadata: { prUrl } });
-		return targets.map((status) => (
-			<DropdownMenuItem key={status} onClick={() => onStatusChange(status)}>
-				{t(TASK_STATUS_LABELS[status])}
-			</DropdownMenuItem>
-		));
-	}, [task.status, prUrl, onStatusChange, t]);
 
 	// Catastrophic stuck detection — last-resort safety net.
 	// XState handles all normal transitions via PROCESS_EXITED events.
@@ -1351,14 +1311,10 @@ export const TaskCard = memo(function TaskCard({
 	useEffect(() => {
 		if (!isRunning) {
 			setIsStuck(false);
-			if (stuckIntervalRef.current) {
-				clearInterval(stuckIntervalRef.current);
-				stuckIntervalRef.current = null;
-			}
 			return;
 		}
 
-		stuckIntervalRef.current = setInterval(() => {
+		const stuckInterval = setInterval(() => {
 			// If any activity (status, progress, logs) was recorded recently, task is alive
 			if (hasRecentActivity(task.id)) {
 				setIsStuck(false);
@@ -1376,11 +1332,7 @@ export const TaskCard = memo(function TaskCard({
 			});
 		}, STUCK_CHECK_INTERVAL_MS);
 
-		return () => {
-			if (stuckIntervalRef.current) {
-				clearInterval(stuckIntervalRef.current);
-			}
-		};
+		return () => clearInterval(stuckInterval);
 	}, [task.id, isRunning]);
 
 	const handleStartStop = (e: React.MouseEvent) => {
@@ -1401,6 +1353,13 @@ export const TaskCard = memo(function TaskCard({
 		const result = await recoverStuckTask(task.id, { autoRestart: true });
 		if (result.success) {
 			setIsStuck(false);
+		} else {
+			// The card stays stuck: say why instead of only re-enabling the button.
+			toast({
+				variant: "destructive",
+				title: t("labels.recoverFailed"),
+				description: result.message,
+			});
 		}
 		setIsRecovering(false);
 	};
@@ -1417,13 +1376,9 @@ export const TaskCard = memo(function TaskCard({
 		}
 	};
 
-	const handleViewPR = (e: React.MouseEvent) => {
+	const handleViewPR = (e: React.MouseEvent, url: string) => {
 		e.stopPropagation();
-		// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-		if (task.metadata?.prUrl && (globalThis as any).electronAPI?.openExternal) {
-			// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-			(globalThis as any).electronAPI.openExternal(task.metadata.prUrl);
-		}
+		void globalThis.electronAPI.openExternal(url);
 	};
 
 	const handlePause = async (e: React.MouseEvent) => {
@@ -1436,21 +1391,15 @@ export const TaskCard = memo(function TaskCard({
 		await resumeTask(task.id);
 	};
 
-	const handleDelete = async (e: React.MouseEvent) => {
+	const handleDelete = (e: React.MouseEvent) => {
 		e.stopPropagation();
-		if (onDelete) {
-			onDelete();
-		}
-	};
-
-	const handleDuplicate = (e: React.MouseEvent) => {
-		e.stopPropagation();
-		onDuplicate?.();
+		onDelete?.();
 	};
 
 	const handleCardClick = (e: React.MouseEvent) => {
-		// Don't open task modal while sync dialog is open (prevents portal event leak)
-		if (showSyncDialog) return;
+		// Don't open task modal while a dialog or menu of the card is open
+		// (prevents portal event leak)
+		if (showSyncDialog || isEditOpen || menuAt || isFromPortal(e)) return;
 		// If delete functionality is available, don't open the task when clicking near the delete button
 		if (onDelete) {
 			// Get the click coordinates relative to the card
@@ -1459,6 +1408,8 @@ export const TaskCard = memo(function TaskCard({
 				return; // Don't open the task if clicking in the delete area
 			}
 		}
+		// A click on the title may be the first of a double-click (rename).
+		if (rename.onTitleClick(e)) return;
 		// Open task details on click
 		onClick();
 	};
@@ -1480,19 +1431,44 @@ export const TaskCard = memo(function TaskCard({
 	const isArchived = !!task.metadata?.archivedAt;
 	const isAbandoned = isTaskAbandoned(task);
 
+	// The card's colour family and its hover preview (lib/card-type-tokens.ts).
+	const cardType = useMemo(
+		() => resolveCardType(task.metadata),
+		[task.metadata],
+	);
+	const isBlocked = useKanbanBlockerStore(
+		(s) => (s.blockers[task.id]?.pending.length ?? 0) > 0,
+	);
+	const isFaded = !!cardType && (cardType.proposed || task.status === "done");
+	const preview = useHoverPreview(!showSyncDialog && !menuAt && !isEditOpen && !rename.isRenaming);
+	useEffect(() => {
+		installCardTypeStylesheet();
+	}, []);
+
 	// Check if task was imported from Azure DevOps
 	const isFromAzureDevOps = !!(
 		task.metadata?.azureDevOpsIdentifier || task.metadata?.azureDevOpsUrl
 	);
 
 	return (
+		<Tooltip open={preview.open} onOpenChange={preview.onOpenChange}>
+		<TooltipTrigger asChild {...preview.triggerProps}>
 		<Card
 			role="option"
 			aria-label={displayTitle}
+			data-card-type={cardType?.type}
+			data-card-faded={isFaded ? "" : undefined}
+			data-card-blocked={isBlocked ? "" : undefined}
 			aria-selected={isSelectable ? isSelected : undefined}
 			tabIndex={0}
 			onKeyDown={(e) => {
-				if (e.key === "Enter" || e.key === " ") {
+				// Only the card itself: a key typed in one of its buttons, menus
+				// or dialogs is theirs.
+				if (e.target !== e.currentTarget) return;
+				if (e.key === "F2") {
+					e.preventDefault();
+					rename.start();
+				} else if (e.key === "Enter" || e.key === " ") {
 					e.preventDefault();
 					onClick();
 				}
@@ -1514,9 +1490,15 @@ export const TaskCard = memo(function TaskCard({
 				isSpotlit && "ring-2 task-spotlight", // violet spotlight on jump-to
 			)}
 			onClick={handleCardClick}
+			onContextMenu={(e) => {
+				if (isFromPortal(e)) return;
+				e.preventDefault();
+				e.stopPropagation();
+				setMenuAt(contextMenuPoint(e, cardRef.current));
+			}}
 			onMouseDown={(e) => {
 				// Additional mouse down handler to catch events early
-				if (onDelete) {
+				if (onDelete && !isFromPortal(e)) {
 					const rect = cardRef.current?.getBoundingClientRect();
 					if (rect && isDeleteAreaMouseDown(e, rect)) {
 						e.preventDefault();
@@ -1533,7 +1515,9 @@ export const TaskCard = memo(function TaskCard({
 					<div className="relative z-10 mb-2 flex items-center gap-2 rounded-md border border-warning/30 bg-warning/10 px-2 py-1">
 						<Ban className="h-3.5 w-3.5 shrink-0 text-warning" />
 						<span className="text-2xs font-medium text-warning">
-							{t("tasks:abandon.badge")}
+							{task.metadata?.abandonedResolution
+								? t(`tasks:abandon.resolutions.${task.metadata.abandonedResolution}`)
+								: t("tasks:abandon.badge")}
 						</span>
 						<button
 							type="button"
@@ -1550,6 +1534,7 @@ export const TaskCard = memo(function TaskCard({
 						</button>
 					</div>
 				)}
+				{task.metadata?.flagged === true && <FlagBanner task={task} />}
 				{/* Delete button - positioned at the top right, outside the content flow */}
 				{onDelete && (
 					<Button
@@ -1568,9 +1553,13 @@ export const TaskCard = memo(function TaskCard({
 					</Button>
 				)}
 				<div className={cn(isSelectable ? "flex gap-2" : "w-full")}>
-					{/* Checkbox for selectable mode - stops event propagation */}
+					{/* Checkbox for selectable mode - stops event propagation. Shown
+					    on hover, on focus, or while the board has a selection. */}
 					{isSelectable && (
-						<div className="shrink-0 pt-0.5">
+						<div
+							className="kanban-card-check shrink-0 pt-0.5"
+							data-checked={isSelected ? "" : undefined}
+						>
 							<Checkbox
 								checked={isSelected}
 								onCheckedChange={onToggleSelect}
@@ -1590,28 +1579,34 @@ export const TaskCard = memo(function TaskCard({
 						{/* Server card: whose claim holds it (server mode) */}
 						<TaskLockBadge taskId={task.id} className="ml-1" />
 
-						{/* Title - full width, no wrapper */}
-						<h3
-							className={cn(
-								"mt-1 font-semibold text-sm text-foreground line-clamp-2 leading-snug",
-								// Leave room for the hover-only delete cross.
-								onDelete && "pr-5",
-							)}
-							title={displayTitle}
-						>
-							{displayTitle}
-						</h3>
+						{/* Title - full width, no wrapper; double-click or F2 renames */}
+						{rename.isRenaming ? (
+							<InlineTitleEditor initial={displayTitle} onDone={rename.finish} />
+						) : (
+							<h3
+								data-card-title
+								className={cn(
+									"mt-1 font-semibold text-sm text-foreground line-clamp-2 leading-snug",
+									// Leave room for the hover-only delete cross.
+									onDelete && "pr-5",
+								)}
+								title={displayTitle}
+							>
+								{displayTitle}
+							</h3>
+						)}
 
 						{/* Description - sanitized to handle markdown content (memoized) */}
 						{sanitizedDescription && (
 							<p
-								className="mt-1 text-xs text-muted-foreground line-clamp-2"
+								className="kanban-card-desc mt-1 text-xs text-muted-foreground line-clamp-2"
 								title={sanitizedDescription}
 							>
 								{sanitizedDescription}
 							</p>
 						)}
 
+						<CardLabels task={task} />
 						{/* Metadata badges */}
 						<MetadataBadges
 							task={task}
@@ -1622,6 +1617,9 @@ export const TaskCard = memo(function TaskCard({
 							reviewReasonInfo={reviewReasonInfo}
 							t={t}
 						/>
+
+						{/* Once done: agents' time, tokens and cost, creator and launcher */}
+						<TaskRunFactsRow task={task} />
 
 						{/* Azure DevOps pipeline badge (CI/CD loop) */}
 						<PipelineBadge task={task} t={t} />
@@ -1705,118 +1703,27 @@ export const TaskCard = memo(function TaskCard({
 									handleResume={handleResume}
 									handleViewPR={handleViewPR}
 									handleArchive={handleArchive}
-									statusMenuItems={statusMenuItems}
 									t={t}
 								/>
 
-								{/* More options menu - includes duplicate, pause/resume and status changes */}
-								{(statusMenuItems ||
-									isRunning ||
-									onDuplicate ||
-									task.metadata?.paused?.enabled) && (
-									<DropdownMenu>
-										<DropdownMenuTrigger asChild>
-											<Button
-												variant="ghost"
-												size="sm"
-												className="h-7 w-7 p-0"
-												onClick={(e) => e.stopPropagation()}
-												aria-label={t("actions.taskActions")}
-											>
-												<MoreVertical className="h-4 w-4" />
-											</Button>
-										</DropdownMenuTrigger>
-										<DropdownMenuContent
-											align="end"
-											onClick={(e) => e.stopPropagation()}
-										>
-											{/* Smart estimation - complexity score from build history,
-											    written back onto the task when it completes */}
-											<DropdownMenuItem
-												onClick={(e) => {
-													e.stopPropagation();
-													openSmartEstimation(
-														extractTextFromHtml(task.description) ||
-															task.description ||
-															task.title,
-														task.id,
-													);
-												}}
-											>
-												<Gauge className="mr-2 h-4 w-4" />
-												{t("actions.estimate")}
-											</DropdownMenuItem>
-											<DropdownMenuSeparator />
-
-											{/* Duplicate - clone the task into a fresh backlog ticket */}
-											{onDuplicate && (
-												<>
-													<DropdownMenuItem
-														onClick={(e) => {
-															e.stopPropagation();
-															handleDuplicate(e as React.MouseEvent);
-														}}
-													>
-														<Copy className="mr-2 h-4 w-4" />
-														{t("actions.duplicate")}
-													</DropdownMenuItem>
-													<DropdownMenuSeparator />
-												</>
-											)}
-											{/* Pause/Resume - show when task is running or paused */}
-											{(isRunning || task.metadata?.paused?.enabled) && (
-												<>
-													{task.metadata?.paused?.enabled ? (
-														<DropdownMenuItem
-															onClick={(e) => {
-																e.stopPropagation();
-																handleResume(e as React.MouseEvent);
-															}}
-														>
-															<Play className="mr-2 h-4 w-4" />
-															{t("actions.resume")}
-														</DropdownMenuItem>
-													) : (
-														<DropdownMenuItem
-															onClick={(e) => {
-																e.stopPropagation();
-																handlePause(e as React.MouseEvent);
-															}}
-														>
-															<Pause className="mr-2 h-4 w-4" />
-															{t("actions.pause")}
-														</DropdownMenuItem>
-													)}
-													<DropdownMenuSeparator />
-												</>
-											)}
-											{task.status !== "done" && (
-												<>
-													<DropdownMenuItem
-														onClick={(e) => {
-															e.stopPropagation();
-															e.preventDefault();
-															setShowSyncDialog(true);
-														}}
-													>
-														<GitMerge className="mr-2 h-4 w-4" />
-														{t("tasks:actions.syncFromBranch")}
-													</DropdownMenuItem>
-													<DropdownMenuSeparator />
-												</>
-											)}
-											{statusMenuItems && (
-												<>
-													<DropdownMenuLabel>
-														{t("actions.moveTo")}
-													</DropdownMenuLabel>
-													<DropdownMenuSeparator />
-													{statusMenuItems}
-												</>
-											)}
-										</DropdownMenuContent>
-									</DropdownMenu>
-								)}
+								<TaskCardMenus
+									task={task}
+									isRunning={isRunning}
+									isLocked={isRunning && !isStuck}
+									onOpen={onClick}
+									onStatusChange={onStatusChange}
+									onDuplicate={onDuplicate}
+									onDelete={onDelete}
+									onSync={
+										task.status !== "done" && currentProject?.path
+											? openSyncDialog
+											: undefined
+									}
+									contextMenuAt={menuAt}
+									onContextMenuClose={closeMenu}
+									editOpen={isEditOpen}
+									onEditOpenChange={setIsEditOpen}
+								/>
 							</div>
 						</div>
 						{/* Close content wrapper for selectable mode */}
@@ -1835,5 +1742,19 @@ export const TaskCard = memo(function TaskCard({
 				/>
 			)}
 		</Card>
+		</TooltipTrigger>
+		<TooltipContent
+			side="right"
+			align="start"
+			sideOffset={8}
+			className="pointer-events-none max-w-none"
+		>
+			<TaskCardPreview
+				task={task}
+				resolved={cardType}
+				statusLabel={getStatusLabel(task.status, t)}
+			/>
+		</TooltipContent>
+		</Tooltip>
 	);
 }, taskCardPropsAreEqual);

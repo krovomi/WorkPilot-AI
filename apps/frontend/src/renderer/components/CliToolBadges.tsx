@@ -4,7 +4,14 @@ import { ClaudeCodeStatusBadge } from "./ClaudeCodeStatusBadge";
 import { CodexCliStatusBadge } from "./CodexCliStatusBadge";
 import { CopilotCliStatusBadge } from "./CopilotCliStatusBadge";
 import { HermesStatusBadge } from "./HermesStatusBadge";
+import { ReaStatusBadge } from "./ReaStatusBadge";
 import { type CliPresence, type CliToolId, orderCliTools } from "./cli-tool-order";
+import {
+	CliUpdateAllButton,
+	type CliUpdateOffer,
+	type CliUpdateOffers,
+	type CliUpdateReporter,
+} from "./cli-update-all";
 
 interface CliToolBadgesProps {
 	readonly isCollapsed: boolean;
@@ -22,6 +29,7 @@ export const CLI_TOOLS: readonly CliToolId[] = [
 	"pi",
 	"gemini-cli",
 	"hermes",
+	"rea",
 ];
 
 /**
@@ -29,7 +37,9 @@ export const CLI_TOOLS: readonly CliToolId[] = [
  * ones first (an update available still counts as installed), then the
  * missing ones, each group in alphabetical order. Each badge runs its own
  * check and reports the answer here; keyed children move without remounting,
- * so an open popover or a running install survives a reorder.
+ * so an open popover or a running install survives a reorder. Each badge
+ * with a newer release also hands its own update to the panel, whose foot
+ * then offers to run them all.
  */
 export function CliToolBadges({
 	isCollapsed,
@@ -51,10 +61,30 @@ export function CliToolBadges({
 		[],
 	);
 
+	const [offers, setOffers] = useState<CliUpdateOffers>({});
+	const updateReporters = useMemo(
+		() =>
+			Object.fromEntries(
+				CLI_TOOLS.map((id) => [
+					id,
+					(next: CliUpdateOffer | null) =>
+						setOffers((prev) => {
+							if ((prev[id] ?? null) === next) return prev;
+							const copy: Partial<Record<CliToolId, CliUpdateOffer>> = { ...prev };
+							if (next) copy[id] = next;
+							else delete copy[id];
+							return copy;
+						}),
+				]),
+			) as Record<CliToolId, CliUpdateReporter>,
+		[],
+	);
+
 	const ordered = orderCliTools(CLI_TOOLS, presence);
 
 	const renderBadge = (id: CliToolId) => {
 		const onPresenceChange = reporters[id];
+		const onUpdateChange = updateReporters[id];
 		switch (id) {
 			case "claude-code":
 				return (
@@ -63,6 +93,7 @@ export function CliToolBadges({
 						onNavigateToTerminals={onNavigateToTerminals}
 						isCollapsed={isCollapsed}
 						onPresenceChange={onPresenceChange}
+						onUpdateChange={onUpdateChange}
 					/>
 				);
 			case "copilot":
@@ -72,15 +103,16 @@ export function CliToolBadges({
 						onNavigateToTerminals={onNavigateToTerminals}
 						isCollapsed={isCollapsed}
 						onPresenceChange={onPresenceChange}
+						onUpdateChange={onUpdateChange}
 					/>
 				);
 			case "codex":
 				return (
 					<CodexCliStatusBadge
 						key={id}
-						onNavigateToTerminals={onNavigateToTerminals}
 						isCollapsed={isCollapsed}
 						onPresenceChange={onPresenceChange}
+						onUpdateChange={onUpdateChange}
 					/>
 				);
 			case "hermes":
@@ -89,7 +121,12 @@ export function CliToolBadges({
 						key={id}
 						isCollapsed={isCollapsed}
 						onPresenceChange={onPresenceChange}
+						onUpdateChange={onUpdateChange}
 					/>
+				);
+			case "rea":
+				return (
+					<ReaStatusBadge key={id} isCollapsed={isCollapsed} onPresenceChange={onPresenceChange} />
 				);
 			default:
 				return (
@@ -98,6 +135,7 @@ export function CliToolBadges({
 						tool={id}
 						isCollapsed={isCollapsed}
 						onPresenceChange={onPresenceChange}
+						onUpdateChange={onUpdateChange}
 					/>
 				);
 		}
@@ -106,6 +144,7 @@ export function CliToolBadges({
 	return (
 		<div className="rounded-lg bg-white/4 border border-white/8 p-2 space-y-0.5 overflow-hidden">
 			{ordered.map(renderBadge)}
+			<CliUpdateAllButton order={ordered} offers={offers} />
 		</div>
 	);
 }

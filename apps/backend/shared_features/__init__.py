@@ -2,15 +2,24 @@
 (``shared_board``) and, declared in ``registry``, its roadmap, its ideation,
 its index and the views that follow, as their files on the server's clone and
 their runners as jobs; its Insights conversations (``insights``); its
-memories (``context``); its GitHub repository or GitLab project, with each
+memories (``context``), with their journal, trash and pins
+(``context_lifecycle``); its GitHub repository or GitLab project, with each
 person's own token (``forge``, ``forge_gitlab``), and the AI review of its
-pull or merge requests as a job on the clone (``forge_review``); its analyses
+pull or merge requests as a job on the clone (``forge_review``), with the
+feedback on their findings (``forge_review_feedback``); its analyses
 (accessibility, i18n, documentation drift, flaky tests, technical debt) as
 jobs whose reports every member reads (``analyses``), its changelog among
 them, with the branches, tags and commits it is chosen from (``changelog``);
 its dashboard, analytics, sessions and costs, computed from its runs, its jobs and the
 ledgers its agents keep in the clone (``workspace``, ``usage_ledger``); its
-automation rules, run by the server process (``automations``).
+automation rules, run by the server process (``automations``); the agent
+sessions its members share with it, behind links that expire
+(``replay_shares``); Pixel Office's leaderboard and each person's badges
+(``pixel_office``); its agents' governance: the policy, the audit trail its
+agents write in the clone, the approvals they wait on and its kill switch
+(``governance``); its team's security reviews of catalogue MCP servers
+(``mcp_reviews``); the execution waves of its backlog and the run that starts
+them in that order (``execution_waves``, ``waves``).
 
 See ``docs/architecture/server-mode.md``.
 """
@@ -26,25 +35,39 @@ def mount_all(mount: Callable[[APIRouter, str], None]) -> None:
     """Mount each router with ``mount``, naming the feature its permission
     derives from (``server.authz.catalog.FEATURE_DOMAINS``)."""
     from shared_board.api import router as board
+    from shared_board.approvals import router as board_approvals
+    from shared_board.ask import router as board_ask
     from shared_board.engines import router as board_engines
     from shared_board.mcp_http import router as board_mcp_http
+    from shared_board.sprints import router as board_sprints
     from shared_features.analyses import router as analyses
     from shared_features.api import feature_router
     from shared_features.automations.api import router as automations
     from shared_features.changelog import router as changelog
     from shared_features.context import router as context
+    from shared_features.context_lifecycle import router as context_lifecycle
+    from shared_features.execution_waves import router as execution_waves
     from shared_features.forge import router as forge
     from shared_features.forge_gitlab import router as forge_gitlab
     from shared_features.forge_review import GITHUB, GITLAB
+    from shared_features.forge_review_feedback import router as review_feedback
+    from shared_features.governance import router as governance
     from shared_features.ideation import router as ideation
     from shared_features.insights import router as insights
+    from shared_features.mcp_reviews import router as mcp_reviews
+    from shared_features.pixel_office import router as pixel_office
     from shared_features.registry import FEATURES
+    from shared_features.replay_share_overview import router as replay_overview
+    from shared_features.replay_shares import router as replay_shares
     from shared_features.roadmap import router as roadmap
     from shared_features.workspace import router as workspace
 
     mount(board, "board")
+    mount(board_approvals, "board")
+    mount(board_ask, "board")
     mount(board_engines, "board")
     mount(board_mcp_http, "board")
+    mount(board_sprints, "board")
     mount(automations, "board")
     for feature in FEATURES.values():
         mount(feature_router(feature), feature.key)
@@ -52,10 +75,18 @@ def mount_all(mount: Callable[[APIRouter, str], None]) -> None:
     mount(ideation, "ideation")
     mount(insights, "insights")
     mount(context, "context")
+    mount(context_lifecycle, "context")
     mount(forge, "forge")
     mount(forge_gitlab, "forge")
     mount(GITHUB.router, "forge")
+    mount(review_feedback, "forge")
     mount(GITLAB.router, "forge")
     mount(analyses, "analyses")
     mount(changelog, "analyses")
     mount(workspace, "workspace")
+    mount(replay_shares, "replay_shares")
+    mount(pixel_office, "pixel_office")
+    mount(replay_overview, "replay_shares")
+    mount(governance, "governance")
+    mount(mcp_reviews, "mcp_reviews")
+    mount(execution_waves, "execution_waves")

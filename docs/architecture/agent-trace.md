@@ -1,3 +1,10 @@
+---
+feature: Attribuer les lignes écrites par l'IA
+summary: >-
+  Un *trace record* Agent Trace v0.1 par session de coder dans `agent-trace.jsonl`, plages tirées
+  de `git diff` (tous providers) ; non-commité = `human`, introuvable = `unknown`, jamais devinée.
+---
+
 # Agent Trace: who wrote each line of a task
 
 > Rationale for `apps/backend/agent_trace/`. The normative summary is the row in

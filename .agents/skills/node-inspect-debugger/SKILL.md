@@ -23,8 +23,8 @@ metadata:
     - python-debugpy
   workpilot:
     pack: hermes
-    version: 0.1.0
-    content_sha256: 301eb7cd5c180bb2cf86c5dad402c3ef0a3a2200d69d5c246570186f05ca4851
+    version: 0.3.0
+    content_sha256: c3ad579c84deaacd080ccaa5652319561474024fb66b43f8f5bff31af31d10bb
 ---
 
 # Node.js Inspect Debugger
@@ -196,11 +196,11 @@ The TUI is built Ink + tsx. Two common scenarios:
 
 ### Debugging a single Ink component under dev
 
-`ui-tui/package.json` has `npm run dev` (tsx --watch). Add `--inspect-brk` by running tsx directly:
+`ui-tui/package.json` has `pnpm run dev` (tsx --watch). Add `--inspect-brk` by running tsx directly:
 
 ```bash
 cd <hermes-agent-repo>/ui-tui
-npm run build    # produce dist/ once so transpile isn't needed on first load
+pnpm run build   # produce dist/ once so transpile isn't needed on first load
 node --inspect-brk dist/entry.js
 # In another terminal:
 node inspect -p <node pid>

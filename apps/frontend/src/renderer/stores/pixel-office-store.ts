@@ -10,6 +10,12 @@ import type {
 	SubtaskState as SwarmSubtaskState,
 } from "../../shared/types/swarm";
 import type { ExecutionPhase, Task } from "../../shared/types/task";
+import {
+	type ProviderFamily,
+	taskProviderFamily,
+} from "../lib/pixel-office-providers";
+import type { DecorId } from "../lib/pixel-office-seasons";
+import { type AgentSkin, savedHiddenDecor, savedSkin } from "../lib/pixel-office-skins";
 import { getDisplayProgress } from "../lib/utils";
 import type { Terminal } from "./terminal-store";
 
@@ -37,6 +43,8 @@ export interface PixelAgent {
 	activity: AgentActivity; // Current visual activity
 	seatIndex: number; // Which desk the agent sits at (NO_SEAT when queued)
 	isClaudeMode: boolean; // Whether in Claude mode (terminals) / always true for tasks
+	/** The provider family running it (its shirt colour); none when unknown. */
+	providerFamily?: ProviderFamily;
 	// Task-specific fields
 	taskId?: string; // Kanban task ID (for type === 'task')
 	phase?: ExecutionPhase; // Current execution phase
@@ -44,8 +52,6 @@ export interface PixelAgent {
 	currentSubtask?: string; // Current subtask description
 	// Terminal-specific fields
 	taskName?: string; // Associated task name (for speech bubble)
-	speechBubble?: string; // Text to show in canvas speech bubble
-	speechBubbleTimer?: number; // Auto-dismiss timer
 	// Waiting queue fields
 	waitingIndex?: number; // Position in the waiting queue (pending/planning tasks only)
 	// Swarm fields
@@ -58,6 +64,16 @@ export interface PixelOfficeSettings {
 	showGrid: boolean;
 	soundEnabled: boolean;
 	autoAssignSeats: boolean;
+	/** Calm mode: the characters and the queue hold still (TV mode's switch). */
+	calmMode: boolean;
+	/** Mini-scenes when a task changes hands (written from templates). */
+	narratives: boolean;
+	/** Have the page's model write the scenes (sends the task's title to it). */
+	narrativesAi: boolean;
+	/** How the characters are dressed (`lib/pixel-office-skins.ts`). */
+	agentSkin: AgentSkin;
+	/** Earned decor the person chose not to show. */
+	hiddenDecor: DecorId[];
 }
 
 /**
@@ -134,28 +150,23 @@ interface PixelOfficeState {
 	// Actions
 	syncAll: (terminals: Terminal[], tasks: Task[]) => void;
 	/** Sync swarm agents from wave/subtask data */
-	syncSwarmAgents: (
-		nodes: Record<string, SubtaskNode>,
-		currentWave?: number,
-	) => void;
+	syncSwarmAgents: (nodes: Record<string, SubtaskNode>) => void;
 	/** Drop every swarm character (the run ended, or swarm mode was turned off) */
 	clearSwarmAgents: () => void;
-	/** @deprecated use syncAll */
-	syncFromTerminals: (terminals: Terminal[]) => void;
 	selectAgent: (id: string | null) => void;
 	/** Move the selection to the next/previous seated agent (keyboard nav) */
 	cycleSelection: (direction: 1 | -1) => string | null;
 	updateSettings: (updates: Partial<PixelOfficeSettings>) => void;
-	setSpeechBubble: (agentId: string, text: string | undefined) => void;
 }
 
 // ── Activity mapping ──────────────────────────────────────────
 
+/** A terminal that has exited leaves the room: `syncAll` never maps one. */
 function mapTerminalToActivity(terminal: Terminal): AgentActivity {
-	if (terminal.status === "exited") return "exited";
 	if (terminal.isClaudeBusy) return "typing";
+	// Busy was answered above: a Claude session that is not busy waits on you.
 	if (terminal.isClaudeMode && terminal.status === "claude-active") {
-		return terminal.isClaudeBusy ? "typing" : "waiting";
+		return "waiting";
 	}
 	if (terminal.status === "running") return "running";
 	return "idle";
@@ -275,6 +286,11 @@ function shortTitle(title: string): string {
 	return title.length > 40 ? `${title.slice(0, 39)}…` : title;
 }
 
+/** A terminal in Claude mode runs Claude Code; any other names no provider. */
+function terminalFamily(terminal: Terminal): ProviderFamily | undefined {
+	return terminal.isClaudeMode ? "anthropic" : undefined;
+}
+
 function buildTerminalAgent(
 	terminal: Terminal,
 	existing: PixelAgent | undefined,
@@ -290,6 +306,7 @@ function buildTerminalAgent(
 			fullName: terminal.title,
 			activity,
 			isClaudeMode: terminal.isClaudeMode,
+			providerFamily: terminalFamily(terminal),
 		};
 	}
 	return {
@@ -301,6 +318,7 @@ function buildTerminalAgent(
 		activity,
 		seatIndex: NO_SEAT,
 		isClaudeMode: terminal.isClaudeMode,
+		providerFamily: terminalFamily(terminal),
 	};
 }
 
@@ -345,6 +363,7 @@ function buildTaskAgent(
 			activity,
 			...progress,
 			isClaudeMode: !isPending,
+			providerFamily: taskProviderFamily(task),
 			taskId: task.id,
 		};
 	}
@@ -357,6 +376,7 @@ function buildTaskAgent(
 		activity,
 		seatIndex: NO_SEAT,
 		isClaudeMode: !isPending,
+		providerFamily: taskProviderFamily(task),
 		taskId: task.id,
 		taskName: task.title,
 		...progress,
@@ -396,6 +416,11 @@ const DEFAULT_SETTINGS: PixelOfficeSettings = {
 	showGrid: false,
 	soundEnabled: false,
 	autoAssignSeats: true,
+	calmMode: false,
+	narratives: true,
+	narrativesAi: false,
+	agentSkin: "provider",
+	hiddenDecor: [],
 };
 
 export const usePixelOfficeStore = create<PixelOfficeState>()(
@@ -476,11 +501,6 @@ export const usePixelOfficeStore = create<PixelOfficeState>()(
 				set({ agents: allocateSeats(remaining.map((a) => ({ ...a }))) });
 			},
 
-			/** @deprecated use syncAll */
-			syncFromTerminals: (terminals: Terminal[]) => {
-				get().syncAll(terminals, []);
-			},
-
 			selectAgent: (id) => set({ selectedAgentId: id }),
 
 			cycleSelection: (direction) => {
@@ -506,12 +526,6 @@ export const usePixelOfficeStore = create<PixelOfficeState>()(
 			updateSettings: (updates) =>
 				set((state) => ({ settings: { ...state.settings, ...updates } })),
 
-			setSpeechBubble: (agentId, text) =>
-				set((state) => ({
-					agents: state.agents.map((a) =>
-						a.id === agentId ? { ...a, speechBubble: text } : a,
-					),
-				})),
 		}),
 		{
 			name: "pixel-office-settings",
@@ -519,14 +533,22 @@ export const usePixelOfficeStore = create<PixelOfficeState>()(
 			// them would restore a room full of characters whose terminals are long
 			// gone. Only the view preferences survive a restart.
 			partialize: (state) => ({ settings: state.settings }),
-			merge: (persisted, current) => ({
-				...current,
-				settings: {
-					...DEFAULT_SETTINGS,
-					...((persisted as { settings?: Partial<PixelOfficeSettings> } | null)
-						?.settings ?? {}),
-				},
-			}),
+			merge: (persisted, current) => {
+				const saved =
+					(persisted as { settings?: Partial<PixelOfficeSettings> } | null)
+						?.settings ?? {};
+				return {
+					...current,
+					settings: {
+						...DEFAULT_SETTINGS,
+						...saved,
+						// Sending titles to a model is opt-in: only a saved `true` turns it on.
+						narrativesAi: saved.narrativesAi === true,
+						agentSkin: savedSkin(saved.agentSkin),
+						hiddenDecor: savedHiddenDecor(saved.hiddenDecor),
+					},
+				};
+			},
 		},
 	),
 );

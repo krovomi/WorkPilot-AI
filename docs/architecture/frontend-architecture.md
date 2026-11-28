@@ -1,3 +1,9 @@
+---
+feature: Architecture frontend
+summary: >-
+  Stores, activité de fond et barre latérale, agents, profils, terminaux, liens d'auth.
+---
+
 # Frontend architecture
 
 > Design rationale moved verbatim out of [`docs/CLAUDE.md`](../CLAUDE.md),
@@ -14,7 +20,10 @@
 - `github/issues-store.ts`, `github/pr-review-store.ts` — GitHub integration
 - `insights-store.ts`, `roadmap-store.ts`, `kanban-settings-store.ts`
 - `self-healing-store.ts` — Incident management and production response
-- `pixel-office-store.ts` — Multi-agent Pixel Office visualization
+- `pixel-office-store.ts` — Multi-agent Pixel Office visualization. The task bubble's log (`pixel-office/use-agent-log-lines.ts`) is the
+  task's phase log, local or server, loaded on open and watched while it stays open, with the
+  live output only until that log has an entry; the watch is shared with the task panel
+  (`lib/task-log-watch.ts`), so closing one view does not silence the other
 - `learning-loop-store.ts` — Learning analytics
 - `app-emulator-store.ts` — App preview/emulator
 - `arena-store.ts` — Model comparison arena
@@ -117,6 +126,7 @@ id changes.
 | the command palette lists a hub's tabs, matched by their own name or the hub's | "replay" finds Agent Replay, not a hub whose name says nothing about it |
 | `HubTabList` follows the WAI-ARIA tabs pattern: one tab in the tab order, arrows, Home and End move, Enter or Space opens; activation is manual | a tab is a whole page: moving the focus does not load one |
 | `HubMain` has the same tree with or without a hub | entering a hub does not remount what the main area keeps alive (the terminals) |
+| `HubMain` wraps the view on screen in one `ErrorBoundary` whose `resetKey` is the active view | a page that throws shows an error card in the main area instead of blanking the window; choosing another page clears it without remounting the views kept alive (a caught error does replace them until then) |
 
 Formula Lab stays outside the costs hub: it chooses the engine of one card
 and needs that card, so it opens from the card. Change Preview (`sandbox`),
@@ -137,6 +147,7 @@ The menu had grown to 61 entries for 77 pages, and people got lost in it
 | the pages opened last come first, from `view-usage-store` (local to the machine) | the page you come back to is one key away |
 | the sidebar's search field, `/` and Ctrl+K open the palette (`stores/command-palette-store.ts`) | one search, which knows every page, instead of a filter of the visible labels |
 | « Outils CLI » is a chip at the foot of the menu (`sidebar/CliToolsChip.tsx`): « CLI 1/8 » and a dot, opening the same badges above it; the badges stay mounted while closed | the panel was always open and took 320 px of a 1000 px window, leaving 420 px for the menu; mounted, the checks still run and the count is right |
+| « Tout mettre à jour (N) » at the panel's foot (`cli-update-all.tsx`): each badge hands the panel its own update (`useReportCliUpdate`) while a newer release is known; the button runs them one after the other, « Mise à jour 2/3… », and hides when none is left | one click instead of one per CLI, with no second update path: the badge's own handler runs, so its chip spins and its popover keeps the error. One at a time because two package managers writing the same global folder can break both; a failure skips to the next and the button comes back with what is left |
 | rows show the icon, the name and the activity badge; the two-letter shortcut moves to the hover title, the drag grip shows on hover; group headers are plain titles; long names were shortened (« Tests instables », « Train de release ») | most names were cut (« Contrôle de … ») by the grip, the shortcut and the counter |
 
 Lot 2 splits the menu in two levels: a rail of spaces and a panel that lists
@@ -152,6 +163,7 @@ one space.
 | while nothing is pinned and no choice was made, « Mon menu » asks once: « Essentiel » pins `ESSENTIAL_VIEWS` (10 stable pages) and hides the beta views, « Complet » keeps everything (`sidebarPrefs.menuMode`); resetting the layout asks again | a short menu by default would hide pages people use; asking in the menu, not in the wizard, lets them answer once they see it |
 | the rail and the panel share one `DndContext`: a group dragged on the rail reorders the spaces, a page or a group dropped on the star is pinned; collision tries the pointer first (`pointerFirst`) | the star is small, the nearest centre alone picked a row of the panel. The old drop zone never pinned: its id `__fav_drop__` has no kind, so the drag-end handler decoded it to nothing and stopped |
 | the stored `sidebarWidth` is the whole menu, rail included (default 296 px, minimum 240) | a width saved before the rail still gives a usable panel |
+| the menu's right edge is a focusable separator (`sidebar/SidebarResizeHandle.tsx`, rules in `sidebar/sidebar-width.ts`, state in `sidebar/use-sidebar-resize.ts`): a drag previews the width and saves it once on release, Escape cancels; dragged 72 px under the minimum it folds the panel (the saved width is kept), dragged out of the rail it unfolds; a double-click restores 296 px; arrows (Shift for 64 px), Home, End resize and Enter folds, saved on key release; the width never exceeds 480 px nor leaves the main view under 560 px | the old edge was a 4 px strip with no sign, mouse only: nobody found it. The pointer is captured and a sheet covers the window once it moves, so a terminal or a web view never swallows the drag; the sheet waits for a move so a double-click still lands on the edge |
 
 Lot 3 tidies what the spaces list.
 
@@ -160,6 +172,16 @@ Lot 3 tidies what the spaces list.
 | the Toolbox's families are four more hubs (`sidebar/hubs.ts`): Quality and security, Accessibility and i18n, API, Automation; its sub-group headers are gone, and with them `NavItem.subGroup` | 20 entries became 9. A hub keeps each page's id and shortcut, so links, pins and the palette are unchanged; a dialog tool (dependency sentinel, app emulator) is a tab that offers to open it (`HubLauncher`) |
 | while a page is in beta (`EXPERIMENTAL_VIEWS`) its entry leaves its group for the Labo, the flask at the foot of the rail, with a count; the Labo lists every beta page, a hub's beta tab included, one card each with what it does (`navigation:labo.about.*`, `LaboPanel`) | stable pages are no longer mixed with trials. The move is computed (`railGroupsOf`, `laboItemsOf`), not written in `nav-model.ts`: a page out of beta is back at its place with no other change. Hiding the beta views hides the Labo |
 | a space's entries not opened for 30 days are offered for hiding (`unusedEntries`), never hidden by the app; nothing is offered before the usage count (`view-usage-store`, local) is 30 days old, nor a pinned entry; « Plus tard » puts the offer off for 30 days | the user decides what goes, from what they actually use. A hidden page stays in Ctrl K, in « Mon menu » if pinned, and under « Pages masquées » in its space to show it again; resetting the layout shows everything |
+
+Each person arranges their own menu (« Personnaliser le menu »).
+
+| Decision | Why |
+|---|---|
+| the rules live in `sidebar/menu-layout.ts`, pure: `applyMenuLayout` moves each page to the space chosen (`sidebarPrefs.itemGroups`, page id → group id), then orders the spaces (`groupOrder`) and the pages of each (`itemOrder`); an id the code no longer ships is dropped, a new one keeps its shipped place after the user's | adding or removing a page needs no settings migration; a page moved back to its shipped space forgets the move instead of storing it |
+| one `DndContext` routes every drop (`sidebar/use-menu-dnd.ts`): page onto page reorders its space, page onto a space of the rail moves it there (the icon lights up), page or space onto the star pins it, pin onto pin (`pin:<id>`) reorders « Mon menu », space onto space reorders the rail | the drag is the quick way and reads like what it does; a page of a pinned group follows its group and has no grip |
+| « Personnaliser le menu » (`sidebar/MenuCustomizer.tsx`) keeps the grips shown and adds, on each row, up, down and « Déplacer vers… » (every other space), and for the space shown its place in the rail; « Rétablir l'ordre d'origine » clears the three order fields only | nothing needs a pointer. Up and down move among the pages on screen, so a hidden page or one in the Labo keeps its place between them. The full « Réinitialiser la disposition » still clears pins, hidden pages and the menu mode |
+| a grip taken from the keyboard (Space or Enter, arrows, Space to drop, Escape to cancel) is announced in the app's language (`navigation:customize.announce.*`) | dnd-kit's own announcements are English only |
+| in server mode the layout (orders, moves, pins, hidden pages; not the space open) follows the person: read at connection, sent when it changes (`main/server-menu-layout.ts`, `GET/PUT /users/me/preferences/menu`), checked by `shared/utils/menu-layout.ts` both ways and by the server | two people on one server each keep their own menu, and one person finds theirs on every desktop |
 
 ## Agent Management (`src/main/agent/`)
 
@@ -175,6 +197,7 @@ Multi-profile credential management for switching between Claude accounts:
 - **`credential-utils.ts`** — OS credential storage (Keychain/Windows Credential Manager)
 - **`token-refresh.ts`** — OAuth token lifecycle and automatic refresh
 - **`usage-monitor.ts`** — API usage tracking and rate limiting per profile
+- **`usage-plan.ts`** — the plan of the account each usage snapshot shows (Claude Max 20x, ChatGPT Plus, Copilot Pro+, an API key billed per use…), added on the way to the renderer by `terminal-handlers.ts`; local sources, except the Claude plan, asked to Anthropic's OAuth profile endpoint (`claude-account-plan.ts`) because the copy Claude Code stores at login is never updated (Pro → Max), then written back to the profile; a plan the provider does not name stays unnamed. Names are built by `shared/utils/plan-names.ts`. The usage indicator publishes each snapshot's plan to `renderer/stores/usage-plan-store.ts`, which the authentication details (`AuthStatusIndicator.tsx`) read
 - **`profile-scorer.ts`** — Scores profiles by usage and availability
 
 ## Terminal System (`src/main/terminal/`)

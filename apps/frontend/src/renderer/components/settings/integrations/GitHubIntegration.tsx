@@ -28,6 +28,8 @@ import { Input } from "../../ui/input";
 import { Label } from "../../ui/label";
 import { Separator } from "../../ui/separator";
 import { Switch } from "../../ui/switch";
+import { ForgeAccountPicker } from "./ForgeAccountPicker";
+import { ForgeBindingNotice } from "./ForgeBindingNotice";
 
 // Debug logging — disabled (kept as a no-op so call sites stay valid).
 function debugLog(_message: string, _data?: unknown) {
@@ -49,6 +51,8 @@ interface GitHubIntegrationProps {
 	readonly gitHubConnectionStatus: GitHubSyncStatus | null;
 	readonly isCheckingGitHub: boolean;
 	readonly projectPath?: string; // Project path for fetching git branches
+	/** The project these settings belong to: its remotes are checked against the repository. */
+	readonly projectId?: string;
 	// Project settings for mainBranch (used by kanban tasks and terminal worktrees)
 	readonly settings?: ProjectSettings;
 	readonly setSettings?: React.Dispatch<React.SetStateAction<ProjectSettings>>;
@@ -66,13 +70,22 @@ export function GitHubIntegration({
 	gitHubConnectionStatus,
 	isCheckingGitHub,
 	projectPath,
+	projectId,
 	settings,
 	setSettings,
 }: GitHubIntegrationProps) {
 	const { t } = useTranslation(["settings", "common"]);
+	// A saved account lends its token: the token fields are not this project's.
+	const usesAccount = Boolean(envConfig?.githubAccountId);
+	// A token saved from the GitHub login reopens on its repository list, not
+	// on the manual token field.
 	const [authMode, setAuthMode] = useState<
 		"manual" | "oauth" | "oauth-success"
-	>("manual");
+	>(() =>
+		envConfig?.githubAuthMethod === "oauth" && envConfig.githubToken
+			? "oauth-success"
+			: "manual",
+	);
 	const [oauthUsername, setOauthUsername] = useState<string | null>(null);
 	const [repos, setRepos] = useState<GitHubRepo[]>([]);
 	const [isLoadingRepos, setIsLoadingRepos] = useState(false);
@@ -270,7 +283,7 @@ export function GitHubIntegration({
 		<div className="space-y-4">
 			<div className="flex items-center justify-between">
 				<div className="space-y-0.5">
-					<Label className="font-normal text-foreground">
+					<Label htmlFor="github-enabled" className="font-normal text-foreground">
 						{t("projectSections.github.enableGitHubIssues", { ns: "settings" })}
 					</Label>
 					<p className="text-xs text-muted-foreground">
@@ -281,6 +294,7 @@ export function GitHubIntegration({
 					</p>
 				</div>
 				<Switch
+					id="github-enabled"
 					data-guide={GUIDE_ANCHORS.github.enable}
 					checked={envConfig.githubEnabled}
 					onCheckedChange={(checked) =>
@@ -291,8 +305,21 @@ export function GitHubIntegration({
 
 			{envConfig.githubEnabled && (
 				<>
+					{/* A saved account of the app, or this project's own token */}
+					<ForgeAccountPicker
+						forge="github"
+						value={envConfig.githubAccountId}
+						onChange={(accountId) => updateEnvConfig({ githubAccountId: accountId })}
+					/>
+					{usesAccount && (
+						<RepositoryInput
+							value={envConfig.githubRepo || ""}
+							onChange={(value) => updateEnvConfig({ githubRepo: value })}
+						/>
+					)}
+
 					{/* OAuth Success State */}
-					{authMode === "oauth-success" && (
+					{!usesAccount && authMode === "oauth-success" && (
 						<div className="space-y-4">
 							<div className="rounded-lg border border-success/30 bg-success/10 p-4">
 								<div className="flex items-center justify-between">
@@ -342,7 +369,7 @@ export function GitHubIntegration({
 					)}
 
 					{/* OAuth Flow */}
-					{authMode === "oauth" && (
+					{!usesAccount && authMode === "oauth" && (
 						<div className="space-y-4">
 							<div className="flex items-center justify-between">
 								<Label className="text-sm font-medium text-foreground">
@@ -364,11 +391,11 @@ export function GitHubIntegration({
 					)}
 
 					{/* Manual Token Entry */}
-					{authMode === "manual" && (
+					{!usesAccount && authMode === "manual" && (
 						<>
 							<div className="space-y-2">
 								<div className="flex items-center justify-between">
-									<Label className="text-sm font-medium text-foreground">
+									<Label htmlFor="github-token" className="text-sm font-medium text-foreground">
 										{t("projectSections.github.patLabel")}
 									</Label>
 									<Button
@@ -395,6 +422,7 @@ export function GitHubIntegration({
 									</a>
 								</p>
 								<PasswordInput
+									id="github-token"
 									data-guide={GUIDE_ANCHORS.github.token}
 									value={envConfig.githubToken || ""}
 									onChange={(value) => updateEnvConfig({ githubToken: value })}
@@ -409,7 +437,17 @@ export function GitHubIntegration({
 						</>
 					)}
 
-					{envConfig.githubToken && envConfig.githubRepo && (
+					<ForgeBindingNotice
+						projectId={projectId}
+						forge="github"
+						current={{
+							githubRepo: envConfig.githubRepo ?? "",
+							githubAccountId: envConfig.githubAccountId ?? "",
+						}}
+						onApply={updateEnvConfig}
+					/>
+
+					{(envConfig.githubToken || usesAccount) && envConfig.githubRepo && (
 						<ConnectionStatus
 							isChecking={isCheckingGitHub}
 							connectionStatus={gitHubConnectionStatus}
@@ -442,6 +480,7 @@ export function GitHubIntegration({
 									size="sm"
 									onClick={fetchBranches}
 									disabled={isLoadingBranches}
+									aria-label={t("common:buttons.refresh")}
 									className="h-7 px-2"
 								>
 									<RefreshCw
@@ -574,6 +613,7 @@ function RepositoryDropdown({
 						size="sm"
 						onClick={onRefresh}
 						disabled={isLoading}
+						aria-label={t("common:buttons.refresh")}
 						className="h-7 px-2"
 					>
 						<RefreshCw
@@ -689,7 +729,7 @@ function RepositoryInput({ value, onChange }: RepositoryInputProps) {
 
 	return (
 		<div className="space-y-2">
-			<Label className="text-sm font-medium text-foreground">
+			<Label htmlFor="github-repo" className="text-sm font-medium text-foreground">
 				{t("projectSections.github.repository")}
 			</Label>
 			<p className="text-xs text-muted-foreground">
@@ -698,6 +738,7 @@ function RepositoryInput({ value, onChange }: RepositoryInputProps) {
 				{t("projectSections.github.repositoryFormatExample")}
 			</p>
 			<Input
+				id="github-repo"
 				data-guide={GUIDE_ANCHORS.github.repo}
 				placeholder={t("projectSections.github.repositoryPlaceholder")}
 				value={value}
@@ -801,7 +842,7 @@ function AutoSyncToggle({ enabled, onToggle }: AutoSyncToggleProps) {
 			<div className="space-y-0.5">
 				<div className="flex items-center gap-2">
 					<RefreshCw className="h-4 w-4 text-info" />
-					<Label className="font-normal text-foreground">
+					<Label htmlFor="github-auto-sync" className="font-normal text-foreground">
 						{t("projectSections.github.autoSyncOnLoad")}
 					</Label>
 				</div>
@@ -809,7 +850,7 @@ function AutoSyncToggle({ enabled, onToggle }: AutoSyncToggleProps) {
 					{t("projectSections.github.autoSyncDescription")}
 				</p>
 			</div>
-			<Switch checked={enabled} onCheckedChange={onToggle} />
+			<Switch id="github-auto-sync" checked={enabled} onCheckedChange={onToggle} />
 		</div>
 	);
 }

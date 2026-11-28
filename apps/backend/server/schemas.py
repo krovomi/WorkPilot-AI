@@ -24,7 +24,8 @@ class LoginRequest(BaseModel):
 
 
 class OidcExchangeRequest(BaseModel):
-    id_token: str
+    # An id_token is a few kilobytes; nothing near this size is one.
+    id_token: str = Field(min_length=1, max_length=16_384)
 
 
 class RefreshRequest(BaseModel):
@@ -43,6 +44,22 @@ class UserPublic(BaseModel):
     role: str
 
     model_config = {"from_attributes": True}
+
+
+class MySessionResponse(BaseModel):
+    """How the caller's current session was opened, and who it is.
+
+    ``method`` is one of ``jwt_tokens.LOGIN_METHODS``, or None for a session
+    from before sign-ins were named. The provider (its name and its issuer's
+    host) is given for an Entra or OpenID Connect sign-in.
+    """
+
+    user: UserPublic
+    login_id: str | None = None
+    method: str | None = None
+    provider_name: str | None = None
+    issuer_host: str | None = None
+    signed_in_at: datetime | None = None
 
 
 class TokenResponse(BaseModel):
@@ -65,6 +82,30 @@ class ChangePasswordRequest(BaseModel):
     new_password: str = Field(min_length=12)
 
 
+class PasswordResetRequest(BaseModel):
+    email: EmailStr
+
+
+class PasswordResetLookup(BaseModel):
+    # POST (not GET) so the token never lands in a URL / proxy access log.
+    token: str = Field(min_length=16, max_length=200)
+
+
+class PasswordResetConfirm(BaseModel):
+    token: str = Field(min_length=16, max_length=200)
+    new_password: str = Field(min_length=12, max_length=1024)
+
+
+class PasswordResetIssued(BaseModel):
+    """A link a platform admin issued for an account."""
+
+    email: str
+    expires_at: datetime
+    email_sent: bool
+    # Only when the email did not go: the admin hands the link over.
+    reset_link: str | None = None
+
+
 # ---------------------------------------------------------------------------
 # Invitations (invitation-only self-service signup)
 # ---------------------------------------------------------------------------
@@ -73,6 +114,9 @@ class ChangePasswordRequest(BaseModel):
 class CreateInvitationRequest(BaseModel):
     email: EmailStr
     role: str = "member"
+    # The role in the organization (a built-in or the organization's own
+    # slug); without it, the one the platform ``role`` maps onto.
+    org_role: str | None = Field(default=None, max_length=60)
     project_id: str | None = None
     project_role: str | None = None
 
@@ -208,8 +252,18 @@ class OrgMemberPublic(BaseModel):
 
 
 class AddOrgMemberRequest(BaseModel):
-    user_id: str
+    """An existing account, named by its id or, for a platform administrator
+    (who sees every account), by its email address."""
+
+    user_id: str | None = Field(default=None, max_length=64)
+    email: EmailStr | None = None
     role_slug: str = "contributor"
+
+    @model_validator(mode="after")
+    def _one_account(self) -> AddOrgMemberRequest:
+        if (self.user_id is None) == (self.email is None):
+            raise ValueError("give either user_id or email")
+        return self
 
 
 class UpdateOrgMemberRequest(BaseModel):
@@ -227,15 +281,18 @@ class QuotaPublic(BaseModel):
     used_users: int = 0
     used_projects: int = 0
     used_concurrent_runs: int = 0
+    used_tokens_this_month: int = 0
 
     model_config = {"from_attributes": True}
 
 
 class UpdateQuotaRequest(BaseModel):
-    max_users: int | None = None
-    max_projects: int | None = None
-    max_concurrent_runs: int | None = None
-    monthly_token_budget: int | None = None
+    """A limit left out stays as it is; a limit sent as ``null`` is lifted."""
+
+    max_users: int | None = Field(default=None, ge=0)
+    max_projects: int | None = Field(default=None, ge=0)
+    max_concurrent_runs: int | None = Field(default=None, ge=0)
+    monthly_token_budget: int | None = Field(default=None, ge=0)
     enforce_hard_stop: bool | None = None
 
 
@@ -249,6 +306,9 @@ class AuditEntryPublic(BaseModel):
     payload: dict | None
     ip: str | None
     created_at: datetime
+    #: The sign-in the action was made under, and how the person signed in.
+    login_id: str | None = None
+    login_method: str | None = None
 
 
 class SessionPublic(BaseModel):
@@ -259,6 +319,9 @@ class SessionPublic(BaseModel):
     ip: str | None
     created_at: datetime
     expires_at: datetime
+    #: The sign-in the session comes from: its audit entries carry this id.
+    login_id: str | None = None
+    login_method: str | None = None
 
 
 class AdminOverviewResponse(BaseModel):

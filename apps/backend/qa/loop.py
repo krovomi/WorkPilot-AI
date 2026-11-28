@@ -15,9 +15,11 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
+from agents.policy_watch import policy_pause_before_session
 from core.client import create_agent_client
 from core.progress import count_subtasks, is_build_complete
 from core.task_event import TaskEventEmitter
+from cost_budget import check_before_session
 from foundation.base_branch import detect_base_branch
 from foundation.build_signals import BuildPaused
 from foundation.change_scope import ChangeScope, change_scope
@@ -76,6 +78,8 @@ from .criteria import (
 )
 from .dependency_gate import dependency_gate
 from .doc_drift_gate import doc_drift_gate
+from .dotnet_api_gate import dotnet_api_gate
+from .exposure_gate import exposure_gate
 from .fixer import run_qa_fixer_session
 from .mutation_gate import guard_start, guard_test_only, mutation_gate
 from .proof_gate import proof_gate
@@ -94,6 +98,7 @@ from .report import (
 )
 from .reviewer import classify_qa_error, run_qa_agent_session
 from .schema_gate import schema_gate
+from .windev_gate import windev_gate, windev_only
 
 
 def _ensure_fix_request_file(
@@ -476,6 +481,11 @@ async def run_qa_validation_loop(
             over := budget_exceeded(goal, spec_dir, source_spec_dir)
         ):
             return _stop_on_goal(scope, state, over)
+        # The cost budget pauses the build before a pass, as in the coder loop.
+        if check_before_session(spec_dir, "qa_review") is not None or (
+            policy_pause_before_session(spec_dir, "qa_review")
+        ):
+            raise BuildPaused("qa_review")
 
         state.qa_iteration += 1
         iteration_start = time_module.time()
@@ -560,6 +570,13 @@ async def run_qa_validation_loop(
                     state.qa_iteration,
                     task_logger=scope.task_logger,
                 )
+                or windev_gate(
+                    spec_dir,
+                    project_dir,
+                    state.qa_iteration,
+                    state.review_scope,
+                    task_logger=scope.task_logger,
+                )
                 or await _architecture_gate(scope, state.qa_iteration, qa_model)
                 or _coverage_gate(
                     spec_dir,
@@ -582,6 +599,19 @@ async def run_qa_validation_loop(
                     task_logger=scope.task_logger,
                 )
                 or doc_drift_gate(
+                    spec_dir,
+                    project_dir,
+                    state.qa_iteration,
+                    state.review_scope,
+                    task_logger=scope.task_logger,
+                )
+                or exposure_gate(
+                    spec_dir,
+                    project_dir,
+                    state.qa_iteration,
+                    task_logger=scope.task_logger,
+                )
+                or dotnet_api_gate(
                     spec_dir,
                     project_dir,
                     state.qa_iteration,
@@ -729,7 +759,13 @@ async def _run_security_scan(
     """
     print("\n🔐 Running security scan...")
     try:
-        sec_passed, _, sec_issues = await run_qa_security_scan(project_dir, spec_dir)
+        from security_reach import evidence_for
+
+        # Ranked by reach and production use (#364): the report and the fixer
+        # see the exposed findings first; what blocks does not change.
+        sec_passed, _, sec_issues = await run_qa_security_scan(
+            project_dir, spec_dir, evidence=evidence_for
+        )
         # Feed the Consensus Arbiter: persist the security scanner's findings as
         # security-domain opinions so the arbiter has real data to reconcile
         # against the QA reviewer's verdict. Overwrites each run (latest state).
@@ -1246,12 +1282,20 @@ def _coverage_gate(
     suite of the repository with coverage for a `.txt`, then the fixer to
     invent placeholder test projects to produce a number. Decided from
     `review_scope` (git), never from what the reviewer wrote in its sign-off.
+    Not applicable either when every code file is a WinDev one: its tests
+    run in the WinDev editor only, so no number can exist.
 
     A targeted pass is judged by `qa.targeted_gate` instead: its mapped tests
     ran and passed, and the touched files reach the threshold.
     """
     if review_scope is not None and not review_scope.touches_code:
         debug("qa_loop", "Coverage gate not applicable: no code in the change set")
+        return None
+    if windev_only(review_scope):
+        debug(
+            "qa_loop",
+            "Coverage gate not applicable: WinDev code, tests run in the editor",
+        )
         return None
     if review_scope is not None and review_scope.is_targeted:
         return _targeted_gate(spec_dir, qa_iteration, review_scope, review_commands)

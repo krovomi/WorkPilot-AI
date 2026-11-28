@@ -32,6 +32,7 @@ import type {
 } from "../../../shared/types";
 import {
 	planTaskProviders,
+	taskAccountPins,
 	readTaskMetadataFor,
 	taskEngineFromMetadata,
 } from "../../agent/task-provider-env";
@@ -39,6 +40,7 @@ import { appLog } from "../../app-logger";
 import { parsePythonCommand } from "../../python-detector";
 import { readyPythonPath } from "../../utils/ensure-python";
 import { pythonRunnerEnv } from "../../utils/python-runner-env";
+import { approvalsEnv } from "../../agent/approvals-env";
 import { findTaskWorktree } from "../../worktree-paths";
 import { findTaskAndProject } from "./shared";
 
@@ -174,12 +176,16 @@ export function registerPrFollowupHandlers(
 				getSpecsDir(project.autoBuildPath || undefined),
 				task.specId,
 			);
-			const engine = taskEngineFromMetadata(
-				readTaskMetadataFor({ projectPath: project.path, specDir }),
-			);
+			const metadata = readTaskMetadataFor({ projectPath: project.path, specDir });
+			const engine = taskEngineFromMetadata(metadata);
 			const backend = backendPath();
 			const env = await pythonRunnerEnv(backend, {
-				taskProviders: planTaskProviders(engine, "qa"),
+				taskProviders: {
+					...planTaskProviders(engine, "qa"),
+					accounts: taskAccountPins(metadata, project.settings),
+				},
+				// The approval tier of the green PR, and whether it merges by itself.
+				extra: approvalsEnv(),
 			});
 			const [command, baseArgs] = parsePythonCommand(pythonPath);
 			const args = buildFollowupArgs({

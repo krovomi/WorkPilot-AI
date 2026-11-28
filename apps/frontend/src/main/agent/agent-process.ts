@@ -9,6 +9,8 @@ import type { EventEmitter } from "node:events";
 import type { CompletablePhase } from "../../shared/constants/phase-protocol";
 import { isPausePhase } from "../../shared/constants/phase-protocol";
 import { stripAnsiCodes } from "../../shared/utils/ansi-sanitizer";
+import { processAccountsEnv } from "../ai-accounts/account-attribution";
+import { servedAccountPins } from "../ai-accounts/pinned-account-env";
 import { appLog } from "../app-logger";
 import { clearKeychainCache } from "../claude-profile/credential-utils";
 import { getProfileSelectionLock } from "../claude-profile/profile-selection-lock";
@@ -21,8 +23,17 @@ import { getClaudeProfileManager } from "../claude-profile-manager";
 import { getToolInfo } from "../cli-tool-manager";
 import { getAugmentedEnv } from "../env-utils";
 import { isWindows, killProcessGracefully } from "../platform";
-import { readProjectEnv } from "../project-env-file";
+import { readProjectForgeEnv } from "../forge/forge-credentials";
 import { projectStore } from "../project-store";
+import {
+	chainHasOtherProvider,
+	FAILOVER_REQUEST_EVENT,
+	type FailoverReason,
+	taskPhaseProvider,
+} from "../provider-failover/task-phase-provider";
+import { agentSafetyEnv } from "./agent-safety-env";
+import { codeModeEnv } from "./code-mode-env";
+import { pinnedClaudeProfile, pinnedClaudeProfileEnv } from "./pinned-claude-profile";
 import { buildTaskProviderEnv, type TaskProviderPlan } from "./task-provider-env";
 import { parsePythonCommand, validatePythonPath } from "../python-detector";
 import {
@@ -32,6 +43,7 @@ import {
 import {
 	createSDKRateLimitInfo,
 	detectAuthFailure,
+	detectBillingFailure,
 	detectRateLimit,
 	getBestAvailableProfileEnv,
 } from "../rate-limit-detector";
@@ -41,11 +53,14 @@ import { loadBackendEnv } from "../source-env";
 import type { AgentEvents } from "./agent-events";
 import type { AgentState } from "./agent-state";
 import { crossReviewEnv, getOAuthModeClearVars, specByExampleEnv } from "./env-utils";
+import { suitePlacementEnv } from "../suite-placement/build-env";
+import { ciRouteAvailable } from "../suite-placement/ci-route";
 import { forwardTaskEventToHooks } from "./hook-bridge";
 import { PERMISSION_CHANNEL_ENV } from "../task-permissions";
 import { parseTaskEvent } from "./task-event-parser";
 import type { ExecutionProgressData, ProcessType } from "./types";
 import { autoSplitEnv } from "../../shared/utils/task-split";
+import { isClaudeProvider } from "../../shared/utils/task-engine";
 
 /**
  * Détermine si l'arrêt du processus backend doit être signalé comme un échec.
@@ -167,6 +182,12 @@ export class AgentProcessManager {
 	// Use null to indicate not yet configured - getPythonPath() will use fallback
 	private _pythonPath: string | null = null;
 	private autoBuildSourcePath: string = "";
+	/**
+	 * Task → the Claude profile its card or project pins, so that a rate limit
+	 * or a failed sign-in in its output is charged to that profile, and the
+	 * auto-swap looks for another one than it.
+	 */
+	private readonly pinnedProfiles = new Map<string, string>();
 
 	constructor(state: AgentState, events: AgentEvents, emitter: EventEmitter) {
 		this.state = state;
@@ -235,7 +256,9 @@ export class AgentProcessManager {
 		taskProviders?: TaskProviderPlan,
 	): NodeJS.ProcessEnv {
 		// Get best available Claude profile environment (automatically handles rate limits)
-		const profileResult = getBestAvailableProfileEnv();
+		// A Claude account pinned by the card or its project wins (ai-account-pins.ts).
+		const profileResult =
+			pinnedClaudeProfileEnv(taskProviders) ?? getBestAvailableProfileEnv();
 		const profileEnv = profileResult.env;
 		// Use getAugmentedEnv() to ensure common tool paths (dotnet, homebrew, etc.)
 		// are available even when app is launched from Finder/Dock
@@ -312,6 +335,13 @@ export class AgentProcessManager {
 			...profileEnv,
 			...claudeAuthClearVars,
 			...providerEnv,
+			// The AI accounts this process runs on, for the spend per account.
+			// A pinned account is charged only when the process runs on it.
+			...processAccountsEnv(
+				profileResult.profileId,
+				!nonClaudeProvider,
+				servedAccountPins(taskProviders?.accounts),
+			),
 			PYTHONUNBUFFERED: "1",
 			PYTHONIOENCODING: "utf-8",
 			PYTHONUTF8: "1",
@@ -328,7 +358,7 @@ export class AgentProcessManager {
 			allOutput.slice(-500),
 		);
 
-		const rateLimitDetection = detectRateLimit(allOutput);
+		const rateLimitDetection = detectRateLimit(allOutput, this.pinnedProfiles.get(taskId));
 		appLog.info("[AgentProcess] Rate limit detection result:", {
 			isRateLimited: rateLimitDetection.isRateLimited,
 			resetTime: rateLimitDetection.resetTime,
@@ -356,8 +386,21 @@ export class AgentProcessManager {
 			this.emitter.emit("sdk-rate-limit", rateLimitInfo);
 			return true;
 		}
+		if (this.handleSpentBalance(taskId, allOutput)) return true;
 
 		return this.handleAuthFailure(taskId, allOutput);
+	}
+
+	/**
+	 * A spent balance or credit (HTTP 402, "Insufficient Balance") stops the
+	 * account like a limit does: off Claude, the task moves to the next
+	 * account of the chain when the failover on limits is on.
+	 */
+	private handleSpentBalance(taskId: string, allOutput: string): boolean {
+		if (!detectBillingFailure(allOutput).isBillingFailure) return false;
+		const settings = getClaudeProfileManager().getAutoSwitchSettings();
+		if (!settings.enabled || !settings.autoSwitchOnRateLimit) return false;
+		return this.requestProviderFailover(taskId, "rate_limit", false);
 	}
 
 	private handleRateLimitWithAutoSwap(
@@ -381,6 +424,7 @@ export class AgentProcessManager {
 			appLog.info("[AgentProcess] Auto-switch disabled - showing manual modal");
 			return false;
 		}
+		if (this.requestProviderFailover(taskId, "rate_limit", false)) return true;
 
 		const currentProfileId = rateLimitDetection.profileId;
 		let bestProfile = profileManager.getBestAvailableProfile(currentProfileId);
@@ -396,6 +440,8 @@ export class AgentProcessManager {
 		);
 
 		if (!bestProfile) {
+			// No other Claude account: the chain may still name another provider.
+			if (this.requestProviderFailover(taskId, "rate_limit", true)) return true;
 			// Single account case: let backend handle with intelligent pause
 			// Don't show manual modal - backend will pause intelligently and resume when ready
 			appLog.info(
@@ -460,6 +506,27 @@ export class AgentProcessManager {
 		return true;
 	}
 
+	/**
+	 * Hand the task to the cross-provider failover (main/provider-failover):
+	 * always when its phase runs off Claude, and for a Claude task only when
+	 * `noClaudeAccountLeft` and the chain names another provider.
+	 */
+	private requestProviderFailover(
+		taskId: string,
+		reason: FailoverReason,
+		noClaudeAccountLeft: boolean,
+	): boolean {
+		const provider = taskPhaseProvider(taskId);
+		if (!provider) return false;
+		const offClaude = !isClaudeProvider(provider);
+		if (!offClaude && !(noClaudeAccountLeft && chainHasOtherProvider())) {
+			return false;
+		}
+		appLog.info(`[AgentProcess] Provider failover requested for ${taskId} (${provider})`);
+		this.emitter.emit(FAILOVER_REQUEST_EVENT, taskId, reason);
+		return true;
+	}
+
 	private handleAuthFailure(taskId: string, allOutput: string): boolean {
 		appLog.info(
 			"[AgentProcess] No rate limit detected - checking for auth failure",
@@ -480,7 +547,7 @@ export class AgentProcessManager {
 			return false;
 		}
 
-		const authFailureDetection = detectAuthFailure(allOutput);
+		const authFailureDetection = detectAuthFailure(allOutput, this.pinnedProfiles.get(taskId));
 
 		if (!authFailureDetection.isAuthFailure) {
 			appLog.info(
@@ -511,6 +578,27 @@ export class AgentProcessManager {
 	}
 
 	/**
+	 * The active profile's refresh token is refused for good (invalid_grant):
+	 * the same prompt as a 401 in the run (AuthFailureModal, "Go to Settings"),
+	 * unless auto-switch on auth failure will move the run to another profile
+	 * when that 401 comes.
+	 */
+	private requestReauthBeforeSpawn(
+		taskId: string,
+		profileId: string,
+		error: string | undefined,
+	): void {
+		const settings = getClaudeProfileManager().getAutoSwitchSettings();
+		if (settings.enabled && settings.autoSwitchOnAuthFailure) return;
+		this.emitter.emit("auth-failure", taskId, {
+			profileId,
+			failureType: "expired",
+			message: "The refresh token expired: sign in again from Settings > Accounts.",
+			originalError: error,
+		});
+	}
+
+	/**
 	 * Attempt to auto-swap to another profile on authentication failure.
 	 * Only works when autoSwitchOnAuthFailure is enabled and an alternative
 	 * authenticated profile is available.
@@ -537,6 +625,7 @@ export class AgentProcessManager {
 			);
 			return false;
 		}
+		if (this.requestProviderFailover(taskId, "auth_failure", false)) return true;
 
 		const currentProfileId = authFailureDetection.profileId;
 		const bestProfile =
@@ -555,6 +644,7 @@ export class AgentProcessManager {
 
 		// Verify the best profile is actually authenticated
 		if (!bestProfile?.isAuthenticated) {
+			if (this.requestProviderFailover(taskId, "auth_failure", true)) return true;
 			appLog.info(
 				"[AgentProcess] No authenticated alternative profile - falling back to UI",
 			);
@@ -715,6 +805,15 @@ export class AgentProcessManager {
 			Object.assign(env, autoSplitEnv(project.settings.autoSplit));
 		}
 
+		// Where the full suite of a QA review runs, and whether the app follows
+		// the project's CI after the build (`suite-placement/`).
+		if (project) {
+			Object.assign(
+				env,
+				suitePlacementEnv(project.settings, ciRouteAvailable(project.id)),
+			);
+		}
+
 		return env;
 	}
 
@@ -735,7 +834,7 @@ export class AgentProcessManager {
 
 		// Skip empty values to prevent overriding valid values from other sources
 		return Object.fromEntries(
-			Object.entries(readProjectEnv(project)).filter(([, value]) => value),
+			Object.entries(readProjectForgeEnv(project)).filter(([, value]) => value),
 		);
 	}
 
@@ -828,7 +927,7 @@ export class AgentProcessManager {
 			// and the UI should prompt re-authentication.
 			try {
 				const profileManager = getClaudeProfileManager();
-				const activeProfile = profileManager.getActiveProfile();
+				const activeProfile = pinnedClaudeProfile(taskProviders) ?? profileManager.getActiveProfile();
 				if (activeProfile?.configDir) {
 					const tokenResult = await ensureValidToken(
 						activeProfile.configDir,
@@ -856,7 +955,14 @@ export class AgentProcessManager {
 							tokenResult.error,
 							"- the refresh token is revoked. User must re-authenticate from the Accounts page.",
 						);
-						// Still proceed — will fail with 401, but the error handling will surface the re-auth prompt
+						// Still proceed (another profile or an API key may serve the run),
+						// but ask for the sign-in now: the prompt used to wait for the run's
+						// 401, and never came when its output matched no auth pattern.
+						this.requestReauthBeforeSpawn(
+							taskId,
+							activeProfile.id,
+							tokenResult.error,
+						);
 					} else if (tokenResult.error) {
 						appLog.warn(
 							"[AgentProcess] Token refresh warning:",
@@ -882,7 +988,10 @@ export class AgentProcessManager {
 		// While marked, the UsageMonitor's ensureValidToken() will SKIP refresh for this
 		// configDir, preventing token revocation that would cause 401 in the subprocess.
 		const profileManager = getClaudeProfileManager();
-		const agentConfigDir = profileManager.getActiveProfile()?.configDir;
+		const pinnedProfile = pinnedClaudeProfile(taskProviders);
+		if (pinnedProfile) this.pinnedProfiles.set(taskId, pinnedProfile.id);
+		else this.pinnedProfiles.delete(taskId);
+		const agentConfigDir = (pinnedProfile ?? profileManager.getActiveProfile())?.configDir;
 		if (agentConfigDir) {
 			markAgentRunning(agentConfigDir);
 			appLog.info(
@@ -934,6 +1043,8 @@ export class AgentProcessManager {
 						...apiProfileEnv, // Include active API profile config (highest priority for ANTHROPIC_* vars)
 						...providerSpecificEnv, // Include provider credentials (WINDSURF_API_KEY, SELECTED_LLM_PROVIDER)
 						...PERMISSION_CHANNEL_ENV, // An ACP agent's questions go to the card; answers come back on stdin
+						...agentSafetyEnv(), // Settings, Sandbox and Anomaly detection (agents/safety_watch.py)
+						...codeModeEnv(), // Settings, Code mode (apps/backend/code_mode)
 					},
 					processType === "task-execution" ? "feature-build" : undefined,
 				),

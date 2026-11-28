@@ -1,3 +1,11 @@
+---
+feature: Recette de worktree
+summary: >-
+  Worktree de tâche préparé avant la première session : recette détectée selon la stack, ou
+  `.workpilot/worktree.toml` approuvé par empreinte ; sans shell ; seuls les fichiers ignorés sont
+  copiés ; ports par tâche ; une étape en échec arrive dans le prompt.
+---
+
 # Recette de worktree (`.workpilot/worktree.toml`)
 
 Un worktree de tâche est un checkout neuf : ni `node_modules`, ni `.venv`, ni paquets NuGet
@@ -8,7 +16,8 @@ worktree avant la première session, pour toutes les stacks.
 
 Code :
 
-- `apps/backend/core/workspace/recipe.py` : lecture du fichier, détection d'après la stack ;
+- `apps/backend/core/workspace/recipe.py` : lecture du fichier ; `recipe_detect.py` : détection
+  d'après les stacks de la racine et des sous-dossiers ;
 - `apps/backend/core/workspace/recipe_run.py` : exécution, approbation, nettoyage, section du prompt ;
 - `apps/backend/core/workspace/ports.py` : un bloc de ports par tâche, sur la machine ;
 - `apps/backend/core/workspace/recipe_api.py` : la route desktop `/api/worktree-recipe` ;
@@ -17,14 +26,29 @@ Code :
 
 ## Deux sources
 
-- **Détectée** (pas de fichier) : une commande par gestionnaire de paquets que les fichiers de la
-  racine nomment. pnpm, yarn, bun, `npm ci` (ou `npm install` sans lockfile) ; `uv sync`,
-  `poetry install`, ou un `.venv` puis `pip install -r requirements.txt` ; `dotnet restore` (et
-  `dotnet tool restore` avec `.config/dotnet-tools.json`, solution ou projet jusqu'à deux niveaux) ;
-  `go mod download`, `cargo fetch`, `composer install`, `bundle install`, `flutter pub get` ou
-  `dart pub get`, le wrapper Gradle ou `mvn dependency:go-offline`. Un dépôt polyglotte (une API
-  .NET et un front Angular) reçoit les deux. La recette détectée est celle de WorkPilot : elle
-  tourne sans approbation.
+- **Détectée** (pas de fichier) : une commande par gestionnaire de paquets que nomment les
+  fichiers de la racine **et des dossiers jusqu'à trois niveaux** (`apps/web`, `src/Api`,
+  `services/billing/api`). pnpm, yarn, bun, `npm ci` (ou `npm install` sans lockfile), `deno install` ;
+  `uv sync`, `poetry install`, ou un `.venv` puis `pip install -r requirements.txt` ;
+  `dotnet restore` (la solution, `.slnx` avant le `.sln` du même nom, sinon chaque projet `.csproj`,
+  `.fsproj` ou `.vbproj`) et `dotnet tool restore` avec `.config/dotnet-tools.json` ;
+  `go mod download` (par module, ou une fois pour un `go.work`), `cargo fetch`, `composer install`,
+  `bundle install`, `flutter pub get` ou `dart pub get` ; le wrapper Gradle, `gradle` sans wrapper,
+  `mvn dependency:go-offline` ou `sbt update` ; `mix deps.get`, `swift package resolve` ;
+  `vcpkg install` et `conan install`. Un dépôt polyglotte (une API .NET et un front Angular)
+  reçoit les deux. La recette détectée est celle de WorkPilot : elle tourne sans approbation.
+  - Chaque commande part de la racine du worktree : un projet de sous-dossier est nommé par
+    l'option de son outil (`npm --prefix`, `pnpm --dir`, `yarn --cwd`, `uv --directory`,
+    `poetry -C`, `dotnet restore <solution>`, `go mod download -C`, `cargo fetch --manifest-path`,
+    `composer --working-dir`, `bundle --gemfile`, `gradle -p`, `mvn -f`…). La recette reste une
+    liste d'arguments et s'enregistre telle quelle en `worktree.toml`. Un outil sans telle option
+    (Elixir, sbt, Deno hors racine) laisse une note qui le dit.
+  - Un dossier sous un projet de la même stack en est membre (paquet d'un workspace pnpm,
+    membre d'un workspace Cargo, module Maven) et n'a pas de commande à lui, sauf s'il a son
+    propre lockfile. `node_modules`, `vendor`, `.venv`, `bin`, `obj`, `target`, `build`, `dist`
+    et les dossiers cachés ne sont pas lus ; un `requirements.txt` sous `docs/` non plus.
+  - Au-delà de 20 commandes (le plafond d'un fichier), les premières sont gardées et une note
+    le dit. Code : `core/workspace/recipe_detect.py`.
 - **Fichier** : `.workpilot/worktree.toml`, celui du projet.
 
 ```toml

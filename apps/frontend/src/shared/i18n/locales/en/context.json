@@ -1,7 +1,8 @@
 {
 	"tabs": {
 		"projectIndex": "Project Index",
-		"memories": "Memories"
+		"memories": "Memories",
+		"lifecycle": "Lifecycle"
 	},
 	"projectIndex": {
 		"title": "Project Structure",
@@ -138,5 +139,205 @@
 		"health": "Health: {{checks}}",
 		"metrics": "Metrics:",
 		"unknownType": "unknown"
+	},
+	"lifecycle": {
+		"description": "Every decision on the project's memory, the forgotten memories you can restore, and the sync conflicts to resolve",
+		"refresh": "Refresh",
+		"error": "Could not read the memory's lifecycle: {{error}}",
+		"serverProject": "This project's memory is its own brain on the server. No teammate's sync feeds it, so there is no conflict between notes to resolve here.",
+		"pins": "{{count}} / {{limit}} pinned",
+		"entry": "{{action}} {{actor}} — {{reason}}",
+		"conflicts": {
+			"title": "To resolve",
+			"empty": "No conflict waiting.",
+			"keep": "Keep this one",
+			"writeCanonical": "Write the canonical note",
+			"canonicalPlaceholder": "What the team should follow from now on",
+			"save": "Save the canonical note",
+			"cancel": "Cancel",
+			"dismiss": "Not a conflict",
+			"ask": "Ask the model",
+			"asking": "Asking…",
+			"opinionTitle": "The model's opinion (you decide)",
+			"useDraft": "Use as draft",
+			"sideA": "Already here",
+			"sideB": "Received",
+			"pinned": "Pinned",
+			"updated": "Updated {{date}}",
+			"confidence": "Confidence {{value}}",
+			"agents": "Written by {{agents}}",
+			"signal": {
+				"value": "Two values for the same setting",
+				"recommendation": "Opposite recommendations",
+				"negation": "One says to do it, the other not to",
+				"textual": "Edited on two machines",
+				"reopened": "An earlier decision was taken back"
+			},
+			"verdict": {
+				"contradiction": "They contradict each other",
+				"complementary": "They are complementary",
+				"duplicate": "They say the same thing"
+			},
+			"prefer": {
+				"a": "prefers the note already here",
+				"b": "prefers the received note",
+				"none": "no preference"
+			},
+			"escalated": "Decided {{date}} {{actor}}, and contradicted again: a maintainer settles it.",
+			"waitingMaintainer": "Waiting for a maintainer: {{names}}.",
+			"foundBy": {
+				"embeddings": "Found by meaning (local model)"
+			}
+		},
+		"trash": {
+			"title": "Recently forgotten",
+			"empty": "Nothing forgotten.",
+			"restore": "Restore",
+			"until": "Restorable until {{date}}",
+			"expiring": "{{count}} forgotten memories will be deleted within 7 days: restore the ones that still matter.",
+			"restored": "Memory restored.",
+			"contradicts": "Memory restored, but it contradicts {{count}} current memory(ies): check before relying on it."
+		},
+		"journal": {
+			"title": "Journal",
+			"empty": "No decision recorded yet."
+		},
+		"actions": {
+			"pin": "Pin",
+			"unpin": "Unpin",
+			"pinnedBadge": "Pinned",
+			"forget": "Forget",
+			"forgetReason": "Why (optional)",
+			"confirmForget": "Forget it",
+			"forgetHint": "A forgotten memory stays restorable from the Lifecycle tab during the retention period.",
+			"history": "History",
+			"hideHistory": "Hide history",
+			"scope": "Scope",
+			"scopePlaceholder": "Where it applies: a module (apps/billing/), team:name or branch:name; empty: everywhere",
+			"saveScope": "Save",
+			"scopeBadge": "Applies to {{scope}}"
+		},
+		"action": {
+			"create": "Created",
+			"update": "Updated",
+			"forget": "Forgotten",
+			"restore": "Restored",
+			"purge": "Deleted for good",
+			"pin": "Pinned",
+			"unpin": "Unpinned",
+			"protect": "Kept (pinned)",
+			"merge": "Merged",
+			"archive": "Archived",
+			"resolve": "Conflict resolved",
+			"conflict": "Conflict detected",
+			"designate": "Maintainers designated",
+			"notify": "Conflict announced to the team"
+		},
+		"actor": {
+			"user": "by you",
+			"agent": "by an agent",
+			"agentType": "by the {{type}} agent",
+			"sync": "by the sync",
+			"learning-loop": "by the learning loop",
+			"lifecycle": "by the retention rule",
+			"person": "by {{name}}"
+		},
+		"reason": {
+			"recorded": "recorded",
+			"edited": "its text changed",
+			"user-request": "asked by a person",
+			"pattern-retired": "retired automatically",
+			"similar-merged": "a similar pattern was merged into it",
+			"retention-expired": "retention period over",
+			"pinned-protected": "an automatic removal was refused because it is pinned",
+			"restored": "restored from the trash",
+			"pinned": "protected from automatic removal",
+			"unpinned": "no longer protected",
+			"pinned-wins": "the pinned version wins",
+			"higher-confidence": "the more confident pattern wins",
+			"more-recent": "the much more recent note wins",
+			"same-statement": "both versions said the same thing",
+			"contradiction-detected": "contradicts another memory",
+			"textual-conflict": "edited on two machines",
+			"person-chose": "a person chose",
+			"person-wrote": "a person wrote the canonical note",
+			"not-a-conflict": "a person said it is not a conflict",
+			"undone": "an automatic decision was undone",
+			"unmerged": "separated from the note it was merged into",
+			"escalated": "contradicted again soon after a decision",
+			"maintainers-changed": "the maintainers changed",
+			"scoped": "where it applies changed",
+			"conflict-announced": "announced on the project's channels",
+			"signers-changed": "the trusted signers changed"
+		},
+		"errors": {
+			"failed": "the action failed",
+			"invalid": "invalid request",
+			"not-found": "this memory no longer exists",
+			"pin-limit": "pin limit reached (50 per project)",
+			"pinned": "this memory is pinned",
+			"exists": "a memory with the same name exists again",
+			"expired": "the retention period is over",
+			"stale": "already settled elsewhere",
+			"no-brain": "no shared brain yet",
+			"project-not-found": "project not found",
+			"server-project": "not available for a server project",
+			"no-runtime": "no model is available",
+			"provider-refused": "the provider refused (offline mode?)",
+			"no-answer": "the model gave no usable answer",
+			"server-mode": "not available in server mode",
+			"not-revertible": "this decision can no longer be taken back",
+			"maintainer-only": "only a maintainer settles this conflict"
+		},
+		"undo": {
+			"last": "Undo the last automatic decision (within the hour)",
+			"undo": "Undo",
+			"unmerge": "Separate",
+			"done": "Decision taken back.",
+			"queued": "Decision taken back: the two memories are waiting for you under “To resolve”."
+		},
+		"metrics": {
+			"title": "How the lifecycle behaves",
+			"restores": "{{count}} memories restored this week",
+			"automaticForgets": "{{count}} removed automatically this week",
+			"pinRate": "{{rate}} % pinned ({{pinned}} of {{live}})",
+			"conflicts": "{{count}} conflicts in 30 days: {{auto}} settled by the rules, {{resolved}} by a person",
+			"resolution": "{{hours}} h on average before a person decides",
+			"views": "{{count}} histories opened on this computer",
+			"tooAggressive": "Many memories were restored this week: the automatic removals may be too aggressive.",
+			"consensus": "{{count}} consensus notes written in 30 days, {{live}} still in use"
+		},
+		"maintainers": {
+			"list": "Maintainers: {{names}}",
+			"none": "No maintainer: anyone settles a conflict that flip-flops.",
+			"edit": "Edit",
+			"placeholder": "Names or e-mails, separated by commas",
+			"save": "Save",
+			"cancel": "Cancel",
+			"scoped": "For {{scope}}: {{names}}",
+			"addScope": "Add a list for a scope",
+			"scopePlaceholder": "Module, team:name or branch:name"
+		},
+		"decisions": {
+			"title": "Decisions"
+		},
+		"signers": {
+			"title": "Trusted signers",
+			"none": "No trusted signer: every note reaches the agents, as before.",
+			"list": "Trusted: {{names}}",
+			"edit": "Edit the list",
+			"save": "Save",
+			"cancel": "Cancel",
+			"placeholder": "One per line: name ssh-ed25519 AAAA… or name GPG fingerprint",
+			"hint": "A note a teammate synced reaches the agents only when its last commit is signed by one of these keys (the SSH or GPG key their git already signs commits with).",
+			"maintainerOnly": "Only a maintainer changes this list.",
+			"unverified_one": "{{count}} memory is unverified: readable here, kept out of the agents' prompts.",
+			"unverified_other": "{{count}} memories are unverified: readable here, kept out of the agents' prompts.",
+			"rejected_one": "{{count}} change to this list was not signed by a listed key and is ignored.",
+			"rejected_other": "{{count}} changes to this list were not signed by a listed key and are ignored.",
+			"notSigning": "This machine does not sign its commits: once synced, the notes written here are unverified for the team. Turn on commit signing in git (commit.gpgsign).",
+			"badge": "Unverified",
+			"badgeHint": "Its last change is signed by no trusted key: kept out of the agents' prompts."
+		}
 	}
 }

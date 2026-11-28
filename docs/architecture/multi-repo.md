@@ -1,3 +1,11 @@
+---
+feature: Multi-dépôts
+summary: >-
+  Graphe, ordre et ruptures analysés, puis une carte par dépôt, lancée quand la précédente a passé
+  la QA, avec ce que les précédentes ont changé ; une carte en attente suspend la suite ; reprise
+  par le manifeste.
+---
+
 # Multi-dépôts : un changement, une carte par dépôt, lancées dans l'ordre
 
 Un changement touche souvent plusieurs dépôts : une bibliothèque partagée et ses consommateurs,
@@ -27,7 +35,8 @@ apps/frontend/src/main/multi-repo/
   host.ts              ce que le déroulé utilise de l'app : runner, projets, cartes, renderer
   service.ts           au plus un déroulé par orchestration
 apps/frontend/src/main/ipc-handlers/multi-repo-handlers.ts
-apps/frontend/src/renderer/components/multi-repo/  bouton « Multi-dépôts » de la barre du Kanban, dialogue
+apps/frontend/src/renderer/components/multi-repo/  dialogue (ouvert par « Multi-dépôts » du menu « ⋯ » du Kanban,
+                                                    kanban/KanbanMoreMenu.tsx)
 ```
 
 ## Le déroulé

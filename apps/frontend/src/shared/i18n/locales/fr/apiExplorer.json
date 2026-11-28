@@ -18,7 +18,8 @@
 		"importSelected": "Importer",
 		"token": "Bearer Token",
 		"tokenPlaceholder": "Collez votre JWT ou token API",
-		"headers": "En-têtes personnalisés"
+		"headers": "En-têtes personnalisés",
+		"defaultName": "Par défaut"
 	},
 	"actions": {
 		"export": "Exporter",
@@ -35,7 +36,9 @@
 		"copied": "Copié !",
 		"endpoints": "{{selected}}/{{total}} endpoints sélectionnés",
 		"selectAll": "Tout sélectionner",
-		"deselectAll": "Tout désélectionner"
+		"deselectAll": "Tout désélectionner",
+		"markdownLabel": "Documentation Markdown",
+		"copyFailed": "Impossible de copier dans le presse-papiers"
 	},
 	"detail": {
 		"docs": "Docs",
@@ -97,9 +100,9 @@
 		"oauth2": {
 			"grantType": "Type de flux",
 			"grants": {
-				"client_credentials": "Client Credentials",
-				"authorization_code": "Authorization Code (With PKCE)",
-				"password": "Password"
+				"client_credentials": "Identifiants du client",
+				"authorization_code": "Code d’autorisation",
+				"password": "Mot de passe"
 			},
 			"configureToken": "Configurer un nouveau token",
 			"authUrl": "URL d'autorisation",
@@ -162,6 +165,18 @@
 		"starting": "Démarrage...",
 		"running": "En cours",
 		"noProject": "Aucun projet actif sélectionné"
+	},
+	"aria": {
+		"close": "Fermer",
+		"loadSpec": "Charger la spec",
+		"clearSearch": "Effacer la recherche",
+		"editEnvironment": "Modifier {{name}}",
+		"removeEnvironment": "Supprimer {{name}}",
+		"showToken": "Afficher le jeton",
+		"showSecret": "Afficher la valeur",
+		"copyResponse": "Copier la réponse",
+		"useRow": "Envoyer",
+		"removeRow": "Retirer"
 	},
 	"title": "API Studio",
 	"description": "Chargez un contrat OpenAPI, ou laissez WorkPilot scanner les routes du projet sur toutes les stacks, puis envoyez des requêtes et exportez le contrat."

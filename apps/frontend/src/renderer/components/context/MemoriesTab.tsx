@@ -26,11 +26,15 @@ import { Input } from "../ui/input";
 import { ScrollArea } from "../ui/scroll-area";
 import { memoryFilterCategories } from "./constants";
 import { InfoItem } from "./InfoItem";
+import { UnverifiedBadge } from "./lifecycle/MemoryTimeline";
 import { MemoryCard } from "./MemoryCard";
 
 type FilterCategory = keyof typeof memoryFilterCategories;
 
 interface MemoriesTabProps {
+	/** With it, each memory offers pin, forget and its history. */
+	readonly projectId?: string;
+	readonly onMemoryChanged?: () => void;
 	readonly memoryStatus: MemoryStatus | null;
 	readonly memoryState: MemoryState | null;
 	readonly recentMemories: MemoryEpisode[];
@@ -39,6 +43,7 @@ interface MemoriesTabProps {
 		type: string;
 		content: string;
 		score: number;
+		verified?: boolean;
 	}>;
 	readonly searchLoading: boolean;
 	readonly onSearch: (query: string) => void;
@@ -82,6 +87,8 @@ const filterIcons: Record<FilterCategory, React.ElementType> = {
 };
 
 export function MemoriesTab({
+	projectId,
+	onMemoryChanged,
 	memoryStatus,
 	// biome-ignore lint/correctness/noUnusedFunctionParameters: parameter kept for API compatibility
 	memoryState,
@@ -297,6 +304,7 @@ export function MemoriesTab({
 											<span className="text-xs text-muted-foreground">
 												{t("context:memories.score", { score: result.score.toFixed(2) })}
 											</span>
+											{result.verified === false && <UnverifiedBadge />}
 										</div>
 										<pre className="text-xs text-muted-foreground whitespace-pre-wrap font-mono max-h-40 overflow-auto">
 											{result.content}
@@ -407,7 +415,15 @@ export function MemoriesTab({
 					{filteredMemories.length > 0 && (
 						<div className="space-y-3">
 							{filteredMemories.map((memory) => (
-								<MemoryCard key={memory.id} memory={memory} />
+								<MemoryCard
+									key={memory.id}
+									memory={memory}
+									actions={
+										projectId && onMemoryChanged
+											? { projectId, onChanged: onMemoryChanged }
+											: undefined
+									}
+								/>
 							))}
 						</div>
 					)}

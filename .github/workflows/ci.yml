@@ -98,6 +98,9 @@ jobs:
           # Fails the sandbox tests instead of skipping them where the
           # runner is meant to have a sandbox.
           WORKPILOT_EXPECT_SANDBOX: ${{ runner.os != 'Windows' && '1' || '' }}
+          # The same for the signed brain notes' tests (ssh-keygen signs git
+          # commits there): ships with the Linux and macOS runners.
+          WORKPILOT_EXPECT_SSH_SIGNING: ${{ runner.os != 'Windows' && '1' || '' }}
           WORKPILOT_TEST_SHARD: ${{ matrix.shard }}
           # sys.monitoring (Python 3.12+) instead of a trace function: the
           # Linux run with coverage took 10 minutes, 6 without.
@@ -112,7 +115,7 @@ jobs:
           # run measures it, the coverage job adds the shards up.
           cov=()
           if [ "$RUNNER_OS" == "Linux" ]; then
-            cov=(--cov=apps/backend --cov-report=)
+            cov=(--cov=apps/backend --cov=src --cov-report=)
           fi
           # Depuis la racine, sans argument : pytest suit `testpaths` du
           # pytest.ini racine, la seule configuration du depot (lot L11, F31),
@@ -153,6 +156,9 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The merge commit and its parents: HEAD^1 is the base branch's tip.
+          fetch-depth: 2
 
       - name: Set up Python
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
@@ -167,12 +173,20 @@ jobs:
 
       - name: Combine and hold the floor
         run: |
-          python -m pip install --quiet 'coverage>=7.4'
+          # 7.10: `patch = subprocess` in .coveragerc.
+          python -m pip install --quiet 'coverage>=7.10'
           python -m coverage combine .coverage.shard*
-          # A floor, not a goal: about two points under the 60 % the suite
-          # covered on 29 October 2026. Raise it when the suite grows.
-          python -m coverage report --fail-under=58 | tail -n 3
+          # A floor, not a goal: just under what the suite covers, raised by
+          # each lot of the 100 % plan (75.4 % on 15 November 2026, src/ included).
+          python -m coverage report --fail-under=93.6 | tail -n 3
           python -m coverage xml -o apps/backend/coverage.xml
+
+      # The floor above holds the whole suite; this holds each change at
+      # 100 %: every line the pull request adds that the report measures was
+      # run by a test (scripts/diff_coverage.py, docs/rules/workflow.md).
+      - name: Every changed line run by a test
+        if: github.event_name == 'pull_request'
+        run: python scripts/diff_coverage.py --base HEAD^1 --cobertura apps/backend/coverage.xml
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7
@@ -209,6 +223,7 @@ jobs:
       - name: Run all tests
         env:
           WORKPILOT_EXPECT_SANDBOX: '1'
+          WORKPILOT_EXPECT_SSH_SIGNING: '1'
         run: |
           source apps/backend/.venv/bin/activate
           log="$(mktemp)"
@@ -232,6 +247,9 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The merge commit and its parents: HEAD^1 is the base branch's tip.
+          fetch-depth: 2
 
       - name: Setup Node.js frontend
         uses: ./.github/actions/setup-node-frontend
@@ -249,10 +267,16 @@ jobs:
         shell: bash
         run: |
           if [ "$RUNNER_OS" == "Linux" ]; then
-            pnpm run test:coverage --coverage.reporter=text-summary
+            pnpm run test:coverage --coverage.reporter=text-summary --coverage.reporter=json
           else
             pnpm run test
           fi
+
+      # Each change at 100 %, as coverage-python does for Python: lines and
+      # branches the pull request adds, in the report the step above wrote.
+      - name: Every changed line run by a test
+        if: runner.os == 'Linux' && github.event_name == 'pull_request'
+        run: python3 scripts/diff_coverage.py --base HEAD^1 --istanbul apps/frontend/coverage/coverage-final.json
 
       - name: Build application
         working-directory: apps/frontend
@@ -298,6 +322,14 @@ jobs:
 
       - name: Fetch the Electron binary
         uses: ./.github/actions/fetch-electron
+
+      # The backend's virtualenv (apps/backend/.venv), as a developer's
+      # install leaves it: the app starts its local backend from it, and the
+      # Kanban flow runs e2e/fake-backend/ (agents without a model) with it.
+      - name: Setup Python backend
+        uses: ./.github/actions/setup-python-backend
+        with:
+          python-version: '3.12'
 
       - name: Build application
         working-directory: apps/frontend

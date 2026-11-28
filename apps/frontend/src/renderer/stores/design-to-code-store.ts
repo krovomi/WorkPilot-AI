@@ -5,10 +5,14 @@ import {
 	type DesignStack,
 	type DesignStackDetection,
 	type DesignStyle,
+	type DesignLoopProgress,
+	type DesignLoopStats,
 	type DesignToCodeProgress,
 	type DesignToCodeResult,
 	type DesignWriteOutcome,
+	type RenderLoopOptions,
 } from "../../shared/types/design-to-code";
+import { RENDER_LOOP_BOUNDS } from "../../shared/constants/design-render-loop";
 import { type DesignStep, stepOfPhase } from "../lib/design-import-steps";
 import { useProjectStore } from "./project-store";
 
@@ -29,6 +33,7 @@ export type PipelinePhase =
 	| "design_token_integration"
 	| "visual_test_generation"
 	| "figma_sync"
+	| "render_loop"
 	| "complete"
 	| "error";
 
@@ -48,6 +53,8 @@ export interface DesignLiveState {
 	tokensSkipped: boolean;
 	files: string[];
 	testsSupported: boolean | null;
+	/** The render loop's latest step, while it runs. */
+	loop: DesignLoopProgress | null;
 }
 
 const EMPTY_LIVE: DesignLiveState = {
@@ -56,6 +63,7 @@ const EMPTY_LIVE: DesignLiveState = {
 	tokensSkipped: false,
 	files: [],
 	testsSupported: null,
+	loop: null,
 };
 
 const NOTES_STORAGE_KEY = "design-import-notes";
@@ -104,6 +112,12 @@ interface DesignToCodeState {
 	generateTests: boolean;
 	useDesignTokens: boolean;
 	customInstructions: string;
+	/** Render, compare and correct the code after its generation. */
+	renderLoop: boolean;
+	/** Its limits and passes, as offered by the page (the runner bounds them). */
+	loopOptions: RenderLoopOptions;
+	/** The iteration shown in the iterations panel (null: the best one). */
+	selectedIteration: number | null;
 
 	// Image state
 	imageData: string | null;
@@ -117,6 +131,8 @@ interface DesignToCodeState {
 	notes: Record<number, string>;
 	writing: boolean;
 	writeOutcome: DesignWriteOutcome | null;
+	/** The render loop's figures on the selected project (null: not read yet). */
+	loopStats: DesignLoopStats | null;
 }
 
 interface DesignToCodeActions {
@@ -129,6 +145,9 @@ interface DesignToCodeActions {
 	setGenerateTests: (generate: boolean) => void;
 	setUseDesignTokens: (use: boolean) => void;
 	setCustomInstructions: (instructions: string) => void;
+	setRenderLoop: (on: boolean) => void;
+	setLoopOptions: (options: Partial<RenderLoopOptions>) => void;
+	selectIteration: (index: number | null) => void;
 
 	setImageData: (
 		data: string | null,
@@ -171,6 +190,18 @@ const initialState: DesignToCodeState = {
 	generateTests: true,
 	useDesignTokens: true,
 	customInstructions: "",
+	renderLoop: true,
+	loopOptions: {
+		maxIterations: RENDER_LOOP_BOUNDS.maxIterations.default,
+		threshold: RENDER_LOOP_BOUNDS.threshold.default,
+		maxTokens: RENDER_LOOP_BOUNDS.maxTokens.default,
+		maxCostUsd: RENDER_LOOP_BOUNDS.maxCostUsd.default,
+		responsive: false,
+		states: false,
+		fixPasses: false,
+		masks: [],
+	},
+	selectedIteration: null,
 	imageData: null,
 	imagePreview: null,
 	imageName: null,
@@ -179,6 +210,7 @@ const initialState: DesignToCodeState = {
 	notes: {},
 	writing: false,
 	writeOutcome: null,
+	loopStats: null,
 };
 
 export const useDesignToCodeStore = create<
@@ -214,11 +246,25 @@ export const useDesignToCodeStore = create<
 	setUseDesignTokens: (use) => set({ useDesignTokens: use }),
 	setCustomInstructions: (instructions) =>
 		set({ customInstructions: instructions }),
+	setRenderLoop: (on) => set({ renderLoop: on }),
+	setLoopOptions: (options) => set((s) => ({ loopOptions: { ...s.loopOptions, ...options } })),
+	selectIteration: (index) => set({ selectedIteration: index }),
 
+	// Zones drawn on a design mean nothing on another one.
 	setImageData: (data, preview, name) =>
-		set({ imageData: data, imagePreview: preview, imageName: name }),
+		set((s) => ({
+			imageData: data,
+			imagePreview: preview,
+			imageName: name,
+			loopOptions: { ...s.loopOptions, masks: [] },
+		})),
 	clearImage: () =>
-		set({ imageData: null, imagePreview: null, imageName: null }),
+		set((s) => ({
+			imageData: null,
+			imagePreview: null,
+			imageName: null,
+			loopOptions: { ...s.loopOptions, masks: [] },
+		})),
 
 	startPipeline: () =>
 		set({
@@ -232,6 +278,7 @@ export const useDesignToCodeStore = create<
 			startedAt: Date.now(),
 			selectedStep: null,
 			selectedFilePath: null,
+			selectedIteration: null,
 			writeOutcome: null,
 		}),
 	applyProgress: (progress) =>
@@ -248,6 +295,7 @@ export const useDesignToCodeStore = create<
 			if (typeof detail.tests_supported === "boolean") {
 				live.testsSupported = detail.tests_supported;
 			}
+			if (detail.loop) live.loop = detail.loop;
 			const phase = progress.phase as PipelinePhase;
 			const journal =
 				s.journal.at(-1)?.phase === phase
@@ -294,6 +342,7 @@ export const useDesignToCodeStore = create<
 			startedAt: null,
 			selectedStep: null,
 			selectedFilePath: null,
+			selectedIteration: null,
 			writeOutcome: null,
 		}),
 
@@ -331,6 +380,23 @@ export async function detectDesignStack(projectId: string | null): Promise<void>
 	}
 }
 
+/** Read the render loop's figures on the project (kept on this computer). */
+export async function loadDesignLoopStats(projectId: string | null): Promise<void> {
+	if (!projectId) {
+		useDesignToCodeStore.setState({ loopStats: null });
+		return;
+	}
+	try {
+		const loopStats = await globalThis.electronAPI.getDesignLoopStats(projectId);
+		// A late answer for a project the page has left is dropped.
+		if (useProjectStore.getState().selectedProjectId === projectId) {
+			useDesignToCodeStore.setState({ loopStats: loopStats ?? null });
+		}
+	} catch {
+		/* no figures: the page shows none */
+	}
+}
+
 /**
  * Run the design-to-code pipeline via IPC
  */
@@ -356,9 +422,14 @@ export async function runDesignToCodePipeline(): Promise<void> {
 			generateTests: state.generateTests,
 			useDesignTokens: state.useDesignTokens,
 			customInstructions: state.customInstructions,
+			renderLoop: state.renderLoop,
+			renderLoopOptions: state.renderLoop ? state.loopOptions : undefined,
 		});
 
 		useDesignToCodeStore.getState().setPipelineResult(result);
+		if (result.render_loop) {
+			void loadDesignLoopStats(useProjectStore.getState().selectedProjectId);
+		}
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
 		useDesignToCodeStore.getState().setPipelineError(message);
@@ -381,6 +452,7 @@ export async function writeDesignFilesToProject(): Promise<void> {
 		const outcome = await globalThis.electronAPI.writeDesignFiles(projectId, files);
 		useDesignToCodeStore.getState().setWriteOutcome(outcome);
 		useDesignToCodeStore.getState().selectStep("project");
+		if (outcome.review) void loadDesignLoopStats(projectId);
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
 		useDesignToCodeStore.setState({ error: message });

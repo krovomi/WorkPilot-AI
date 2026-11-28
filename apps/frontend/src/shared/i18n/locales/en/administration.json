@@ -10,7 +10,8 @@
 		"organizations": "Organizations",
 		"invitations": "Invitations",
 		"audit": "Audit",
-		"quotas": "Quotas"
+		"quotas": "Quotas",
+		"usage": "Usage"
 	},
 	"common": {
 		"loading": "Loading…",
@@ -40,6 +41,15 @@
 		"recentFailures": "Recent failures"
 	},
 	"members": {
+		"passwordReset": {
+			"action": "Reset password",
+			"actionNamed": "Reset the password of {{name}}",
+			"sent": "A reset link was emailed to {{email}}.",
+			"copyLink": "No email went: send this link to {{email}} yourself. It works once, until {{expires}}.",
+			"copy": "Copy the link",
+			"copied": "Copied",
+			"failed": "The reset link could not be issued"
+		},
 		"empty": "No members yet.",
 		"active": "Active",
 		"inactive": "Disabled",
@@ -53,6 +63,11 @@
 			"status": "Status",
 			"sessions": "Sessions",
 			"actions": "Actions"
+		},
+		"addExisting": {
+			"email": "Add an account that already exists",
+			"help": "For someone who already has an account on this server, in another organization: an invitation refuses their address.",
+			"submit": "Add to the organization"
 		}
 	},
 	"groups": {
@@ -100,6 +115,7 @@
 		"builtInReadOnly": "Built-in roles cannot be edited, so an upgrade that adds a permission reaches every organization. Create a custom role to define your own.",
 		"permissionCount": "{{count}} permissions",
 		"privileged": "Privileged action",
+		"delete": "Delete this role",
 		"selectPrompt": "Select a role to see the permissions it grants.",
 		"namePlaceholder": "Frontend Lead"
 	},
@@ -119,13 +135,22 @@
 	},
 	"audit": {
 		"empty": "No administrative events recorded yet.",
-		"filter": "Filter by action or user",
+		"filter": "Filter by action, user or sign-in",
 		"export": "Export",
 		"columns": {
 			"when": "When",
 			"who": "Who",
+			"signIn": "Sign-in",
 			"action": "Action",
 			"details": "Details"
+		},
+		"signIn": "{{method}} · {{id}}",
+		"methods": {
+			"local": "Password",
+			"entra": "Microsoft Entra",
+			"oidc": "Single sign-on",
+			"invite": "Invitation",
+			"unknown": "Unknown"
 		}
 	},
 	"quotas": {
@@ -137,7 +162,267 @@
 		"unlimited": "Unlimited",
 		"unlimitedUsage": "{{used}} (no limit)",
 		"currentlyUsed": "{{count}} in use",
+		"usedThisMonth": "{{count}} used this month",
 		"enforceHardStop": "Block new runs once the token budget is spent",
 		"hardStopHint": "When unchecked, exceeding the budget is reported but runs still start."
+	},
+	"usage": {
+		"description": "What the server collects about this organization's members, and how long it keeps it. Never a prompt, code, typed text or file name.",
+		"failed": "The server refused: {{error}}",
+		"saved": "Saved.",
+		"pageActivity": {
+			"title": "Page activity",
+			"what": "When on, each member's desktop and phone send how many times they opened each page per day (the page's name only: no project, card or text).",
+			"toggle": "Count which pages members open",
+			"inform": "Off. Tell the members what is measured and why before turning it on: the change is recorded in the audit log.",
+			"since": "On since {{date}}. Each change is recorded in the audit log.",
+			"erase": "Turning it off erases the page counts kept so far when you save."
+		},
+		"retention": {
+			"title": "How long data is kept",
+			"usage": "Token use and presence (days)",
+			"pages": "Page activity (days)",
+			"serverDefault": "Server default: {{count}} days",
+			"hint": "Empty keeps the server's default. From {{min}} to {{max}} days; older data is erased every hour.",
+			"invalid": "Enter a whole number of days from {{min}} to {{max}}, or leave it empty."
+		},
+		"panes": {
+			"dashboard": "Figures",
+			"settings": "Collection and retention",
+			"report": "Report",
+			"budgets": "Budgets"
+		},
+		"dashboard": {
+			"period": "Period",
+			"presets": {
+				"7d": "Last 7 days",
+				"30d": "Last 30 days",
+				"month": "This month",
+				"custom": "Chosen days"
+			},
+			"start": "From",
+			"end": "To",
+			"all": "All",
+			"person": "Person",
+			"group": "Group",
+			"project": "Project",
+			"provider": "Provider",
+			"model": "Model",
+			"platform": "Whole platform",
+			"exportCsv": "Export CSV",
+			"empty": "Nothing in this period.",
+			"tokens": "Tokens",
+			"tokensHint": "{{input}} in, {{output}} out",
+			"cost": "Cost",
+			"estimated": "Partly estimated",
+			"budget": "Monthly budget",
+			"budgetHint": "{{used}} of {{limit}} this month",
+			"noBudget": "No budget set",
+			"active": "Active today",
+			"activeHint": "{{week}} this week, {{month}} this month",
+			"runs": "Runs",
+			"jobs": "Jobs",
+			"successRate": "{{rate}} succeeded",
+			"sessions": "Agent sessions",
+			"dailyTitle": "Tokens per day",
+			"dailyChart": "Tokens per day, by provider",
+			"unknownProvider": "Unknown provider",
+			"peopleTitle": "By person",
+			"engines": "Models",
+			"lastSeen": "Last seen",
+			"erased": "Erased account",
+			"modelsTitle": "By provider and model",
+			"successRateShort": "Succeeded",
+			"costPerRun": "Cost per run",
+			"byPhase": "By phase",
+			"phase": "Phase",
+			"projectsTitle": "By project",
+			"phases": "Phases",
+			"noProject": "No project",
+			"pagesTitle": "Pages opened",
+			"pagesOff": "Page activity is off for this organization: nothing is counted.",
+			"app": "App",
+			"page": "Page",
+			"opens": "Opens",
+			"people": "People",
+			"apps": {
+				"desktop": "Desktop",
+				"mobile": "Phone"
+			},
+			"deliveryTitle": "Delivery",
+			"funnel": "From invitation to first merge",
+			"funnelSteps": {
+				"invited": "Invited",
+				"accepted": "Accepted",
+				"first_sign_in": "First sign-in",
+				"first_task": "First task",
+				"first_merge": "First merge"
+			},
+			"delivered": "Delivered",
+			"deliveredTasks_one": "{{count}} task merged",
+			"deliveredTasks_other": "{{count}} tasks merged",
+			"costPerTask": "Cost per delivered task: {{cost}}",
+			"timeToMerge": "Median time to merge: {{hours}} h",
+			"failures": "Why runs failed",
+			"causes": {
+				"usage_limit": "Usage limit reached",
+				"provider_sign_in": "Provider sign-in",
+				"timeout": "Timed out",
+				"tests": "Tests failed",
+				"other": "Other"
+			},
+			"failureCounts": "{{runs}} runs, {{jobs}} jobs",
+			"presenceTitle": "Right now",
+			"online_one": "{{count}} person online",
+			"online_other": "{{count}} people online",
+			"running_one": "{{count}} run in progress",
+			"running_other": "{{count}} runs in progress",
+			"runningRow": "{{what}} on {{project}} since {{since}}, by",
+			"dormant": "Not seen for {{days}} days",
+			"neverSeen": "never signed in",
+			"deactivate": "Deactivate",
+			"nobody": "Erased account"
+		},
+		"person": {
+			"back": "Back to the figures",
+			"timeline": "What they did",
+			"kinds": {
+				"sign_in": "Sign-in",
+				"audit": "Action",
+				"run": "Run",
+				"job": "Job"
+			},
+			"erase": {
+				"title": "Erase this account",
+				"what": "Removes the account, its sign-in details and its invitations everywhere. Token totals stay, without a name. This cannot be undone.",
+				"confirm": "Type the account's email address",
+				"button": "Erase the account",
+				"done": "The account was erased. Its totals now count as an erased account."
+			}
+		},
+		"report": {
+			"description": "A summary of the organization's usage, sent by email. It carries figures, never a prompt, code, typed text or file name.",
+			"noSmtp": "This server cannot send mail (SMTP is not configured): the report can only be read here.",
+			"enabled": "Send the daily report",
+			"when": "When",
+			"time": "Time",
+			"timezone": "Time zone",
+			"invalidTime": "A time as HH:MM and a time zone such as Europe/Paris.",
+			"days": "Days",
+			"weekdays": {
+				"0": "Mon",
+				"1": "Tue",
+				"2": "Wed",
+				"3": "Thu",
+				"4": "Fri",
+				"5": "Sat",
+				"6": "Sun"
+			},
+			"noDay": "Choose at least one day.",
+			"weekly": "Also the past week's report, each Monday",
+			"monthly": "Also the past month's report, on the first of the month",
+			"content": "Content",
+			"language": "Language",
+			"languages": {
+				"fr": "French",
+				"en": "English"
+			},
+			"names": "Name people in the report",
+			"namesHint": "Off, the report gives totals only and names nobody.",
+			"recipients": "Recipients",
+			"recipientsHint": "One address per line, up to {{max}}.",
+			"defaultRecipients": "Left empty, the report goes to the members whose role reads usage: {{list}}.",
+			"noReader": "nobody yet",
+			"invalidRecipients": "Check the addresses: one per line, up to {{max}}.",
+			"outside": "{{address}} is not a member of this organization: the report will leave it.",
+			"lastSends": "Last sends",
+			"noSends": "Nothing sent yet.",
+			"sentAt": "When",
+			"kind": "Report",
+			"status": "Outcome",
+			"recipientCount": "Recipients",
+			"kinds": {
+				"daily": "Daily",
+				"weekly": "Weekly",
+				"monthly": "Monthly"
+			},
+			"statuses": {
+				"sent": "Sent",
+				"failed": "Failed",
+				"no_smtp": "No SMTP",
+				"no_recipient": "No recipient"
+			},
+			"sendNow": "Send now",
+			"sendNowHint": "Sends the last daily report to its recipients now; the scheduled send still goes at its time.",
+			"sent_one": "Sent to {{count}} address.",
+			"sent_other": "Sent to {{count}} addresses.",
+			"notSent": "Not sent: {{status}}.",
+			"preview": {
+				"title": "Preview",
+				"hint": "The report as the email carries it.",
+				"day": "Period holding",
+				"show": "Show",
+				"period": "From {{start}} to {{end}}",
+				"figure": "Figure",
+				"value": "This period",
+				"previous": "Period before",
+				"average": "7-day mean",
+				"figures": {
+					"tokens": "Tokens",
+					"cost_usd": "Cost",
+					"active": "Active people",
+					"new_members": "New members",
+					"runs": "Runs",
+					"succeeded": "Succeeded",
+					"failed": "Failed",
+					"success_rate": "Success rate",
+					"merged": "Tasks merged",
+					"cost_per_task_usd": "Cost per delivered task"
+				},
+				"dormant_one": "{{count}} member not seen for a while.",
+				"dormant_other": "{{count}} members not seen for a while.",
+				"top": "Who used most",
+				"unnamed": "Not named",
+				"alerts": "Budget alerts",
+				"budgetAlert": "Organization budget: {{percent}} used (alert at {{threshold}} %).",
+				"scopeAlert": "{{scope}} {{name}}: {{percent}} used (alert at {{threshold}} %)."
+			}
+		},
+		"budgets": {
+			"description": "Monthly token budgets for a person, a group or a project. Those who read usage get an email at 80 % and at 100 %; a blocking budget refuses new runs once spent, until the next month.",
+			"organization": "Organization budget",
+			"organizationHint": "{{used}} of {{limit}} tokens this month ({{percent}}), set in Quotas.",
+			"noOrganization": "No organization budget: it is set in Quotas.",
+			"list": "Budgets",
+			"empty": "No budget yet.",
+			"scope": "For",
+			"name": "Name",
+			"limit": "Monthly tokens",
+			"used": "Used this month",
+			"block": "Blocks new runs",
+			"yes": "Yes",
+			"no": "No",
+			"unknown": "Unknown",
+			"scopes": {
+				"person": "Person",
+				"group": "Group",
+				"project": "Project"
+			},
+			"remove": "Remove",
+			"removeLabel": "Remove the budget of {{name}}",
+			"set": "Add or change a budget",
+			"setHint": "A budget set again for the same person, group or project replaces it.",
+			"target": "Who",
+			"choose": "Choose",
+			"tokens": "Monthly tokens",
+			"invalidTokens": "A whole number of tokens, from 1 to 1,000,000,000,000.",
+			"blockToggle": "Refuse new runs once it is spent",
+			"save": "Set the budget",
+			"alerts": "Last alerts",
+			"noAlerts": "No alert yet.",
+			"month": "Month",
+			"threshold": "Threshold",
+			"recipients": "Sent to"
+		}
 	}
 }

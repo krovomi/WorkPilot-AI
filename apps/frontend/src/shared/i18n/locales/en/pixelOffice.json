@@ -72,8 +72,8 @@
 		"coding": "Code is being written. Subtasks run one after another automatically.",
 		"qa_review": "An agent is checking the quality of the code produced: tests, consistency, best practices.",
 		"qa_fixing": "Problems were found. The agent is fixing them before delivery.",
-		"rate_limit_paused": "The Claude API hit its limit. It will resume automatically in a moment.",
-		"auth_failure_paused": "Authentication problem. Check your Claude profiles in the settings.",
+		"rate_limit_paused": "The provider hit its usage limit. The task resumes on its own in a moment.",
+		"auth_failure_paused": "Authentication problem. Check the provider account in the settings.",
 		"complete": "The task is complete and ready for your review.",
 		"failed": "The task failed. Check the logs to understand what happened."
 	},
@@ -90,8 +90,10 @@
 		"logs": "Agent logs",
 		"copy": "Copy",
 		"copied": "Copied",
+		"copyFailed": "Not copied",
 		"copyAll": "Copy all logs",
 		"waitingForLogs": "Waiting for logs…",
+		"noLogs": "No log was recorded for this task.",
 		"sendPlaceholder": "Give an order to the terminal…",
 		"sendPlaceholderWaiting": "Reply to the agent…",
 		"sendHint": "↵ Enter to send · Typed straight into the terminal",
@@ -99,12 +101,168 @@
 		"viewTerminal": "View terminal",
 		"interrupt": "Interrupt",
 		"resumeClaude": "Resume Claude",
-		"kill": "Close",
+		"kill": "Close terminal",
 		"goToKanban": "View in Kanban",
 		"stopTask": "Stop"
 	},
 	"pending": {
 		"description": "This task is queued and has not started yet. Go to the Kanban to launch it, reprioritise it or edit its specification.",
 		"hint": "Waiting for an available agent"
+	},
+	"achievements": {
+		"title": "Achievements",
+		"open": "Show the project's achievements",
+		"count": "{{earned}}/{{total}}",
+		"unlocked": "Achievement unlocked",
+		"dismiss": "Dismiss",
+		"locked": "Not earned yet",
+		"earnedOn": "Earned on {{date}}",
+		"items": {
+			"first-ship": {
+				"name": "First delivery",
+				"description": "A task was done or turned into a pull request."
+			},
+			"ten-ships-week": {
+				"name": "Busy week",
+				"description": "Ten tasks delivered within seven days."
+			},
+			"qa-first-try": {
+				"name": "Right the first time",
+				"description": "A task passed QA on its first review."
+			},
+			"qa-first-try-five": {
+				"name": "Steady hand",
+				"description": "Five tasks passed QA on their first review."
+			},
+			"incident-resolved": {
+				"name": "Back to green",
+				"description": "A Self-Healing incident was resolved."
+			},
+			"incident-fixed-by-agent": {
+				"name": "Fixed on its own",
+				"description": "An agent opened the pull request that resolved an incident."
+			},
+			"second-opinion": {
+				"name": "Second opinion",
+				"description": "A second engine reviewed a task and agreed with it."
+			}
+		}
+	},
+	"kiosk": {
+		"enter": "TV mode",
+		"exit": "Leave TV mode",
+		"calmOn": "Calm mode",
+		"calmOff": "Animations",
+		"calmLocked": "Your system asks for reduced motion, so the office stays still.",
+		"active": "Active",
+		"waiting": "Need you",
+		"shippedToday": "Delivered today",
+		"achievements": "Achievements"
+	},
+	"narratives": {
+		"title": "Office scenes",
+		"settings": "Scene settings",
+		"show": "Show scenes when a task changes hands",
+		"ai": "Have the page's model write them",
+		"aiHelp": "The model chosen for this page writes each scene. It only gets the kind of scene, the roles, their providers and the spec number, never the task's title or content. Without an answer, the scene keeps its template.",
+		"spec": "spec #{{number}}",
+		"task": "“{{title}}”",
+		"withEngine": "{{role}} ({{engine}})",
+		"roles": {
+			"planner": "Planner",
+			"coder": "Coder",
+			"reviewer": "QA Reviewer",
+			"fixer": "QA Fixer",
+			"you": "you"
+		},
+		"scenes": {
+			"plan-ready": "{{from}} slides the finished plan for {{spec}} across the desk to {{to}}.",
+			"handed-to-qa": "{{from}} hands in their copy for {{spec}} to {{to}}.",
+			"qa-sent-back": "{{from}} hands {{spec}} back to {{to}}, with a few notes in the margin.",
+			"qa-approved": "{{from}} signs off {{spec}}: it is waiting for {{to}}.",
+			"shipped": "Delivered: {{spec}}. The whole office applauds.",
+			"stumbled": "{{from}} trips over an error on {{spec}} and stops."
+		}
+	},
+	"providers": {
+		"legend": "Providers at work",
+		"anthropic": "Anthropic",
+		"openai": "OpenAI",
+		"google": "Google",
+		"ollama": "Ollama",
+		"copilot": "Copilot",
+		"grok": "Grok",
+		"custom": "Other"
+	},
+	"seasons": {
+		"name": "Season Q{{quarter}} {{year}}",
+		"open": "Show the goals of {{name}}",
+		"count": "{{met}}/{{total}}",
+		"ends": "Ends on {{date}}",
+		"progress": "{{count}}/{{target}}",
+		"reward": "Reward: {{decor}}",
+		"earned": "In the office: {{list}}.",
+		"noDecor": "Meet a goal to decorate the office.",
+		"goals": {
+			"ship": "Deliver {{count}} tasks",
+			"qa-first-try": "Pass QA on the first review {{count}} times",
+			"debt": "Deliver {{count}} refactoring tasks",
+			"incidents": "Resolve {{count}} incidents",
+			"second-opinion": "Get a second engine to agree {{count}} times"
+		},
+		"decor": {
+			"trophy-shelf": "a trophy shelf",
+			"plants": "potted plants",
+			"whiteboard": "a whiteboard",
+			"neon-sign": "a neon sign",
+			"arcade": "an arcade cabinet"
+		}
+	},
+	"team": {
+		"open": "Show the team leaderboard",
+		"title": "Team leaderboard",
+		"scopeLabel": "Which projects",
+		"scope": {
+			"project": "This project",
+			"org": "Organization"
+		},
+		"periodLabel": "Which period",
+		"period": {
+			"season": "This season",
+			"all": "Since the start"
+		},
+		"loading": "Reading the board from your team's server…",
+		"error": "The server could not give the leaderboard.",
+		"empty": "Nobody shows by name here yet.",
+		"rank": "#{{rank}}",
+		"you": "{{name}} (you)",
+		"points_one": "{{count}} pt",
+		"points_other": "{{count}} pts",
+		"mine": "Your work",
+		"mySummary": "{{points}} points: {{delivered}} delivered, {{reviews}} reviews of a teammate's task.",
+		"noBadges": "No badge yet: deliver a task or review a teammate's.",
+		"showMe": "Show my name to the team",
+		"shown": "Your name and score show on the leaderboards of your organization.",
+		"hidden": "Off: your work is counted for you alone, nobody else sees it.",
+		"howItCounts": "Computed by your team's server, never sent elsewhere. A delivered task counts 1 to 3 points by its assessed complexity; reviewing a teammate's task counts 2. No token or price is counted.",
+		"badges": {
+			"first_delivery": "First task delivered",
+			"ten_deliveries": "Ten tasks delivered",
+			"complex_delivery": "A complex task delivered",
+			"first_review": "First review of a teammate's task",
+			"ten_reviews": "Ten reviews of teammates' tasks"
+		}
+	},
+	"cosmetics": {
+		"open": "Choose how the office looks",
+		"skins": "Characters",
+		"skin": {
+			"provider": "Provider colours",
+			"classic": "Their own colours",
+			"neon": "Neon"
+		},
+		"neonLocked": "Neon is a reward: meet every season goal once to wear it.",
+		"neonEarned": "Neon earned: every season goal has been met.",
+		"decor": "Earned decor"
 	}
 }

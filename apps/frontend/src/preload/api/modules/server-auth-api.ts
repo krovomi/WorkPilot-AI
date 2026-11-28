@@ -10,7 +10,8 @@ import type {
 	ServerAccessToken,
 	ServerAccessTokenCreated,
 } from "../../../shared/types";
-import type { ColorTheme } from "../../../shared/types/settings";
+import type { ServerSessionInfo } from "../../../shared/types/server-session";
+import type { ColorTheme, SidebarPrefs } from "../../../shared/types/settings";
 import type {
 	NeedsYouChannelKind,
 	NeedsYouEventKind,
@@ -51,6 +52,12 @@ export interface ServerAuthConfig {
 	entra_enabled: boolean;
 	entra_tenant_id: string | null;
 	entra_client_id: string | null;
+	/** Sign-in with the server's OpenID Connect provider (Okta, Google, Keycloak...). */
+	sso_enabled?: boolean;
+	/** The provider's name, for the button. */
+	sso_name?: string;
+	/** "Forgot password?" emails a link; otherwise an administrator issues it. */
+	password_reset_by_email?: boolean;
 }
 
 export type ServerAuthResult =
@@ -79,6 +86,15 @@ export interface CreateInvitationResult extends InvitationPublic {
 
 export type DataResult<T> = { ok: true; data: T } | { ok: false; error: string };
 
+/** A link a platform admin issued for an account to set a new password. */
+export interface PasswordResetIssued {
+	email: string;
+	expires_at: string;
+	email_sent: boolean;
+	/** Only when no email went: the admin hands the link over. */
+	reset_link: string | null;
+}
+
 export interface ServerAuthAPI {
 	getState: () => Promise<ServerAuthState>;
 	getConfig: (
@@ -94,6 +110,7 @@ export interface ServerAuthAPI {
 		password: string,
 	) => Promise<ServerAuthResult>;
 	loginEntra: (serverUrl: string) => Promise<ServerAuthResult>;
+	loginSso: (serverUrl: string) => Promise<ServerAuthResult>;
 	lookupInvite: (
 		serverUrl: string,
 		token: string,
@@ -104,9 +121,24 @@ export interface ServerAuthAPI {
 		displayName: string,
 		password: string,
 	) => Promise<ServerAuthResult>;
+	requestPasswordReset: (
+		serverUrl: string,
+		email: string,
+	) => Promise<DataResult<{ requested: boolean }>>;
+	lookupPasswordReset: (
+		serverUrl: string,
+		link: string,
+	) => Promise<DataResult<{ email: string }>>;
+	confirmPasswordReset: (
+		serverUrl: string,
+		link: string,
+		password: string,
+	) => Promise<DataResult<{ reset: boolean }>>;
+	issuePasswordReset: (userId: string) => Promise<DataResult<PasswordResetIssued>>;
 	createInvite: (payload: {
 		email: string;
 		role?: string;
+		org_role?: string | null;
 		project_id?: string | null;
 		project_role?: string | null;
 	}) => Promise<DataResult<CreateInvitationResult>>;
@@ -140,13 +172,20 @@ export interface ServerAuthAPI {
 	logout: () => Promise<ServerAuthState>;
 	restore: () => Promise<ServerAuthState>;
 	onStateChanged: (callback: (state: ServerAuthState) => void) => () => void;
-	/** The person's theme from the server, already kept in the settings; null when none. */
+	/**
+	 * The person's theme and menu layout from the server, already kept in the
+	 * settings; null when the server has neither.
+	 */
 	pullUiPreferences: () => Promise<ServerUiPreferences | null>;
+	/** How the current session was opened and who it is, as the server reports it. */
+	getSession: () => Promise<IPCResult<ServerSessionInfo>>;
 }
 
 export interface ServerUiPreferences {
-	theme: "light" | "dark" | "system";
-	colorTheme: ColorTheme;
+	theme?: "light" | "dark" | "system";
+	colorTheme?: ColorTheme;
+	/** The sidebar preferences with the layout the person saved on the server. */
+	sidebarPrefs?: SidebarPrefs;
 }
 
 export const createServerAuthAPI = (): ServerAuthAPI => ({
@@ -163,6 +202,8 @@ export const createServerAuthAPI = (): ServerAuthAPI => ({
 		),
 	loginEntra: (serverUrl) =>
 		invokeIpc<ServerAuthResult>(IPC_CHANNELS.SERVER_AUTH_LOGIN_ENTRA, serverUrl),
+	loginSso: (serverUrl) =>
+		invokeIpc<ServerAuthResult>(IPC_CHANNELS.SERVER_AUTH_LOGIN_SSO, serverUrl),
 	lookupInvite: (serverUrl, token) =>
 		invokeIpc<DataResult<InviteLookup>>(
 			IPC_CHANNELS.SERVER_AUTH_LOOKUP_INVITE,
@@ -176,6 +217,30 @@ export const createServerAuthAPI = (): ServerAuthAPI => ({
 			token,
 			displayName,
 			password,
+		),
+	requestPasswordReset: (serverUrl, email) =>
+		invokeIpc<DataResult<{ requested: boolean }>>(
+			IPC_CHANNELS.SERVER_AUTH_REQUEST_PASSWORD_RESET,
+			serverUrl,
+			email,
+		),
+	lookupPasswordReset: (serverUrl, link) =>
+		invokeIpc<DataResult<{ email: string }>>(
+			IPC_CHANNELS.SERVER_AUTH_LOOKUP_PASSWORD_RESET,
+			serverUrl,
+			link,
+		),
+	confirmPasswordReset: (serverUrl, link, password) =>
+		invokeIpc<DataResult<{ reset: boolean }>>(
+			IPC_CHANNELS.SERVER_AUTH_CONFIRM_PASSWORD_RESET,
+			serverUrl,
+			link,
+			password,
+		),
+	issuePasswordReset: (userId) =>
+		invokeIpc<DataResult<PasswordResetIssued>>(
+			IPC_CHANNELS.SERVER_AUTH_ISSUE_PASSWORD_RESET,
+			userId,
 		),
 	createInvite: (payload) =>
 		invokeIpc<DataResult<CreateInvitationResult>>(
@@ -223,6 +288,8 @@ export const createServerAuthAPI = (): ServerAuthAPI => ({
 	restore: () => invokeIpc<ServerAuthState>(IPC_CHANNELS.SERVER_AUTH_RESTORE),
 	pullUiPreferences: () =>
 		invokeIpc<ServerUiPreferences | null>(IPC_CHANNELS.SERVER_AUTH_PULL_UI_PREFERENCES),
+	getSession: () =>
+		invokeIpc<IPCResult<ServerSessionInfo>>(IPC_CHANNELS.SERVER_AUTH_GET_SESSION),
 	onStateChanged: (callback) =>
 		createIpcListener<[ServerAuthState]>(IPC_CHANNELS.SERVER_AUTH_STATE_CHANGED, (state) =>
 			callback(state),

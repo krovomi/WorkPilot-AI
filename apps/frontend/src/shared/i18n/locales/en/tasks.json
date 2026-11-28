@@ -1,4 +1,22 @@
 {
+	"readiness": {
+		"checking": "Checking “{{title}}” before it starts…",
+		"title": "Before “{{title}}” starts",
+		"questionsIntro": "The card is short: the agent would have to guess. Answer in one line; the answer is added to the description.",
+		"problemIntro": "The start would fail:",
+		"problems": {
+			"no_git": "The project is not a git repository. WorkPilot builds each task in a worktree: run “git init” in the project folder.",
+			"no_commit": "The git repository has no commit yet. Make a first commit, then start the card again.",
+			"no_auth": "The Claude account is not signed in. Sign in under Settings, Claude Profiles, then start the card again."
+		},
+		"answerLabel": "Answer",
+		"sectionTitle": "Clarifications before the start",
+		"later": "Later",
+		"close": "Close",
+		"startAnyway": "Start anyway",
+		"saveAndStart": "Save and start",
+		"saveFailed": "The answers could not be saved. The card did not start."
+	},
 	"dictation": {
 		"pending": "Add or discard the voice draft before continuing.",
 		"start": "Dictate",
@@ -92,6 +110,7 @@
 		"stuck": "Stuck",
 		"incomplete": "Incomplete",
 		"recovering": "Recovering...",
+		"recoverFailed": "Could not recover the task",
 		"needsRecovery": "Needs Recovery",
 		"needsResume": "Needs Resume",
 		"tdd": "TDD",
@@ -106,6 +125,9 @@
 		"sessionCompaction": "Session Compaction",
 		"criticalPhases": "Key steps",
 		"lastError": "Last error",
+		"compactionSummaryClean": "{{completed}}/{{total}} phases completed, no failures.",
+		"compactionSummaryFailed_one": "{{completed}}/{{total}} phases completed, {{count}} needs attention. Last issue at phase {{index}}: {{title}}",
+		"compactionSummaryFailed_other": "{{completed}}/{{total}} phases completed, {{count}} need attention. Last issue at phase {{index}}: {{title}}",
 		"automation": "Automations",
 		"automationTooltip": "Created by the automation rule “{{rule}}”"
 	},
@@ -180,14 +202,13 @@
 		"build_failed": "Red Build",
 		"done": "Done",
 		"pr_created": "Open PR",
-		"error": "Error"
+		"error": "Error",
+		"failed": "Failed",
+		"abandoned": "Abandoned"
 	},
 	"kanban": {
-		"abandoned": {
-			"chip": "{{count}} abandoned",
-			"chip_other": "{{count}} abandoned",
-			"hideChip": "Hide abandoned tasks",
-			"showChip": "Show abandoned tasks"
+		"more": {
+			"label": "More board actions"
 		},
 		"emptyBacklog": "No tasks planned",
 		"emptyBacklogHint": "Add a task to get started",
@@ -245,7 +266,6 @@
 		"undo": "Undo",
 		"clearSelection": "Clear Selection",
 		"mixedColumnWarning": "Different columns — move unavailable",
-		"invalidBulkTransition": "Cannot move selected tasks to this column",
 		"markAsDone": "Complete & Create PRs",
 		"markAsDoneConfirmTitle": "Complete Selected Tasks",
 		"markAsDoneConfirmDescription": "You are about to mark {{count}} task(s) as done. This will open the PR creation flow for all selected tasks.",
@@ -254,6 +274,15 @@
 		"tasksToComplete": "Tasks to complete",
 		"bulkMoveSuccess": "{{count}} task(s) moved successfully",
 		"bulkMoveError": "Failed to move {{failed}} of {{total}} tasks",
+		"groupMove": {
+			"queued_one": "{{count}} card waits in Queue: In Progress is full ({{slots}} at a time).",
+			"queued_other": "{{count}} cards wait in Queue: In Progress is full ({{slots}} at a time).",
+			"skipped_one": "{{count}} card stays put (already in that column, or PR Open without a PR).",
+			"skipped_other": "{{count}} cards stay put (already in that column, or PR Open without a PR).",
+			"held_one": "{{count}} card waits for your answers before it starts.",
+			"held_other": "{{count}} cards wait for your answers before they start.",
+			"nothing": "No card to move to this column"
+		},
 		"dragColumn": "Drag to reorder column",
 		"columnOptions": "Column options",
 		"collapseColumn": "Collapse column",
@@ -270,7 +299,10 @@
 		"bulkRestoreSuccess": "{{count}} task(s) restored",
 		"sortActiveDragHint": "Manual reordering is disabled while a sort is active. Switch back to \"Manual order\" to drag and drop.",
 		"aging": {
-			"idleFor": "Idle for {{duration}}"
+			"idleFor": "Idle for {{duration}}",
+			"days": "{{count}}d",
+			"hours": "{{count}}h",
+			"minutes": "{{count}}min"
 		},
 		"stale": {
 			"chip": "{{count}} idle",
@@ -295,10 +327,11 @@
 		"views": {
 			"button": "Views",
 			"title": "Saved views",
-			"empty": "No saved views yet. Set your filters, then save them here.",
+			"empty": "No saved views yet. Set your filters, layout and lanes, then save them here.",
 			"namePlaceholder": "View name…",
 			"save": "Save current view",
-			"delete": "Delete view"
+			"delete": "Delete view",
+			"summary": "{{layout}} · lanes by {{lanes}}"
 		},
 		"wipLimit": {
 			"label": "WIP limit",
@@ -315,7 +348,8 @@
 			"droppedSimple": "Dropped task \"{{title}}\".",
 			"cancelled": "Move cancelled.",
 			"columnPickedUp": "Picked up column {{column}}. Use arrow keys to reorder.",
-			"columnReordered": "Column {{column}} moved."
+			"columnReordered": "Column {{column}} moved.",
+			"cardFocus": "{{position}} of {{count}}, {{column}}"
 		},
 		"filter": {
 			"button": "Filter",
@@ -339,6 +373,13 @@
 				"insights": "Insights",
 				"generated": "Generated by a page",
 				"manual": "Manual"
+			},
+			"quickLabel": "Quick filters",
+			"labelsLabel": "Labels",
+			"quick": {
+				"flagged": "Blocked",
+				"recent": "Changed this week",
+				"mine": "My tasks"
 			}
 		},
 		"sort": {
@@ -370,8 +411,8 @@
 			"runAsTaskHint": "Run as an interactive Kanban task (planning, review, conversation) instead of a direct run.",
 			"taskCreated": "Task created: {{name}}",
 			"uncommitted": "The files written could not be committed on the review branch; they are still in {{path}}.",
-			"reviewCard_other": "{{count}} files committed on {{branch}} (card “{{card}}”, in Human Review). Review the diff, then create the PR from the card.",
-			"reviewCard_one": "{{count}} file committed on {{branch}} (card “{{card}}”, in Human Review). Review the diff, then create the PR from the card.",
+			"reviewCard_other": "{{count}} files committed on {{branch}} (task “{{card}}”, in Human Review). Review the diff, then create the PR from the task.",
+			"reviewCard_one": "{{count}} file committed on {{branch}} (task “{{card}}”, in Human Review). Review the diff, then create the PR from the task.",
 			"helpTitle": "Available commands"
 		},
 		"blockers": {
@@ -399,11 +440,457 @@
 			"qaIterations_other": "{{count}} QA passes expected."
 		},
 		"serverBoard": "Shared board · {{role}}",
-		"serverBoardHint": "This project lives on the WorkPilot server: everyone on it sees the same cards, and its builds run there. The board refreshes every few seconds.",
+		"serverBoardHint": "This project lives on the WorkPilot server: everyone on it sees the same tasks, and its builds run there. The board refreshes every few seconds.",
 		"serverRole": {
 			"viewer": "Viewer",
 			"member": "Member",
 			"owner": "Owner"
+		},
+		"bulk": {
+			"label": "Selected tasks",
+			"saveFailed_one": "{{count}} task could not be changed",
+			"saveFailed_other": "{{count}} tasks could not be changed"
+		},
+		"undoLabels": {
+			"type": "type change",
+			"priority": "priority change",
+			"move_one": "move of {{count}} task",
+			"move_other": "move of {{count}} tasks",
+			"delete_one": "deletion of {{count}} task",
+			"delete_other": "deletion of {{count}} tasks",
+			"rename": "rename"
+		},
+		"undone": "Undone: {{label}}",
+		"undoStale": "Could not fully undo ({{label}}): a task has changed since",
+		"undoNothing": "Nothing to undo",
+		"cardMenu": {
+			"label": "Task menu",
+			"open": "Open",
+			"edit": "Edit…",
+			"type": "Type",
+			"priority": "Priority",
+			"saveFailed": "The change could not be saved"
+		},
+		"quickAdd": {
+			"addCard": "Add a task",
+			"addQueued": "Add and queue",
+			"addStarted": "Add and start",
+			"addTooltip": "Add a task (N)",
+			"ariaLabel": "Describe the new task",
+			"placeholder": "Describe the task… Paste a list to create one task per line.",
+			"type": "Type",
+			"noType": "No type (detected automatically)",
+			"priority": "Priority",
+			"noPriority": "No priority",
+			"splitLines_one": "One task per line ({{count}})",
+			"splitLines_other": "One task per line ({{count}})",
+			"create": "Create",
+			"queue": "Queue",
+			"createMany_one": "Create {{count}} task",
+			"createMany_other": "Create {{count}} tasks",
+			"start": "Start",
+			"startMany_one": "Start {{count}} task",
+			"startMany_other": "Start {{count}} tasks",
+			"moreOptions": "More options…",
+			"close": "Close (Esc)",
+			"hint": "Enter to create · Shift+Enter for a new line · Esc to close",
+			"created_one": "Task created in {{column}}",
+			"created_other": "{{count}} tasks created in {{column}}",
+			"createFailed": "The task could not be created. Your text is kept: try again."
+		},
+		"rename": {
+			"label": "Task title"
+		},
+		"shortcuts": {
+			"open": "Keyboard shortcuts",
+			"title": "Keyboard shortcuts",
+			"description": "Keys of the board. They wait while you type or while a menu or a dialog is open.",
+			"groups": {
+				"cards": "Tasks",
+				"selection": "Selection",
+				"board": "Board"
+			},
+			"rows": {
+				"navigate": "Move between tasks",
+				"open": "Open the task",
+				"rename": "Rename the task (or double-click its title)",
+				"menu": "Task menu (or right-click)",
+				"toggle": "Add or remove a task",
+				"range": "Select a range in a column",
+				"column": "Select the column",
+				"clear": "Clear the selection",
+				"delete": "Delete the selection",
+				"add": "New task in Planning",
+				"undo": "Undo the last change",
+				"help": "Show this list (or ?)"
+			},
+			"keys": {
+				"enter": "Enter",
+				"shift": "Shift",
+				"click": "Click",
+				"escape": "Esc",
+				"delete": "Delete"
+			}
+		},
+		"capacity": {
+			"slots": "slots",
+			"wip": "limit {{limit}}",
+			"slotsAria": "{{count}} of {{limit}} parallel slots in use",
+			"wipAria": "{{count}} tasks, limit {{limit}}"
+		},
+		"pulse": {
+			"urgent_one": "{{count}} urgent",
+			"urgent_other": "{{count}} urgent",
+			"high_one": "{{count}} high priority",
+			"high_other": "{{count}} high priority",
+			"next": "Next: {{title}}",
+			"plansToApprove_one": "{{count}} plan to approve",
+			"plansToApprove_other": "{{count}} plans to approve",
+			"toReview_one": "{{count}} to review",
+			"toReview_other": "{{count}} to review",
+			"needsFix_one": "{{count}} to fix",
+			"needsFix_other": "{{count}} to fix",
+			"doneThisWeek_one": "{{count}} this week",
+			"doneThisWeek_other": "{{count}} this week",
+			"label": "Column summary",
+			"planning_one": "{{count}} planning",
+			"planning_other": "{{count}} planning",
+			"coding_one": "{{count}} coding",
+			"coding_other": "{{count}} coding",
+			"qa_one": "{{count}} in QA",
+			"qa_other": "{{count}} in QA",
+			"paused_one": "{{count}} paused",
+			"paused_other": "{{count}} paused",
+			"failedErrors_one": "{{count}} run failed",
+			"failedErrors_other": "{{count}} runs failed",
+			"failedQa_one": "{{count}} rejected by QA",
+			"failedQa_other": "{{count}} rejected by QA",
+			"failedContext_one": "{{count}} context too long",
+			"failedContext_other": "{{count}} context too long",
+			"resolution_wont_do_one": "{{count}} won’t do",
+			"resolution_wont_do_other": "{{count}} won’t do",
+			"resolution_duplicate_one": "{{count}} duplicate",
+			"resolution_duplicate_other": "{{count}} duplicates",
+			"resolution_obsolete_one": "{{count}} obsolete",
+			"resolution_obsolete_other": "{{count}} obsolete",
+			"resolution_replaced_one": "{{count}} replaced",
+			"resolution_replaced_other": "{{count}} replaced",
+			"resolution_pr_closed_one": "{{count}} PR closed",
+			"resolution_pr_closed_other": "{{count}} PRs closed",
+			"resolution_other_one": "{{count}} other",
+			"resolution_other_other": "{{count}} other"
+		},
+		"emptyFailed": "No failed runs",
+		"emptyFailedHint": "A run that fails, or that QA could not get to pass, waits here to be restarted or abandoned",
+		"emptyAbandoned": "Nothing set aside",
+		"emptyAbandonedHint": "Drop a task here to abandon it: won’t do, duplicate, obsolete, replaced",
+		"outcome": {
+			"failedDropRefused": "Only a failed run lands in Failed. Restart a task from its card or move it to the queue.",
+			"doneCannotBeAbandoned": "A completed task cannot be abandoned."
+		},
+		"ask": {
+			"button": "Ask",
+			"open": "Ask a question about the board's tickets",
+			"title": "Ask the board",
+			"description": "Ask in any language: every related ticket comes up, finished and archived ones included, even when written in another language.",
+			"emptyHint": "For instance, before planning a feature, ask whether it was already built, even partly.",
+			"examples": {
+				"adminPage": "How was the admin page reworked?",
+				"export": "Can we already export data to CSV?",
+				"login": "What was done about sign-in errors?"
+			},
+			"placeholder": "Ask a question about the tickets…",
+			"send": "Ask",
+			"searching": "Reading the tickets…",
+			"failed": "The question could not be answered. Try again in a moment.",
+			"serverUnreachable": "The server's cards could not be read. Check the connection to the server and try again.",
+			"modeAi": "Answered by AI",
+			"modeKeywords": "Keyword search",
+			"keywordsHint": "No AI answer (no provider, or it did not reply): these tickets share words with the question.",
+			"searched_one": "{{count}} ticket searched",
+			"searched_other": "{{count}} tickets searched",
+			"noMatch": "No ticket relates to this question.",
+			"citation": "Ticket {{index}}: {{title}}",
+			"archived": "Archived",
+			"coverage": {
+				"full": "Already covered",
+				"partial": "Partly covered",
+				"related": "Related"
+			},
+			"state": {
+				"done": "Done",
+				"in_review": "In review",
+				"in_progress": "In progress",
+				"planned": "Planned",
+				"failed": "Failed",
+				"abandoned": "Abandoned"
+			},
+			"privacy": "The question and the tickets go to the AI provider chosen in Settings, and to an embeddings model (this computer's first). Vectors are kept on this computer only.",
+			"newConversation": "New conversation",
+			"modeSemantic": "Ranked by meaning",
+			"semanticHint": "No answer from the AI (no provider, or it did not answer): these tickets are the closest to the question in meaning and words, whatever their language.",
+			"semanticTitle": "An embeddings model compared the meaning of the question with each ticket's",
+			"semanticSource": {
+				"local": "Meaning: {{model}}, on this computer",
+				"cloud": "Meaning: {{model}} ({{provider}} API)"
+			},
+			"semanticPartial": "{{indexed}} of {{total}} tickets read by meaning so far; the rest follow with the next questions",
+			"semanticMode": {
+				"label": "By meaning",
+				"auto": "Auto",
+				"local": "This computer only",
+				"off": "Off",
+				"hint": {
+					"auto": "An embeddings model on this computer (Ollama, LM Studio), else your provider's embeddings API (OpenAI, Mistral, Google, Hugging Face)",
+					"local": "Only an embeddings model on this computer: tickets never leave it for this step",
+					"off": "Keywords and the AI model only"
+				}
+			},
+			"tabs": {
+				"label": "Ask the board or check an idea",
+				"ask": "Ask a question",
+				"idea": "Check an idea"
+			},
+			"idea": {
+				"description": "Paste a feature you plan, in any language: each of its requirements comes back done, partly done or missing, with the tickets that hold it.",
+				"label": "The feature to check",
+				"placeholder": "Describe the feature: a sentence, a list of needs or a pasted spec. For example: \"Admins can export the user list to CSV, filtered by role, and get an email when it is ready.\"",
+				"check": "Check",
+				"length": "{{count}} / {{max}}",
+				"emptyHint": "The board splits the idea into requirements and looks for each one in every ticket, whatever language it was written in. Ctrl + Enter checks it.",
+				"checking": "Reading the board for each requirement…",
+				"failed": "The idea could not be checked. Try again.",
+				"noRequirement": "No requirement could be read from this idea.",
+				"unjudgedHint": "No model judged these requirements: the closest tickets are listed, check them before deciding.",
+				"verdict": {
+					"done": "Already done",
+					"partial": "Partly done",
+					"missing": "Missing",
+					"unknown": "To check"
+				},
+				"tally": {
+					"done_one": "{{count}} done",
+					"done_other": "{{count}} done",
+					"partial_one": "{{count}} partly done",
+					"partial_other": "{{count}} partly done",
+					"missing_one": "{{count}} missing",
+					"missing_other": "{{count}} missing",
+					"unknown_one": "{{count}} to check",
+					"unknown_other": "{{count}} to check"
+				},
+				"createCard": "Create a card with what is missing",
+				"createHint": "The card lists only the requirements not done yet, with the tickets they build on. It lands in the backlog.",
+				"createFailed": "The card could not be created.",
+				"created": "Card created in the backlog.",
+				"openCard": "Open the card",
+				"allDone": "Every requirement is already done: nothing to create.",
+				"another": "Check another idea",
+				"card": {
+					"untitled": "Feature to build",
+					"section": {
+						"missing": "To build",
+						"partial": "To finish",
+						"unknown": "To check",
+						"done": "Already done"
+					},
+					"buildsOn": "Builds on: {{tickets}}",
+					"original": "Original idea"
+				}
+			},
+			"kind": {
+				"roadmap": "Roadmap",
+				"idea": "Idea",
+				"change": "Merged change"
+			},
+			"sources": {
+				"button_one": "{{count}} source",
+				"button_other": "{{count}} sources",
+				"hint": "Besides the cards, the board also reads:",
+				"cards": "Board cards",
+				"roadmap": "Roadmap features",
+				"ideas": "Ideation ideas",
+				"history": "Changes merged into the branch (git history)",
+				"serverBoard": "The server's cards, with your rights"
+			}
+		},
+		"lanes": {
+			"title": "Swimlanes",
+			"button": "Swimlanes",
+			"buttonActive": "Lanes: {{grouping}}",
+			"groupings": {
+				"none": "None",
+				"priority": "Priority",
+				"type": "Type",
+				"area": "Sub-project",
+				"sprint": "Sprint",
+				"source": "Origin",
+				"parent": "Split task"
+			},
+			"readOnly": "read only",
+			"pinFlagged": "Blocked cards in a lane of their own, first",
+			"flagged": "Blocked",
+			"noValue": {
+				"none": "Cards",
+				"priority": "No priority",
+				"type": "No type yet",
+				"area": "No sub-project",
+				"sprint": "Backlog (no sprint)",
+				"source": "No origin",
+				"parent": "Not split"
+			},
+			"expand": "Expand the lane",
+			"collapse": "Collapse the lane",
+			"addArea": "Add a sub-project",
+			"addAreaPlaceholder": "Sub-project name",
+			"addAreaHint": "An empty lane appears: drag cards into it.",
+			"addAreaRefused": "This sub-project is already there, or the name is not valid.",
+			"readOnlyDrop": "Cards cannot change lanes here: {{grouping}} is not set by moving a card.",
+			"undoLabel": "lane move",
+			"saveFailed_one": "{{count}} card could not be moved to this lane.",
+			"saveFailed_other": "{{count}} cards could not be moved to this lane."
+		},
+		"sprints": {
+			"title": "Sprints",
+			"button": "Sprints",
+			"allCards": "All cards",
+			"backlog": "Backlog (no sprint)",
+			"empty": "No sprint yet. Create one, then put cards in it from their menu or by dragging them into its lane (Swimlanes: Sprint).",
+			"unknown": "Unknown sprint",
+			"states": {
+				"planned": "Planned",
+				"active": "Active",
+				"closed": "Closed"
+			},
+			"progress": "{{done}}/{{cards}} cards · {{donePoints}}/{{points}} pts",
+			"unestimated_one": "{{count}} not estimated",
+			"unestimated_other": "{{count}} not estimated",
+			"pointsHint": "Points are the card's Smart Estimation score (1 to 13). A card with no estimate counts 0.",
+			"velocity": "Velocity: {{points}} pts",
+			"velocityHint": "Average points done by the last closed sprints (up to three).",
+			"report": "Done: {{done}} cards ({{donePoints}} pts) · carried over: {{carried}}",
+			"new": "New sprint",
+			"newTitle": "New sprint",
+			"editTitle": "Edit the sprint",
+			"dialogHint": "A sprint is a box of cards with an optional goal and dates. Only one sprint is active at a time.",
+			"name": "Name",
+			"namePlaceholder": "Sprint 12",
+			"goal": "Goal",
+			"goalPlaceholder": "What the team commits to deliver",
+			"startDate": "Start",
+			"endDate": "End",
+			"endBeforeStart": "The sprint cannot end before it starts.",
+			"create": "Create",
+			"save": "Save",
+			"edit": "Edit",
+			"start": "Start",
+			"complete": "Complete sprint",
+			"delete": "Delete",
+			"oneActive": "Another sprint is active: complete it first.",
+			"completeTitle": "Complete « {{name}} »",
+			"completeSummary": "{{done}} cards done ({{donePoints}} pts), {{carried}} unfinished.",
+			"carryTo": "Move the unfinished cards to",
+			"deleteTitle": "Delete « {{name}} »?",
+			"deleteHint": "Its cards go back to the backlog. Only a planned sprint can be deleted.",
+			"saveFailed": "The sprint could not be saved.",
+			"cardsNotMoved_one": "{{count}} card could not be moved: the sprint was not changed.",
+			"cardsNotMoved_other": "{{count}} cards could not be moved: the sprint was not changed.",
+			"cardMenu": "Sprint",
+			"noneToJoin": "No open sprint",
+			"undoLabel": "sprint change"
+		},
+		"layout": {
+			"label": "Layout",
+			"board": "Board",
+			"list": "List",
+			"timeline": "Timeline"
+		},
+		"list": {
+			"caption": "The board's cards as a list",
+			"empty": "No card matches the filters.",
+			"columns": {
+				"title": "Card",
+				"status": "Status",
+				"priority": "Priority",
+				"sprint": "Sprint",
+				"area": "Sub-project",
+				"points": "Points",
+				"updated": "Updated"
+			}
+		},
+		"reports": {
+			"button": "Reports",
+			"title": "Reports",
+			"description": "Measured from the project's cards and sprints, whatever the board's filters. Points are the Smart Estimation score, never a duration.",
+			"day": "Day",
+			"sprint": "Sprint",
+			"cards": "Cards",
+			"tabs": {
+				"burndown": "Burndown",
+				"velocity": "Velocity",
+				"flow": "Cumulative flow",
+				"cycle": "Cycle time",
+				"throughput": "Throughput",
+				"ends": "Unsuccessful ends"
+			},
+			"burndown": {
+				"empty": "No sprint in progress. Start one from the « Sprints » menu to follow its burndown.",
+				"chart": "Burndown of {{name}}",
+				"summary": "{{name}}: {{left}} of {{scope}} points left.",
+				"ideal": "Ideal",
+				"remaining": "Points left"
+			},
+			"velocity": {
+				"empty": "No sprint closed yet: the velocity appears with the first one.",
+				"chart": "Points committed and done per sprint",
+				"summary": "Average of the last 3 sprints: {{points}} points.",
+				"committed": "Committed",
+				"done": "Done"
+			},
+			"flow": {
+				"chart": "Cards per stage, last 30 days",
+				"summary": "Cards per stage at the end of each day of the last 30 days. A band that widens is work piling up.",
+				"bands": {
+					"todo": "To do",
+					"doing": "In progress",
+					"review": "In review",
+					"done": "Done"
+				}
+			},
+			"cycle": {
+				"empty": "No card finished in the last 90 days with a known start.",
+				"chart": "Cycle time of the cards finished in the last 90 days",
+				"summary_one": "{{count}} card finished: {{median}} days from start to done.",
+				"summary_other": "{{count}} cards finished: median {{median}} days from start to done, 85 % within {{p85}} days.",
+				"span": "From start to done",
+				"bins": {
+					"lt1": "< 1 day",
+					"d1to3": "1–3 days",
+					"d3to7": "3–7 days",
+					"d7to14": "1–2 weeks",
+					"gt14": "> 2 weeks"
+				}
+			},
+			"throughput": {
+				"chart": "Cards finished per week",
+				"summary_one": "{{count}} card finished in the last {{weeks}} weeks.",
+				"summary_other": "{{count}} cards finished in the last {{weeks}} weeks.",
+				"week": "Week of"
+			},
+			"ends": {
+				"empty": "No card ended without success.",
+				"failed": "Failed",
+				"abandoned": "Abandoned",
+				"reasons": {
+					"errors": "Build errors",
+					"prompt_too_long": "Prompt too long",
+					"qa_rejected": "Rejected by QA"
+				}
+			}
+		},
+		"timeline": {
+			"card": "Card",
+			"span": "{{status}}: {{start}} to {{end}}",
+			"running": "{{status}}: since {{start}}, still running"
 		}
 	},
 	"queue": {
@@ -574,7 +1061,12 @@
 		"otherProjectWarning": "An emulator appears to be active for another project. Restart it to switch to this task."
 	},
 	"metadata": {
-		"severity": "severity",
+		"securitySeverity": {
+			"low": "Low severity",
+			"medium": "Medium severity",
+			"high": "High severity",
+			"critical": "Critical severity"
+		},
 		"pullRequest": "Pull Request",
 		"showMore": "Show more",
 		"showLess": "Show less",
@@ -584,6 +1076,8 @@
 		"acEmpty": "No criteria defined. Click to add some.",
 		"acSyncFromAdo": "Sync from Azure DevOps",
 		"acSyncing": "Syncing…",
+		"acSyncErrorTitle": "Could not sync",
+		"acSyncErrorDesc": "The acceptance criteria could not be read from Azure DevOps.",
 		"acPlaceholder": "One criterion per line…",
 		"acEdit": "Edit",
 		"acSave": "Save",
@@ -611,6 +1105,8 @@
 		"extraNotePlaceholder": "Add precisions, constraints or hints. These notes are passed to every pipeline phase (plan, code, QA, review).",
 		"extraNoteHelp": "Saved into requirements.json as additional_context.",
 		"extraNoteSaved": "Saved.",
+		"extraNoteSaveErrorTitle": "Could not save",
+		"extraNoteSaveErrorDesc": "The note could not be saved.",
 		"extraNoteSave": "Save note",
 		"extraNoteSaving": "Saving…",
 		"blockedBy": {
@@ -647,7 +1143,8 @@
 			"visual-canvas": "Visual canvas",
 			"tech-debt": "Tech debt",
 			"automation": "Automation",
-			"generated": "Generated code"
+			"generated": "Generated code",
+			"self-healing": "Self-Healing"
 		},
 		"cicdRun": {
 			"triggered_pr": "{{provider}} pipeline started after the PR was opened, {{when}}",
@@ -682,6 +1179,47 @@
 			"default": "default"
 		},
 		"help": "Decided without AI from the category, the imported item or the words of the title. Change it if it is wrong: later versions will pick the workflow from it."
+	},
+	"cardType": {
+		"label": "Task type",
+		"values": {
+			"feature": "Feature",
+			"ux": "UI / UX",
+			"bug": "Bug",
+			"hotfix": "Hotfix",
+			"security": "Security",
+			"perf": "Performance",
+			"refactor": "Refactoring",
+			"test": "Tests",
+			"investigation": "Investigation",
+			"spike": "Spike / POC",
+			"docs": "Docs",
+			"run": "Operations (RUN)",
+			"upgrade": "Upgrade",
+			"infra": "Infra / chore"
+		},
+		"proposedTitle": "{{type}} (proposed, confirm it in the task detail)",
+		"also": "Also: {{type}}",
+		"basis": {
+			"user": "chosen by you",
+			"category": "from the category",
+			"import": "from the imported item",
+			"keywords": "from the title",
+			"severity": "from the security severity",
+			"origin": "from the task's origin"
+		},
+		"preview": {
+			"field": "{{label}}: {{value}}",
+			"progress": "{{status}} · {{percent}}%",
+			"blockedBy": "Waiting for: {{titles}}"
+		},
+		"families": {
+			"build": "Build",
+			"fix": "Fix",
+			"quality": "Harden",
+			"know": "Understand",
+			"ops": "Operate"
+		}
 	},
 	"images": {
 		"removeImageAriaLabel": "Remove image {{filename}}",
@@ -761,7 +1299,7 @@
 		"dialogTitle": "Abandon task",
 		"dialogPrefix": "Abandon",
 		"dialogSuffix": "? Development stops and the task is set aside.",
-		"dialogReversible": "Nothing is deleted: the task is greyed out on the board and you can resume it at any time.",
+		"dialogReversible": "Nothing is deleted: the task moves to the Abandoned column and you can resume it at any time.",
 		"reasonPlaceholder": "Reason (optional) — e.g. the product owner no longer wants it developed",
 		"abandoning": "Abandoning…",
 		"abandonedTitle": "Task abandoned",
@@ -769,7 +1307,29 @@
 		"failedTitle": "Abandon failed",
 		"failedDescription": "Could not abandon the task. Please try again.",
 		"resumeFailedTitle": "Resume failed",
-		"resumeFailedDescription": "Could not resume the task. Please try again."
+		"resumeFailedDescription": "Could not resume the task. Please try again.",
+		"dialogTitleMany_one": "Abandon {{count}} task",
+		"dialogTitleMany_other": "Abandon {{count}} tasks",
+		"dialogMany_one": "Abandon {{count}} task? Development stops and it is set aside.",
+		"dialogMany_other": "Abandon {{count}} tasks? Development stops and they are set aside.",
+		"resolutionLabel": "Why",
+		"reasonLabel": "Note",
+		"linkNone": "Not on the board",
+		"linkLabel": {
+			"duplicate": "Duplicate of",
+			"replaced": "Replaced by"
+		},
+		"resolutions": {
+			"wont_do": "Won’t do",
+			"duplicate": "Duplicate",
+			"obsolete": "Obsolete",
+			"replaced": "Replaced by another task",
+			"pr_closed": "PR closed without merge",
+			"other": "Other"
+		},
+		"abandonedTitleMany_one": "Task abandoned",
+		"abandonedTitleMany_other": "{{count}} tasks abandoned",
+		"abandonMenu": "Abandon…"
 	},
 	"edit": {
 		"title": "Edit Task",
@@ -821,8 +1381,8 @@
 		},
 		"errors": {
 			"descriptionRequired": "Please provide a description",
-			"maxImagesReached": "Maximum of 5 images allowed",
-			"invalidImageType": "Invalid image type. Allowed: PNG, JPEG, GIF, WebP",
+			"maxImagesReached": "Maximum of {{max}} images allowed",
+			"invalidImageType": "Invalid image type. Allowed: {{types}}",
 			"processPasteFailed": "Failed to process pasted image",
 			"processDropFailed": "Failed to process dropped image"
 		},
@@ -842,7 +1402,11 @@
 					"bug_fix": "Bug Fix",
 					"refactoring": "Refactoring",
 					"documentation": "Docs",
-					"security": "Security"
+					"security": "Security",
+					"performance": "Performance",
+					"ui_ux": "UI/UX",
+					"infrastructure": "Infrastructure",
+					"testing": "Testing"
 				},
 				"priority": {
 					"low": "Low",
@@ -1050,11 +1614,21 @@
 		"capture": "Capture",
 		"capturing": "Capturing...",
 		"noSources": "No screens or windows found",
+		"kind": {
+			"screen": "Screen",
+			"window": "Window"
+		},
 		"errors": {
 			"getSources": "Failed to get screenshot sources",
 			"fetchSources": "Failed to fetch screenshot sources",
 			"capture": "Failed to capture screenshot",
-			"captureFailed": "Failed to capture screenshot"
+			"captureFailed": "Failed to capture screenshot",
+			"codes": {
+				"sources_failed": "The screens and windows could not be listed. Check that the app is allowed to record the screen.",
+				"invalid_source": "No screen or window was picked.",
+				"source_not_found": "This screen or window is no longer available. Refresh the list and pick it again.",
+				"capture_failed": "The capture did not go through. Try again."
+			}
 		},
 		"devMode": {
 			"title": "Screenshot capture unavailable",
@@ -1214,6 +1788,7 @@
 			"stopTask": "Stop Task",
 			"startTask": "Start Task",
 			"deleteTask": "Delete Task",
+			"edit": "Edit task",
 			"close": "Close",
 			"watchLive": "Watch Live",
 			"activating": "Activating...",
@@ -1321,6 +1896,7 @@
 			"rejecting": "Rejecting...",
 			"rejectionReason": "Reason for changes (optional)",
 			"rejectionPlaceholder": "Describe what needs to be changed in the plan...",
+			"sendRejection": "Send the request",
 			"conflictsChecking": "Checking for file overlaps with parallel tasks...",
 			"conflictsNone": "No file overlap with other active tasks",
 			"conflictsTitle": "Potential conflicts with parallel tasks",
@@ -1338,9 +1914,10 @@
 		"saveError": "Could not save the plan"
 	},
 	"codeEditor": {
-		"deleteFile": "Delete file",
-		"contentPlaceholder": "File content...",
-		"selectFile": "Select a file to edit"
+		"hint": "Remove the files this subtask should leave alone. The files themselves do not change.",
+		"removeFile": "Remove {{name}} from this subtask",
+		"filesRemoved_one": "{{count}} file removed from the plan",
+		"filesRemoved_other": "{{count}} files removed from the plan"
 	},
 	"failure": {
 		"title": "This task failed",
@@ -1911,7 +2488,14 @@
 		"onlyResumedPhase": "Only for the resumed phase ({{phase}}) — the following phases keep their engine",
 		"effortNotApplied": "This model has no effort setting WorkPilot can reach: the level you pick has no effect on it.",
 		"effortSentAs": "Sent to the provider as “{{value}}”, the closest level this model takes.",
-		"effortRuntime": "Applied at launch if the model takes it; the task log says what was sent."
+		"effortRuntime": "Applied at launch if the model takes it; the task log says what was sent.",
+		"codeMode": {
+			"label": "Code mode",
+			"default": "As in Settings",
+			"off": "Off",
+			"auto": "Auto",
+			"on": "On"
+		}
 	},
 	"redTeam": {
 		"title": "Red team",
@@ -2006,7 +2590,7 @@
 			"screenshots": "Screenshots",
 			"scenario": "Scenario (replayed after QA)",
 			"findings": "Findings",
-			"cardScenario": "Scenario written on the card"
+			"cardScenario": "Scenario written on the task"
 		},
 		"kind": {
 			"web-frontend": "web front end",
@@ -2488,7 +3072,7 @@
 		"button": "Purge",
 		"buttonTitle": "Free the room taken by the worktrees whose work is over",
 		"title": "Purge finished worktrees",
-		"description": "Every card works in a full copy of the project. These belong to cards whose PR is merged, or that are done, archived or abandoned. Purging removes the folder and the local workpilot/… branch; the card, its spec and its PR stay. A merged PR is purged automatically.",
+		"description": "Every task works in a full copy of the project. These belong to tasks whose PR is merged, or that are done, archived or abandoned. Purging removes the folder and the local workpilot/… branch; the task, its spec and its PR stay. A merged PR is purged automatically.",
 		"loading": "Measuring the room they take…",
 		"empty": "No worktree to purge: nothing takes room for nothing.",
 		"dirty": "uncommitted changes, kept",
@@ -2550,5 +3134,282 @@
 			"switch": "Switch: deploy the code that reads only the new structure.",
 			"contract": "Contract: once no running version uses it, drop the old structure in a later migration."
 		}
+	},
+	"budgetPause": {
+		"chip": "Budget reached: {{spent}} / {{limit}}",
+		"stallChip": "Paused: no progress",
+		"floor": " (at least, a model with no known price)",
+		"task": "This task spent {{spent}}{{floor}} of its {{limit}} limit. It paused before its next session, with nothing lost.",
+		"project": "The project spent {{spent}}{{floor}} of its {{limit}} budget for the period. The task paused before its next session.",
+		"projectHint": "Raise the project's budget in Costs, or make it a warning only, then resume the task.",
+		"stall": "{{spent}} spent since the last completed subtask ({{done}}/{{total}}), over the {{limit}} the task allowed itself.",
+		"stallHint": "Read the logs to see where it goes in circles. Resuming gives it the same allowance again.",
+		"newLimit": "New limit for the task (USD)",
+		"raise": "Raise and resume",
+		"tooLow": "The limit must be above the {{spent}} already spent",
+		"saveFailed": "The limit could not be saved",
+		"resumed": "Limit raised to {{limit}}, the task resumes"
+	},
+	"appliedLessons": {
+		"title_one": "{{count}} lesson applied to this task",
+		"title_other": "{{count}} lessons applied to this task",
+		"description": "What the Learning Loop gave this task's agents: the rules adopted from reviews, the patterns learned from earlier builds, and the checkpoints of the task's kind when this repository's QA history asks for them.",
+		"disabledCount": "{{count}} turned off",
+		"show": "Show",
+		"hide": "Hide",
+		"kind": {
+			"rule": "Rule",
+			"pattern": "Pattern",
+			"checkpoint": "Checkpoint"
+		},
+		"patternType": {
+			"success": "to apply",
+			"failure": "to avoid",
+			"optimization": "tip"
+		},
+		"confidence": "confidence {{value}}",
+		"agents": "Given to",
+		"off": "Off for this task",
+		"disable": "Turn off for this task",
+		"enable": "Turn back on",
+		"disabledHint": "Later prompts of this task leave it out; every other task keeps it.",
+		"error": "Could not update the lesson: {{error}}"
+	},
+	"breakerPause": {
+		"chip": "Circuit breaker: {{tool}}",
+		"body": "The agent called {{tool}} {{repeats}} times with the same arguments and got the same result each time, with no file changed in between. The task paused itself rather than pay for a loop.",
+		"hint": "Read its logs. Resume restarts the phase with the same conversation; if it loops again, switch the model or make the task more precise.",
+		"killSwitch": "Stopped by Stop all agents",
+		"voiceStop": "Stopped by voice after its step"
+	},
+	"safetyPause": {
+		"anomalyChip": "Trust score: {{score}}/100",
+		"anomalyBody": "The agent's trust score fell to {{score}}/100 (pause at {{pause}}). The task paused itself; its files are as the agent left them.",
+		"anomalyStopped": "The agent's trust score fell to {{score}}/100, at or below the stop threshold ({{stop}}). The session was stopped.",
+		"types": {
+			"mass_file_deletion": "Mass file deletion",
+			"unexpected_network_access": "Network access to another machine",
+			"system_config_modification": "Write to the security configuration",
+			"excessive_token_usage": "Excessive token usage",
+			"rapid_file_changes": "Rapid file changes",
+			"sensitive_file_access": "Access to a secret or the git history",
+			"unusual_command_execution": "Dangerous command",
+			"long_running_session": "Long-running session",
+			"repetitive_errors": "Repeated errors",
+			"path_traversal_attempt": "Path outside the project or into the system"
+		},
+		"sandboxChip": {
+			"restricted_path": "Sandbox: write outside the allowed paths",
+			"file_size": "Sandbox: file too large",
+			"files_written": "Sandbox: too many files",
+			"session_time": "Sandbox: session too long"
+		},
+		"sandboxBody": {
+			"restricted_path": "The agent wrote {{path}}, outside the paths the restricted sandbox allows. The session was stopped.",
+			"file_size": "The agent wrote {{path}} ({{value}} bytes), over the sandbox's limit of {{limit}} bytes per file. The session was stopped.",
+			"files_written": "The agent wrote {{value}} files in one session, over the sandbox's limit of {{limit}}. The task paused itself; its files are as the agent left them.",
+			"session_time": "The session ran {{value}} seconds, over the sandbox's limit of {{limit}}. The task paused itself; its files are as the agent left them."
+		},
+		"rolledBack": "Its files were restored to the snapshot taken before that session. The state they replaced is kept as a snapshot too.",
+		"rollbackFailed": "Restoring the snapshot failed: the files are as the agent left them. Restore one below.",
+		"hint": "Read its logs before resuming. Limits and thresholds are in Settings, Sandbox and Anomaly detection.",
+		"snapshots": {
+			"open": "Snapshots…",
+			"none": "No snapshot for this task yet.",
+			"restore": "Restore",
+			"confirm": "Confirm restore",
+			"restored": "Snapshot restored.",
+			"failed": "Could not restore: {{error}}",
+			"listFailed": "Could not read the snapshots: {{error}}",
+			"hint": "A restore rewrites the task's worktree; the current state is saved as a snapshot first, so it can be undone.",
+			"labels": {
+				"planning": "before planning",
+				"coding": "before coding",
+				"qa_review": "before QA",
+				"before_rollback": "before a restore"
+			}
+		},
+		"anomalyLine_one": "{{label}}",
+		"anomalyLine_other": "{{label}} (×{{count}})"
+	},
+	"policyPause": {
+		"hoursChip": "Outside allowed hours",
+		"hoursBody": "workpilot.policy.yaml lets agents work {{hours}} ({{timezone}}). The task paused itself once its current action had finished.",
+		"budgetChip": "Token budget reached",
+		"budgetBody": "The project's agents spent {{spent}} tokens in the last hour, at or past the {{limit}} workpilot.policy.yaml allows.",
+		"taskBudgetChip": "Task token budget reached",
+		"taskBudgetBody": "This task's agents spent {{spent}} tokens, at or past the {{limit}} per task workpilot.policy.yaml allows.",
+		"invalidChip": "Invalid policy",
+		"invalidBody_one": "The guardrails policy has {{count}} error: no agent runs until it is fixed. Settings > Guardrails lists it.",
+		"invalidBody_other": "The guardrails policy has {{count}} errors: no agent runs until they are fixed. Settings > Guardrails lists them.",
+		"hint": "Resume it when the policy allows again; the decision is in the audit trail of Settings > Guardrails."
+	},
+	"suitePlacement": {
+		"modes": {
+			"auto": "Automatic",
+			"machine": "This machine",
+			"ci": "The forge's CI"
+		},
+		"modeHints": {
+			"auto": "Tests run on this machine when it isn't too busy. Otherwise they go to your repository's CI or the WorkPilot server, or wait their turn here.",
+			"machine": "The full suite always runs on the machine that runs WorkPilot.",
+			"ci": "The task's branch is pushed (without a pull request when there is none yet) and the forge's CI runs the full suite. The change's own tests still run here."
+		},
+		"project": {
+			"label": "Where long test suites run",
+			"manual": "Manual",
+			"autoHint": "Tests run on this machine when it isn't too busy. Otherwise they go to your repository's CI or the WorkPilot server, or wait their turn so the machine doesn't slow down.",
+			"manualHint": "You choose where each task's tests run.",
+			"branchPush": "Push the task's branch without a pull request to run the CI",
+			"branchPushHint": "Lets the suite start on the CI as soon as QA ends, without waiting for you to create the pull request."
+		},
+		"form": {
+			"label": "Where this task's long suites run",
+			"project": "Project setting",
+			"projectHint": "Follows the project's choice.",
+			"options": {
+				"auto": "Automatic",
+				"machine": "Manual: this machine",
+				"ci": "Manual: the forge's CI"
+			}
+		},
+		"targets": {
+			"machine": "this machine",
+			"server": "the WorkPilot server",
+			"ci": "the CI",
+			"queue": "the queue"
+		},
+		"badge": {
+			"queued": "Suite queued",
+			"sent": "Suite on {{target}}",
+			"pending": "Suite running on the CI",
+			"passed": "CI suite green",
+			"failed": "CI suite red",
+			"not_started": "CI suite not started"
+		},
+		"reasons": {
+			"chosen": "Chosen for this task or project.",
+			"alone": "No other task running: the suite runs here.",
+			"room": "The machine has room for the suite.",
+			"pr": "The machine lacks {{short}}: the suite runs on the pull request's CI.",
+			"server": "The machine lacks {{short}}: the suite runs on the WorkPilot server.",
+			"branch_push": "The machine lacks {{short}}: the branch was pushed without a pull request to run the CI.",
+			"no_route": "The machine lacks {{short}} and nothing else can run it: the suite waits its turn here.",
+			"turn": "Its turn came: the suite runs here.",
+			"not_followed": "The CI is not followed for this project yet: the suite runs here."
+		},
+		"short": {
+			"cpu": "CPU",
+			"ram": "RAM",
+			"vram": "VRAM"
+		},
+		"notStarted": {
+			"push_failed": "The branch could not be pushed. The full suite did not run: run it before merging.",
+			"no_remote": "The project has no remote to push to. The full suite did not run: run it before merging.",
+			"no_pipeline": "No pipeline started on the pushed commit within 20 minutes. The next suites stay on this machine for 24 hours."
+		},
+		"mergeHeld": "The full suite is running on the CI for this commit. Merge becomes available once it is green.",
+		"mergeHeldLink": "Open the run"
+	},
+	"flag": {
+		"badge": "Blocked",
+		"flag": "Flag as blocked",
+		"flagMenu": "Flag as blocked…",
+		"unflag": "Remove flag",
+		"dialogTitle_one": "Flag the task as blocked",
+		"dialogTitle_other": "Flag {{count}} tasks as blocked",
+		"dialogDescription_one": "The task keeps its column; the flag tells everyone it cannot move on until the impediment is lifted.",
+		"dialogDescription_other": "The tasks keep their columns; the flag tells everyone they cannot move on until the impediment is lifted.",
+		"reasonLabel": "What blocks it",
+		"reasonPlaceholder": "What blocks it (optional), e.g. waiting for the API key from the client",
+		"failedTitle": "Flag not saved",
+		"failedDescription": "Could not save the flag. Please try again."
+	},
+	"runFacts": {
+		"title": "How it went",
+		"unknown": "unknown",
+		"automation": "Automation",
+		"agentTime": "Agents' working time",
+		"leadTime": "From launch to finish",
+		"spendTitle": "Tokens and cost of every agent session",
+		"tokens": "{{value}} tokens",
+		"tokensEstimated": "≈ {{value}} tokens",
+		"tokensUnknown": "Tokens unknown",
+		"costShort": "· {{cost}}",
+		"tokensLabel": "Tokens",
+		"tokensDetail": "{{total}} (in {{input}}, out {{output}}, cache {{cache}})",
+		"costLabel": "Cost",
+		"estimatedNote_one": "{{count}} session of {{total}} estimated: its provider reported no count.",
+		"estimatedNote_other": "{{count}} sessions of {{total}} estimated: their provider reported no count.",
+		"models": "Models",
+		"createdBy": "Created by",
+		"startedBy": "Launched by",
+		"peopleShort": "{{creator}} → {{launcher}}",
+		"peopleTitle": "Created by {{creator}}, launched by {{launcher}}",
+		"duration": {
+			"seconds": "{{seconds}} s",
+			"minutes": "{{minutes}} min",
+			"hours": "{{hours}} h {{minutes}} min",
+			"days": "{{days}} d {{hours}} h",
+			"hoursOnly": "{{hours}} h",
+			"daysOnly": "{{days}} d"
+		}
+	},
+	"approvalTier": {
+		"cardBadge": "{{tier}} · {{outcome}}",
+		"tooltip": "Approval tier: {{outcome}}. Why: {{reasons}}",
+		"outcome": {
+			"merged": "merged by itself",
+			"waiting": "waits for a person",
+			"observed": "observed",
+			"mergeFailed": "merge refused"
+		},
+		"reasons": {
+			"sensitive_paths": "sensitive paths",
+			"protected_files": "policy or agent files",
+			"requires_review": "files that need a review",
+			"ci_files": "CI files",
+			"ci_files_bump": "bump that touches CI",
+			"feature": "new feature",
+			"breaking": "breaking change",
+			"migration": "migration",
+			"contract": "public contract",
+			"layers": "several layers",
+			"size_files": "many files",
+			"size_lines": "many lines",
+			"trust": "low trust score",
+			"major_bump": "major bump",
+			"bump_with_code": "bump with code",
+			"bump_unknown": "bump of unknown level",
+			"dependency_bump": "dependency bump",
+			"docs_only": "documentation only",
+			"empty": "no change",
+			"code_change": "code change",
+			"review_missing": "no cross-review on this code",
+			"review_inconclusive": "cross-review without a verdict",
+			"policy_invalid": "invalid approvals section",
+			"rule": "project rule",
+			"claude_approvals_pending": "Claude Approvals still running",
+			"claude_approvals_failed": "Claude Approvals did not pass",
+			"unsandboxed": "ran without a sandbox",
+			"blocked_hosts": "tried a refused host"
+		}
+	},
+	"cardLabels": {
+		"cardMenu": "Labels…",
+		"dialogTitle": "Labels",
+		"dialogDescription": "Short words to find « {{title}} » again and filter the board by.",
+		"listLabel": "Labels",
+		"none": "No label yet.",
+		"remove": "Remove the label {{label}}",
+		"placeholder": "New label",
+		"inputLabel": "Label to add",
+		"add": "Add",
+		"full": "A task holds {{count}} labels at most.",
+		"suggestions": "Already on the board",
+		"suggest": "+ {{label}}",
+		"filterBy": "Show the tasks labelled {{label}}",
+		"failedTitle": "Labels not saved",
+		"failedDescription": "The task could not be saved. Try again."
 	}
 }

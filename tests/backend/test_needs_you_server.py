@@ -576,6 +576,8 @@ class TestStorage:
             "plan_review": True,
             "review_ready": False,
             "failed": True,
+            "approval_escalated": True,
+            "review_feedback_held": True,
         }
 
 

@@ -27,6 +27,7 @@ from foundation.paging import (
     render_page,
     spill_excerpt,
 )
+from foundation.platform import is_windows
 from harness.domain.tools import canonical_tools
 from rtk import rewrite_command as rtk_rewrite
 from watermarks import clean_generated
@@ -139,6 +140,16 @@ def executor_may_use(agent_type: str | None, tool_name: str) -> bool:
         return True
     from agents.tools_pkg.permissions import declared_servers, declared_tools
 
+    if tool_name == "run_script":
+        # A script only chains the type's own tools, each gated again when it
+        # runs; a type that declares none has nothing to chain. Whether the
+        # session is offered it at all is the code mode switch
+        # (`code_mode.offered`), which needs the task and is asked by
+        # `get_tool_definitions` and `_run_script`.
+        from agents.tools_pkg.permissions import declared_tools
+
+        declared = declared_tools(agent_type)
+        return declared is None or bool(declared)
     server = EXECUTOR_SERVER_GRANTS.get(tool_name)
     if server is not None:
         servers = declared_servers(agent_type)
@@ -263,6 +274,7 @@ class ToolExecutor:
         # The OS sandbox `run_command` runs in (`os_sandbox`), decided on the
         # first command so a bare executor that never runs one costs nothing.
         self._sandbox = None
+        self._script_sandbox = None
         self.working_directory = self.project_dir
         if working_directory is not None:
             self.working_directory = self._resolve_within_project(working_directory)
@@ -295,6 +307,13 @@ class ToolExecutor:
             from security.path_guard import protected_config_refusal
 
             if refusal := protected_config_refusal(path, self.working_directory):
+                raise ValueError(refusal)
+            # The reinforced sandbox (Settings, Sandbox), as the SDK hook applies it.
+            from security.sandbox import current_policy, write_refusal
+
+            if refusal := write_refusal(
+                current_policy(), str(candidate), self.project_dir, self.spec_dir
+            ):
                 raise ValueError(refusal)
         return candidate
 
@@ -341,6 +360,15 @@ class ToolExecutor:
                 "does not include it. Work with the tools you were given."
             )
 
+        # The Agent Debugger's breakpoints, as the SDK hook applies them on
+        # Claude: the call waits for the person, who may skip it.
+        from agents.debugger_gate import gate_tool_call
+
+        gated = await gate_tool_call(self.spec_dir, tool_name, arguments)
+        if gated.refusal is not None:
+            return gated.refusal
+        arguments = gated.arguments
+
         if tool_name == "read_file":
             return await self._read_file(
                 _pick_arg(arguments, *path_aliases),
@@ -381,6 +409,10 @@ class ToolExecutor:
             )
         elif tool_name == "create_directory":
             return await self._create_directory(_pick_arg(arguments, *dir_aliases))
+        elif tool_name == "run_script":
+            return await self._run_script(
+                _pick_arg(arguments, "code", "script", "source")
+            )
         elif _is_uiux_tool(tool_name):
             # ui-ux-pro-max: the same tools the Claude SDK reaches over MCP,
             # offered only on a task whose preflight said it is about the UI.
@@ -400,6 +432,7 @@ class ToolExecutor:
                     arguments,
                     task=task_ref(self.project_dir, self.spec_dir),
                     max_chars=self._page_chars(),
+                    project_dir=self.project_dir,
                 )
             )
         elif _is_code_search_tool(tool_name):
@@ -453,7 +486,7 @@ class ToolExecutor:
         try:
             with open(file_path, encoding="utf-8") as f:
                 text = f.read()
-        except Exception as e:
+        except (OSError, UnicodeDecodeError) as e:
             raise RuntimeError(f"Error reading file {path}: {e}")
         return render_page(
             page_lines(
@@ -482,6 +515,19 @@ class ToolExecutor:
             logger.info("write refused by a guardrail: %s", refusal)
             return f"Write refused by the project's guardrails: {refusal}"
 
+        from security.sandbox import current_policy, write_refusal
+
+        if isinstance(content, str) and (
+            refusal := write_refusal(
+                current_policy(),
+                str(file_path),
+                self.project_dir,
+                self.spec_dir,
+                len(content.encode("utf-8", errors="replace")),
+            )
+        ):
+            raise ValueError(refusal)
+
         # The other half of the product. Providers that do not use the Claude
         # SDK never reach `create_client`'s PreToolUse hooks, so the same
         # cleaning is applied at the one place their writes go through —
@@ -507,17 +553,10 @@ class ToolExecutor:
 
         try:
             with open(file_path, "w", encoding="utf-8") as f:
-                if empty_file:
-                    # Create empty file
-                    pass
-                elif content is not None:
-                    f.write(content)
-                else:
-                    # Default content if none provided
-                    f.write("")
-            return f"Successfully wrote to {path}"
-        except Exception as e:
+                f.write("" if empty_file else content or "")
+        except OSError as e:
             raise RuntimeError(f"Error writing file {path}: {e}")
+        return f"Successfully wrote to {path}"
 
     def _write_implementation_plan(
         self,
@@ -604,7 +643,7 @@ class ToolExecutor:
                 elif item.is_dir():
                     files.append(item.name + "/")
             return sorted(files)
-        except Exception as e:
+        except OSError as e:
             raise RuntimeError(f"Error listing files in {directory}: {e}")
 
     def _walk_files(self, directory: str):
@@ -714,7 +753,7 @@ class ToolExecutor:
         try:
             dir_path.mkdir(parents=True, exist_ok=True)
             return f"Successfully created directory {path}"
-        except Exception as e:
+        except OSError as e:
             raise RuntimeError(f"Error creating directory {path}: {e}")
 
     async def _run_command(self, command: str | None, cwd: str | None = None) -> str:
@@ -775,7 +814,7 @@ class ToolExecutor:
                     stdin=asyncio.subprocess.DEVNULL,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
-                    start_new_session=os.name != "nt",
+                    start_new_session=not is_windows(),
                 )
 
             try:
@@ -798,6 +837,9 @@ class ToolExecutor:
                 stderr_bytes.decode("utf-8", errors="replace") if stderr_bytes else ""
             )
             if refused := sandbox.refused_hosts(started):
+                from os_sandbox.evidence import record_refused
+
+                record_refused(self.spec_dir, refused)  # for the PR's approval tier
                 # Said, not left to a timeout to guess from.
                 note = (
                     "[WorkPilot sandbox] network refused: "
@@ -832,6 +874,29 @@ class ToolExecutor:
             return self._fit_output(stdout)
         except Exception as e:
             raise RuntimeError(f"Error running command {command}: {e}")
+
+    async def _run_script(self, code: str | None) -> str:
+        """Code mode: the model's script, each of its calls run by `execute`.
+
+        Offered only when the switch, the task and the phase say so
+        (`code_mode.offered`); refused here too, since a model may name a tool
+        it was not offered. The record of the script's calls stays whole after
+        the fitted body: the safety watch reads it (`code_mode.protocol`).
+        """
+        from code_mode import offered
+        from code_mode.runner import ScriptError, run_script
+
+        if not offered(self.agent_type, self.spec_dir):
+            return (
+                "Tool 'run_script' is not available: code mode is off for this "
+                "session. Work with the tools you were given."
+            )
+        try:
+            result = await run_script(self, code or "")
+        except ScriptError as error:
+            raise RuntimeError(str(error)) from error
+        body = self._fit_output(result.body)
+        return "\n\n".join(part for part in (body, result.calls) if part)
 
     def _fit_output(self, output: Any) -> Any:
         """A command's or an in-process tool's output as the model reads it.
@@ -895,12 +960,29 @@ class ToolExecutor:
         if self._sandbox is None:
             from os_sandbox import session_sandbox
 
-            self._sandbox = session_sandbox(self.project_dir, self.spec_dir)
+            self._sandbox = session_sandbox(
+                self.project_dir, self.spec_dir, microvm=True
+            )
         return self._sandbox
+
+    def script_sandbox(self):
+        """The OS sandbox ``run_script``'s Node runs in, on this machine.
+
+        Never the task's microVM: its image may have no Node, and the script's
+        own commands already reach the VM through ``execute``.
+        """
+        sandbox = self.session_sandbox()
+        if getattr(sandbox, "vm", None) is None:
+            return sandbox
+        if self._script_sandbox is None:
+            from os_sandbox import session_sandbox
+
+            self._script_sandbox = session_sandbox(self.project_dir, self.spec_dir)
+        return self._script_sandbox
 
     async def _stop_command(self, process) -> None:
         """Reap the shell and its children when a command times out or is cancelled."""
-        if os.name == "nt":
+        if is_windows():
             killer = await asyncio.create_subprocess_exec(
                 "taskkill",
                 "/PID",
@@ -922,59 +1004,41 @@ class ToolExecutor:
 
 
 def _is_brain_tool(name: str) -> bool:
-    try:
-        from brain.runtime import is_brain_tool
+    from brain.runtime import is_brain_tool
 
-        return is_brain_tool(name)
-    except Exception:  # noqa: BLE001 - an optional store never breaks dispatch
-        return False
+    return is_brain_tool(name)
 
 
 def _is_uiux_tool(name: str) -> bool:
-    try:
-        from uiux.integration import is_uiux_tool
+    from uiux.integration import is_uiux_tool
 
-        return is_uiux_tool(name)
-    except Exception:  # noqa: BLE001 - optional design data never breaks dispatch
-        return False
+    return is_uiux_tool(name)
 
 
 def _uiux_tool_definitions(spec_dir: str | Path | None) -> list[dict[str, Any]]:
     """ui-ux-pro-max's tools, when this task's preflight said it is a UI task."""
-    try:
-        from uiux.integration import tool_definitions
+    from uiux.integration import tool_definitions
 
-        return tool_definitions(spec_dir)
-    except Exception:  # noqa: BLE001 - optional design data never breaks a session
-        return []
+    return tool_definitions(spec_dir)
 
 
 def _is_verify_tool(name: str) -> bool:
-    try:
-        from verify.tools import is_verify_tool
+    from verify.tools import is_verify_tool
 
-        return is_verify_tool(name)
-    except Exception:  # noqa: BLE001 - an optional feature never breaks dispatch
-        return False
+    return is_verify_tool(name)
 
 
 def _is_code_search_tool(name: str) -> bool:
-    try:
-        from harness.tools.code_search import is_code_search_tool
+    from harness.tools.code_search import is_code_search_tool
 
-        return is_code_search_tool(name)
-    except Exception:  # noqa: BLE001 - an optional tool never breaks dispatch
-        return False
+    return is_code_search_tool(name)
 
 
 def _code_search_tool_definitions() -> list[dict[str, Any]]:
     """`search_code`; `get_tool_definitions` keeps it for the types that declare it."""
-    try:
-        from harness.tools.code_search import tool_definitions
+    from harness.tools.code_search import tool_definitions
 
-        return tool_definitions()
-    except Exception:  # noqa: BLE001 - an optional tool never breaks a session
-        return []
+    return tool_definitions()
 
 
 #: The agent types that drive a verification and get the `verify_*` tools.
@@ -984,22 +1048,33 @@ VERIFY_AGENT_TYPES = frozenset({"verifier"})
 def _verify_tool_definitions(agent_type: str) -> list[dict[str, Any]]:
     if agent_type not in VERIFY_AGENT_TYPES:
         return []
-    try:
-        from verify.tools import tool_definitions
+    from verify.tools import tool_definitions
 
-        return tool_definitions()
-    except Exception:  # noqa: BLE001
-        return []
+    return tool_definitions()
 
 
 def _brain_tool_definitions() -> list[dict[str, Any]]:
     """The shared brain's tools, when a brain exists on this machine."""
-    try:
-        from brain.runtime import tool_definitions
+    from brain.runtime import tool_definitions
 
-        return tool_definitions()
-    except Exception:  # noqa: BLE001 - an optional store never breaks a session
-        return []
+    return tool_definitions()
+
+
+def _run_command_description() -> str:
+    text = (
+        "Run a non-interactive shell command with a time limit. Quote paths "
+        "containing spaces. Use read_file to read files."
+    )
+    from security.agent_safety_settings import load_settings
+
+    if load_settings().sandbox.microvm.enabled:
+        # Said whatever the host is: on Windows, `cmd` syntax would fail there.
+        text += (
+            " Commands run with /bin/sh in the task's Linux microVM, whatever "
+            "the host system; the host's own services are reached as "
+            "host.docker.internal."
+        )
+    return text
 
 
 def get_tool_definitions(
@@ -1125,7 +1200,7 @@ def get_tool_definitions(
         },
         {
             "name": "run_command",
-            "description": "Run a non-interactive shell command with a time limit. Quote paths containing spaces. Use read_file to read files.",
+            "description": _run_command_description(),
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -1212,6 +1287,13 @@ def get_tool_definitions(
     # no `write_file` and no `run_command`, and `execute` refuses them too.
     # Sorted and serialized one way (`harness.domain.tools`): the definitions
     # sit in the cached prefix of every provider that caches one.
-    return canonical_tools(
+    offered_tools = [
         tool for tool in base_tools if executor_may_use(agent_type, tool["name"])
-    )
+    ]
+    # Code mode (`code_mode`): off unless the switch, the task or the phase
+    # turns it on; written for the tools this type was just given.
+    from code_mode import offered, tool_definition
+
+    if offered(agent_type, spec_dir) and executor_may_use(agent_type, "run_script"):
+        offered_tools.append(tool_definition(tool["name"] for tool in offered_tools))
+    return canonical_tools(offered_tools)

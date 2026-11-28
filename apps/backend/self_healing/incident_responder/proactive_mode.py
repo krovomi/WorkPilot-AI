@@ -20,6 +20,9 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from security.untrusted import clean_untrusted
+
+from ..proactive import RiskHistoryStore, build_trend_report
 from .fragility_analyzer import FragilityAnalyzer
 from .models import (
     FragilityReport,
@@ -29,6 +32,7 @@ from .models import (
     IncidentSeverity,
     IncidentSource,
 )
+from .prompt_fill import fill_template
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +54,7 @@ class ProactiveMode:
             project_dir=project_dir,
             churn_days=churn_days,
         )
+        self.history = RiskHistoryStore(project_dir)
         self._last_reports: list[FragilityReport] = []
 
     async def scan_fragility(self) -> list[FragilityReport]:
@@ -64,10 +69,14 @@ class ProactiveMode:
             f"(threshold={self.risk_threshold}, max_files={self.max_files})"
         )
 
-        reports = await self.analyzer.analyze(
+        # Every measured file goes into the history (#370): a file below the
+        # threshold today is the one whose climb the trend has to see.
+        measured = await self.analyzer.analyze(
             max_files=self.max_files,
-            risk_threshold=self.risk_threshold,
+            risk_threshold=0.0,
         )
+        self.history.record(measured)
+        reports = [r for r in measured if r.risk_score >= self.risk_threshold]
 
         self._last_reports = reports
         logger.info(f"Fragility scan complete: {len(reports)} files above threshold")
@@ -104,7 +113,8 @@ class ProactiveMode:
                 description=(
                     f"File '{report.file_path}' has a high fragility risk score of {report.risk_score}/100. "
                     f"Cyclomatic complexity: {report.cyclomatic_complexity}, "
-                    f"Git churn: {report.git_churn_count} commits in 30 days, "
+                    f"Git churn: {report.git_churn_count} commits in "
+                    f"{self.analyzer.churn_days} days, "
                     f"Test coverage: {report.test_coverage_percent}%."
                 ),
                 status=HealingStatus.PENDING,
@@ -130,18 +140,27 @@ class ProactiveMode:
         except FileNotFoundError:
             template = self._fallback_prompt()
 
+        # A file name is repository text (rule S2): cleaned before it is used.
+        file_path = clean_untrusted(
+            str(data.get("file_path") or "")[:300],
+            kind="comment",
+            source=f"self-healing:{incident.source.value}",
+        ).text
         replacements = {
-            "{{FILE_PATH}}": data.get("file_path", ""),
+            "{{FILE_PATH}}": file_path,
             "{{RISK_SCORE}}": str(data.get("risk_score", 0)),
             "{{COMPLEXITY}}": str(data.get("cyclomatic_complexity", 0)),
             "{{CHURN_COUNT}}": str(data.get("git_churn_count", 0)),
             "{{COVERAGE_PERCENT}}": str(data.get("test_coverage_percent", 0)),
         }
 
-        for key, value in replacements.items():
-            template = template.replace(key, value)
+        return fill_template(template, replacements)
 
-        return template
+    def trend_report(self) -> dict[str, Any]:
+        """Trajectories, hot list and degrading directories from the history."""
+        return build_trend_report(
+            self.history.series(), snapshots=len(self.history.days())
+        )
 
     @property
     def last_reports(self) -> list[FragilityReport]:

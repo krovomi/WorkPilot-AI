@@ -21,6 +21,11 @@ WORKPILOT_ENTRA_CLIENT_ID=
 # Server-level LLM credentials (shared pool for all agent runs)
 CLAUDE_CODE_OAUTH_TOKEN=
 
+# Where this server runs, written by `python3 configure.py` with the two
+# addresses below: public (a VPS or a server with a DNS name, HTTPS),
+# lan (a machine of the local network, HTTP) or local (this computer only).
+WORKPILOT_HOSTING=
+
 # Public base URL of this server (used to build invitation links)
 WORKPILOT_PUBLIC_BASE_URL=https://workpilot.example.com
 
@@ -35,8 +40,20 @@ WORKPILOT_PASSWORD_MIN_LENGTH=12
 # query; the full password never leaves the server). Off by default.
 WORKPILOT_PASSWORD_HIBP_CHECK=false
 
-# SMTP for invitation emails (leave WORKPILOT_SMTP_HOST empty to disable;
-# the admin UI then shows a copyable invite link instead).
+# How long a forgotten-password link stays usable, in minutes (5 to 1440).
+WORKPILOT_PASSWORD_RESET_TTL_MINUTES=60
+
+# How many days token use and presence days are kept before they are erased
+# (30 to 3650). What is recorded: docs/server-usage-data.md.
+WORKPILOT_USAGE_RETENTION_DAYS=365
+# How many days page activity is kept (off unless an organization turns it on).
+WORKPILOT_PAGE_ACTIVITY_RETENTION_DAYS=183
+# The bearer token a Prometheus scraper sends to /metrics (32 characters or
+# more, `openssl rand -hex 32`); left empty, /metrics answers 404.
+WORKPILOT_METRICS_TOKEN=
+
+# SMTP for invitation and forgotten-password emails (leave WORKPILOT_SMTP_HOST
+# empty to disable; the admin UI then shows a copyable link instead).
 WORKPILOT_SMTP_HOST=
 WORKPILOT_SMTP_PORT=587
 WORKPILOT_SMTP_USER=

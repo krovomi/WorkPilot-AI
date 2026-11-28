@@ -10,7 +10,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from brain.project_memory import ProjectMemory, get_graph_hints, is_memory_enabled
+from brain.project_memory import (
+    ProjectMemory,
+    get_graph_hints,
+    is_memory_enabled,
+    open_project_memory,
+)
 
 __all__ = ["get_graph_hints", "get_project_memory", "is_memory_enabled", "remember"]
 
@@ -18,9 +23,10 @@ __all__ = ["get_graph_hints", "get_project_memory", "is_memory_enabled", "rememb
 def get_project_memory(
     spec_dir: Path | str | None, project_dir: Path | str | None = None
 ) -> ProjectMemory | None:
-    """The memory of *spec_dir*'s project, or ``None`` when memory is off."""
-    memory = ProjectMemory(spec_dir, project_dir)
-    return memory if memory.is_enabled else None
+    """The memory of *spec_dir*'s project as the build's agents recall it
+    (its branch, its run's teams: `brain.lifecycle.scopes`), or ``None`` when
+    memory is off."""
+    return open_project_memory(spec_dir, project_dir)
 
 
 def remember(spec_dir: Path | str, write) -> bool:

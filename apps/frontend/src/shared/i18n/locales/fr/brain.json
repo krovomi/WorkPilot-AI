@@ -101,8 +101,45 @@
 			"locked": "Un autre programme git travaille sur ce dossier (le plugin obsidian-git ?). Réessayez dans un instant.",
 			"identity": "git ne sait pas qui committe : lancez « git config --global user.name \"Votre nom\" » et « git config --global user.email vous@exemple.com ».",
 			"rejected": "GitHub a refusé l'envoi (branche protégée, ou dépôt modifié ailleurs entre-temps). Resynchronisez ; si ça persiste, voyez le détail ci-dessous.",
-			"pathTooLong": "Un chemin du vault est trop long pour Windows : lancez « git config --global core.longpaths true »."
+			"pathTooLong": "Un chemin du vault est trop long pour Windows : lancez « git config --global core.longpaths true ».",
+			"invalidModel": "Ce n'est pas un nom de modèle local.",
+			"invalidProvider": "Ce n'est pas un serveur local que cette vérification sait interroger (Ollama ou LM Studio)."
 		},
-		"gitSaid": "git a répondu :"
+		"gitSaid": "git a répondu :",
+		"embeddings": {
+			"title": "Trouver les conflits de mémoire formulés autrement",
+			"hint": "Quand Ollama ou LM Studio a déjà un modèle d'embeddings, une synchronisation lui demande aussi quelles notes veulent dire la même chose, pour signaler deux notes qui se contredisent sans mots en commun. Rien n'est téléchargé et rien ne quitte cette machine ; sans modèle, seuls les mots en commun comptent.",
+			"model": "Modèle d'embeddings",
+			"modelPlaceholder": "Automatique : le premier modèle d'embeddings du serveur",
+			"modelHint": "Un modèle que le serveur a déjà (par exemple nomic-embed-text ou bge-m3 dans Ollama, text-embedding-nomic-embed-text-v1.5 dans LM Studio). Si aucun serveur ne l'a, la vérification est sautée : il n'est jamais téléchargé.",
+			"save": "Enregistrer le modèle",
+			"locked": "Imposé par la variable d'environnement {{variable}}.",
+			"provider": "Serveur local",
+			"providerAuto": "Automatique : Ollama, sinon LM Studio",
+			"providerOllama": "Ollama",
+			"providerLmStudio": "LM Studio",
+			"providerHint": "Un serveur choisi ici est le seul interrogé.",
+			"searching": "Recherche d'un modèle d'embeddings local…",
+			"found": "Trouvé : {{model}} dans {{provider}}.",
+			"notFound": "Aucun modèle d'embeddings local trouvé : seuls les mots en commun comptent."
+		},
+		"signers": {
+			"title": "Signataires de confiance des notes partagées",
+			"hint": "Les notes hors des projets (connaissances partagées, instructions, skills) synchronisées par un coéquipier ne vont aux agents que si leur dernier commit est signé par l'une de ces clés (la clé SSH ou GPG avec laquelle son git signe déjà ses commits). Chaque projet a sa propre liste pour ses notes, dans son onglet Cycle de vie.",
+			"none": "Aucun signataire de confiance : toutes les notes partagées vont aux agents, comme avant.",
+			"list": "De confiance : {{names}}",
+			"edit": "Modifier la liste",
+			"save": "Enregistrer",
+			"cancel": "Annuler",
+			"placeholder": "Une par ligne : nom ssh-ed25519 AAAA… ou nom empreinte GPG",
+			"unverified_one": "{{count}} note partagée n'est pas vérifiée : lisible ici, tenue hors des agents.",
+			"unverified_other": "{{count}} notes partagées ne sont pas vérifiées : lisibles ici, tenues hors des agents.",
+			"rejected_one": "{{count}} modification de cette liste n'est signée par aucune clé listée : elle est ignorée.",
+			"rejected_other": "{{count}} modifications de cette liste ne sont signées par aucune clé listée : elles sont ignorées.",
+			"notSigning": "Cette machine ne signe pas ses commits : une fois synchronisées, les notes écrites ici ne sont pas vérifiées pour l'équipe. Active la signature des commits dans git (commit.gpgsign).",
+			"invalid": "Une ligne n'est ni une clé publique SSH ni une empreinte GPG après un nom d'un seul mot.",
+			"noBrain": "Crée d'abord le cerveau.",
+			"failed": "La liste n'a pas pu être enregistrée."
+		}
 	}
 }

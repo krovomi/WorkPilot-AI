@@ -26,7 +26,7 @@ import type {
 import { slugifySpecTitle } from "../../../shared/utils/spec-slug";
 import type { AgentManager } from "../../agent";
 import { getAppLanguage } from "../../app-language";
-import { readProjectEnv } from "../../project-env-file";
+import { readProjectForgeEnv } from "../../forge/forge-credentials";
 import { projectStore } from "../../project-store";
 import { getRemoteTasks } from "../../remote-board";
 import {
@@ -53,13 +53,14 @@ import {
 	specIsStale,
 } from "./stale-spec";
 import { resolveUnder } from "../../security/renderer-path";
+import { recordStatusChange } from "../../task-status-history";
 
 /** Charge le PAT et l'URL d'organisation Azure DevOps depuis le `.env` projet. */
 function loadAzureDevOpsConfig(
 	projectPath: string,
 	autoBuildPath: string,
 ): { pat: string | null; orgUrl: string | null } {
-	const vars = readProjectEnv({ path: projectPath, autoBuildPath });
+	const vars = readProjectForgeEnv({ path: projectPath, autoBuildPath });
 	return {
 		pat: vars.AZURE_DEVOPS_PAT || null,
 		orgUrl: vars.AZURE_DEVOPS_ORG_URL || null,
@@ -287,7 +288,9 @@ export function registerTaskCRUDHandlers(agentManager: AgentManager): void {
 			if (existsSync(sourceSpecPath)) {
 				try {
 					let specContent = readFileSync(sourceSpecPath, "utf-8");
-					specContent = specContent.replace(/^#\s+.*$/m, `# ${finalTitle}`);
+					// A function, so a `$` in the title stays text.
+					const heading = `# ${finalTitle}`;
+					specContent = specContent.replace(/^#\s+.*$/m, () => heading);
 					writeFileSync(
 						path.join(newSpecDir, AUTO_BUILD_PATHS.SPEC_FILE),
 						specContent,
@@ -403,6 +406,12 @@ export function registerTaskCRUDHandlers(agentManager: AgentManager): void {
 				JSON.stringify(implementationPlan, null, 2),
 				"utf-8",
 			);
+			// A clean ticket: its history starts here, not with the source's.
+			recordStatusChange(newSpecDir, {
+				to: "backlog",
+				actor: "user",
+				previous: null,
+			});
 
 			const duplicatedTask: Task = {
 				id: newSpecId,
@@ -903,8 +912,11 @@ export function registerTaskCRUDHandlers(agentManager: AgentManager): void {
 					let specContent = readFileSync(specPath, "utf-8");
 
 					// Update title (first # heading)
+					// Replacements are functions: a `$` in the person's text
+					// ("costs $1", "$&") is text, not a replacement pattern.
 					if (finalTitle !== undefined) {
-						specContent = specContent.replace(/^#\s+.*$/m, `# ${finalTitle}`);
+						const heading = `# ${finalTitle}`;
+						specContent = specContent.replace(/^#\s+.*$/m, () => heading);
 					}
 
 					// Update description (## Overview section content)
@@ -912,7 +924,8 @@ export function registerTaskCRUDHandlers(agentManager: AgentManager): void {
 						// Replace content between ## Overview and the next ## section
 						specContent = specContent.replace(
 							/(## Overview\n)([\s\S]*?)((?=\n## )|$)/,
-							`$1${aiDescription}\n\n$3`,
+							(_match, heading: string, _old: string, next: string) =>
+								`${heading}${aiDescription}\n\n${next}`,
 						);
 					}
 

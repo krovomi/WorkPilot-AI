@@ -1,685 +1,333 @@
-import { getProvider as getRegistryProvider } from "@shared/services/providerRegistry";
-import { detectProvider } from "@shared/utils/provider-detection";
-import { getStaticProviders } from "@shared/utils/providers";
-import {
-	Activity,
-	AlertCircle,
-	ArrowDownUp,
-	BarChart3,
-	RefreshCw,
-	Router,
-	Zap,
-} from "lucide-react";
-import { useEffect, useState } from "react";
+/**
+ * Settings → AI accounts → Auto failover.
+ *
+ * The switches are the ones the main acts on (ClaudeAutoSwitchSettings, read
+ * by agent-process and main/provider-failover), and the chain is the order it
+ * walks: every connected account of every provider. A task stopped on a limit
+ * or a lost sign-in resumes on the next account, from the phase it stopped in.
+ */
+import type { ClaudeAutoSwitchSettings } from "@shared/types/agent";
+import { normalizeFailoverOrder } from "@shared/utils/failover-chain";
+import { ArrowDownUp, ShieldCheck, Zap } from "lucide-react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import type { AppSettings } from "../../../shared/types";
-import {
-	loadClaudeProfiles as loadGlobalClaudeProfiles,
-	useClaudeProfileStore,
-} from "../../stores/claude-profile-store";
-import { saveSettings, useSettingsStore } from "../../stores/settings-store";
-import { useShallow } from "zustand/react/shallow";
-import { Label } from "../ui/label";
+import { EmptyStage, Notice, Panel } from "../charter";
 import { Switch } from "../ui/switch";
+import { AccountPriorityList } from "./AccountPriorityList";
 import {
-	AccountPriorityList,
-	type UnifiedAccount,
-} from "./AccountPriorityList";
+	type FailoverAccount,
+	isAccountExcluded,
+	orderFailoverAccounts,
+} from "./failover-accounts";
 
-/** Profile usage data interface */
-interface ProfileUsageData {
-	readonly sessionPercent?: number;
-	readonly weeklyPercent?: number;
-}
-
-/** Authenticated provider entry for the priority list */
-interface AuthenticatedProvider {
-	id: string;
-	name: string;
-	label: string;
-	isAuthenticated: boolean;
-	username?: string;
-}
+const DEFAULTS: ClaudeAutoSwitchSettings = {
+	enabled: false,
+	proactiveSwapEnabled: false,
+	usageCheckInterval: 30000,
+	sessionThreshold: 95,
+	weeklyThreshold: 99,
+	autoSwitchOnRateLimit: true,
+	autoSwitchOnAuthFailure: true,
+};
 
 interface GlobalAutoSwitchingProps {
-	readonly settings: AppSettings;
-	readonly onSettingsChange: (settings: AppSettings) => void;
-	readonly isOpen: boolean;
-	/** Pre-computed provider status from the parent grid (includes OAuth enrichment).
-	 *  When provided, used as the source of truth to filter providers — guarantees
-	 *  the priority list is ISO with what the grid shows. */
-	readonly providerStatus?: Record<string, boolean>;
+	/** Every connected account, in their default order (failover-accounts.ts). */
+	readonly accounts: readonly FailoverAccount[];
+	/** Entries taken out of the chain (settings.disabledAutoSwitchProviders). */
+	readonly excluded: readonly string[];
+	readonly onExcludedChange: (excluded: string[]) => Promise<boolean>;
+	readonly providerLabel: (provider: string) => string;
+	/** Told when the switch or the chain length changes, for the page's summary. */
+	readonly onSummaryChange?: (summary: { enabled: boolean; chainLength: number }) => void;
+}
+
+function ToggleRow({
+	id,
+	title,
+	hint,
+	checked,
+	disabled,
+	onChange,
+	children,
+}: {
+	readonly id: string;
+	readonly title: string;
+	readonly hint: string;
+	readonly checked: boolean;
+	readonly disabled?: boolean;
+	readonly onChange: (value: boolean) => void;
+	readonly children?: ReactNode;
+}) {
+	return (
+		<div className="flex flex-col gap-3 py-3 first:pt-0 last:pb-0">
+			<div className="flex items-start justify-between gap-4">
+				<div className="min-w-0">
+					<label htmlFor={id} className="text-sm font-medium text-foreground">
+						{title}
+					</label>
+					<p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>
+				</div>
+				<Switch id={id} checked={checked} disabled={disabled} onCheckedChange={onChange} />
+			</div>
+			{children}
+		</div>
+	);
+}
+
+function ThresholdField({
+	id,
+	label,
+	value,
+	disabled,
+	onCommit,
+}: {
+	readonly id: string;
+	readonly label: string;
+	readonly value: number;
+	readonly disabled: boolean;
+	readonly onCommit: (value: number) => void;
+}) {
+	const [draft, setDraft] = useState(value);
+	useEffect(() => setDraft(value), [value]);
+	const commit = () => {
+		if (draft !== value) onCommit(draft);
+	};
+	return (
+		<div className="flex items-center gap-3">
+			<label htmlFor={id} className="w-36 shrink-0 text-xs text-muted-foreground">
+				{label}
+			</label>
+			<input
+				id={id}
+				type="range"
+				min={50}
+				max={99}
+				step={1}
+				value={draft}
+				disabled={disabled}
+				onChange={(event) => setDraft(Number(event.target.value))}
+				onPointerUp={commit}
+				onKeyUp={commit}
+				onBlur={commit}
+				className="flex-1 accent-[var(--primary)]"
+			/>
+			<span className="wp-mono w-10 text-right text-xs text-foreground">{draft}%</span>
+		</div>
+	);
 }
 
 export function GlobalAutoSwitching({
-	settings,
-	onSettingsChange,
-	isOpen,
-	providerStatus,
+	accounts,
+	excluded,
+	onExcludedChange,
+	providerLabel,
+	onSummaryChange,
 }: GlobalAutoSwitchingProps) {
 	const { t } = useTranslation("settings");
 	const { toast } = useToast();
-	const { profiles: apiProfiles, activeProfileId: activeApiProfileId } = useSettingsStore(
-		useShallow((s) => ({
-			profiles: s.profiles,
-			activeProfileId: s.activeProfileId,
-		})),
-	);
-	// Select only the fields we need to avoid re-renders from unrelated store changes (e.g. isLoading)
-	const claudeProfiles = useClaudeProfileStore((s) => s.profiles);
-	const activeClaudeProfileId = useClaudeProfileStore((s) => s.activeProfileId);
-	const [isLoading, setIsLoading] = useState(false);
+	const [settings, setSettings] = useState<ClaudeAutoSwitchSettings | null>(null);
+	const [savedOrder, setSavedOrder] = useState<string[] | null>(null);
+	const [saving, setSaving] = useState(false);
 
-	// Priority order state
-	const [priorityOrder, setPriorityOrder] = useState<string[]>([]);
-	const [isSavingPriority, setIsSavingPriority] = useState(false);
-	const [profileUsageData] = useState<Map<string, ProfileUsageData>>(new Map());
-
-	// Authenticated providers (Copilot, OpenAI, etc.)
-	const [authenticatedProviders, setAuthenticatedProviders] = useState<
-		AuthenticatedProvider[]
-	>([]);
-
-	// Unified accounts state
-	const [unifiedAccounts, setUnifiedAccounts] = useState<UnifiedAccount[]>([]);
-
-	// Auto-switching state - initialize from settings
-	const [autoSwitchEnabled, setAutoSwitchEnabled] = useState(
-		settings.autoSwitchEnabled ?? false,
-	);
-	const [proactiveEnabled, setProactiveEnabled] = useState(
-		settings.proactiveEnabled ?? true,
-	);
-	const [sessionThreshold, setSessionThreshold] = useState(
-		settings.sessionThreshold ?? 95,
-	);
-	const [rateLimitEnabled, setRateLimitEnabled] = useState(
-		settings.rateLimitEnabled ?? false,
-	);
-	const [authFailureEnabled, setAuthFailureEnabled] = useState(
-		settings.authFailureEnabled ?? false,
-	);
-	const [routingStrategy, setRoutingStrategy] = useState(
-		settings.routingStrategy ?? "best_performance",
-	);
-
-	// Load Claude profiles on mount
 	useEffect(() => {
-		loadGlobalClaudeProfiles();
+		let cancelled = false;
+		Promise.all([
+			globalThis.electronAPI.getAutoSwitchSettings(),
+			globalThis.electronAPI.getAccountPriorityOrder(),
+		])
+			.then(([switches, order]) => {
+				if (cancelled) return;
+				setSettings({ ...DEFAULTS, ...(switches.success ? switches.data : {}) });
+				setSavedOrder(order.success ? (normalizeFailoverOrder(order.data) ?? []) : []);
+			})
+			.catch((error) => {
+				console.error("[GlobalAutoSwitching] Failed to load failover settings:", error);
+				if (!cancelled) {
+					setSettings(DEFAULTS);
+					setSavedOrder([]);
+				}
+			});
+		return () => {
+			cancelled = true;
+		};
 	}, []);
 
-	// Detect authenticated providers on mount and when relevant settings change
-	// biome-ignore lint/correctness/useExhaustiveDependencies: intentional dependency omission
+	const ordered = useMemo(
+		() => (savedOrder ? orderFailoverAccounts(accounts, savedOrder) : []),
+		[accounts, savedOrder],
+	);
+	const chainLength = ordered.filter((account) => !isAccountExcluded(account, excluded)).length;
+
+	// The main walks the saved order: keep it equal to the accounts shown, so a
+	// provider connected since is in the chain without a drag.
 	useEffect(() => {
-		const detectAuthenticatedProviders = async () => {
-			const providers: AuthenticatedProvider[] = [];
-
-			// Check Copilot via GitHub CLI
-			try {
-				if (!globalThis.electronAPI?.checkCopilotAuth) {
-					return;
-				}
-
-				const copilotResult = await globalThis.electronAPI.checkCopilotAuth();
-
-				if (copilotResult?.success && copilotResult.data?.authenticated) {
-					const copilotProvider = {
-						id: "copilot", // Use same ID as CleanProviderSection
-						name: "copilot",
-						label: "GitHub Copilot",
-						isAuthenticated: true,
-						username: copilotResult.data.username,
-					};
-					providers.push(copilotProvider);
-				}
-			} catch (err) {
-				console.error(
-					"[GlobalAutoSwitching] Error details:",
-					err instanceof Error ? err.message : String(err),
-				);
-			}
-
-			// Check API-key based providers from settings
-			const apiKeyProviders = [
-				{ name: "openai", label: "OpenAI", key: "globalOpenAIApiKey" },
-				{
-					name: "google",
-					label: "Google (Gemini)",
-					key: "globalGoogleDeepMindApiKey",
-				},
-				{ name: "mistral", label: "Mistral AI", key: "globalMistralApiKey" },
-				{ name: "grok", label: "Grok (xAI)", key: "globalGrokApiKey" },
-				{ name: "deepseek", label: "DeepSeek", key: "globalDeepSeekApiKey" },
-				{ name: "aws", label: "AWS (Bedrock)", key: "globalAWSApiKey" },
-				{ name: "meta", label: "Meta AI", key: "globalMetaApiKey" },
-				{
-					name: "azure-openai",
-					label: "Azure OpenAI",
-					key: "globalOpenAIApiKey",
-				},
-			];
-
-			apiKeyProviders.forEach(({ name, label, key }) => {
-				if (settings[key as keyof AppSettings]) {
-					const provider = {
-						id: name, // Use same ID as CleanProviderSection (without 'provider-' prefix)
-						name,
-						label,
-						isAuthenticated: true,
-					};
-					providers.push(provider);
-				}
-			});
-
-			setAuthenticatedProviders(providers);
-		};
-
-		if (isOpen) {
-			detectAuthenticatedProviders();
-		}
-	}, [
-		isOpen,
-		settings.globalOpenAIApiKey,
-		settings.globalGoogleDeepMindApiKey,
-		settings.globalMistralApiKey,
-		settings.globalGrokApiKey,
-		settings.globalDeepSeekApiKey,
-		settings.globalAWSApiKey,
-		settings.globalMetaApiKey,
-	]);
-
-	// Sync autoSwitchEnabled with settings
-	useEffect(() => {
-		setAutoSwitchEnabled(settings.autoSwitchEnabled ?? false);
-	}, [settings.autoSwitchEnabled]);
-
-	// Sync other auto-switching settings with settings
-	useEffect(() => {
-		setProactiveEnabled(settings.proactiveEnabled ?? true);
-		setSessionThreshold(settings.sessionThreshold ?? 95);
-		setRateLimitEnabled(settings.rateLimitEnabled ?? false);
-		setAuthFailureEnabled(settings.authFailureEnabled ?? false);
-		setRoutingStrategy(settings.routingStrategy ?? "best_performance");
-	}, [
-		settings.proactiveEnabled,
-		settings.sessionThreshold,
-		settings.rateLimitEnabled,
-		settings.authFailureEnabled,
-		settings.routingStrategy,
-	]);
-
-	// Build unified accounts list — getStaticProviders is the single source of truth,
-	// same as the provider grid, to guarantee ISO between the two views.
-	const buildUnifiedAccounts = async (): Promise<UnifiedAccount[]> => {
-		const unifiedList: UnifiedAccount[] = [];
-		const representedProviders = new Set<string>();
-
-		const getRegistryLabel = (providerName: string): string => {
-			const regProvider = getRegistryProvider(providerName);
-			return regProvider?.label || providerName;
-		};
-
-		// Step 1: OAuth Claude profiles → always displayed as "Anthropic (Claude)"
-		claudeProfiles.forEach((profile) => {
-			const usageData = profileUsageData.get(profile.id);
-			unifiedList.push({
-				id: `oauth-${profile.id}`,
-				name: profile.name,
-				type: "oauth",
-				displayName: getRegistryLabel("anthropic"), // "Anthropic (Claude)" — not the account nickname
-				identifier: profile.email || t("accounts.priority.noEmail"),
-				isActive: profile.id === activeClaudeProfileId && !activeApiProfileId,
-				isNext: false,
-				isAvailable: profile.isAuthenticated ?? false,
-				hasUnlimitedUsage: false,
-				sessionPercent: usageData?.sessionPercent,
-				weeklyPercent: usageData?.weeklyPercent,
-			});
-			representedProviders.add(profile.name);
-			representedProviders.add("anthropic"); // block duplicate API Anthropic entry
+		if (!savedOrder) return;
+		const ids = ordered.map((account) => account.id);
+		if (ids.length === 0 || ids.join("\n") === savedOrder.join("\n")) return;
+		setSavedOrder(ids);
+		void globalThis.electronAPI.setAccountPriorityOrder(ids).catch((error: unknown) => {
+			console.error("[GlobalAutoSwitching] Failed to save the failover chain:", error);
 		});
+	}, [ordered, savedOrder]);
 
-		// Step 2: All other providers via getStaticProviders — same source as the provider grid
-		// Use parent's providerStatus when available (already OAuth-enriched, matches the grid exactly).
-		// Fall back to getStaticProviders for standalone usage (e.g. outside CleanProviderSection).
-		const { providers: staticProviders, status: fallbackStatus } =
-			await getStaticProviders(
-				apiProfiles,
-				settings as unknown as Record<string, unknown>,
-			);
-		const effectiveStatus = providerStatus ?? fallbackStatus;
+	useEffect(() => {
+		if (settings) onSummaryChange?.({ enabled: settings.enabled, chainLength });
+	}, [settings, chainLength, onSummaryChange]);
 
-		// Copilot username (from async auth check) for a nicer identifier
-		const copilotProvider = authenticatedProviders.find(
-			(p) => p.name === "copilot",
+	const reorder = async (ids: string[]) => {
+		const previous = savedOrder;
+		setSavedOrder(ids);
+		try {
+			const result = await globalThis.electronAPI.setAccountPriorityOrder(ids);
+			if (!result.success) throw new Error(result.error);
+		} catch (error) {
+			console.error("[GlobalAutoSwitching] Failed to save the order:", error);
+			setSavedOrder(previous);
+			toast({ variant: "destructive", title: t("aiAccounts.failover.orderError") });
+		}
+	};
+
+	const include = async (id: string, included: boolean) => {
+		const account = ordered.find((a) => a.id === id);
+		const rest = excluded.filter(
+			(item) => item !== id && !(account?.kind === "provider" && item === account.provider),
 		);
-		// Matching API profile for URL-based identifier
-		const findApiProfile = (providerName: string) =>
-			apiProfiles.find((p) => {
-				if (p.baseUrl) {
-					const detected = detectProvider(p.baseUrl);
-					if (detected === providerName) return true;
-					if (providerName === "ollama" && detected === "ollama_local") return true;
-				}
-				const n = p.name?.toLowerCase() || "";
-				if (providerName === "openai") return n.includes("openai");
-				if (providerName === "google") return n.includes("gemini");
-				if (providerName === "mistral") return n.includes("mistral");
-				if (providerName === "deepseek") return n.includes("deepseek");
-				if (providerName === "grok") return n.includes("grok");
-				if (providerName === "windsurf") return n.includes("windsurf");
-				if (providerName === "ollama") return n.includes("ollama");
-				return false;
-			});
-
-		for (const sp of staticProviders) {
-			if (representedProviders.has(sp.name)) continue;
-			if (!effectiveStatus[sp.name]) continue; // not configured/authenticated — skip (same filter as grid)
-
-			const matchingProfile = findApiProfile(sp.name);
-			const identifier =
-				sp.name === "copilot" && copilotProvider?.username
-					? `@${copilotProvider.username}`
-					: matchingProfile?.baseUrl ||
-						matchingProfile?.name ||
-						t("accounts.priority.providerAuth");
-
-			unifiedList.push({
-				id: matchingProfile ? `api-${matchingProfile.id}` : sp.name,
-				name: sp.name,
-				type: "api",
-				displayName: getRegistryLabel(sp.name),
-				identifier,
-				isActive: matchingProfile
-					? matchingProfile.id === activeApiProfileId
-					: false,
-				isNext: false,
-				isAvailable: true,
-				hasUnlimitedUsage: sp.name !== "copilot",
-				sessionPercent: undefined,
-				weeklyPercent: undefined,
-			});
-			representedProviders.add(sp.name);
-		}
-
-		const filteredList = unifiedList.filter((account) => account.isAvailable);
-
-		if (priorityOrder.length > 0) {
-			filteredList.sort((a, b) => {
-				const findIndex = (account: UnifiedAccount): number => {
-					let idx = priorityOrder.indexOf(account.id);
-					if (idx !== -1) return idx;
-					idx = priorityOrder.indexOf(account.name);
-					if (idx !== -1) return idx;
-					return -1;
-				};
-				const aPos = findIndex(a) === -1 ? Infinity : findIndex(a);
-				const bPos = findIndex(b) === -1 ? Infinity : findIndex(b);
-				return aPos - bPos;
-			});
-		}
-		return filteredList;
+		const saved = await onExcludedChange(included ? rest : [...rest, id]);
+		if (!saved) toast({ variant: "destructive", title: t("aiAccounts.failover.saveError") });
 	};
 
-	// Load unified accounts when the underlying data changes.
-	// NOTE: Do NOT put `buildUnifiedAccounts` itself in the deps array — it is a
-	// plain function recreated on every render, which would cause the effect to fire
-	// every render → setUnifiedAccounts → re-render → new function → infinite loop.
-	// biome-ignore lint/correctness/useExhaustiveDependencies: deps are the data buildUnifiedAccounts reads
-	useEffect(() => {
-		buildUnifiedAccounts().then(setUnifiedAccounts);
-	}, [
-		claudeProfiles,
-		activeClaudeProfileId,
-		activeApiProfileId,
-		authenticatedProviders,
-		providerStatus,
-		priorityOrder,
-		apiProfiles,
-	]);
+	if (!settings) return null;
+	const off = !settings.enabled;
 
-	// Load priority order from ClaudeProfileManager
-	const loadPriorityOrder = async () => {
+	const update = async (patch: Partial<ClaudeAutoSwitchSettings>) => {
+		const previous = settings;
+		setSettings({ ...settings, ...patch });
+		setSaving(true);
 		try {
-			const result = await globalThis.electronAPI.getAccountPriorityOrder();
-			if (result.success && result.data) {
-				setPriorityOrder(result.data);
-			}
-		} catch (err) {
-			console.warn("[GlobalAutoSwitching] Failed to load priority order:", err);
-		}
-	};
-
-	// Save priority order
-	const handlePriorityReorder = async (newOrder: string[]) => {
-		setPriorityOrder(newOrder);
-		setIsSavingPriority(true);
-		try {
-			// Save to ClaudeProfileManager (single source of truth)
-			await globalThis.electronAPI.setAccountPriorityOrder(newOrder);
-		} catch (err) {
-			console.warn("[GlobalAutoSwitching] Failed to save priority order:", err);
-			toast({
-				variant: "destructive",
-				title: t("autoSwitching.toast.error"),
-				description: t("autoSwitching.toast.errorDescription"),
-			});
-		} finally {
-			setIsSavingPriority(false);
-		}
-	};
-
-	// Load data when section is opened
-	useEffect(() => {
-		if (isOpen) {
-			loadPriorityOrder();
-			// Also refresh Claude profiles when opening
-			loadGlobalClaudeProfiles();
-		}
-		// biome-ignore lint/correctness/useExhaustiveDependencies: intentional dependency omission
-	}, [isOpen, loadPriorityOrder]);
-
-	const handleToggleAutoSwitch = async (enabled: boolean) => {
-		// Update local state immediately for better UX
-		setAutoSwitchEnabled(enabled);
-
-		setIsLoading(true);
-		try {
-			// Save to settings
-			const success = await saveSettings({ autoSwitchEnabled: enabled });
-
-			if (success) {
-				// Also propagate to parent
-				onSettingsChange({
-					...settings,
-					autoSwitchEnabled: enabled,
-				});
-
-				toast({
-					title: enabled
-						? t("settings:autoSwitching.enabled")
-						: t("settings:autoSwitching.disabled"),
-					description: enabled
-						? t("settings:autoSwitching.enabledDescription")
-						: t("settings:autoSwitching.disabledDescription"),
-				});
-			} else {
-				// Revert state if save failed
-				setAutoSwitchEnabled(!enabled);
-				throw new Error("Failed to save settings");
-			}
+			const result = await globalThis.electronAPI.updateAutoSwitchSettings(patch);
+			if (!result.success) throw new Error(result.error);
 		} catch (error) {
-			// Revert state if save failed
-			setAutoSwitchEnabled(!enabled);
-			console.error(
-				"[GlobalAutoSwitching] Failed to toggle auto-switch:",
-				error,
-			);
-			toast({
-				variant: "destructive",
-				title: t("settings:autoSwitching.toast.error"),
-				description: t("settings:autoSwitching.toast.errorDescription"),
-			});
+			console.error("[GlobalAutoSwitching] Failed to save:", error);
+			setSettings(previous);
+			toast({ variant: "destructive", title: t("aiAccounts.failover.saveError") });
 		} finally {
-			setIsLoading(false);
-		}
-	};
-
-	const handleStrategyChange = async (strategy: typeof routingStrategy) => {
-		setRoutingStrategy(strategy);
-		await handleUpdateSetting({ routingStrategy: strategy });
-	};
-
-	const handleUpdateSetting = async (updates: Partial<AppSettings>) => {
-		setIsLoading(true);
-		try {
-			await new Promise((resolve) => setTimeout(resolve, 300));
-
-			// Mettre à jour les états locaux
-			if (updates.proactiveEnabled !== undefined)
-				setProactiveEnabled(updates.proactiveEnabled);
-			if (updates.sessionThreshold !== undefined)
-				setSessionThreshold(updates.sessionThreshold);
-			if (updates.rateLimitEnabled !== undefined)
-				setRateLimitEnabled(updates.rateLimitEnabled);
-			if (updates.authFailureEnabled !== undefined)
-				setAuthFailureEnabled(updates.authFailureEnabled);
-
-			// Save to global settings
-			const success = await saveSettings(updates);
-
-			if (success) {
-				// Also propagate to parent
-				onSettingsChange({
-					...settings,
-					...updates,
-				});
-			} else {
-				throw new Error("Failed to save settings");
-			}
-		} catch (error) {
-			console.error("[GlobalAutoSwitching] Failed to update settings:", error);
-			toast({
-				variant: "destructive",
-				title: t("settings:autoSwitching.toast.error"),
-				description: t("settings:autoSwitching.toast.errorDescription"),
-			});
-		} finally {
-			setIsLoading(false);
+			setSaving(false);
 		}
 	};
 
 	return (
-		<div className="space-y-6">
-			{/* Master toggle */}
-			<div className="flex items-center justify-between">
-				<div>
-					<Label className="text-sm font-medium">
-						{t("settings:autoSwitching.enableLabel")}
-					</Label>
-					<p className="text-xs text-muted-foreground mt-1">
-						{t("settings:autoSwitching.enableDescription")}
+		<div className="flex flex-col gap-4">
+			<Panel rail tone={settings.enabled ? "green" : "muted"} className="flex items-start gap-4">
+				<span className="wp-empty-glyph shrink-0" aria-hidden="true">
+					<ShieldCheck className="h-4 w-4" />
+				</span>
+				<div className="min-w-0 flex-1">
+					<label htmlFor="failover-enabled" className="wp-title text-sm">
+						{t("aiAccounts.failover.masterTitle")}
+					</label>
+					<p className="mt-1 text-xs text-muted-foreground">
+						{settings.enabled ? t("aiAccounts.failover.masterOn") : t("aiAccounts.failover.masterOff")}
 					</p>
 				</div>
 				<Switch
-					checked={autoSwitchEnabled}
-					onCheckedChange={handleToggleAutoSwitch}
-					disabled={isLoading}
+					id="failover-enabled"
+					checked={settings.enabled}
+					disabled={saving}
+					onCheckedChange={(enabled) => void update({ enabled })}
 				/>
+			</Panel>
+
+			<div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+				<Panel className={cn("flex flex-col self-start", off && "opacity-60")}>
+					<h4 className="wp-kicker mb-3 flex items-center gap-1.5">
+						<Zap className="h-3.5 w-3.5" aria-hidden="true" />
+						{t("aiAccounts.failover.triggersTitle")}
+					</h4>
+					<div className="flex flex-col divide-y divide-border">
+						<ToggleRow
+							id="failover-rate-limit"
+							title={t("aiAccounts.failover.rateLimit")}
+							hint={t("aiAccounts.failover.rateLimitHint")}
+							checked={settings.autoSwitchOnRateLimit}
+							disabled={off || saving}
+							onChange={(value) => void update({ autoSwitchOnRateLimit: value })}
+						/>
+						<ToggleRow
+							id="failover-auth"
+							title={t("aiAccounts.failover.authFailure")}
+							hint={t("aiAccounts.failover.authFailureHint")}
+							checked={settings.autoSwitchOnAuthFailure}
+							disabled={off || saving}
+							onChange={(value) => void update({ autoSwitchOnAuthFailure: value })}
+						/>
+						<ToggleRow
+							id="failover-same-provider"
+							title={t("aiAccounts.failover.sameProviderFirst")}
+							hint={t("aiAccounts.failover.sameProviderFirstHint")}
+							checked={settings.sameProviderFirst !== false}
+							disabled={off || saving}
+							onChange={(value) => void update({ sameProviderFirst: value })}
+						/>
+						<ToggleRow
+							id="failover-proactive"
+							title={t("aiAccounts.failover.proactive")}
+							hint={t("aiAccounts.failover.proactiveHint")}
+							checked={settings.proactiveSwapEnabled}
+							disabled={off || saving}
+							onChange={(value) => void update({ proactiveSwapEnabled: value })}
+						>
+							{settings.proactiveSwapEnabled && (
+								<div className="flex flex-col gap-2">
+									<ThresholdField
+										id="failover-session"
+										label={t("aiAccounts.failover.session")}
+										value={settings.sessionThreshold}
+										disabled={off || saving}
+										onCommit={(value) => void update({ sessionThreshold: value })}
+									/>
+									<ThresholdField
+										id="failover-weekly"
+										label={t("aiAccounts.failover.weekly")}
+										value={settings.weeklyThreshold}
+										disabled={off || saving}
+										onCommit={(value) => void update({ weeklyThreshold: value })}
+									/>
+								</div>
+							)}
+						</ToggleRow>
+					</div>
+				</Panel>
+
+				<Panel className="flex flex-col gap-3">
+					<div>
+						<h4 className="wp-kicker flex items-center gap-1.5">
+							<ArrowDownUp className="h-3.5 w-3.5" aria-hidden="true" />
+							{t("aiAccounts.failover.chainTitle")}
+						</h4>
+						<p className="mt-1 text-xs text-muted-foreground">
+							{t("aiAccounts.failover.chainDescription")}
+						</p>
+					</div>
+					{ordered.length === 0 ? (
+						<EmptyStage icon={ArrowDownUp} title={t("aiAccounts.failover.chainEmpty")} tone="muted" />
+					) : (
+						<>
+							{chainLength < 2 && (
+								<Notice tone="amber">{t("aiAccounts.failover.chainSingle")}</Notice>
+							)}
+							<AccountPriorityList
+								accounts={ordered}
+								excluded={(account) => isAccountExcluded(account, excluded)}
+								providerLabel={providerLabel}
+								onReorder={(ids) => void reorder(ids)}
+								onInclude={(id, included) => void include(id, included)}
+							/>
+						</>
+					)}
+				</Panel>
 			</div>
-
-			{autoSwitchEnabled && (
-				<>
-					{/* Routing Strategy */}
-					<div className="space-y-3">
-						<div>
-							<Label className="text-sm font-medium flex items-center gap-2">
-								<Router className="h-3.5 w-3.5" />
-								{t("llmRouter.routingStrategy.title")}
-							</Label>
-							<p className="text-xs text-muted-foreground mt-1">
-								{t("llmRouter.routingStrategy.description")}
-							</p>
-						</div>
-						<div className="grid grid-cols-2 gap-2">
-							{(
-								[
-									{
-										id: "best_performance",
-										label: t("llmRouter.routingStrategy.bestPerformance"),
-										desc: t(
-											"llmRouter.routingStrategy.bestPerformanceDescription",
-										),
-										icon: <Zap className="h-3.5 w-3.5" />,
-									},
-									{
-										id: "cheapest",
-										label: t("llmRouter.routingStrategy.cheapest"),
-										desc: t("llmRouter.routingStrategy.cheapestDescription"),
-										icon: <ArrowDownUp className="h-3.5 w-3.5" />,
-									},
-									{
-										id: "lowest_latency",
-										label: t("llmRouter.routingStrategy.lowestLatency"),
-										desc: t(
-											"llmRouter.routingStrategy.lowestLatencyDescription",
-										),
-										icon: <BarChart3 className="h-3.5 w-3.5" />,
-									},
-									{
-										id: "round_robin",
-										label: t("llmRouter.routingStrategy.roundRobin"),
-										desc: t("llmRouter.routingStrategy.roundRobinDescription"),
-										icon: <Router className="h-3.5 w-3.5" />,
-									},
-								] as const
-							).map((s) => (
-								<button
-									key={s.id}
-									type="button"
-									onClick={() => handleStrategyChange(s.id)}
-									disabled={isLoading}
-									className={cn(
-										"flex items-start gap-2 rounded-lg border p-2.5 text-left transition-colors",
-										routingStrategy === s.id
-											? "border-primary bg-primary/5 ring-1 ring-primary"
-											: "border-border hover:bg-accent/50",
-									)}
-								>
-									<span
-										className={cn(
-											"mt-0.5 shrink-0",
-											routingStrategy === s.id
-												? "text-primary"
-												: "text-muted-foreground",
-										)}
-									>
-										{s.icon}
-									</span>
-									<div className="min-w-0">
-										<span className="text-xs font-medium block">{s.label}</span>
-										<p className="text-3xs text-muted-foreground leading-tight mt-0.5">
-											{s.desc}
-										</p>
-									</div>
-								</button>
-							))}
-						</div>
-					</div>
-
-					{/* Proactive Monitoring */}
-					<div className="pl-6 space-y-4 pt-2 border-l-2 border-primary/20">
-						<div className="flex items-center justify-between">
-							<div>
-								<Label className="text-sm font-medium flex items-center gap-2">
-									<Activity className="h-3.5 w-3.5" />
-									{t("settings:autoSwitching.proactiveMonitoring")}
-								</Label>
-								<p className="text-xs text-muted-foreground mt-1">
-									{t("settings:autoSwitching.proactiveDescription")}
-								</p>
-							</div>
-							<Switch
-								checked={proactiveEnabled}
-								onCheckedChange={(value) =>
-									handleUpdateSetting({ proactiveEnabled: value })
-								}
-								disabled={isLoading}
-							/>
-						</div>
-
-						{/* Session threshold */}
-						<div className="space-y-2">
-							<div className="flex items-center justify-between">
-								<Label htmlFor="session-threshold" className="text-sm">
-									{t("settings:autoSwitching.sessionThreshold")}
-								</Label>
-								<span className="text-sm font-mono">{sessionThreshold}%</span>
-							</div>
-							<div className="flex items-center gap-2">
-								<input
-									type="range"
-									min={0}
-									max={99}
-									step={1}
-									value={sessionThreshold}
-									onChange={(e) =>
-										handleUpdateSetting({
-											sessionThreshold: Number.parseInt(e.target.value, 10),
-										})
-									}
-									disabled={isLoading}
-									className="flex-1"
-								/>
-							</div>
-							<p className="text-xs text-muted-foreground">
-								{t("settings:autoSwitching.sessionThresholdDescription")}
-							</p>
-						</div>
-
-						{/* Rate limit switching */}
-						<div className="flex items-center justify-between">
-							<div>
-								<Label className="text-sm font-medium flex items-center gap-2">
-									<AlertCircle className="h-3.5 w-3.5" />
-									{t("settings:autoSwitching.rateLimitSwitching")}
-								</Label>
-								<p className="text-xs text-muted-foreground mt-1">
-									{t("settings:autoSwitching.rateLimitDescription")}
-								</p>
-							</div>
-							<Switch
-								checked={rateLimitEnabled}
-								onCheckedChange={(value) =>
-									handleUpdateSetting({ rateLimitEnabled: value })
-								}
-								disabled={isLoading}
-							/>
-						</div>
-
-						{/* Auth failure switching */}
-					</div>
-					<div className="flex items-center justify-between">
-						<div>
-							<Label className="text-sm font-medium">
-								{t("settings:autoSwitching.authFailureSwitching")}
-							</Label>
-							<p className="text-xs text-muted-foreground mt-1">
-								{t("settings:autoSwitching.authFailureDescription")}
-							</p>
-						</div>
-						<Switch
-							checked={authFailureEnabled}
-							onCheckedChange={(value) =>
-								handleUpdateSetting({ authFailureEnabled: value })
-							}
-							disabled={isLoading}
-						/>
-					</div>
-				</>
-			)}
-
-			{/* Account Priority Order */}
-			{autoSwitchEnabled && unifiedAccounts.length > 0 && (
-				<div className="pt-4 border-t border-border/50">
-					<div className="space-y-3">
-						<div className="flex items-center gap-2">
-							<RefreshCw className="h-4 w-4 text-muted-foreground" />
-							<h4 className="text-sm font-medium text-foreground">
-								{t("settings:autoSwitching.priorityOrder.title")}
-							</h4>
-						</div>
-
-						<AccountPriorityList
-							accounts={unifiedAccounts}
-							onReorder={handlePriorityReorder}
-							isLoading={isSavingPriority}
-						/>
-					</div>
-				</div>
-			)}
 		</div>
 	);
 }

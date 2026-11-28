@@ -11,6 +11,12 @@ was imported into every Claude session (audit F23). Theme rules load per folder
 rationale lives in `docs/architecture/`, one file per feature
 (`docs/architecture/agent-instructions.md`).
 
+`docs/CLAUDE.md` then carried one row per design file, so every feature PR
+edited the same table: parallel PRs conflicted on it, and each batch of merges
+pushed it past its cap on `develop`. Each design file now says what it covers
+in its own frontmatter (`scripts/docs_index.py` reads them as the index), and
+`docs/CLAUDE.md` lists no feature at all.
+
 The `AGENTS.md` indexes are read the same way, and a path they name that no
 longer exists sends an agent looking for a file that was deleted
 (`agents/kanban_subagents.py` was cited months after the subagent registry
@@ -19,9 +25,11 @@ replaced it — audit F18).
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import re
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -32,8 +40,18 @@ CLAUDE_MD = DOCS / "CLAUDE.md"
 ARCHITECTURE = DOCS / "architecture"
 RULES = DOCS / "rules"
 
-# Fails above this, to leave room under the 20 KB target without a PR per line.
-MAX_CLAUDE_MD_BYTES = 25 * 1024
+_spec = importlib.util.spec_from_file_location(
+    "docs_index", ROOT / "scripts" / "docs_index.py"
+)
+docs_index = importlib.util.module_from_spec(_spec)
+sys.modules["docs_index"] = docs_index
+_spec.loader.exec_module(docs_index)
+
+# A stable map of the rules (~3 KB): no feature row ever goes back into it.
+MAX_CLAUDE_MD_BYTES = 8 * 1024
+
+# The only design files `docs/CLAUDE.md` names: the entry points, not features.
+CLAUDE_MD_DESIGN_LINKS = {"agent-instructions.md", "product-overview.md"}
 
 # An instruction file longer than this is split by theme, not grown.
 MAX_INSTRUCTION_LINES = 200
@@ -136,7 +154,7 @@ def test_claude_md_stays_small():
     size = CLAUDE_MD.stat().st_size
     assert size <= MAX_CLAUDE_MD_BYTES, (
         f"docs/CLAUDE.md is {size} bytes: design rationale goes in "
-        "docs/architecture/<feature>.md, with one row in the table"
+        "docs/architecture/<feature>.md, whose frontmatter is the index"
     )
 
 
@@ -149,14 +167,42 @@ def test_instruction_files_stay_short(document: Path):
     )
 
 
-def test_every_architecture_file_is_indexed():
-    claude_md = CLAUDE_MD.read_text(encoding="utf-8")
+@pytest.mark.parametrize(
+    "design", sorted(ARCHITECTURE.glob("*.md")), ids=lambda p: p.name
+)
+def test_every_architecture_file_says_what_it_covers(design: Path):
+    try:
+        docs_index.read(design)
+    except ValueError as error:
+        pytest.fail(
+            f"docs/architecture/{design.name}: {error}. Start it with "
+            "---, feature: <name>, summary: >- <one or two sentences>, --- "
+            "(see docs/CLAUDE.md)"
+        )
+
+
+def test_claude_md_lists_no_feature():
+    """A row per feature here is what made every feature PR conflict."""
+    linked = set(
+        re.findall(
+            r"\]\(architecture/([^)#\s]+\.md)", CLAUDE_MD.read_text(encoding="utf-8")
+        )
+    )
+    extra = sorted(linked - CLAUDE_MD_DESIGN_LINKS)
+    assert extra == [], (
+        f"docs/CLAUDE.md links {extra}: a design file is indexed by its own "
+        "frontmatter (scripts/docs_index.py), not by a row in docs/CLAUDE.md"
+    )
+
+
+def test_the_index_lists_every_architecture_file():
+    table = docs_index.render(docs_index.entries(ARCHITECTURE))
     missing = [
         p.name
         for p in sorted(ARCHITECTURE.glob("*.md"))
-        if f"](architecture/{p.name})" not in claude_md
+        if f"](docs/architecture/{p.name})" not in table
     ]
-    assert missing == [], "not listed in docs/CLAUDE.md's design-rationale table"
+    assert missing == []
 
 
 def test_every_rules_file_is_indexed():

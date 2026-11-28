@@ -4,7 +4,8 @@
 	"tabs": {
 		"browser": "Navigateur",
 		"visualRegression": "Régression visuelle",
-		"testRunner": "Tests E2E"
+		"testRunner": "Tests E2E",
+		"recorder": "Enregistreur"
 	},
 	"stats": {
 		"totalTests": "Tests",
@@ -73,5 +74,133 @@
 		"compareFailed": "Échec de la comparaison visuelle",
 		"testsFailed": "Échec de l’exécution des tests",
 		"noProject": "Sélectionnez un projet pour utiliser l’agent navigateur."
+	},
+	"recorder": {
+		"title": "Enregistrer un test",
+		"description": "Ouvrez une page dans une fenêtre de navigateur, faites ce que le test doit faire, puis exportez les étapes en test Playwright, Cypress, Selenium ou WebdriverIO. Alt+clic sur un élément pour vérifier son texte visible. Les survols, défilements, glisser-déposer, textes modifiables et listes à choix multiples sont enregistrés, comme les iframes et les shadow roots ouverts ; une boîte de dialogue ouverte par la page se répond ici. Le test attend ce que chaque action a provoqué (une page, une requête, un élément) au lieu de faire une pause.",
+		"urlLabel": "Adresse de départ de l'enregistrement",
+		"start": "Enregistrer",
+		"stop": "Arrêter",
+		"starting": "Ouverture de la fenêtre du navigateur…",
+		"recording": "Enregistrement : agissez dans la fenêtre du navigateur",
+		"stopping": "Fermeture de la fenêtre du navigateur…",
+		"truncated": "L'enregistrement a atteint sa limite de 300 étapes ; les actions suivantes n'ont pas été enregistrées.",
+		"stepsTitle": "Étapes",
+		"noSteps": "Aucune étape pour l'instant. Lancez un enregistrement et agissez dans la fenêtre du navigateur.",
+		"removeStep": "Retirer cette étape",
+		"secretValue": "secret, lu dans {{name}}",
+		"kinds": {
+			"navigate": "Ouvrir",
+			"click": "Cliquer",
+			"fill": "Saisir",
+			"select": "Choisir",
+			"press": "Appuyer",
+			"assert_text": "Vérifier le texte",
+			"hover": "Survoler",
+			"scroll": "Faire défiler",
+			"drag": "Glisser"
+		},
+		"place": {
+			"frame": "dans un cadre",
+			"shadow": "dans un shadow root"
+		},
+		"waits": {
+			"visible": "attend son affichage",
+			"request": "attend {{method}} {{path}}",
+			"url": "attend {{url}}",
+			"hidden": "attend que l'indicateur de chargement disparaisse"
+		},
+		"suggestions": {
+			"title": "Vérifications proposées",
+			"hint": "Ce qui est apparu juste après une action. Gardez une vérification pour l'ajouter après cette action ; elle n'est pas dans le test tant que vous ne l'avez pas gardée.",
+			"check": "Vérifier que « {{text}} » s'affiche",
+			"after": "après : {{action}}",
+			"keep": "Garder",
+			"dismiss": "Écarter cette vérification"
+		},
+		"exportTitle": "Exporter",
+		"nameLabel": "Nom du test",
+		"namePlaceholder": "parcours enregistré",
+		"formatLabel": "Format du test",
+		"formats": {
+			"playwright-ts": "Playwright (TypeScript)",
+			"playwright-python": "Playwright (Python)",
+			"cypress": "Cypress",
+			"selenium-python": "Selenium (Python)",
+			"selenium-java": "Selenium (Java)",
+			"webdriverio": "WebdriverIO (JavaScript)",
+			"selenium-csharp": "Selenium (C#)",
+			"selenium-ruby": "Selenium (Ruby)",
+			"selenium-js": "Selenium (JavaScript)",
+			"webdriverio-ts": "WebdriverIO (TypeScript)"
+		},
+		"preview": "Aperçu",
+		"review": "Proposer sur une carte de revue",
+		"file": "Enregistrer dans un fichier…",
+		"reviewHint": "Une carte de revue met le test sur sa propre branche, jamais dans le dossier du projet ; un fichier s'enregistre hors du projet.",
+		"savedTo": "Enregistré dans {{path}}",
+		"envVars": "Définissez ces variables d'environnement avant de lancer le test : {{names}}",
+		"skipped": "{{count}} étape(s) sans sélecteur exprimable par ce framework, laissée(s) en commentaire.",
+		"data": {
+			"file": "Les valeurs saisies pendant l'enregistrement sont lues dans {{path}}, écrit à côté du test : modifiez-les là.",
+			"keys": "Valeurs saisies",
+			"kinds": {
+				"email": "e-mail",
+				"date": "date",
+				"number": "nombre",
+				"phone": "téléphone",
+				"url": "adresse",
+				"name": "nom",
+				"text": "texte"
+			},
+			"secrets": "Le test lit dans {{path}}, écrit à côté du test, le nom de la variable d'environnement de chaque secret : jamais sa valeur."
+		},
+		"window": "la page",
+		"dropOn": "sur {{target}}",
+		"dialog": {
+			"alert": "Alerte",
+			"confirm": "Confirmation",
+			"prompt": "Question",
+			"beforeunload": "Quitter la page ?",
+			"hint": "La page a ouvert une boîte de dialogue et attend votre réponse. Le test y répondra de la même façon.",
+			"textLabel": "Votre réponse",
+			"accept": "OK",
+			"dismiss": "Annuler"
+		},
+		"answered": {
+			"accept": "{{kind}} : réponse OK",
+			"dismiss": "{{kind}} : annulée"
+		},
+		"check": {
+			"title": "Lancer et vérifier",
+			"hint": "Lancez le test proposé sur une carte de revue dans le worktree de cette carte, sans identifiants, ou rejouez l'enregistrement sans fenêtre pour voir quels sélecteurs trouvent encore leur élément."
+		},
+		"run": {
+			"start": "Lancer le test sur sa carte de revue",
+			"passed": "Le test est passé.",
+			"failed": "Le test a échoué (code de sortie {{code}}).",
+			"awaitingApproval": "La recette du worktree du projet attend son approbation : ses dépendances ne sont peut-être pas installées.",
+			"firstRun": "Premier lancement de ce test.",
+			"rate": "{{passed}} test(s) enregistré(s) sur {{runs}} sont passés à leur premier lancement."
+		},
+		"reshoot": {
+			"start": "Revérifier les sélecteurs",
+			"empty": "Rien à rejouer.",
+			"now": "maintenant :",
+			"applied": "mis à jour",
+			"apply": "Utiliser les nouveaux sélecteurs",
+			"status": {
+				"ok": "Trouvé",
+				"changed": "Changé",
+				"missing": "Introuvable",
+				"failed": "Action en échec",
+				"not-reached": "Non atteint"
+			}
+		},
+		"assist": {
+			"start": "Proposer un nom et classer les vérifications",
+			"model": "Nommé et classé par le modèle rapide du fournisseur ; rien de ce que vous avez saisi n'a été envoyé.",
+			"rules": "Nommé et classé par des règles : aucun modèle n'a été sollicité."
+		}
 	}
 }

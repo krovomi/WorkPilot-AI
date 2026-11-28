@@ -17,7 +17,6 @@ import type {
 } from "../../preload/api/modules/phase35-features-api";
 import {
 	addKey as addKeyToDraft,
-	countChanges,
 	deleteKey as deleteKeyFromDraft,
 	type Draft,
 	emptyDraft,
@@ -267,8 +266,3 @@ export const useI18nEditorStore = create<I18nEditorState>((set, get) => ({
 		}
 	},
 }));
-
-/** How many unsaved changes the draft holds. Re-exported so components need one import. */
-export function pendingChangeCount(draft: Draft): number {
-	return countChanges(draft);
-}

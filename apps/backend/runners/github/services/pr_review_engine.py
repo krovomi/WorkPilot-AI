@@ -12,40 +12,18 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-try:
-    from ...phase_config import resolve_model_id
-    from ..context_gatherer import PRContext
-    from ..models import (
-        AICommentTriage,
-        GitHubRunnerConfig,
-        PRReviewFinding,
-        ReviewPass,
-        StructuralIssue,
-    )
-    from .io_utils import safe_print
-    from .prompt_manager import PromptManager
-    from .response_parsers import ResponseParser
-except (ImportError, ValueError, SystemError):
-    import sys
-    from pathlib import Path
-
-    # Add backend root to path for absolute imports
-    backend_root = Path(__file__).parent.parent.parent.parent
-    if str(backend_root) not in sys.path:
-        sys.path.insert(0, str(backend_root))
-
-    from phase_config import resolve_model_id
-    from runners.github.context_gatherer import PRContext
-    from runners.github.models import (
-        AICommentTriage,
-        GitHubRunnerConfig,
-        PRReviewFinding,
-        ReviewPass,
-        StructuralIssue,
-    )
-    from runners.github.services.io_utils import safe_print
-    from runners.github.services.prompt_manager import PromptManager
-    from runners.github.services.response_parsers import ResponseParser
+from phase_config import resolve_model_id
+from runners.github.context_gatherer import PRContext
+from runners.github.models import (
+    AICommentTriage,
+    GitHubRunnerConfig,
+    PRReviewFinding,
+    ReviewPass,
+    StructuralIssue,
+)
+from runners.github.services.io_utils import safe_print
+from runners.github.services.prompt_manager import PromptManager
+from runners.github.services.response_parsers import ResponseParser
 
 
 # Define a local ProgressCallback to avoid circular import
@@ -66,13 +44,26 @@ def _learning_context(project_dir) -> str:
     Empty when nothing is recorded. Never raises — a review that runs without
     its history is worse, a review that crashes is useless.
     """
-    try:
-        from learning_loop.prompt_injection import context_for_agent
+    from learning_loop.prompt_injection import context_for_agent
 
-        context = context_for_agent(project_dir, "pr_reviewer")
-        return f"\n\n---\n\n{context}\n" if context.strip() else ""
-    except Exception:  # noqa: BLE001
-        return ""
+    context = context_for_agent(project_dir, "pr_reviewer")
+    return f"\n\n---\n\n{context}\n" if context.strip() else ""
+
+
+async def _response_text(client) -> str:
+    """The text the model wrote, from a client made by ``create_agent_client``.
+
+    Every provider's client yields ``AgentMessage`` objects; the text is in
+    their ``TEXT`` blocks, whatever the provider's own message classes are.
+    """
+    from core.agent_client import ContentBlockType
+
+    text = ""
+    async for msg in client.receive_response():
+        for block in msg.content:
+            if block.type == ContentBlockType.TEXT and block.text:
+                text += block.text
+    return text
 
 
 class PRReviewEngine:
@@ -253,16 +244,17 @@ class PRReviewEngine:
         if advice := context_advice(context):
             full_prompt += "\n\n" + advice
 
-        project_root = (
-            self.project_dir.parent.parent
-            if self.project_dir.name == "backend"
-            else self.project_dir
-        )
+        project_root = self.project_dir
 
         # What earlier reviews on this project established. Without it the
         # reviewer re-raises findings the team already decided about, which is
         # the single most common complaint about automated review.
         full_prompt += _learning_context(project_root)
+        # The kinds of remark this project rejected (#361); the same rules are
+        # applied to the findings afterwards, so this only saves the effort.
+        from runners.github.services.learned_suppression import learned_prompt_block
+
+        full_prompt += learned_prompt_block(project_root)
 
         # Resolve model shorthand (e.g., "sonnet") to full model ID for API compatibility
         model = resolve_model_id(self.config.model or "sonnet")
@@ -273,19 +265,11 @@ class PRReviewEngine:
             agent_type="pr_reviewer",  # Read-only - no bash, no edits
         )
 
-        result_text = ""
         try:
             async with client:
                 await client.query(full_prompt)
 
-                async for msg in client.receive_response():
-                    msg_type = type(msg).__name__
-                    if msg_type == "AssistantMessage" and hasattr(msg, "content"):
-                        for block in msg.content:
-                            # Must check block type - only TextBlock has .text attribute
-                            block_type = type(block).__name__
-                            if block_type == "TextBlock" and hasattr(block, "text"):
-                                result_text += block.text
+                result_text = await _response_text(client)
 
             if review_pass == ReviewPass.QUICK_SCAN:
                 return self.parser.parse_scan_result(result_text)
@@ -473,13 +457,13 @@ class PRReviewEngine:
         for i, result in enumerate(results):
             if isinstance(result, Exception):
                 safe_print(f"[AI] Pass '{task_names[i]}' failed: {result}")
-            elif isinstance(result, tuple):
+            else:
                 pass_type, data = result
                 if pass_type in ("security", "quality", "deep"):
                     all_findings.extend(data)
                 elif pass_type == "structural":
                     structural_issues.extend(data)
-                elif pass_type == "ai_triage":
+                else:
                     ai_triages.extend(data)
 
         self._report_progress(
@@ -508,12 +492,7 @@ class PRReviewEngine:
         from core.client import create_agent_client
 
         # Load the structural prompt file
-        prompt_file = (
-            Path(__file__).parent.parent.parent.parent
-            / "prompts"
-            / "github"
-            / "pr_structural.md"
-        )
+        prompt_file = self.prompt_manager.prompts_dir / "pr_structural.md"
         if prompt_file.exists():
             prompt = prompt_file.read_text(encoding="utf-8")
         else:
@@ -523,11 +502,7 @@ class PRReviewEngine:
         pr_context = self._build_review_context(context)
         full_prompt = prompt + "\n\n---\n\n" + pr_context
 
-        project_root = (
-            self.project_dir.parent.parent
-            if self.project_dir.name == "backend"
-            else self.project_dir
-        )
+        project_root = self.project_dir
 
         # Resolve model shorthand (e.g., "sonnet") to full model ID for API compatibility
         model = resolve_model_id(self.config.model or "sonnet")
@@ -542,14 +517,7 @@ class PRReviewEngine:
         try:
             async with client:
                 await client.query(full_prompt)
-                async for msg in client.receive_response():
-                    msg_type = type(msg).__name__
-                    if msg_type == "AssistantMessage" and hasattr(msg, "content"):
-                        for block in msg.content:
-                            # Must check block type - only TextBlock has .text attribute
-                            block_type = type(block).__name__
-                            if block_type == "TextBlock" and hasattr(block, "text"):
-                                result_text += block.text
+                result_text = await _response_text(client)
         except Exception as e:
             safe_print(f"[AI] Structural pass error: {e}")
 
@@ -563,12 +531,7 @@ class PRReviewEngine:
             return "[]"
 
         # Load the AI triage prompt file
-        prompt_file = (
-            Path(__file__).parent.parent.parent.parent
-            / "prompts"
-            / "github"
-            / "pr_ai_triage.md"
-        )
+        prompt_file = self.prompt_manager.prompts_dir / "pr_ai_triage.md"
         if prompt_file.exists():
             prompt = prompt_file.read_text(encoding="utf-8")
         else:
@@ -583,11 +546,7 @@ class PRReviewEngine:
             prompt + "\n\n---\n\n" + ai_comments_context + "\n\n---\n\n" + pr_context
         )
 
-        project_root = (
-            self.project_dir.parent.parent
-            if self.project_dir.name == "backend"
-            else self.project_dir
-        )
+        project_root = self.project_dir
 
         # Resolve model shorthand (e.g., "sonnet") to full model ID for API compatibility
         model = resolve_model_id(self.config.model or "sonnet")
@@ -602,14 +561,7 @@ class PRReviewEngine:
         try:
             async with client:
                 await client.query(full_prompt)
-                async for msg in client.receive_response():
-                    msg_type = type(msg).__name__
-                    if msg_type == "AssistantMessage" and hasattr(msg, "content"):
-                        for block in msg.content:
-                            # Must check block type - only TextBlock has .text attribute
-                            block_type = type(block).__name__
-                            if block_type == "TextBlock" and hasattr(block, "text"):
-                                result_text += block.text
+                result_text = await _response_text(client)
         except Exception as e:
             safe_print(f"[AI] AI triage pass error: {e}")
 

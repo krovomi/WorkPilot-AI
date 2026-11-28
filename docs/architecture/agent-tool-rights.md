@@ -1,3 +1,10 @@
+---
+feature: Droits d'outils
+summary: >-
+  Une liste d'outils déclarée est un droit des deux côtés : `disallowed_tools` du SDK, garde de
+  l'exécuteur, sandbox Codex.
+---
+
 # Agent tool rights
 
 > Design rationale for a rule of [`docs/CLAUDE.md`](../CLAUDE.md),

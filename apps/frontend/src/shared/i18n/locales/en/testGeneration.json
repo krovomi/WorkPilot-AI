@@ -99,7 +99,9 @@
 	"filePicker": {
 		"selectFile": "Browse and select a source file...",
 		"filter": "Filter files...",
-		"empty": "No files found"
+		"empty": "No files found",
+		"clear": "Clear the selected file",
+		"clearFilter": "Clear the filter"
 	},
 	"errors": {
 		"noFile": "Please select a file to analyze",
@@ -186,6 +188,10 @@
 			"invalid_input": {
 				"title": "Something is missing from the request",
 				"hint": "Fill in the highlighted field and start the generation again."
+			},
+			"unsupported_stack": {
+				"title": "This project's tests are written in its editor",
+				"hint": "WinDev tests are test scenarios that only the WinDev editor creates and runs. Create the scenario there; a Kanban task can then write the WLangage code it calls."
 			},
 			"backend_missing": {
 				"title": "The WorkPilot AI backend was not found",

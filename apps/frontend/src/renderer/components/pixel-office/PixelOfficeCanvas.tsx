@@ -5,7 +5,9 @@
  * active agent terminals, Kanban tasks and swarm subtasks.
  */
 
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { DecorId } from "../../lib/pixel-office-seasons";
+import { type AgentSkin, agentShirt } from "../../lib/pixel-office-skins";
 import {
 	type AgentActivity,
 	type PixelAgent,
@@ -21,11 +23,11 @@ import {
 	seatPosition,
 	toOfficePoint,
 } from "./office-layout";
+import { drawSeasonDecor } from "./office-decor";
 import {
 	type ActivityIcon,
 	CHAIR_H,
 	DESK_H,
-	drawSpeechBubble,
 	getActivityIcon,
 	getChairSprite,
 	getCharacterSprite,
@@ -38,13 +40,22 @@ import {
 
 // ── Activity config ───────────────────────────────────────────
 
-const ACTIVITY_COLORS: Record<string, string> = {
+const ACTIVITY_COLORS: Record<AgentActivity, string> = {
 	typing: "#4A90D9",
 	running: "#1ABC9C",
 	waiting: "#F39C12",
 	reading: "#27AE60",
 	exited: "#E74C3C",
 	idle: "#6B7280",
+	pending: "#8B5CF6",
+};
+
+/** The icon above an agent's head; idle and ghost agents are dimmed instead. */
+const ACTIVITY_ICONS: Partial<Record<AgentActivity, ActivityIcon>> = {
+	typing: "typing",
+	reading: "reading",
+	running: "running",
+	waiting: "waiting",
 };
 
 /** Frames per second. The characters animate on a 2-frame cycle; 30 is plenty. */
@@ -69,7 +80,7 @@ function getAgentVisual(
 	frame: number,
 	z: number,
 ): AgentVisual {
-	const color = ACTIVITY_COLORS[activity] ?? "#6B7280";
+	const color = ACTIVITY_COLORS[activity];
 	const isActive =
 		activity === "typing" || activity === "running" || activity === "reading";
 	const isWaiting = activity === "waiting";
@@ -89,21 +100,6 @@ function activityToDirection(activity: AgentActivity): "down" | "up" {
 	if (activity === "typing" || activity === "reading" || activity === "running")
 		return "up";
 	return "down";
-}
-
-function activityToIcon(activity: AgentActivity): ActivityIcon {
-	switch (activity) {
-		case "typing":
-			return "typing";
-		case "reading":
-			return "reading";
-		case "running":
-			return "running";
-		case "waiting":
-			return "waiting";
-		default:
-			return "idle";
-	}
 }
 
 // ── Per-agent drawing helpers ─────────────────────────────────
@@ -275,6 +271,7 @@ interface DrawAgentOpts {
 	selected: string | null;
 	animFrame: number;
 	frame: number;
+	skin: AgentSkin;
 }
 
 function drawAgent({
@@ -286,6 +283,7 @@ function drawAgent({
 	selected,
 	animFrame,
 	frame,
+	skin,
 }: DrawAgentOpts) {
 	const visual = getAgentVisual(agent.activity, frame, z);
 	const { color, isActive, isWaiting, isIdle, isGhost, bounceY } = visual;
@@ -305,6 +303,7 @@ function drawAgent({
 		agent.characterIndex,
 		activityToDirection(agent.activity),
 		animFrame,
+		agentShirt(agent.providerFamily, skin),
 	);
 
 	// Selection ring
@@ -340,17 +339,17 @@ function drawAgent({
 	}
 
 	// Activity icon above head
-	if (!isIdle) {
-		const icon = getActivityIcon(activityToIcon(agent.activity), animFrame);
+	const iconName = ACTIVITY_ICONS[agent.activity];
+	if (iconName) {
+		const icon = getActivityIcon(iconName, animFrame);
 		ctx.drawImage(icon, cx + 2 * z, cy - 14 * z, 12 * z, 12 * z);
 	}
 
 	// Gauge, then the name below whatever was drawn.
 	const gaugeY = cy + (SPRITE_H + 2) * z;
-	const hasGauge = typeof agent.progress === "number" && !isGhost;
-	if (hasGauge && agent.progress !== undefined) {
-		drawProgressGauge(ctx, dx, gaugeY, agent.progress, color, z);
-	}
+	const progress = isGhost ? undefined : agent.progress;
+	const hasGauge = progress !== undefined;
+	if (hasGauge) drawProgressGauge(ctx, dx, gaugeY, progress, color, z);
 
 	drawAgentLabel({
 		ctx,
@@ -362,9 +361,6 @@ function drawAgent({
 		isSelected,
 		z,
 	});
-
-	if (agent.speechBubble)
-		drawSpeechBubble(ctx, cx + 8 * z, cy - 16 * z, agent.speechBubble, z);
 }
 
 // ── Background drawing helpers ────────────────────────────────
@@ -453,11 +449,19 @@ function drawDecorations(
 
 // ── Component ────────────────────────────────────────────────
 
+const NO_DECOR: readonly DecorId[] = [];
+
 interface PixelOfficeCanvasProps {
 	readonly width: number;
 	readonly height: number;
 	/** Translated caption drawn on a desk nobody sits at. */
 	readonly emptyDeskLabel: string;
+	/** Calm: the scene is still drawn, but nothing bobs, glows or blinks. */
+	readonly calm?: boolean;
+	/** The decor the project's seasons earned. */
+	readonly decor?: readonly DecorId[];
+	/** How the characters are dressed. */
+	readonly skin?: AgentSkin;
 	readonly onAgentClick?: (
 		agentId: string,
 		screenX: number,
@@ -469,9 +473,14 @@ export function PixelOfficeCanvas({
 	width,
 	height,
 	emptyDeskLabel,
+	calm = false,
+	decor = NO_DECOR,
+	skin = "provider",
 	onAgentClick,
 }: PixelOfficeCanvasProps) {
-	const canvasRef = useRef<HTMLCanvasElement>(null);
+	// State rather than a ref: the effects below run again once the element
+	// exists, instead of each guarding against a ref that is always set.
+	const [canvas, setCanvas] = useState<HTMLCanvasElement | null>(null);
 	const frameRef = useRef(0);
 	const animFrameRef = useRef<number>(0);
 	const lastTimeRef = useRef(0);
@@ -508,90 +517,114 @@ export function PixelOfficeCanvas({
 	sizeRef.current = { width, height };
 	const emptyLabelRef = useRef(emptyDeskLabel);
 	emptyLabelRef.current = emptyDeskLabel;
+	const calmRef = useRef(calm);
+	calmRef.current = calm;
+	const decorRef = useRef(decor);
+	decorRef.current = decor;
+	const skinRef = useRef(skin);
+	skinRef.current = skin;
 
 	// ── Render loop ────────────────────────────────────────
 
-	const render = useCallback((timestamp: number) => {
-		const canvas = canvasRef.current;
-		if (!canvas) return;
-		const ctx = canvas.getContext("2d");
-		if (!ctx) return;
+	const render = useCallback(
+		(ctx: CanvasRenderingContext2D, timestamp: number) => {
+			animFrameRef.current = requestAnimationFrame((next) => render(ctx, next));
 
-		animFrameRef.current = requestAnimationFrame(render);
+			// A hidden view animates nothing anyone can see. requestAnimationFrame is
+			// already throttled in a background window, but the office is just as
+			// invisible behind another view in the same window, where it is not.
+			if (document.hidden) return;
 
-		// A hidden view animates nothing anyone can see. requestAnimationFrame is
-		// already throttled in a background window, but the office is just as
-		// invisible behind another view in the same window, where it is not.
-		if (document.hidden) return;
+			const delta = timestamp - lastTimeRef.current;
+			if (delta < 1000 / TARGET_FPS) return;
+			lastTimeRef.current = timestamp;
+			// Every animation reads the frame counter: holding it still is calm mode.
+			if (!calmRef.current) frameRef.current++;
 
-		const delta = timestamp - lastTimeRef.current;
-		if (delta < 1000 / TARGET_FPS) return;
-		lastTimeRef.current = timestamp;
-		frameRef.current++;
+			const z = zoomRef.current;
+			const agents = seatedRef.current;
+			const selected = selectedRef.current;
+			const frame = frameRef.current;
+			const layout = layoutRef.current;
+			const { width: cssW, height: cssH } = sizeRef.current;
 
-		const z = zoomRef.current;
-		const agents = seatedRef.current;
-		const selected = selectedRef.current;
-		const frame = frameRef.current;
-		const layout = layoutRef.current;
-		const { width: cssW, height: cssH } = sizeRef.current;
+			ctx.imageSmoothingEnabled = false;
+			ctx.clearRect(0, 0, cssW, cssH);
 
-		ctx.imageSmoothingEnabled = false;
-		ctx.clearRect(0, 0, cssW, cssH);
+			const viewport = computeViewport(layout, z, cssW, cssH);
 
-		const viewport = computeViewport(layout, z, cssW, cssH);
+			ctx.save();
+			ctx.translate(viewport.offsetX, viewport.offsetY);
+			ctx.scale(viewport.scale, viewport.scale);
 
-		ctx.save();
-		ctx.translate(viewport.offsetX, viewport.offsetY);
-		ctx.scale(viewport.scale, viewport.scale);
+			drawFloor(ctx, layout, z);
+			drawWalls(ctx, layout, z);
+			if (showGridRef.current) drawGrid(ctx, layout, z);
 
-		drawFloor(ctx, layout, z);
-		drawWalls(ctx, layout, z);
-		if (showGridRef.current) drawGrid(ctx, layout, z);
+			const deskSprite = getDeskSprite();
+			const chairSprite = getChairSprite();
+			const animFrame = Math.floor(frame / 15) % 2;
+			const bySeat = new Map(agents.map((a) => [a.seatIndex, a]));
 
-		const deskSprite = getDeskSprite();
-		const chairSprite = getChairSprite();
-		const animFrame = Math.floor(frame / 15) % 2;
-		const bySeat = new Map(agents.map((a) => [a.seatIndex, a]));
+			for (let seat = 0; seat < layout.seatCount; seat++) {
+				const pos = seatPosition(layout, seat);
+				const dx = pos.x * TILE_SIZE * z;
+				const dy = pos.y * TILE_SIZE * z;
 
-		for (let seat = 0; seat < layout.seatCount; seat++) {
-			const pos = seatPosition(layout, seat);
-			const dx = pos.x * TILE_SIZE * z;
-			const dy = pos.y * TILE_SIZE * z;
-
-			ctx.drawImage(deskSprite, dx, dy, DESK_W * z, DESK_H * z);
-			ctx.drawImage(chairSprite, dx, dy + DESK_H * z, DESK_W * z, CHAIR_H * z);
-
-			const occupant = bySeat.get(seat);
-			if (!occupant) {
-				ctx.fillStyle = "rgba(255,255,255,0.15)";
-				ctx.font = `${Math.max(7, 8 * z)}px "Courier New", monospace`;
-				ctx.textAlign = "center";
-				ctx.fillText(
-					emptyLabelRef.current,
-					dx + (DESK_W / 2) * z,
-					dy + (DESK_H + 14) * z,
+				ctx.drawImage(deskSprite, dx, dy, DESK_W * z, DESK_H * z);
+				ctx.drawImage(
+					chairSprite,
+					dx,
+					dy + DESK_H * z,
+					DESK_W * z,
+					CHAIR_H * z,
 				);
-				ctx.textAlign = "start";
-				continue;
+
+				const occupant = bySeat.get(seat);
+				if (!occupant) {
+					ctx.fillStyle = "rgba(255,255,255,0.15)";
+					ctx.font = `${Math.max(7, 8 * z)}px "Courier New", monospace`;
+					ctx.textAlign = "center";
+					ctx.fillText(
+						emptyLabelRef.current,
+						dx + (DESK_W / 2) * z,
+						dy + (DESK_H + 14) * z,
+					);
+					ctx.textAlign = "start";
+					continue;
+				}
+
+				drawAgent({
+					ctx,
+					agent: occupant,
+					dx,
+					dy,
+					z,
+					selected,
+					animFrame,
+					frame,
+					skin: skinRef.current,
+				});
 			}
 
-			drawAgent({ ctx, agent: occupant, dx, dy, z, selected, animFrame, frame });
-		}
-
-		drawDecorations(ctx, layout, z);
-		ctx.restore();
-	}, []);
+			drawDecorations(ctx, layout, z);
+			drawSeasonDecor(ctx, layout, z, decorRef.current);
+			ctx.restore();
+		},
+		[],
+	);
 
 	useEffect(() => {
-		animFrameRef.current = requestAnimationFrame(render);
+		// No 2D context (no GPU process, or a test DOM): an empty room, not a crash.
+		const ctx = canvas?.getContext("2d");
+		if (!ctx) return;
+		animFrameRef.current = requestAnimationFrame((ts) => render(ctx, ts));
 		return () => {
 			cancelAnimationFrame(animFrameRef.current);
 		};
-	}, [render]);
+	}, [canvas, render]);
 
 	useEffect(() => {
-		const canvas = canvasRef.current;
 		if (!canvas) return;
 		const dpr = window.devicePixelRatio || 1;
 		canvas.width = Math.max(1, Math.round(width * dpr));
@@ -601,16 +634,13 @@ export function PixelOfficeCanvas({
 		// Setting width/height resets the transform, so this scale is applied to a
 		// clean context. Everything drawn afterwards is in CSS pixels.
 		canvas.getContext("2d")?.setTransform(dpr, 0, 0, dpr, 0, 0);
-	}, [width, height]);
+	}, [canvas, width, height]);
 
 	// ── Click handling ─────────────────────────────────────
 
 	const handleClick = useCallback(
 		(e: React.MouseEvent<HTMLCanvasElement>) => {
-			const canvas = canvasRef.current;
-			if (!canvas) return;
-
-			const rect = canvas.getBoundingClientRect();
+			const rect = e.currentTarget.getBoundingClientRect();
 			const z = zoomRef.current;
 			const layout = layoutRef.current;
 			const viewport = computeViewport(layout, z, rect.width, rect.height);
@@ -647,7 +677,7 @@ export function PixelOfficeCanvas({
 
 	return (
 		<canvas
-			ref={canvasRef}
+			ref={setCanvas}
 			onClick={handleClick}
 			className="cursor-pointer"
 			style={{

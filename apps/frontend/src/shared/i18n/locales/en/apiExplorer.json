@@ -18,7 +18,8 @@
 		"importSelected": "Import",
 		"token": "Bearer Token",
 		"tokenPlaceholder": "Paste your JWT or API token",
-		"headers": "Custom Headers"
+		"headers": "Custom Headers",
+		"defaultName": "Default"
 	},
 	"actions": {
 		"export": "Export",
@@ -35,7 +36,9 @@
 		"copied": "Copied!",
 		"endpoints": "{{selected}}/{{total}} endpoints selected",
 		"selectAll": "Select all",
-		"deselectAll": "Deselect all"
+		"deselectAll": "Deselect all",
+		"markdownLabel": "Markdown documentation",
+		"copyFailed": "Could not copy to the clipboard"
 	},
 	"detail": {
 		"docs": "Docs",
@@ -98,7 +101,7 @@
 			"grantType": "Grant Type",
 			"grants": {
 				"client_credentials": "Client Credentials",
-				"authorization_code": "Authorization Code (With PKCE)",
+				"authorization_code": "Authorization Code",
 				"password": "Password"
 			},
 			"configureToken": "Configure New Token",
@@ -162,6 +165,18 @@
 		"starting": "Starting...",
 		"running": "Running",
 		"noProject": "No active project selected"
+	},
+	"aria": {
+		"close": "Close",
+		"loadSpec": "Load the spec",
+		"clearSearch": "Clear the search",
+		"editEnvironment": "Edit {{name}}",
+		"removeEnvironment": "Remove {{name}}",
+		"showToken": "Show the token",
+		"showSecret": "Show the value",
+		"copyResponse": "Copy the response",
+		"useRow": "Send",
+		"removeRow": "Remove"
 	},
 	"title": "API Studio",
 	"description": "Load an OpenAPI contract, or let WorkPilot scan the project routes on every stack, then send requests and export the contract."

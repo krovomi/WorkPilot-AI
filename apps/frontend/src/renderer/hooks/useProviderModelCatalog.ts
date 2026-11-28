@@ -12,6 +12,7 @@ import {
 	sortClaudeCatalog,
 } from "../../shared/constants/models";
 import { dedupeLocalCatalog } from "../../shared/utils/local-models";
+import { localBackendFetch } from "../lib/local-backend";
 
 /**
  * `live`: the provider's own API (a key is configured).
@@ -41,6 +42,13 @@ export interface CatalogModel {
 	/** For local providers only: parameter count in billions (e.g. 8, 70). Used
 	 * to warn that a small model is weak for planning. null/undefined = unknown. */
 	param_b?: number | null;
+	/** For gateways (OpenRouter, Hugging Face): USD per million tokens, as the
+	 * gateway reports it. null/undefined = unknown. */
+	inputPrice?: number | null;
+	outputPrice?: number | null;
+	contextWindow?: number | null;
+	/** For Hugging Face: how many inference providers serve it with tools. */
+	providerCount?: number;
 }
 
 export interface ProviderModelCatalog {
@@ -150,9 +158,8 @@ async function load(provider: string, force = false): Promise<void> {
 	publish(state, { loading: true });
 	state.pending = (async () => {
 		try {
-			const baseUrl = import.meta.env?.VITE_BACKEND_URL || "";
-			const res = await fetch(
-				`${baseUrl}/providers/models/${encodeURIComponent(provider)}/catalog${force ? "?refresh=true" : ""}`,
+			const res = await localBackendFetch(
+				`/providers/models/${encodeURIComponent(provider)}/catalog${force ? "?refresh=true" : ""}`,
 				{ signal: controller.signal },
 			);
 			if (!res.ok) throw new Error(`HTTP ${res.status}`);

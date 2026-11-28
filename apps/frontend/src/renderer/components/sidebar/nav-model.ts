@@ -101,9 +101,16 @@ export function isItemExperimental(item: NavItem): boolean {
 	return item.hub ? isHubExperimental(getHub(item.hub)) : EXPERIMENTAL_VIEWS.has(item.id);
 }
 
+/**
+ * Whether the menu lists an entry: a server project's GitHub or GitLab
+ * views only on its forge (`gates.forge`), as its hubs' tabs.
+ */
 export function itemShown(item: NavItem, gates: HubTabGates): boolean {
 	if (item.hub) return shownHubTabs(getHub(item.hub), gates).length > 0;
-	return !(gates.hideExperimental && isItemExperimental(item)) && showsView(item.id, gates.serverProject);
+	return (
+		!(gates.hideExperimental && isItemExperimental(item)) &&
+		showsView(item.id, gates.serverProject, gates.forge ?? null)
+	);
 }
 
 export interface NavGroup {
@@ -492,6 +499,22 @@ export const gitlabNavItems: readonly NavItem[] = [
 	},
 ];
 
+// Bitbucket nav items shown when Bitbucket is enabled (local projects only)
+export const bitbucketNavItems: readonly NavItem[] = [
+	{
+		id: "bitbucket-issues",
+		labelKey: "navigation:items.bitbucketIssues",
+		icon: Globe,
+		shortcut: "BI",
+	},
+	{
+		id: "bitbucket-pull-requests",
+		labelKey: "navigation:items.bitbucketPRs",
+		icon: GitPullRequest,
+		shortcut: "BP",
+	},
+];
+
 /**
  * How a menu entry is named, for anything outside the sidebar that has to say
  * which page it is talking about — the activity centre, its toasts.
@@ -505,6 +528,7 @@ const NAV_LABEL_KEYS: Partial<Record<SidebarView, string>> = Object.fromEntries(
 		...navGroups.flatMap((group) => group.items),
 		...githubNavItems,
 		...gitlabNavItems,
+		...bitbucketNavItems,
 		// A hub's entry has its first tab's id: the tab's own name wins.
 		...SIDEBAR_HUBS.flatMap((hub) => hub.tabs.map((tab) => ({ ...tab, id: tab.view }))),
 	].map((item) => [item.id, item.labelKey]),

@@ -7,6 +7,8 @@
  * NOTE: Keep this in sync with usage-monitor.ts provider detection logic
  */
 
+import { GATEWAY_PROVIDERS, gatewayProvider } from "../constants/gateway-providers";
+
 /**
  * API Provider type for usage monitoring
  * Determines which usage endpoint to query and how to normalize responses
@@ -22,6 +24,8 @@ export type ApiProvider =
 	| "mistral"
 	| "deepseek"
 	| "grok"
+	| "openrouter"
+	| "huggingface"
 	| "meta"
 	| "cursor"
 	| "aws"
@@ -84,6 +88,10 @@ const PROVIDER_PATTERNS: readonly ProviderPattern[] = [
 		provider: "grok",
 		domainPatterns: ["x.ai"],
 	},
+	...GATEWAY_PROVIDERS.map((gateway) => ({
+		provider: gateway.id,
+		domainPatterns: [...gateway.domainPatterns],
+	})),
 	{
 		provider: "meta",
 		domainPatterns: ["meta.com", "meta.ai", "together.xyz"],
@@ -181,6 +189,9 @@ export function getProviderLabel(provider: ApiProvider): string {
 			return "DeepSeek";
 		case "grok":
 			return "Grok (xAI)";
+		case "openrouter":
+		case "huggingface":
+			return gatewayProvider(provider)?.label ?? provider;
 		case "meta":
 			return "Meta (Llama)";
 		case "cursor":
@@ -228,6 +239,10 @@ export function getProviderBadgeColor(provider: ApiProvider): string {
 			return "bg-cyan-500/10 text-cyan-500 border-cyan-500/20 hover:bg-cyan-500/15";
 		case "grok":
 			return "bg-red-500/10 text-red-500 border-red-500/20 hover:bg-red-500/15";
+		case "openrouter":
+			return "bg-indigo-400/10 text-indigo-400 border-indigo-400/20 hover:bg-indigo-400/15";
+		case "huggingface":
+			return "bg-yellow-500/10 text-yellow-600 border-yellow-500/20 hover:bg-yellow-500/15";
 		case "meta":
 			return "bg-blue-600/10 text-blue-600 border-blue-600/20 hover:bg-blue-600/15";
 		case "cursor":

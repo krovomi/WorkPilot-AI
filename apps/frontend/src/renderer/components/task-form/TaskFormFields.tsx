@@ -19,7 +19,10 @@ import {
 } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { MAX_IMAGES_PER_TASK } from "../../../shared/constants";
+import {
+	ALLOWED_IMAGE_TYPES_DISPLAY,
+	MAX_IMAGES_PER_TASK,
+} from "../../../shared/constants";
 import type { MobilePlatform } from "../../../shared/types/mobile";
 import { providerRegistry } from "../../../shared/services/providerRegistry";
 import type {
@@ -30,16 +33,18 @@ import type {
 	TaskImpact,
 	TaskKind,
 	TaskPriority,
+	TestPlacementMode,
 	ThinkingLevel,
 } from "../../../shared/types";
 import type {
 	PhaseModelConfig,
 	PhaseThinkingConfig,
 } from "../../../shared/types/settings";
+import { isMacOS } from "../../lib/os-detection";
 import { cn } from "../../lib/utils";
 import { usePromptOptimizerStore } from "../../stores/prompt-optimizer-store";
 import { AgentProfileSelector } from "../AgentProfileSelector";
-import { createThumbnail } from "../ImageUpload";
+import { createThumbnail } from "../../lib/image-attachments";
 import { ScreenshotCapture } from "../ScreenshotCapture";
 import { Button } from "../ui/button";
 import { Checkbox } from "../ui/checkbox";
@@ -56,6 +61,7 @@ import { Textarea } from "../ui/textarea";
 import { ClassificationFields } from "./ClassificationFields";
 import { ContextPolicyFields } from "./ContextPolicyFields";
 import { VerifyLoopFields } from "./VerifyLoopFields";
+import { TestPlacementFields } from "../suite-placement/TestPlacementFields";
 import { ImagePreviewModal } from "./ImagePreviewModal";
 import { MobileTargetsFields } from "./MobileTargetsFields";
 import type { MobileSetupState } from "./useMobileSetup";
@@ -146,6 +152,9 @@ interface TaskFormFieldsProps {
 	autoSplitKind?: TaskKind;
 	/** The project turned the split off. */
 	autoSplitProjectDisabled?: boolean;
+	/** Where this task's long suites run (undefined: the project's); without a handler, not shown. */
+	testPlacement?: TestPlacementMode;
+	onTestPlacementChange?: (value: TestPlacementMode | undefined) => void;
 	/** The verification loop for this task; omitted, the field is not shown. */
 	verifyLoop?: boolean;
 	onVerifyLoopChange?: (enabled: boolean) => void;
@@ -243,6 +252,8 @@ export function TaskFormFields({
 	autoSplitProjectDisabled,
 	verifyLoop,
 	onVerifyLoopChange,
+	testPlacement,
+	onTestPlacementChange,
 	verifyWindow,
 	onVerifyWindowChange,
 	verifyScenario,
@@ -281,6 +292,7 @@ export function TaskFormFields({
 	const internalDescriptionRef = useRef<HTMLTextAreaElement>(null);
 	const descriptionRef = externalDescriptionRef || internalDescriptionRef;
 	const prefix = idPrefix ? `${idPrefix}-` : "";
+	const pasteShortcut = isMacOS() ? "⌘V" : "Ctrl+V";
 
 	// Reference Images section state
 	const [showReferenceImages, setShowReferenceImages] = useState(false);
@@ -314,6 +326,7 @@ export function TaskFormFields({
 	// This handles the case when TaskFormFields mounts with persisted images from disk
 	useEffect(() => {
 		let cancelled = false;
+		let pending: ImageAttachment[] = [];
 
 		const loadMissingThumbnails = async () => {
 			// Need project context to load images from disk
@@ -331,6 +344,7 @@ export function TaskFormFields({
 
 			// Mark these as attempted before loading to prevent re-entry
 			imagesToLoad.forEach((img) => loadedThumbnailsRef.current.add(img.id));
+			pending = imagesToLoad;
 
 			// Collect loaded thumbnails into a Map to avoid stale closure issues
 			const thumbnailMap = new Map<string, string>();
@@ -340,7 +354,7 @@ export function TaskFormFields({
 					const result = await window.electronAPI.loadImageThumbnail(
 						projectPath,
 						specId,
-						image.path ?? "",
+						image.path as string,
 					);
 					if (result.success && result.data) {
 						thumbnailMap.set(image.id, result.data);
@@ -350,8 +364,12 @@ export function TaskFormFields({
 				}
 			}
 
+			// A newer run took over (the list changed): it loads them again.
+			if (cancelled) return;
+			pending = [];
+
 			// Merge thumbnails into current state without overwriting user changes
-			if (thumbnailMap.size > 0 && !cancelled) {
+			if (thumbnailMap.size > 0) {
 				const updatedImages = imagesRef.current.map((img) => ({
 					...img,
 					thumbnail: thumbnailMap.get(img.id) ?? img.thumbnail,
@@ -364,6 +382,8 @@ export function TaskFormFields({
 
 		return () => {
 			cancelled = true;
+			// Not attempted after all: the next run (or the next mount) tries again.
+			for (const img of pending) loadedThumbnailsRef.current.delete(img.id);
 		};
 	}, [images, onImagesChange, projectPath, specId]);
 
@@ -382,8 +402,12 @@ export function TaskFormFields({
 		disabled,
 		onError,
 		errorMessages: {
-			maxImagesReached: t("tasks:form.errors.maxImagesReached"),
-			invalidImageType: t("tasks:form.errors.invalidImageType"),
+			maxImagesReached: t("tasks:form.errors.maxImagesReached", {
+				max: MAX_IMAGES_PER_TASK,
+			}),
+			invalidImageType: t("tasks:form.errors.invalidImageType", {
+				types: ALLOWED_IMAGE_TYPES_DISPLAY,
+			}),
 			processPasteFailed: t("tasks:form.errors.processPasteFailed"),
 			processDropFailed: t("tasks:form.errors.processDropFailed"),
 		},
@@ -394,17 +418,21 @@ export function TaskFormFields({
 	 * Handle screenshot capture from modal
 	 *
 	 * Validates the max images limit and creates a thumbnail for the screenshot.
+	 * The capture is a PNG data URL; an attachment keeps only its base64 part,
+	 * which main decodes into the file.
 	 */
 	const handleScreenshotCapture = async (imageData: string) => {
 		// Check max images limit
 		if (images.length >= MAX_IMAGES_PER_TASK) {
-			onError?.(t("tasks:form.errors.maxImagesReached"));
+			onError?.(
+				t("tasks:form.errors.maxImagesReached", { max: MAX_IMAGES_PER_TASK }),
+			);
 			return;
 		}
 
-		// Calculate size from base64 string (approximate)
-		const base64Length = imageData.length;
-		const sizeInBytes = Math.round(base64Length * 0.75); // Base64 is ~33% larger than binary
+		const base64 = imageData.slice(imageData.indexOf(",") + 1);
+		// Base64 is ~33% larger than binary
+		const sizeInBytes = Math.round(base64.length * 0.75);
 
 		// Create thumbnail from full resolution screenshot
 		const thumbnail = await createThumbnail(imageData);
@@ -412,12 +440,13 @@ export function TaskFormFields({
 		const newImage: ImageAttachment = {
 			id: crypto.randomUUID(),
 			filename: `screenshot-${Date.now()}.png`,
-			data: imageData,
+			data: base64,
 			thumbnail,
 			mimeType: "image/png",
 			size: sizeInBytes,
 		};
-		onImagesChange([...images, newImage]);
+		// The list as it is now: it may have changed while the thumbnail was made.
+		onImagesChange([...imagesRef.current, newImage]);
 	};
 
 	return (
@@ -462,6 +491,7 @@ export function TaskFormFields({
 					{/* Description (Primary - Required) */}
 					<div className="space-y-2">
 						<Label
+							id={`${prefix}description-label`}
 							htmlFor={`${prefix}description`}
 							className="text-sm font-medium text-foreground"
 						>
@@ -479,6 +509,7 @@ export function TaskFormFields({
 								}
 								disabled={disabled}
 								ariaRequired
+								ariaLabelledBy={`${prefix}description-label`}
 								ariaDescribedBy={`${prefix}description-help`}
 								isDragOver={isDragOver}
 								onPaste={handlePaste}
@@ -526,9 +557,7 @@ export function TaskFormFields({
 								className="text-xs text-muted-foreground"
 							>
 								{t("images.pasteHint", {
-									shortcut: navigator.platform.includes("Mac")
-										? "âŒ˜V"
-										: "Ctrl+V",
+									shortcut: pasteShortcut,
 								})}
 							</p>
 							<Button
@@ -615,9 +644,7 @@ export function TaskFormFields({
 								</Button>
 								<span className="text-xs text-muted-foreground">
 									{t("images.pasteHint", {
-										shortcut: navigator.platform.includes("Mac")
-											? "âŒ˜V"
-											: "Ctrl+V",
+										shortcut: pasteShortcut,
 									})}
 								</span>
 							</div>
@@ -626,35 +653,38 @@ export function TaskFormFields({
 							{images.length > 0 && (
 								<div className="flex flex-wrap gap-2">
 									{images.map((image) => (
-										// biome-ignore lint/a11y/noStaticElementInteractions: interactive handler is intentional
-										// biome-ignore lint/a11y/noNoninteractiveElementInteractions: double-click to preview image
 										<div
 											key={image.id}
-											className="relative group rounded-md border border-border overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all"
+											className="relative group rounded-md border border-border overflow-hidden hover:ring-2 hover:ring-primary/50 transition-all"
 											style={{ width: "72px", height: "72px" }}
-											title={image.filename}
-											onDoubleClick={() => setPreviewImage(image)}
 										>
-											{image.thumbnail ? (
-												<img
-													src={image.thumbnail}
-													alt={image.filename}
-													className="w-full h-full object-cover"
-												/>
-											) : (
-												<div className="w-full h-full flex items-center justify-center bg-muted">
-													<ImageIcon className="h-6 w-6 text-muted-foreground" />
-												</div>
-											)}
+											<button
+												type="button"
+												className="block w-full h-full cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+												title={image.filename}
+												aria-label={t("tasks:imagePreview.description", {
+													filename: image.filename,
+												})}
+												onClick={() => setPreviewImage(image)}
+											>
+												{image.thumbnail ? (
+													<img
+														src={image.thumbnail}
+														alt={image.filename}
+														className="w-full h-full object-cover"
+													/>
+												) : (
+													<span className="w-full h-full flex items-center justify-center bg-muted">
+														<ImageIcon className="h-6 w-6 text-muted-foreground" />
+													</span>
+												)}
+											</button>
 											{/* Remove button */}
 											{!disabled && (
 												<button
 													type="button"
-													className="absolute top-0.5 right-0.5 h-5 w-5 flex items-center justify-center rounded-full bg-destructive text-destructive-foreground opacity-0 group-hover:opacity-100 transition-opacity"
-													onClick={(e) => {
-														e.stopPropagation();
-														removeImage(image.id);
-													}}
+													className="absolute top-0.5 right-0.5 h-5 w-5 flex items-center justify-center rounded-full bg-destructive text-destructive-foreground opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
+													onClick={() => removeImage(image.id)}
 													aria-label={t("images.removeImageAriaLabel", {
 														filename: image.filename,
 													})}
@@ -852,6 +882,15 @@ export function TaskFormFields({
 							onVerifyWindowChange={onVerifyWindowChange}
 							verifyScenario={verifyScenario}
 							onVerifyScenarioChange={onVerifyScenarioChange}
+							disabled={disabled}
+							idPrefix={idPrefix}
+						/>
+					)}
+
+					{onTestPlacementChange && (
+						<TestPlacementFields
+							value={testPlacement}
+							onChange={onTestPlacementChange}
 							disabled={disabled}
 							idPrefix={idPrefix}
 						/>

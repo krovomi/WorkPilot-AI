@@ -14,6 +14,7 @@ import { getAppLanguage } from "../app-language";
 import { openReviewRun, type ReviewRun } from "../generated-review/review-run";
 import { requirePythonPath } from "../utils/ensure-python";
 import { pythonRunnerEnv } from "../utils/python-runner-env";
+import { decodeRunnerError } from "../utils/runner-error";
 
 const TRANSLATE_PREFIX = "I18N_TRANSLATE:";
 const ERROR_PREFIX = "I18N_ERROR:";
@@ -66,7 +67,7 @@ export const runTranslator: RunTranslator = async (root, request) => {
 			const error = lines.find((l) => l.startsWith(ERROR_PREFIX));
 			const result = lines.find((l) => l.startsWith(TRANSLATE_PREFIX));
 			if (code !== 0 || !result) {
-				reject(new Error(error?.slice(ERROR_PREFIX.length) || `i18n translator exited with code ${code}`));
+				reject(new Error((error && decodeRunnerError(error.slice(ERROR_PREFIX.length))) || `i18n translator exited with code ${code}`));
 				return;
 			}
 			try {

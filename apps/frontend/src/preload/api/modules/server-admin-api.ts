@@ -73,6 +73,8 @@ export interface QuotaSummary {
 	used_users: number;
 	used_projects: number;
 	used_concurrent_runs: number;
+	/** Every token the organization's runs and jobs used this month. */
+	used_tokens_this_month?: number;
 }
 
 export interface AuditEntry {
@@ -85,6 +87,9 @@ export interface AuditEntry {
 	payload: Record<string, unknown> | null;
 	ip: string | null;
 	created_at: string;
+	/** The sign-in the action was made under, and how the person signed in. */
+	login_id?: string | null;
+	login_method?: string | null;
 }
 
 export interface SessionSummary {
@@ -174,10 +179,10 @@ export interface ServerAdminAPI {
 	deleteRole: (roleId: string) => Promise<DataResult<{ deleted: boolean }>>;
 
 	listMembers: () => Promise<DataResult<OrgMemberSummary[]>>;
-	addMember: (body: {
-		user_id: string;
-		role_slug: string;
-	}) => Promise<DataResult<OrgMemberSummary>>;
+	/** An existing account, by id or (platform administrators) by email. */
+	addMember: (
+		body: { user_id: string; role_slug: string } | { email: string; role_slug: string },
+	) => Promise<DataResult<OrgMemberSummary>>;
 	updateMemberRole: (
 		userId: string,
 		roleSlug: string,

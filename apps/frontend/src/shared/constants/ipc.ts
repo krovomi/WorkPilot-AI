@@ -43,6 +43,8 @@ export const IPC_CHANNELS = {
 	TASK_UPDATE: "task:update",
 	TASK_START: "task:start",
 	TASK_STOP: "task:stop",
+	AGENTS_STOP_ALL: "agents:stopAll",
+	AGENTS_STOP_AFTER_STEP: "agents:stopAfterStep",
 	TASK_REVIEW: "task:review",
 	TASK_UPDATE_STATUS: "task:updateStatus",
 	TASK_UPDATE_PLAN: "task:updatePlan", // Update plan phases and subtasks
@@ -69,8 +71,13 @@ export const IPC_CHANNELS = {
 	TASK_CONTEXT_POLICY_UPDATE: "task:contextPolicyUpdate", // Merge `contextPolicy` into task_metadata.json of every spec dir copy (main + worktree) — read live by the backend
 	TASK_SANDBOX_STATUS: "task:sandboxStatus", // Event (main -> renderer): whether a task's commands run in the OS sandbox (SANDBOX_STATUS)
 	TASK_SANDBOX_LIST: "task:sandboxList", // The sandbox statuses main holds, for a reloaded renderer
+	TASK_SANDBOX_MICROVM_STATUS: "task:sandboxMicrovmStatus", // Whether Docker Sandboxes (sbx) is installed and ready here
 	TASK_GOAL_GET: "task:goalGet", // The task's goal (goal mode), read from <spec>/.workpilot-goal.json
 	TASK_GOAL_SET: "task:goalSet", // Write or remove the goal in every spec dir copy; agents cannot write that file
+	TASK_SNAPSHOTS_LIST: "task:snapshotsList", // The git snapshots of a task's worktree taken before each agent session (runners/snapshot_runner.py)
+	TASK_SNAPSHOT_RESTORE: "task:snapshotRestore", // Put the task's worktree back on one snapshot; refused while an agent runs on it
+	TASK_LESSONS_GET: "task:lessonsGet", // The lessons the task's prompts carried, from every spec dir copy
+	TASK_LESSONS_SET_DISABLED: "task:lessonsSetDisabled", // Turn one lesson off (or back on) for this task, in every spec dir copy
 	TASK_CONTEXT_USAGE: "task:contextUsage", // Event (main -> renderer): CONTEXT_USAGE / CONTEXT_ACTION_APPLIED task events, forwarded untouched
 	TASK_PERMISSION_REQUEST: "task:permissionRequest", // Event (main -> renderer): an ACP agent asks before it acts (PERMISSION_REQUESTED, validated)
 	TASK_PERMISSION_CLEARED: "task:permissionCleared", // Event (main -> renderer): that question is answered, timed out or its process is gone
@@ -84,6 +91,7 @@ export const IPC_CHANNELS = {
 	TASK_PIPELINE_STATUS_EVENT: "task:pipelineStatus", // Event (main -> renderer): pipeline status changed for a task
 	TASK_UPDATED_EVENT: "task:updated", // Event (main -> renderer): fields of a task changed in main (PR URL, visual proof)
 	TASK_SPLIT_EVENT: "task:split", // Event (main -> renderer): a task too big for one PR became its parts, or a part's PR was merged (task_split); reload the board and start the queue
+	TASK_CHECK_READINESS: "task:checkReadiness", // Pre-analysis before a card starts: machine checks, AI review of a short card
 	TASK_SPEC_INTERVIEW: "task:specInterview", // Generate 3-5 clarifying questions about the spec before planning (answers are appended to the description)
 	TASK_LOAD_IMAGE_THUMBNAIL: "task:loadImageThumbnail",
 
@@ -166,8 +174,6 @@ export const IPC_CHANNELS = {
 	// Terminal session management
 	TERMINAL_GET_SESSIONS: "terminal:getSessions",
 	TERMINAL_RESTORE_SESSION: "terminal:restoreSession",
-	TERMINAL_CLEAR_SESSIONS: "terminal:clearSessions",
-	TERMINAL_RESUME_CLAUDE: "terminal:resumeClaude",
 	TERMINAL_ACTIVATE_DEFERRED_RESUME: "terminal:activateDeferredResume", // Trigger deferred Claude resume when terminal becomes active
 	TERMINAL_GET_SESSION_DATES: "terminal:getSessionDates",
 	TERMINAL_GET_SESSIONS_FOR_DATE: "terminal:getSessionsForDate",
@@ -207,8 +213,6 @@ export const IPC_CHANNELS = {
 	CLAUDE_PROFILE_VERIFY_AUTH: "claude:profileVerifyAuth", // Check if profile has been authenticated
 	CLAUDE_PROFILE_AUTO_SWITCH_SETTINGS: "claude:autoSwitchSettings",
 	CLAUDE_PROFILE_UPDATE_AUTO_SWITCH: "claude:updateAutoSwitch",
-	CLAUDE_PROFILE_FETCH_USAGE: "claude:fetchUsage",
-	CLAUDE_PROFILE_GET_BEST_PROFILE: "claude:getBestProfile",
 
 	// Account priority order (unified OAuth + API profile ordering)
 	ACCOUNT_PRIORITY_GET: "account:priorityGet",
@@ -296,6 +300,18 @@ export const IPC_CHANNELS = {
 	CONTEXT_MEMORY_STATUS: "context:memoryStatus",
 	CONTEXT_SEARCH_MEMORIES: "context:searchMemories",
 	CONTEXT_GET_MEMORIES: "context:getMemories",
+	// The memory's lifecycle (journal, trash, pins, sync conflicts): /api/brain/memory/*
+	CONTEXT_MEMORY_LIFECYCLE: "context:memoryLifecycle",
+	CONTEXT_MEMORY_HISTORY: "context:memoryHistory",
+	CONTEXT_MEMORY_FORGET: "context:memoryForget",
+	CONTEXT_MEMORY_RESTORE: "context:memoryRestore",
+	CONTEXT_MEMORY_PIN: "context:memoryPin",
+	CONTEXT_MEMORY_RESOLVE_CONFLICT: "context:memoryResolveConflict",
+	CONTEXT_MEMORY_SUGGEST_RESOLUTION: "context:memorySuggestResolution",
+	CONTEXT_MEMORY_REVERT: "context:memoryRevert",
+	CONTEXT_MEMORY_SET_SCOPE: "context:memorySetScope",
+	CONTEXT_MEMORY_SET_MAINTAINERS: "context:memorySetMaintainers",
+	CONTEXT_MEMORY_SET_SIGNERS: "context:memorySetSigners",
 
 	// Environment configuration
 	ENV_GET: "env:get",
@@ -343,11 +359,6 @@ export const IPC_CHANNELS = {
 	AZURE_DEVOPS_SYNC_TASK_AC: "azureDevOps:syncTaskAC",
 	AZURE_DEVOPS_HYDRATE_TASK_DISPLAY: "azureDevOps:hydrateTaskDisplay",
 
-	// Azure DevOps PR Review
-	AZURE_DEVOPS_PR_REVIEW: "azureDevOps:prReview",
-	AZURE_DEVOPS_PR_GET_REVIEW: "azureDevOps:prGetReview",
-	AZURE_DEVOPS_PR_REVIEW_CANCEL: "azureDevOps:prReviewCancel",
-	AZURE_DEVOPS_PR_POST_COMMENT: "azureDevOps:prPostComment",
 
 	// Jira integration
 	JIRA_GET_ISSUES: "jira:getIssues",
@@ -393,20 +404,15 @@ export const IPC_CHANNELS = {
 	GITHUB_INVESTIGATION_ERROR: "github:investigationError",
 
 	// GitLab integration
-	GITLAB_GET_PROJECTS: "gitlab:getProjects",
 	GITLAB_GET_ISSUES: "gitlab:getIssues",
-	GITLAB_GET_ISSUE: "gitlab:getIssue",
 	GITLAB_GET_ISSUE_NOTES: "gitlab:getIssueNotes",
 	GITLAB_CHECK_CONNECTION: "gitlab:checkConnection",
 	GITLAB_INVESTIGATE_ISSUE: "gitlab:investigateIssue",
 	GITLAB_IMPORT_ISSUES: "gitlab:importIssues",
-	GITLAB_CREATE_RELEASE: "gitlab:createRelease",
 
 	// GitLab Merge Requests (equivalent to GitHub PRs)
 	GITLAB_GET_MERGE_REQUESTS: "gitlab:getMergeRequests",
-	GITLAB_GET_MERGE_REQUEST: "gitlab:getMergeRequest",
 	GITLAB_CREATE_MERGE_REQUEST: "gitlab:createMergeRequest",
-	GITLAB_UPDATE_MERGE_REQUEST: "gitlab:updateMergeRequest",
 
 	// GitLab OAuth (glab CLI authentication)
 	GITLAB_CHECK_CLI: "gitlab:checkCli",
@@ -416,11 +422,6 @@ export const IPC_CHANNELS = {
 	GITLAB_GET_TOKEN: "gitlab:getToken",
 	GITLAB_GET_USER: "gitlab:getUser",
 	GITLAB_LIST_USER_PROJECTS: "gitlab:listUserProjects",
-	GITLAB_DETECT_PROJECT: "gitlab:detectProject",
-	GITLAB_GET_BRANCHES: "gitlab:getBranches",
-	GITLAB_CREATE_PROJECT: "gitlab:createProject",
-	GITLAB_ADD_REMOTE: "gitlab:addRemote",
-	GITLAB_LIST_GROUPS: "gitlab:listGroups",
 
 	// GitLab events (main -> renderer)
 	GITLAB_INVESTIGATION_PROGRESS: "gitlab:investigationProgress",
@@ -428,7 +429,6 @@ export const IPC_CHANNELS = {
 	GITLAB_INVESTIGATION_ERROR: "gitlab:investigationError",
 
 	// GitLab MR Review operations
-	GITLAB_MR_GET_DIFF: "gitlab:mr:getDiff",
 	GITLAB_MR_REVIEW: "gitlab:mr:review",
 	GITLAB_MR_REVIEW_CANCEL: "gitlab:mr:reviewCancel",
 	GITLAB_MR_GET_REVIEW: "gitlab:mr:getReview",
@@ -444,41 +444,6 @@ export const IPC_CHANNELS = {
 	GITLAB_MR_REVIEW_PROGRESS: "gitlab:mr:reviewProgress",
 	GITLAB_MR_REVIEW_COMPLETE: "gitlab:mr:reviewComplete",
 	GITLAB_MR_REVIEW_ERROR: "gitlab:mr:reviewError",
-
-	// GitLab Auto-Fix operations
-	GITLAB_AUTOFIX_START: "gitlab:autofix:start",
-	GITLAB_AUTOFIX_GET_QUEUE: "gitlab:autofix:getQueue",
-	GITLAB_AUTOFIX_CHECK_LABELS: "gitlab:autofix:checkLabels",
-	GITLAB_AUTOFIX_CHECK_NEW: "gitlab:autofix:checkNew",
-	GITLAB_AUTOFIX_GET_CONFIG: "gitlab:autofix:getConfig",
-	GITLAB_AUTOFIX_SAVE_CONFIG: "gitlab:autofix:saveConfig",
-	GITLAB_AUTOFIX_GET_BATCHES: "gitlab:autofix:getBatches",
-
-	// GitLab Auto-Fix events (main -> renderer)
-	GITLAB_AUTOFIX_PROGRESS: "gitlab:autofix:progress",
-	GITLAB_AUTOFIX_COMPLETE: "gitlab:autofix:complete",
-	GITLAB_AUTOFIX_ERROR: "gitlab:autofix:error",
-
-	// GitLab Issue Analysis Preview (proactive batch workflow)
-	GITLAB_AUTOFIX_ANALYZE_PREVIEW: "gitlab:autofix:analyzePreview",
-	GITLAB_AUTOFIX_ANALYZE_PREVIEW_PROGRESS:
-		"gitlab:autofix:analyzePreviewProgress",
-	GITLAB_AUTOFIX_ANALYZE_PREVIEW_COMPLETE:
-		"gitlab:autofix:analyzePreviewComplete",
-	GITLAB_AUTOFIX_ANALYZE_PREVIEW_ERROR: "gitlab:autofix:analyzePreviewError",
-	GITLAB_AUTOFIX_APPROVE_BATCHES: "gitlab:autofix:approveBatches",
-
-	// GitLab Issue Triage operations
-	GITLAB_TRIAGE_RUN: "gitlab:triage:run",
-	GITLAB_TRIAGE_GET_RESULTS: "gitlab:triage:getResults",
-	GITLAB_TRIAGE_APPLY_LABELS: "gitlab:triage:applyLabels",
-	GITLAB_TRIAGE_GET_CONFIG: "gitlab:triage:getConfig",
-	GITLAB_TRIAGE_SAVE_CONFIG: "gitlab:triage:saveConfig",
-
-	// GitLab Issue Triage events (main -> renderer)
-	GITLAB_TRIAGE_PROGRESS: "gitlab:triage:progress",
-	GITLAB_TRIAGE_COMPLETE: "gitlab:triage:complete",
-	GITLAB_TRIAGE_ERROR: "gitlab:triage:error",
 
 	// GitHub Auto-Fix operations
 	GITHUB_AUTOFIX_START: "github:autofix:start",
@@ -526,6 +491,15 @@ export const IPC_CHANNELS = {
 	GITHUB_PR_CHECK_MERGE_READINESS: "github:pr:checkMergeReadiness",
 	GITHUB_PR_MARK_REVIEW_POSTED: "github:pr:markReviewPosted",
 	GITHUB_PR_UPDATE_BRANCH: "github:pr:updateBranch",
+	// Accept / reject / not applicable on a review finding (#361)
+	GITHUB_PR_REVIEW_FEEDBACK_SET: "github:pr:reviewFeedback:set",
+	GITHUB_PR_REVIEW_FEEDBACK_GET: "github:pr:reviewFeedback:get",
+	// The project's acceptance rate, a learned rule reset, the conventions file
+	GITHUB_PR_REVIEW_FEEDBACK_STATS: "github:pr:reviewFeedback:stats",
+	GITHUB_PR_REVIEW_FEEDBACK_RESET: "github:pr:reviewFeedback:reset",
+	GITHUB_PR_REVIEW_CONVENTIONS_WRITE: "github:pr:reviewConventions:write",
+	// A maintainer's decision on a held rejection (server projects)
+	GITHUB_PR_REVIEW_FEEDBACK_HELD_DECIDE: "github:pr:reviewFeedback:heldDecide",
 
 	// GitHub PR Review events (main -> renderer)
 	GITHUB_PR_REVIEW_PROGRESS: "github:pr:reviewProgress",
@@ -630,6 +604,24 @@ export const IPC_CHANNELS = {
 	GIT_DETECT_MAIN_BRANCH: "git:detectMainBranch",
 	GIT_CHECK_STATUS: "git:checkStatus",
 	GIT_DETECT_PROVIDER: "git:detectProvider",
+	GIT_FORGE_BINDINGS: "git:forgeBindings",
+	// Forge accounts saved for the whole app (main/forge/forge-accounts.ts)
+	FORGE_ACCOUNTS_LIST: "forgeAccounts:list",
+	FORGE_ACCOUNTS_SAVE: "forgeAccounts:save",
+	FORGE_ACCOUNTS_DELETE: "forgeAccounts:delete",
+	FORGE_ACCOUNTS_TEST: "forgeAccounts:test",
+	// AI accounts: several API-key accounts per provider (main/ai-accounts/ai-accounts.ts)
+	AI_ACCOUNTS_LIST: "aiAccounts:list",
+	AI_ACCOUNTS_SAVE: "aiAccounts:save",
+	AI_ACCOUNTS_DELETE: "aiAccounts:delete",
+	AI_ACCOUNTS_TEST: "aiAccounts:test",
+	AI_ACCOUNTS_SET_DEFAULT: "aiAccounts:setDefault",
+	AI_ACCOUNTS_SIGN_IN: "aiAccounts:signIn",
+	// Spend and monthly budget per AI account (main/ai-accounts/account-usage.ts)
+	AI_ACCOUNTS_USAGE: "aiAccounts:usage",
+	AI_ACCOUNTS_SET_BUDGET: "aiAccounts:setBudget",
+	// Approval tiers: whether Claude Ship was detected (main/agent/approvals-env.ts)
+	APPROVALS_CLAUDE_SHIP_STATUS: "approvals:claudeShipStatus",
 	GIT_INITIALIZE: "git:initialize",
 	GIT_SET_REMOTE: "git:setRemote",
 	GIT_CHECKOUT_BRANCH: "git:checkoutBranch",
@@ -695,10 +687,17 @@ export const IPC_CHANNELS = {
 
 	// MCP Marketplace operations
 	MCP_MARKETPLACE_GET_CATALOG: "mcpMarketplace:getCatalog", // Get full server catalog
-	MCP_MARKETPLACE_GET_SERVER: "mcpMarketplace:getServer", // Get single server details
+	MCP_MARKETPLACE_GET_SECURITY: "mcpMarketplace:getSecurity", // Security score of a catalog server (#369)
+	MCP_MARKETPLACE_GET_POLICY: "mcpMarketplace:getPolicy", // The project's MCP install policy (#369)
+	MCP_MARKETPLACE_GET_INSTALLED_WATCH: "mcpMarketplace:getInstalledWatch", // Alerts on installed servers (#369)
+	MCP_MARKETPLACE_ACKNOWLEDGE_ALERTS: "mcpMarketplace:acknowledgeAlerts", // Acknowledge a server's alerts (#369)
+	MCP_MARKETPLACE_LIST_REVIEWS: "mcpMarketplace:listReviews", // Team reviews of a catalog server, server project (#369)
+	MCP_MARKETPLACE_PUT_REVIEW: "mcpMarketplace:putReview", // Write one's own review of a catalog server (#369)
+	MCP_MARKETPLACE_DELETE_REVIEW: "mcpMarketplace:deleteReview", // Delete a review of a catalog server (#369)
 	MCP_MARKETPLACE_SAVE_BUILDER: "mcpMarketplace:saveBuilder", // Save builder project
 	MCP_MARKETPLACE_GET_BUILDER_PROJECTS: "mcpMarketplace:getBuilderProjects", // List builder projects
 	MCP_MARKETPLACE_DELETE_BUILDER: "mcpMarketplace:deleteBuilder", // Delete builder project
+	MCP_MARKETPLACE_GET_SANDBOX: "mcpMarketplace:getSandbox", // Whether this machine starts a confined server (#369)
 
 	// Hugging Face Hub discovery (via the official HF MCP server)
 	HUGGINGFACE_SEARCH_MODELS: "huggingface:searchModels", // Live model search on the Hub
@@ -791,6 +790,9 @@ export const IPC_CHANNELS = {
 	SELF_HEALING_CANCEL_OPERATION: "selfHealing:cancelOperation",
 	SELF_HEALING_DISMISS_INCIDENT: "selfHealing:dismissIncident",
 	SELF_HEALING_RETRY_INCIDENT: "selfHealing:retryIncident",
+	/** Find the first bad commit of a CI/CD incident (#375); one event per tested commit. */
+	SELF_HEALING_BISECT: "selfHealing:bisect",
+	SELF_HEALING_BISECT_PROGRESS: "selfHealing:bisectProgress",
 	// Events (main -> renderer)
 	SELF_HEALING_OPERATION_PROGRESS: "selfHealing:operationProgress",
 	SELF_HEALING_OPERATION_COMPLETE: "selfHealing:operationComplete",
@@ -805,6 +807,15 @@ export const IPC_CHANNELS = {
 	BROWSER_AGENT_COMPARE: "browserAgent:compare",
 	BROWSER_AGENT_DELETE_BASELINE: "browserAgent:deleteBaseline",
 	BROWSER_AGENT_RUN_TESTS: "browserAgent:runTests",
+	BROWSER_AGENT_RECORD_START: "browserAgent:recordStart", // A session in a browser window the person drives (#387)
+	BROWSER_AGENT_RECORD_STOP: "browserAgent:recordStop",
+	BROWSER_AGENT_RECORD_DIALOG: "browserAgent:recordDialog", // The person's answer to a dialog the recorded page opened
+	BROWSER_AGENT_RECORD_RUN: "browserAgent:recordRun", // Run the test proposed on a review card, in its worktree
+	BROWSER_AGENT_RECORD_RESHOOT: "browserAgent:recordReshoot", // Replay the stopped recording headless: which selectors still work
+	BROWSER_AGENT_RECORD_RESHOOT_APPLY: "browserAgent:recordReshootApply", // Give steps the selectors the reshoot proposed
+	BROWSER_AGENT_RECORD_ASSIST: "browserAgent:recordAssist", // A light model (or rules) names the test, ranks the checks
+	BROWSER_AGENT_RECORD_EXPORT: "browserAgent:recordExport", // Steps → Playwright / Cypress test: preview, review card or file
+	BROWSER_AGENT_RECORD_EVENT: "browserAgent:recordEvent", // main → renderer: step, started, stopped, error
 
 	// Architecture Visualizer
 	ARCHITECTURE_VISUALIZER_GENERATE: "architectureVisualizer:generate",
@@ -843,6 +854,12 @@ export const IPC_CHANNELS = {
 		"performanceProfiler:implementationComplete",
 
 	// Pipeline Generator (Feature 23) — AI-powered CI/CD pipeline generation
+	// Pixel Office: a mini-scene written by the page's model
+	PIXEL_OFFICE_NARRATE: "pixelOffice:narrate",
+	// Pixel Office on a server project: the team leaderboard, and showing one's name on it
+	PIXEL_OFFICE_TEAM_BOARD: "pixelOffice:teamBoard",
+	PIXEL_OFFICE_TEAM_CONSENT: "pixelOffice:teamConsent",
+
 	PIPELINE_GENERATOR_GENERATE: "pipelineGenerator:generate",
 	PIPELINE_GENERATOR_CANCEL: "pipelineGenerator:cancel",
 	// Pipeline Generator events (main -> renderer)
@@ -868,6 +885,33 @@ export const IPC_CHANNELS = {
 
 	// Kanban quick-command bar: a command runs on a review card (F182)
 	QUICK_COMMAND_RUN: "quickCommand:run",
+
+	// Mission Control: state proxied to the local backend, model calls run in main
+	MISSION_CONTROL_GET_STATE: "missionControl:getState",
+	MISSION_CONTROL_START_SESSION: "missionControl:startSession",
+	MISSION_CONTROL_STOP_SESSION: "missionControl:stopSession",
+	MISSION_CONTROL_CREATE_AGENT: "missionControl:createAgent",
+	MISSION_CONTROL_REMOVE_AGENT: "missionControl:removeAgent",
+	MISSION_CONTROL_START_AGENT: "missionControl:startAgent",
+	MISSION_CONTROL_STOP_AGENT: "missionControl:stopAgent",
+	MISSION_CONTROL_SUGGEST_COMPOSITION: "missionControl:suggestComposition",
+	MISSION_CONTROL_SET_PLAN: "missionControl:setPlan",
+	MISSION_CONTROL_GET_METRICS: "missionControl:getMetrics",
+
+	// Execution waves across specs (Conflict Predictor, #358): plan by task id
+	CONFLICT_WAVES_PLAN: "conflictWaves:plan",
+	// The run, kept in <project>/.workpilot/ to survive a restart: by project id
+	CONFLICT_WAVES_RUN_LOAD: "conflictWaves:loadRun",
+	CONFLICT_WAVES_RUN_SAVE: "conflictWaves:saveRun",
+	CONFLICT_WAVES_RUN_CLEAR: "conflictWaves:clearRun",
+	CONFLICT_WAVES_HISTORY: "conflictWaves:history",
+	// The same for a server project: planned and run by the server, by project id
+	CONFLICT_WAVES_SERVER_PLAN: "conflictWaves:serverPlan",
+	CONFLICT_WAVES_SERVER_RUN: "conflictWaves:serverRun",
+	CONFLICT_WAVES_SERVER_START: "conflictWaves:serverStart",
+	CONFLICT_WAVES_SERVER_STEP: "conflictWaves:serverStep",
+	CONFLICT_WAVES_SERVER_STOP: "conflictWaves:serverStop",
+	CONFLICT_WAVES_SERVER_HISTORY: "conflictWaves:serverHistory",
 
 	// Context Mesh — Cross-Project Intelligence
 	CONTEXT_MESH_GET_PROJECTS: "contextMesh:getProjects",
@@ -909,6 +953,35 @@ export const IPC_CHANNELS = {
 	LIVE_COMPANION_TAKEOVER_PROPOSAL: "liveCompanion:takeoverProposal",
 	LIVE_COMPANION_FILE_CHANGE: "liveCompanion:fileChange",
 
+	// Agent Replay — recorded agent sessions, read from the local backend by main
+	REPLAY_LIST_SESSIONS: "replay:listSessions",
+	REPLAY_GET_SESSION: "replay:getSession",
+	REPLAY_DELETE_SESSION: "replay:deleteSession",
+	REPLAY_GET_HEATMAP: "replay:getHeatmap",
+	REPLAY_COMPARE: "replay:compare",
+	REPLAY_ADD_BREAKPOINT: "replay:addBreakpoint",
+	REPLAY_REMOVE_BREAKPOINT: "replay:removeBreakpoint",
+	REPLAY_EXPORT_SESSION: "replay:exportSession",
+	REPLAY_IMPORT_SESSION: "replay:importSession",
+	REPLAY_ADD_BOOKMARK: "replay:addBookmark",
+	REPLAY_REMOVE_BOOKMARK: "replay:removeBookmark",
+	REPLAY_ADD_BOOKMARK_REPLY: "replay:addBookmarkReply",
+	REPLAY_REMOVE_BOOKMARK_REPLY: "replay:removeBookmarkReply",
+	REPLAY_EXPORT_VIDEO: "replay:exportVideo",
+	REPLAY_EXPORT_COMPARISON_VIDEO: "replay:exportComparisonVideo",
+	REPLAY_SUMMARIZE_SESSION: "replay:summarizeSession",
+	// A replay left with a server project's team, behind a link (#347)
+	REPLAY_SHARE_TO_TEAM: "replay:shareToTeam",
+	REPLAY_LIST_TEAM_SHARES: "replay:listTeamShares",
+	REPLAY_REVOKE_TEAM_SHARE: "replay:revokeTeamShare",
+	REPLAY_OPEN_TEAM_SHARE: "replay:openTeamShare",
+	REPLAY_LIST_MY_TEAM_SHARES: "replay:listMyTeamShares",
+	// How replays are shared, counted on this machine or on the person's server
+	REPLAY_GET_USAGE: "replay:getUsage",
+	REPLAY_GET_TEAM_USAGE: "replay:getTeamUsage",
+	// Session History — the same records, as history cards
+	SESSION_HISTORY_LIST: "sessionHistory:list",
+
 	// Agent Time Travel — Temporal debugger for AI agents
 	TIME_TRAVEL_GENERATE_CHECKPOINTS: "timeTravel:generateCheckpoints",
 	TIME_TRAVEL_GET_CHECKPOINTS: "timeTravel:getCheckpoints",
@@ -925,6 +998,9 @@ export const IPC_CHANNELS = {
 	TIME_TRAVEL_GET_DECISION_SCORES: "timeTravel:getDecisionScores",
 	TIME_TRAVEL_GET_DECISION_HEATMAP: "timeTravel:getDecisionHeatmap",
 
+	// The local backend for the renderer views that read it (closed route list)
+	LOCAL_BACKEND_REQUEST: "localBackend:request",
+
 	// === Phase 3-5 backend modules (one HTTP-backed channel per module) ===
 	// Longevity Score (#3.8)
 	LONGEVITY_SCORE: "longevity:score",
@@ -934,6 +1010,7 @@ export const IPC_CHANNELS = {
 	AGENT_HEALTH_SCORE: "agentHealth:score",
 	AGENT_HEALTH_SCORES: "agentHealth:scores",
 	AGENT_HEALTH_RESET: "agentHealth:reset",
+	AGENT_HEALTH_PROJECT: "agentHealth:project",
 	// Adaptive Model Routing (#3.1)
 	MODEL_ROUTER_ROUTE: "modelRouter:route",
 	MODEL_ROUTER_COMPARE: "modelRouter:compare",
@@ -941,6 +1018,8 @@ export const IPC_CHANNELS = {
 	DOMAIN_AGENTS_LIST: "domainAgents:list",
 	DOMAIN_AGENTS_PROFILE: "domainAgents:profile",
 	DOMAIN_AGENTS_BUILD: "domainAgents:build",
+	DOMAIN_AGENTS_PROJECT_GET: "domainAgents:projectGet",
+	DOMAIN_AGENTS_PROJECT_SET: "domainAgents:projectSet",
 	// CI/CD Anomaly Detective (#3.4)
 	CICD_ANOMALY_SCAN: "cicdAnomaly:scan",
 	CICD_ANOMALY_ANALYSE: "cicdAnomaly:analyse",
@@ -956,6 +1035,10 @@ export const IPC_CHANNELS = {
 	GEN_TESTS_CAPTURE: "genTests:capture",
 	GEN_TESTS_COMPARE: "genTests:compare",
 	GEN_TESTS_DELETE: "genTests:delete",
+	GEN_TESTS_DETECT: "genTests:detect",
+	GEN_TESTS_RUN: "genTests:run",
+	GEN_TESTS_CANCEL: "genTests:cancel",
+	GEN_TESTS_IMPORT_FILE: "genTests:importFile",
 	// i18n Auto-Scaling (#3.12)
 	I18N_SCALER_DIFF: "i18nScaler:diff",
 	I18N_SCALER_SKELETON: "i18nScaler:skeleton",
@@ -987,6 +1070,7 @@ export const IPC_CHANNELS = {
 	PAIR_RT_OPS: "pairRT:ops",
 	PAIR_RT_SUBSCRIBE: "pairRT:subscribe",
 	PAIR_RT_UNSUBSCRIBE: "pairRT:unsubscribe",
+	PAIR_RT_ASK_AI: "pairRT:askAi",
 	// Pair Programming SSE event (main -> renderer)
 	PAIR_RT_OP_EVENT: "pairRT:opEvent",
 	PAIR_RT_STREAM_ERROR: "pairRT:streamError",
@@ -1028,6 +1112,8 @@ export const IPC_CHANNELS = {
 	AGENT_CLI_INSTALL: "agentCli:install",
 	AGENT_CLI_UPDATE_CHECK: "agentCli:updateCheck",
 	AGENT_CLI_UPDATE: "agentCli:update",
+	REA_CHECK: "rea:check",
+	REA_INSTALL: "rea:install",
 	AGENT_COACH_CANCEL: "agentCoach:cancel",
 	AGENT_COACH_ERROR: "agent-coach-error",
 	AGENT_COACH_EVENT: "agent-coach-event",
@@ -1055,11 +1141,28 @@ export const IPC_CHANNELS = {
 	API_WATCHER_EVENT: "api-watcher-event",
 	API_WATCHER_RESULT: "api-watcher-result",
 	API_WATCHER_RUN: "apiWatcher:run",
+	// Device matrix: one preset rendered, captured and read by the main (#383)
+	APP_EMULATOR_CAPTURE_DEVICE: "app-emulator:capture-device",
 	APP_EMULATOR_CONFIG: "app-emulator:config",
+	// Device matrix: custom devices and personas kept by the main (#383)
+	APP_EMULATOR_DELETE_CUSTOM_DEVICE: "app-emulator:delete-custom-device",
+	APP_EMULATOR_DELETE_PERSONA: "app-emulator:delete-persona",
 	APP_EMULATOR_DETECT: "app-emulator:detect",
+	// Device matrix: live views, emulated by the main and scrolled together (#383)
+	APP_EMULATOR_EMULATE_LIVE_VIEW: "app-emulator:emulate-live-view",
 	APP_EMULATOR_ERROR: "app-emulator:error",
+	// Device matrix: the grid of the main's last captures, saved where the person chooses (#383)
+	APP_EMULATOR_EXPORT_DEVICE_GRID: "app-emulator:export-device-grid",
+	APP_EMULATOR_LIST_CUSTOM_DEVICES: "app-emulator:list-custom-devices",
+	APP_EMULATOR_LIST_PERSONAS: "app-emulator:list-personas",
 	APP_EMULATOR_OUTPUT: "app-emulator:output",
+	APP_EMULATOR_READ_LIVE_SCROLL: "app-emulator:read-live-scroll",
 	APP_EMULATOR_READY: "app-emulator:ready",
+	APP_EMULATOR_SAVE_CUSTOM_DEVICE: "app-emulator:save-custom-device",
+	APP_EMULATOR_SAVE_PERSONA: "app-emulator:save-persona",
+	// Device matrix: one page read at several widths, around its own breakpoints (#383)
+	APP_EMULATOR_SCAN_BREAKPOINTS: "app-emulator:scan-breakpoints",
+	APP_EMULATOR_SET_LIVE_SCROLL: "app-emulator:set-live-scroll",
 	APP_EMULATOR_START: "app-emulator:start",
 	APP_EMULATOR_STATUS: "app-emulator:status",
 	APP_EMULATOR_STATUS_UPDATE: "app-emulator:status-update",
@@ -1091,7 +1194,18 @@ export const IPC_CHANNELS = {
 	BENCH_EVENT: "bench:event",
 	BENCH_START: "bench:start",
 	BENCH_STATUS: "bench:status",
+	BITBUCKET_CHECK_CONNECTION: "bitbucket:checkConnection",
+	BITBUCKET_GET_ISSUE_COMMENTS: "bitbucket:getIssueComments",
+	BITBUCKET_GET_ISSUES: "bitbucket:getIssues",
+	BITBUCKET_GET_PIPELINE_STEPS: "bitbucket:getPipelineSteps",
+	BITBUCKET_GET_PIPELINES: "bitbucket:getPipelines",
+	BITBUCKET_GET_PR_COMMENTS: "bitbucket:getPullRequestComments",
+	BITBUCKET_GET_PR_DIFF: "bitbucket:getPullRequestDiff",
+	BITBUCKET_GET_PULL_REQUESTS: "bitbucket:getPullRequests",
+	BITBUCKET_IMPORT_ISSUES: "bitbucket:importIssues",
 	BLAST_RADIUS_ANALYZE: "blastRadius:analyze",
+	BOARD_ASK: "boardAsk:ask", // « Interroger le tableau »: a question answered with the related tickets
+	BOARD_ASK_CHECK_IDEA: "boardAsk:checkIdea", // « Vérifier une idée »: what the board already holds of a planned feature
 	BOARD_MCP_APPLY: "boardMcp:apply",
 	BOARD_MCP_STATUS: "boardMcp:status",
 	BOUNTY_BOARD_LIST_ARCHIVES: "bountyBoard:listArchives",
@@ -1106,9 +1220,14 @@ export const IPC_CHANNELS = {
 	CARBON_PROFILER_RUN: "carbonProfiler:run",
 	CICD_TRIGGERS_CANCEL_RUN: "cicdTriggers:cancelRun",
 	CICD_TRIGGERS_GET_CONFIG: "cicdTriggers:getConfig",
+	CICD_TRIGGERS_GET_FIGURES: "cicdTriggers:getFigures",
+	CICD_TRIGGERS_GET_LINKS: "cicdTriggers:getLinks",
 	CICD_TRIGGERS_GET_RUN_STATUS: "cicdTriggers:getRunStatus",
 	CICD_TRIGGERS_LIST_RUNS: "cicdTriggers:listRuns",
+	CICD_TRIGGERS_REVIEW_VERDICT: "cicdTriggers:reviewVerdict",
+	CICD_TRIGGERS_ROLLBACK: "cicdTriggers:rollback",
 	CICD_TRIGGERS_SET_CONFIG: "cicdTriggers:setConfig",
+	CICD_TRIGGERS_SET_LINKS: "cicdTriggers:setLinks",
 	CICD_TRIGGERS_TRIGGER: "cicdTriggers:trigger",
 	CLAUDE_PROFILE_CREATE_DIR: "claude:profileCreateDir",
 	CODE_PLAYGROUND_CANCEL: "code-playground:cancel",
@@ -1137,10 +1256,12 @@ export const IPC_CHANNELS = {
 	COSTS_GET_CONTEXT_USAGE: "costs:getContextUsage",
 	COSTS_GET_SUMMARY: "costs:getSummary",
 	COSTS_SET_BUDGET: "costs:setBudget",
+	COSTS_SET_TASK_BUDGET: "costs:setTaskBudget",
 	COST_PREDICTOR_RUN: "costPredictor:run",
 	CREDENTIAL_CHECK_CLAUDE_OAUTH: "credential:checkClaudeOAuth",
 	CREDENTIAL_CHECK_OPENAI_CODEX_OAUTH: "credential:checkOpenAICodexOAuth",
 	CREDENTIAL_DETECT_WINDSURF_TOKEN: "credential:detectWindsurfToken",
+	CREDENTIAL_SAVE_DETECTED_WINDSURF_TOKEN: "credential:saveDetectedWindsurfToken",
 	CREDENTIAL_GET_ACTIVE: "credential:getActive",
 	CREDENTIAL_SET_ACTIVE: "credential:setActive",
 	CREDENTIAL_TEST_PROVIDER: "credential:testProvider",
@@ -1152,8 +1273,16 @@ export const IPC_CHANNELS = {
 	CROSS_LANG_TRANSLATION_GET_SUPPORTED_LANGUAGES: "crossLangTranslation:getSupportedLanguages",
 	CROSS_LANG_TRANSLATION_STREAM_CHUNK: "crossLangTranslation:streamChunk",
 	CROSS_LANG_TRANSLATION_TRANSLATE: "crossLangTranslation:translate",
+	// "How you compare": a project's specs against its past and the person's
+	// other projects, read from their folders (main/build-compare.ts)
+	DASHBOARD_COMPARE: "dashboard:compare",
+	// Its team report, worded by the renderer, printed to a PDF the person
+	// saves (main/build-compare-report.ts)
+	DASHBOARD_COMPARE_EXPORT: "dashboard:compareExport",
 	DASHBOARD_GET_SNAPSHOT: "dashboard:getSnapshot",
 	DESIGN_TO_CODE_DETECT_STACK: "designToCode:detectStack",
+	// The render loop's figures on this project (main/design-loop-history.ts)
+	DESIGN_TO_CODE_LOOP_STATS: "designToCode:loopStats",
 	DESIGN_TO_CODE_PROGRESS: "designToCode:progress",
 	DESIGN_TO_CODE_RUN: "designToCode:run",
 	DESIGN_TO_CODE_WRITE_FILES: "designToCode:writeFiles",
@@ -1208,6 +1337,12 @@ export const IPC_CHANNELS = {
 	GUARDRAILS_ACTIVITY: "guardrails:activity",
 	GUARDRAILS_ANSWER: "guardrails:answer",
 	GUARDRAILS_CHECK_DIFF: "guardrails:checkDiff",
+	GOVERNANCE_REPORT: "governance:report",
+	GOVERNANCE_EXPORT_AUDIT: "governance:exportAudit",
+	GOVERNANCE_SERVER_REPORT: "governance:serverReport",
+	GOVERNANCE_SERVER_EXPORT: "governance:serverExport",
+	GOVERNANCE_SERVER_ANSWER: "governance:serverAnswer",
+	GOVERNANCE_SERVER_STOP: "governance:serverStop",
 	I18N_AGENT_CANCEL: "i18nAgent:cancel",
 	I18N_AGENT_ERROR: "i18n-agent-error",
 	I18N_AGENT_EVENT: "i18n-agent-event",
@@ -1318,6 +1453,26 @@ export const IPC_CHANNELS = {
 	SERVER_ADMIN_UPDATE_MEMBER_ROLE: "server-admin:update-member-role",
 	SERVER_ADMIN_UPDATE_ORG: "server-admin:update-org",
 	SERVER_ADMIN_UPDATE_ROLE: "server-admin:update-role",
+	// Usage (main/server-usage.ts): a view opened, counted only while the
+	// organization has page activity on; the organization's usage settings.
+	SERVER_USAGE_PAGE_VISIT: "server-usage:page-visit",
+	SERVER_USAGE_GET_SETTINGS: "server-usage:get-settings",
+	SERVER_USAGE_SET_SETTINGS: "server-usage:set-settings",
+	SERVER_USAGE_VIEW: "server-usage:view",
+	SERVER_USAGE_PERSON: "server-usage:person",
+	SERVER_USAGE_EXPORT: "server-usage:export",
+	SERVER_USAGE_MINE: "server-usage:mine",
+	SERVER_USAGE_EXPORT_MINE: "server-usage:export-mine",
+	SERVER_USAGE_NOTICE: "server-usage:notice",
+	SERVER_USAGE_NOTICE_SEEN: "server-usage:notice-seen",
+	SERVER_USAGE_ERASE_ACCOUNT: "server-usage:erase-account",
+	SERVER_USAGE_GET_REPORT_SETTINGS: "server-usage:get-report-settings",
+	SERVER_USAGE_SET_REPORT_SETTINGS: "server-usage:set-report-settings",
+	SERVER_USAGE_REPORT: "server-usage:report",
+	SERVER_USAGE_SEND_REPORT: "server-usage:send-report",
+	SERVER_USAGE_BUDGETS: "server-usage:budgets",
+	SERVER_USAGE_SET_BUDGET: "server-usage:set-budget",
+	SERVER_USAGE_REMOVE_BUDGET: "server-usage:remove-budget",
 	SERVER_AUTH_ACCEPT_INVITE: "server-auth:accept-invite",
 	SERVER_AUTH_CREATE_INVITE: "server-auth:create-invite",
 	SERVER_AUTH_GET_CONFIG: "server-auth:get-config",
@@ -1325,8 +1480,15 @@ export const IPC_CHANNELS = {
 	SERVER_AUTH_LIST_INVITES: "server-auth:list-invites",
 	SERVER_AUTH_LOGIN_ENTRA: "server-auth:login-entra",
 	SERVER_AUTH_LOGIN_LOCAL: "server-auth:login-local",
+	SERVER_AUTH_LOGIN_SSO: "server-auth:login-sso",
 	SERVER_AUTH_LOGOUT: "server-auth:logout",
 	SERVER_AUTH_LOOKUP_INVITE: "server-auth:lookup-invite",
+	// A forgotten password (main/server-password-reset.ts): ask for a link,
+	// read it, set the new password; a platform admin issues a link.
+	SERVER_AUTH_REQUEST_PASSWORD_RESET: "server-auth:request-password-reset",
+	SERVER_AUTH_LOOKUP_PASSWORD_RESET: "server-auth:lookup-password-reset",
+	SERVER_AUTH_CONFIRM_PASSWORD_RESET: "server-auth:confirm-password-reset",
+	SERVER_AUTH_ISSUE_PASSWORD_RESET: "server-auth:issue-password-reset",
 	SERVER_AUTH_RESTORE: "server-auth:restore",
 	SERVER_AUTH_REVOKE_INVITE: "server-auth:revoke-invite",
 	SERVER_AUTH_SET_MODE: "server-auth:set-mode",
@@ -1341,6 +1503,8 @@ export const IPC_CHANNELS = {
 	SERVER_AUTH_DELETE_SECRET: "server-auth:delete-secret",
 	// The person's theme on the server, read at connection (main/server-ui-preferences.ts).
 	SERVER_AUTH_PULL_UI_PREFERENCES: "server-auth:pull-ui-preferences",
+	// How the current session was opened and who it is (main/server-session-info.ts).
+	SERVER_AUTH_GET_SESSION: "server-auth:get-session",
 	// The person's own "needs you" channels on the server (ntfy, Telegram,
 	// Teams): secrets set, masked, never read back (main/server-needs-you.ts).
 	SERVER_NEEDS_YOU_GET: "server-needs-you:get",
@@ -1369,13 +1533,30 @@ export const IPC_CHANNELS = {
 	SERVER_VIEW_CHANGED: "server-view:changed",
 	// Server mode: a server project's dashboard, analytics, costs and session
 	// history, computed by the server (main/server-workspace.ts)
+	SERVER_WORKSPACE_COMPARE: "server-workspace:compare",
 	SERVER_WORKSPACE_COSTS: "server-workspace:costs",
 	SERVER_WORKSPACE_DASHBOARD: "server-workspace:dashboard",
 	SERVER_WORKSPACE_SESSIONS: "server-workspace:sessions",
+	SMART_ESTIMATION_ADJUST: "smartEstimation:adjust",
 	SMART_ESTIMATION_COMPLETE: "smart-estimation-complete",
 	SMART_ESTIMATION_ERROR: "smart-estimation-error",
 	SMART_ESTIMATION_EVENT: "smart-estimation-event",
+	SMART_ESTIMATION_RESET_CALIBRATION: "smartEstimation:resetCalibration",
 	SPEC_APPROVAL_GET_SPEC: "specApproval:getSpec",
+	// Server mode: a server card's approval (criticality, who approved) and the
+	// approvals lent on a server project (main/server-card-approvals.ts)
+	SPEC_APPROVAL_SERVER_GET: "specApproval:serverGet",
+	SPEC_APPROVAL_SERVER_SET_CRITICALITY: "specApproval:serverSetCriticality",
+	SPEC_APPROVAL_DELEGATIONS_LIST: "specApproval:delegationsList",
+	SPEC_APPROVAL_DELEGATION_CREATE: "specApproval:delegationCreate",
+	SPEC_APPROVAL_DELEGATION_REVOKE: "specApproval:delegationRevoke",
+	SPEC_APPROVAL_DELEGATES_LIST: "specApproval:delegatesList",
+	// Sprints of a project's Kanban (main/ipc-handlers/sprint-handlers.ts)
+	SPRINTS_COMPLETE: "sprints:complete",
+	SPRINTS_DELETE: "sprints:delete",
+	SPRINTS_LIST: "sprints:list",
+	SPRINTS_SAVE: "sprints:save",
+	SPRINTS_START: "sprints:start",
 	SWARM_ANALYZE: "swarm:analyze",
 	SWARM_CANCEL: "swarm:cancel",
 	SWARM_EVENT: "swarm:event",

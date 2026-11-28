@@ -1,8 +1,9 @@
 /**
  * AgentPanel — Individual agent card in the Mission Control grid.
  *
- * Shows: status badge, provider/model, progress bar, live thinking,
- * last tool call, active files, token usage, and control buttons.
+ * Shows: status badge, provider/model, what the agent is doing, its answer as
+ * it streams in, last tool call, active files, token usage, and controls.
+ * A run is one model call: it can be stopped, not paused.
  */
 
 import {
@@ -12,14 +13,21 @@ import {
 	DollarSign,
 	FileCode,
 	GitBranch,
+	LifeBuoy,
+	MessageSquareText,
 	MoreVertical,
-	Pause,
 	Play,
+	Repeat,
+	Shuffle,
 	Square,
 	Trash2,
 	Wrench,
 } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
+import type { MissionControlAgentStatus } from "../../../shared/types/mission-control";
+import { providerRegistry } from "../../../shared/services/providerRegistry";
+import { appDateLocale } from "../../lib/date-format";
 import { cn } from "../../lib/utils";
 import type { AgentSlot } from "../../stores/mission-control-store";
 import { Badge } from "../ui/badge";
@@ -32,32 +40,20 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
-import { Progress } from "../ui/progress";
-import { useTranslation } from "react-i18next";
-
 import { Input } from "../ui/input";
+import { formatElapsed, ROLE_EMOJI } from "./agent-format";
+
 interface AgentPanelProps {
 	readonly agent: AgentSlot;
 	readonly isSelected: boolean;
 	readonly onSelect: () => void;
 	readonly onStart: (task: string) => void;
-	readonly onPause: () => void;
-	readonly onResume: () => void;
 	readonly onStop: () => void;
 	readonly onRemove: () => void;
 	readonly onShowDecisionTree: () => void;
-	readonly onUpdateConfig: (
-		config: Partial<{
-			provider: string;
-			model: string;
-			model_label: string;
-			name: string;
-			role: string;
-		}>,
-	) => void;
 }
 
-const STATUS_COLORS: Record<string, string> = {
+const STATUS_COLORS: Record<MissionControlAgentStatus, string> = {
 	idle: "bg-gray-500/10 text-gray-500 border-gray-500/30",
 	running: "bg-success/10 text-success border-success/30",
 	paused: "bg-warning/10 text-warning border-warning/30",
@@ -66,7 +62,7 @@ const STATUS_COLORS: Record<string, string> = {
 	waiting: "bg-purple-500/10 text-purple-500 border-purple-500/30",
 };
 
-const STATUS_DOT: Record<string, string> = {
+const STATUS_DOT: Record<MissionControlAgentStatus, string> = {
 	idle: "bg-gray-500",
 	running: "bg-success animate-pulse",
 	paused: "bg-warning",
@@ -75,57 +71,53 @@ const STATUS_DOT: Record<string, string> = {
 	waiting: "bg-purple-500 animate-pulse",
 };
 
-const ROLE_LABELS: Record<string, string> = {
-	architect: "🏗️ Architect",
-	coder: "💻 Coder",
-	tester: "🧪 Tester",
-	reviewer: "👁️ Reviewer",
-	documenter: "📝 Documenter",
-	planner: "📋 Planner",
-	debugger: "🐛 Debugger",
-	custom: "⚙️ Custom",
-};
-
 export function AgentPanel({
 	agent,
 	isSelected,
 	onSelect,
 	onStart,
-	onPause,
-	onResume,
 	onStop,
 	onRemove,
 	onShowDecisionTree,
-	// biome-ignore lint/correctness/noUnusedFunctionParameters: parameter kept for API compatibility
-	onUpdateConfig,
 }: AgentPanelProps) {
 	const { t } = useTranslation();
 	const [taskInput, setTaskInput] = useState("");
 
-	const statusColor = STATUS_COLORS[agent.status] ?? STATUS_COLORS.idle;
-	const statusDot = STATUS_DOT[agent.status] ?? STATUS_DOT.idle;
+	const provider = providerRegistry.getProvider(agent.provider)?.label ?? agent.provider;
+	// Each Enter or click hands the task over once, then clears the field.
+	const submitTask = () => {
+		if (!taskInput.trim()) return;
+		onStart(taskInput);
+		setTaskInput("");
+	};
 
 	return (
 		<Card
 			className={cn(
-				"border transition-all duration-200 cursor-pointer hover:shadow-md",
+				"border transition-all duration-200 hover:shadow-md",
 				isSelected
 					? "border-primary/50 shadow-lg shadow-primary/5 ring-1 ring-primary/20"
 					: "border-border/50 hover:border-border",
 			)}
-			onClick={onSelect}
 		>
 			<CardContent className="p-3 space-y-3">
 				{/* Header: Name + Status + Menu */}
 				<div className="flex items-center justify-between gap-2">
 					<div className="flex items-center gap-2 min-w-0">
-						<div className={cn("h-2 w-2 rounded-full shrink-0", statusDot)} />
-						<span className="font-semibold text-sm truncate">{agent.name}</span>
+						<div className={cn("h-2 w-2 rounded-full shrink-0", STATUS_DOT[agent.status])} />
+						<button
+							type="button"
+							className="font-semibold text-sm truncate text-left hover:underline"
+							aria-pressed={isSelected}
+							onClick={onSelect}
+						>
+							{agent.name}
+						</button>
 						<Badge
 							variant="outline"
-							className={cn("text-3xs px-1.5 py-0", statusColor)}
+							className={cn("text-3xs px-1.5 py-0", STATUS_COLORS[agent.status])}
 						>
-							{agent.status}
+							{t(`missionControl:status.${agent.status}`)}
 						</Badge>
 					</div>
 					<DropdownMenu>
@@ -134,7 +126,7 @@ export function AgentPanel({
 								variant="ghost"
 								size="icon"
 								className="h-6 w-6 shrink-0"
-								onClick={(e) => e.stopPropagation()}
+								aria-label={t("missionControl:agentPanel.actions", { name: agent.name })}
 							>
 								<MoreVertical className="h-3.5 w-3.5" />
 							</Button>
@@ -155,26 +147,81 @@ export function AgentPanel({
 
 				{/* Role + Provider/Model */}
 				<div className="flex items-center gap-2 text-xs text-muted-foreground">
-					<span>{ROLE_LABELS[agent.role] ?? agent.role}</span>
+					<span>
+						{ROLE_EMOJI[agent.role]} {t(`missionControl:roles.${agent.role}`)}
+					</span>
 					<span className="text-border">•</span>
 					<span className="truncate">
-						{agent.provider ? `${agent.provider}:` : ""}
+						{provider && `${provider}: `}
 						{agent.model_label || agent.model || t("missionControl:agentPanel.noModel")}
 					</span>
 				</div>
 
-				{/* Progress */}
+				{/* Live rebalancing (#344): the agent was moved, its answer looped, or a helper is beside it */}
+				{(Boolean(agent.rebalances) || agent.loop_detected || agent.helper_of || agent.helper_id) && (
+					<div className="flex flex-wrap gap-1.5" data-testid="mission-control-agent-rebalanced">
+						{Boolean(agent.rebalances) && (
+							<Badge variant="outline" className="text-3xs px-1.5 py-0 text-warning border-warning/30">
+								<Shuffle className="h-3 w-3 mr-1" />
+								{t("missionControl:rebalance.badge", { count: agent.rebalances })}
+							</Badge>
+						)}
+						{agent.loop_detected && (
+							<Badge variant="outline" className="text-3xs px-1.5 py-0 text-warning border-warning/30">
+								<Repeat className="h-3 w-3 mr-1" />
+								{t("missionControl:rebalance.loopBadge")}
+							</Badge>
+						)}
+						{agent.helper_of && (
+							<Badge variant="outline" className="text-3xs px-1.5 py-0 text-info border-info/30">
+								<LifeBuoy className="h-3 w-3 mr-1" />
+								{t("missionControl:rebalance.helperBadge", { name: agent.helper_of_name })}
+							</Badge>
+						)}
+						{agent.helper_id && (
+							<Badge variant="outline" className="text-3xs px-1.5 py-0 text-info border-info/30">
+								<LifeBuoy className="h-3 w-3 mr-1" />
+								{t("missionControl:rebalance.helpedBadge")}
+							</Badge>
+						)}
+					</div>
+				)}
+
+				{/* Task + what the run is waiting on: one model call has no percentage */}
+				{/* A helper's task is the prompt the backend wrote for its model: say what it does. */}
+				{agent.current_task && (
+					<p className="text-xs text-foreground/80 line-clamp-2">
+						{agent.helper_of
+							? t("missionControl:rebalance.helperTask", { name: agent.helper_of_name })
+							: agent.current_task}
+					</p>
+				)}
 				{agent.status === "running" && (
-					<div className="space-y-1">
-						<div className="flex items-center justify-between text-xs">
-							<span className="text-muted-foreground truncate">
-								{agent.current_step || agent.current_task || t("missionControl:agentPanel.working")}
-							</span>
-							<span className="text-muted-foreground shrink-0">
-								{Math.round(agent.progress * 100)}%
-							</span>
+					<div className="space-y-1" data-testid="mission-control-agent-running">
+						<span className="text-xs text-muted-foreground">
+							{agent.output
+								? t("missionControl:agentPanel.answering")
+								: t("missionControl:agentPanel.waitingForModel")}
+						</span>
+						<div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+							<div className="h-full w-1/3 animate-pulse rounded-full bg-primary/60" />
 						</div>
-						<Progress value={agent.progress * 100} className="h-1.5" />
+					</div>
+				)}
+
+				{/* The agent's answer */}
+				{agent.output && (
+					<div
+						className="rounded-md bg-muted/30 p-2 text-xs"
+						data-testid="mission-control-agent-output"
+					>
+						<div className="mb-1 flex items-center gap-1.5 font-medium text-foreground/70">
+							<MessageSquareText className="h-3 w-3" />
+							{t("missionControl:agentPanel.answer")}
+						</div>
+						<p className="max-h-48 overflow-y-auto whitespace-pre-wrap break-words text-foreground/90">
+							{agent.output}
+						</p>
 					</div>
 				)}
 
@@ -218,7 +265,7 @@ export function AgentPanel({
 									variant="secondary"
 									className="text-3xs font-mono px-1.5"
 								>
-									{f.split("/").pop()}
+									{f.split(/[\\/]/).pop()}
 								</Badge>
 							))}
 							{agent.active_files.length > 3 && (
@@ -234,11 +281,11 @@ export function AgentPanel({
 				<div className="flex items-center gap-3 text-xs text-muted-foreground pt-1 border-t border-border/30">
 					<div className="flex items-center gap-1" title={t("missionControl:statTokens")}>
 						<Cpu className="h-3 w-3" />
-						{agent.tokens.total_tokens.toLocaleString()}
+						{agent.tokens.total_tokens.toLocaleString(appDateLocale())}
 					</div>
 					<div className="flex items-center gap-1" title={t("missionControl:statCost")}>
-						<DollarSign className="h-3 w-3" />$
-						{agent.tokens.estimated_cost_usd.toFixed(4)}
+						<DollarSign className="h-3 w-3" />
+						{t("missionControl:costValue", { value: agent.tokens.estimated_cost_usd.toFixed(4) })}
 					</div>
 					<div className="flex items-center gap-1" title={t("missionControl:statElapsed")}>
 						<Clock className="h-3 w-3" />
@@ -247,25 +294,17 @@ export function AgentPanel({
 				</div>
 
 				{/* Controls */}
-				{/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: stop-propagation container */}
-				{/* biome-ignore lint/a11y/noStaticElementInteractions: stop-propagation container */}
-				{/* biome-ignore lint/a11y/useKeyWithClickEvents: keyboard handled by controls inside */}
-				<div
-					className="flex items-center gap-1.5 pt-1"
-					onClick={(e) => e.stopPropagation()}
-				>
+				<div className="flex items-center gap-1.5 pt-1">
 					{agent.status === "idle" && (
 						<>
 							<Input
 								type="text"
 								placeholder={t("missionControl:agentPanel.taskPlaceholder")}
+								aria-label={t("missionControl:agentPanel.taskLabel", { name: agent.name })}
 								value={taskInput}
 								onChange={(e) => setTaskInput(e.target.value)}
 								onKeyDown={(e) => {
-									if (e.key === "Enter" && taskInput.trim()) {
-										onStart(taskInput);
-										setTaskInput("");
-									}
+									if (e.key === "Enter") submitTask();
 								}}
 								className="flex-1 text-xs px-2 py-1 h-auto"
 							/>
@@ -273,56 +312,25 @@ export function AgentPanel({
 								variant="default"
 								size="icon"
 								className="h-6 w-6"
-								onClick={() => {
-									if (taskInput.trim()) {
-										onStart(taskInput);
-										setTaskInput("");
-									}
-								}}
+								aria-label={t("missionControl:agentPanel.start")}
+								disabled={!taskInput.trim()}
+								onClick={submitTask}
 							>
 								<Play className="h-3 w-3" />
 							</Button>
 						</>
 					)}
-					{agent.status === "running" && (
-						<>
-							<Button
-								variant="outline"
-								size="icon"
-								className="h-6 w-6"
-								onClick={onPause}
-							>
-								<Pause className="h-3 w-3" />
-							</Button>
-							<Button
-								variant="destructive"
-								size="icon"
-								className="h-6 w-6"
-								onClick={onStop}
-							>
-								<Square className="h-3 w-3" />
-							</Button>
-						</>
-					)}
-					{agent.status === "paused" && (
-						<>
-							<Button
-								variant="default"
-								size="icon"
-								className="h-6 w-6"
-								onClick={onResume}
-							>
-								<Play className="h-3 w-3" />
-							</Button>
-							<Button
-								variant="destructive"
-								size="icon"
-								className="h-6 w-6"
-								onClick={onStop}
-							>
-								<Square className="h-3 w-3" />
-							</Button>
-						</>
+					{(agent.status === "running" || agent.status === "paused") && (
+						<Button
+							variant="destructive"
+							size="sm"
+							className="h-6 text-xs"
+							aria-label={t("missionControl:agentPanel.stopAgent", { name: agent.name })}
+							onClick={onStop}
+						>
+							<Square className="h-3 w-3 mr-1" />
+							{t("missionControl:agentPanel.stop")}
+						</Button>
 					)}
 					{(agent.status === "completed" || agent.status === "error") && (
 						<Button
@@ -339,17 +347,14 @@ export function AgentPanel({
 
 				{/* Error message */}
 				{agent.error_message && (
-					<div className="text-xs text-destructive bg-destructive/10 rounded px-2 py-1 truncate">
+					<div
+						className="text-xs text-destructive bg-destructive/10 rounded px-2 py-1 break-words"
+						role="alert"
+					>
 						{agent.error_message}
 					</div>
 				)}
 			</CardContent>
 		</Card>
 	);
-}
-
-function formatElapsed(seconds: number): string {
-	if (seconds < 60) return `${Math.floor(seconds)}s`;
-	if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
-	return `${Math.floor(seconds / 3600)}h${Math.floor((seconds % 3600) / 60)}m`;
 }

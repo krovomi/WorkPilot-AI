@@ -6,7 +6,10 @@
 import { Activity, AlertTriangle, Brain, GitBranch, Plus, Power, PowerOff, RefreshCw, Rocket, Users } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useShallow } from "zustand/react/shallow";
+import { appDateLocale } from "../../lib/date-format";
 import { useMissionControlStore } from "../../stores/mission-control-store";
+import { useProjectStore } from "../../stores/project-store";
 import {
 	CharterButton,
 	Chip,
@@ -20,7 +23,12 @@ import {
 	Stat,
 	Stats,
 } from "../charter";
+import { WavesView } from "../conflict-predictor/WavesView";
+import { formatElapsed } from "./agent-format";
 import { AddAgentDialog, AgentEventLog, AgentPanel, DecisionTreeViewer } from "./index";
+import { MissionControlMetrics } from "./MissionControlMetrics";
+import { ServerMissionControl } from "./ServerMissionControl";
+import { SessionHealth } from "./SessionHealth";
 
 const FEATURES = [
 	{ key: "featureMultiAgent", icon: Users },
@@ -29,15 +37,16 @@ const FEATURES = [
 	{ key: "featureLiveView", icon: Activity },
 ] as const;
 
-function formatElapsed(seconds: number): string {
-	if (seconds < 60) return `${Math.floor(seconds)}s`;
-	if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${Math.floor(seconds % 60)}s`;
-	const h = Math.floor(seconds / 3600);
-	const m = Math.floor((seconds % 3600) / 60);
-	return `${h}h ${m}m`;
+export function MissionControlDashboard() {
+	const serverProject = useProjectStore((s) => {
+		const project = s.projects.find((p) => p.id === s.selectedProjectId);
+		return project?.remote ? project : null;
+	});
+	// A server project's agents run on the server (`ServerMissionControl`).
+	return serverProject ? <ServerMissionControl project={serverProject} /> : <LocalMissionControl />;
 }
 
-export function MissionControlDashboard() {
+function LocalMissionControl() {
 	const { t } = useTranslation(["missionControl", "common", "navigation"]);
 	const {
 		session,
@@ -54,16 +63,42 @@ export function MissionControlDashboard() {
 		createAgent,
 		removeAgent,
 		startAgent,
-		pauseAgent,
-		resumeAgent,
 		stopAgent,
 		selectAgent,
 		startPolling,
 		stopPolling,
-		updateAgentConfig,
-	} = useMissionControlStore();
+	} = useMissionControlStore(
+		useShallow((s) => ({
+			session: s.session,
+			isActive: s.isActive,
+			agents: s.agents,
+			selectedAgentId: s.selectedAgentId,
+			decisionTrees: s.decisionTrees,
+			events: s.events,
+			isLoading: s.isLoading,
+			error: s.error,
+			startSession: s.startSession,
+			stopSession: s.stopSession,
+			fetchState: s.fetchState,
+			createAgent: s.createAgent,
+			removeAgent: s.removeAgent,
+			startAgent: s.startAgent,
+			stopAgent: s.stopAgent,
+			selectAgent: s.selectAgent,
+			startPolling: s.startPolling,
+			stopPolling: s.stopPolling,
+		})),
+	);
 
 	const [showAddAgent, setShowAddAgent] = useState(false);
+	// null: nothing refused yet; "" a refusal without a reason.
+	const [createError, setCreateError] = useState<string | null>(null);
+
+	// Coming back to the page finds the session still open in the backend,
+	// with the agents that kept running meanwhile.
+	useEffect(() => {
+		void fetchState();
+	}, [fetchState]);
 
 	// Poll while the session runs.
 	useEffect(() => {
@@ -78,12 +113,21 @@ export function MissionControlDashboard() {
 	const selectedTree = selectedAgentId ? (decisionTrees[selectedAgentId] ?? null) : null;
 
 	const runningCount = agents.filter((a) => a.status === "running").length;
-	const totalTokens = agents.reduce((sum, a) => sum + (a.tokens?.total_tokens ?? 0), 0);
-	const totalCost = agents.reduce((sum, a) => sum + (a.tokens?.estimated_cost_usd ?? 0), 0);
+	const totalTokens = agents.reduce((sum, a) => sum + a.tokens.total_tokens, 0);
+	const totalCost = agents.reduce((sum, a) => sum + a.tokens.estimated_cost_usd, 0);
 
+	const openAddAgent = () => {
+		setCreateError(null);
+		setShowAddAgent(true);
+	};
 	const handleAddAgent = async (name: string, role: string, provider: string, model: string, modelLabel: string) => {
-		await createAgent(name, role, provider, model, modelLabel);
+		const agent = await createAgent(name, role, provider, model, modelLabel);
+		if (!agent) {
+			setCreateError(useMissionControlStore.getState().error ?? "");
+			return false;
+		}
 		setShowAddAgent(false);
+		return true;
 	};
 
 	const header = (actions: React.ReactNode) => (
@@ -97,8 +141,8 @@ export function MissionControlDashboard() {
 		/>
 	);
 
-	// Before a session: what it does, and one button to launch it.
-	if (!isActive) {
+	// Before a session (or after the backend ended it): what it does, and one button to launch it.
+	if (!session || !isActive) {
 		return (
 			<ModuleStage scroll="page" data-testid="mission-control-view">
 				{header(
@@ -131,6 +175,10 @@ export function MissionControlDashboard() {
 							))}
 						</div>
 					</Section>
+					{/* What past sessions measured (#344). */}
+					<MissionControlMetrics />
+					{/* The specs of the board, run wave after wave (#358). */}
+					<WavesView />
 				</Page>
 			</ModuleStage>
 		);
@@ -146,7 +194,7 @@ export function MissionControlDashboard() {
 					<CharterButton icon={PowerOff} variant="danger" onClick={() => void stopSession()}>
 						{t("missionControl:stopSession")}
 					</CharterButton>
-					<CharterButton variant="primary" icon={Plus} onClick={() => setShowAddAgent(true)}>
+					<CharterButton variant="primary" icon={Plus} onClick={openAddAgent}>
 						{t("missionControl:addAgent")}
 					</CharterButton>
 				</>,
@@ -155,9 +203,11 @@ export function MissionControlDashboard() {
 				<div className="flex flex-wrap items-center gap-2">
 					<span className="wp-kicker">{t("missionControl:session")}</span>
 					<Chip tone="green">
-						<span className="font-mono">{session?.session_id ?? "—"}</span>
+						<span className="font-mono">{session.session_id}</span>
 					</Chip>
 				</div>
+
+				<SessionHealth session={session} tokens={totalTokens} cost={totalCost} />
 
 				<Stats>
 					<Stat
@@ -165,7 +215,7 @@ export function MissionControlDashboard() {
 						value={t("missionControl:agentsRunning", { running: runningCount, total: agents.length })}
 						tone="blue"
 					/>
-					<Stat label={t("missionControl:statTokens")} value={totalTokens.toLocaleString()} tone="violet" />
+					<Stat label={t("missionControl:statTokens")} value={totalTokens.toLocaleString(appDateLocale())} tone="violet" />
 					<Stat
 						label={t("missionControl:statCost")}
 						value={t("missionControl:costValue", { value: totalCost.toFixed(4) })}
@@ -173,7 +223,7 @@ export function MissionControlDashboard() {
 					/>
 					<Stat
 						label={t("missionControl:statElapsed")}
-						value={formatElapsed(session?.elapsed_seconds ?? 0)}
+						value={formatElapsed(session.elapsed_seconds)}
 						tone="orange"
 					/>
 				</Stats>
@@ -196,12 +246,9 @@ export function MissionControlDashboard() {
 									isSelected={agent.id === selectedAgentId}
 									onSelect={() => selectAgent(agent.id)}
 									onStart={(task: string) => startAgent(agent.id, task)}
-									onPause={() => pauseAgent(agent.id)}
-									onResume={() => resumeAgent(agent.id)}
 									onStop={() => stopAgent(agent.id)}
 									onRemove={() => removeAgent(agent.id)}
 									onShowDecisionTree={() => selectAgent(agent.id)}
-									onUpdateConfig={(config: Record<string, unknown>) => updateAgentConfig(agent.id, config)}
 								/>
 							))}
 						</div>
@@ -234,8 +281,15 @@ export function MissionControlDashboard() {
 						</Section>
 					</div>
 				)}
+
+				<WavesView />
 			</Page>
-			<AddAgentDialog open={showAddAgent} onOpenChange={setShowAddAgent} onAdd={handleAddAgent} />
+			<AddAgentDialog
+				open={showAddAgent}
+				onOpenChange={setShowAddAgent}
+				onAdd={handleAddAgent}
+				error={createError}
+			/>
 		</ModuleStage>
 	);
 }

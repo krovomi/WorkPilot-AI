@@ -24,8 +24,8 @@ from pathlib import Path
 BASE_READ_TOOLS = ["Read", "Glob", "Grep"]
 BASE_WRITE_TOOLS = ["Write", "Edit", "Bash"]
 
-# Web tools for documentation lookup and research
-# Always available to all agents for accessing external information
+# Web tools for documentation lookup and research, for the agent types that
+# declare them below
 WEB_TOOLS = ["WebFetch", "WebSearch"]
 
 # =============================================================================
@@ -439,8 +439,11 @@ AGENT_CONFIGS = {
         "auto_claude_tools": [],
         "thinking_default": "low",  # Fast utility task for structured fill-in
     },
+    # The forge reviewers below read a pull or merge request and the project
+    # it changes. They work offline from the repository's content: the
+    # project's files and the change are all a review needs, so no web tool.
     "pr_reviewer": {
-        "tools": BASE_READ_TOOLS + WEB_TOOLS,  # Read-only
+        "tools": BASE_READ_TOOLS,  # Read-only
         "mcp_servers": ["context7", "code"],
         "auto_claude_tools": [],
         "thinking_default": "high",
@@ -449,7 +452,7 @@ AGENT_CONFIGS = {
         # Read-only for parallel PR orchestrator
         # NOTE: Do NOT add "Task" here - the SDK auto-allows Task when agents are defined
         # via the --agents flag. Explicitly adding it interferes with agent registration.
-        "tools": BASE_READ_TOOLS + WEB_TOOLS,
+        "tools": BASE_READ_TOOLS,
         "mcp_servers": ["context7", "code"],
         "auto_claude_tools": [],
         "thinking_default": "high",
@@ -457,7 +460,7 @@ AGENT_CONFIGS = {
     "pr_followup_parallel": {
         # Read-only for parallel followup reviewer
         # NOTE: Do NOT add "Task" here - same reason as pr_orchestrator_parallel
-        "tools": BASE_READ_TOOLS + WEB_TOOLS,
+        "tools": BASE_READ_TOOLS,
         "mcp_servers": ["context7", "code"],
         "auto_claude_tools": [],
         "thinking_default": "high",
@@ -484,8 +487,17 @@ AGENT_CONFIGS = {
     # ═══════════════════════════════════════════════════════════════════════
     # ANALYSIS PHASES
     # ═══════════════════════════════════════════════════════════════════════
+    # Issue triage and batching read issues from the forge, like the
+    # reviewers above, and answer in text the caller parses.
+    "issue_triage": {
+        # runners/github/services/triage_engine.py: classifies one issue.
+        "tools": BASE_READ_TOOLS,
+        "mcp_servers": [],
+        "auto_claude_tools": [],
+        "thinking_default": "low",
+    },
     "batch_analysis": {
-        "tools": BASE_READ_TOOLS + WEB_TOOLS,
+        "tools": BASE_READ_TOOLS,
         "mcp_servers": [],
         "auto_claude_tools": [],
         "thinking_default": "low",
@@ -549,14 +561,6 @@ AGENT_CONFIGS = {
         "auto_claude_tools": [],
         "thinking_default": "low",
     },
-    "migration": {
-        # migration/llm_transformer.py — before/after code in, improved code
-        # out as text; the transformer writes the file, not the model.
-        "tools": BASE_READ_TOOLS,
-        "mcp_servers": [],
-        "auto_claude_tools": [],
-        "thinking_default": "medium",
-    },
     # ═══════════════════════════════════════════════════════════════════════
     # ONE-SHOT FEATURES
     # ═══════════════════════════════════════════════════════════════════════
@@ -568,6 +572,24 @@ AGENT_CONFIGS = {
         # repository's status in the prompt, one git command out. The runner
         # executes it, without a shell and only if it starts with `git`; the
         # model runs nothing.
+        "tools": [],
+        "mcp_servers": [],
+        "auto_claude_tools": [],
+        "thinking_default": "none",
+    },
+    "replay_summary": {
+        # replay/summary.py — a recorded session, masked and quoted as data,
+        # in the prompt; a few lines of summary out as text, in one turn. It
+        # reads text other runs wrote, so it gets no tool to act on it with.
+        "tools": [],
+        "mcp_servers": [],
+        "auto_claude_tools": [],
+        "thinking_default": "none",
+    },
+    "recorder_assist": {
+        # browser_agent/recorder_assist.py — what the recorded steps say of a
+        # page (never a typed value), quoted as data; one JSON object out (a
+        # test name, the proposed checks ranked), read through closed lists.
         "tools": [],
         "mcp_servers": [],
         "auto_claude_tools": [],
@@ -664,8 +686,6 @@ def _map_mcp_server_name(
     Returns:
         Internal server identifier or None if not recognized
     """
-    if not name:
-        return None
     mappings = {
         "brain": "brain",
         "workpilot-brain": "brain",
@@ -793,16 +813,12 @@ def get_required_mcp_servers(
     # preflight said this task touches the interface. A backend task declares
     # no server and pays for no tool definition. Before the overrides, so
     # AGENT_MCP_<agent>_REMOVE=uiux works.
+    # ``active_for`` turns any failure of its own into "not offered".
     if config.get("tools") and "uiux" not in servers:
-        try:
-            from uiux.integration import active_for as uiux_active
+        from uiux.integration import active_for as uiux_active
 
-            if uiux_active(spec_dir):
-                servers.append("uiux")
-        except Exception as exc:  # noqa: BLE001 - optional design data never blocks an agent
-            import logging
-
-            logging.getLogger(__name__).debug("ui-ux-pro-max not offered: %s", exc)
+        if uiux_active(spec_dir):
+            servers.append("uiux")
 
     # Filter chrome-devtools if not enabled (default: disabled)
     if "chrome-devtools" in servers:

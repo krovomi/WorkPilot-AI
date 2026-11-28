@@ -1,3 +1,9 @@
+---
+feature: Cerveau partagé et mémoire
+summary: >-
+  La seule mémoire : vault Obsidian, `graph.json`, serveur MCP, mémoire des builds, `mem-search`.
+---
+
 # The shared brain (memory)
 
 > Design rationale moved verbatim out of [`docs/CLAUDE.md`](../CLAUDE.md),
@@ -21,6 +27,9 @@ Graphiti / LadybugDB is gone (audit lot L7): `integrations/graphiti/`,
 onboarding memory step and the *Memory (Graphiti)* settings section were
 removed, with `graphiti-core`, `real_ladybug` and `pandas`. Sharing memory
 with a team is the brain's git remote (`brain/sync.py`).
+What happens to a memory — created, forgotten (a restorable trash now, not an
+`unlink`), pinned, archived when a team sync brings a contradicting note — is
+journalled in the vault itself: see [memory-lifecycle.md](memory-lifecycle.md).
 
 The learning loop's patterns were a fourth store
 (`.workpilot/learning_loop/patterns.json`), injected into the same prompts as
@@ -61,6 +70,7 @@ format Graphify, un dépôt git synchronisé, servi par un serveur MCP.
 | `runtime.py` | le branchement sur **toutes** les features de WorkPilot |
 | `learn.py` | ce que WorkPilot enregistre lui-même : chaque build, chaque merge |
 | `project_memory.py` | **la** mémoire des builds (pièges, conventions, fichiers, sessions) — le seul magasin, lu et écrit par toutes les features |
+| `lifecycle/` | ce qui arrive à une mémoire : journal en clair, corbeille restaurable, épingles, contradictions apportées par une synchronisation ([memory-lifecycle.md](memory-lifecycle.md)) |
 | `images.py` | les images du vault lues par docintel (source d'un schéma, sinon OCR local), en cache par empreinte |
 
 ```bash

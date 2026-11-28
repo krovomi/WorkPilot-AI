@@ -72,8 +72,8 @@
 		"coding": "Le code est en cours d'écriture. Les sous-tâches s'enchaînent automatiquement.",
 		"qa_review": "Un agent vérifie la qualité du code produit : tests, cohérence, bonnes pratiques.",
 		"qa_fixing": "Des problèmes ont été détectés. L'agent les corrige avant livraison.",
-		"rate_limit_paused": "L'API Claude a atteint sa limite. Reprise automatique dans quelques instants.",
-		"auth_failure_paused": "Problème d'authentification. Vérifie tes profils Claude dans les paramètres.",
+		"rate_limit_paused": "Le provider a atteint sa limite d'usage. La tâche reprend seule dans quelques instants.",
+		"auth_failure_paused": "Problème d'authentification. Vérifie le compte du provider dans les paramètres.",
 		"complete": "La tâche est complète et prête pour ta revue.",
 		"failed": "La tâche a échoué. Consulte les logs pour comprendre ce qui s'est passé."
 	},
@@ -90,8 +90,10 @@
 		"logs": "Logs de l'agent",
 		"copy": "Copier",
 		"copied": "Copié",
+		"copyFailed": "Non copié",
 		"copyAll": "Copier tous les logs",
 		"waitingForLogs": "En attente de logs…",
+		"noLogs": "Aucun log n'a été enregistré pour cette tâche.",
 		"sendPlaceholder": "Donne un ordre au terminal…",
 		"sendPlaceholderWaiting": "Réponds à l'agent…",
 		"sendHint": "↵ Entrée pour envoyer · Tapé directement dans le terminal",
@@ -99,12 +101,168 @@
 		"viewTerminal": "Voir terminal",
 		"interrupt": "Interrompre",
 		"resumeClaude": "Reprendre Claude",
-		"kill": "Fermer",
+		"kill": "Fermer le terminal",
 		"goToKanban": "Voir dans Kanban",
 		"stopTask": "Arrêter"
 	},
 	"pending": {
 		"description": "Cette tâche est en file d'attente et n'a pas encore démarré. Rends-toi dans le Kanban pour la lancer, la prioriser ou modifier sa spécification.",
 		"hint": "En attente d'un agent disponible"
+	},
+	"achievements": {
+		"title": "Succès",
+		"open": "Voir les succès du projet",
+		"count": "{{earned}}/{{total}}",
+		"unlocked": "Succès débloqué",
+		"dismiss": "Fermer",
+		"locked": "Pas encore obtenu",
+		"earnedOn": "Obtenu le {{date}}",
+		"items": {
+			"first-ship": {
+				"name": "Première livraison",
+				"description": "Une tâche est terminée ou devenue une pull request."
+			},
+			"ten-ships-week": {
+				"name": "Belle semaine",
+				"description": "Dix tâches livrées en sept jours."
+			},
+			"qa-first-try": {
+				"name": "Du premier coup",
+				"description": "Une tâche a passé la QA à sa première revue."
+			},
+			"qa-first-try-five": {
+				"name": "Main sûre",
+				"description": "Cinq tâches ont passé la QA à leur première revue."
+			},
+			"incident-resolved": {
+				"name": "Retour au vert",
+				"description": "Un incident Self-Healing a été résolu."
+			},
+			"incident-fixed-by-agent": {
+				"name": "Réparé tout seul",
+				"description": "Un agent a ouvert la pull request qui a résolu un incident."
+			},
+			"second-opinion": {
+				"name": "Deuxième avis",
+				"description": "Un second moteur a relu une tâche et l'a approuvée."
+			}
+		}
+	},
+	"kiosk": {
+		"enter": "Mode TV",
+		"exit": "Quitter le mode TV",
+		"calmOn": "Mode calme",
+		"calmOff": "Animations",
+		"calmLocked": "Votre système demande moins d'animations : le bureau reste immobile.",
+		"active": "Actifs",
+		"waiting": "Vous attendent",
+		"shippedToday": "Livrées aujourd'hui",
+		"achievements": "Succès"
+	},
+	"narratives": {
+		"title": "Scènes du bureau",
+		"settings": "Réglages des scènes",
+		"show": "Montrer une scène quand une tâche change de mains",
+		"ai": "Les faire écrire par le modèle de la page",
+		"aiHelp": "Le modèle choisi pour cette page écrit chaque scène. Il ne reçoit que le type de scène, les rôles, leurs fournisseurs et le numéro de spec, jamais le titre ni le contenu de la tâche. Sans réponse, la scène garde son modèle.",
+		"spec": "la spec n°{{number}}",
+		"task": "« {{title}} »",
+		"withEngine": "{{role}} ({{engine}})",
+		"roles": {
+			"planner": "Planner",
+			"coder": "Coder",
+			"reviewer": "Reviewer QA",
+			"fixer": "Fixer QA",
+			"you": "vous"
+		},
+		"scenes": {
+			"plan-ready": "{{from}} glisse le plan de {{spec}} sur le bureau de {{to}}.",
+			"handed-to-qa": "{{from}} vient de rendre sa copie pour {{spec}} à {{to}}.",
+			"qa-sent-back": "{{from}} rend {{spec}} à {{to}}, avec quelques notes dans la marge.",
+			"qa-approved": "{{from}} valide {{spec}} : à {{to}} de jouer.",
+			"shipped": "Livraison : {{spec}}. Tout le bureau applaudit.",
+			"stumbled": "{{from}} trébuche sur une erreur dans {{spec}} et s'arrête."
+		}
+	},
+	"providers": {
+		"legend": "Fournisseurs au travail",
+		"anthropic": "Anthropic",
+		"openai": "OpenAI",
+		"google": "Google",
+		"ollama": "Ollama",
+		"copilot": "Copilot",
+		"grok": "Grok",
+		"custom": "Autre"
+	},
+	"seasons": {
+		"name": "Saison T{{quarter}} {{year}}",
+		"open": "Voir les objectifs : {{name}}",
+		"count": "{{met}}/{{total}}",
+		"ends": "Se termine le {{date}}",
+		"progress": "{{count}}/{{target}}",
+		"reward": "Récompense : {{decor}}",
+		"earned": "Dans le bureau : {{list}}.",
+		"noDecor": "Atteignez un objectif pour décorer le bureau.",
+		"goals": {
+			"ship": "Livrer {{count}} tâches",
+			"qa-first-try": "Passer la QA du premier coup {{count}} fois",
+			"debt": "Livrer {{count}} tâches de refactorisation",
+			"incidents": "Résoudre {{count}} incidents",
+			"second-opinion": "Obtenir {{count}} fois l'accord d'un second moteur"
+		},
+		"decor": {
+			"trophy-shelf": "une étagère à trophées",
+			"plants": "des plantes en pot",
+			"whiteboard": "un tableau blanc",
+			"neon-sign": "une enseigne néon",
+			"arcade": "une borne d'arcade"
+		}
+	},
+	"team": {
+		"open": "Afficher le classement de l'équipe",
+		"title": "Classement de l'équipe",
+		"scopeLabel": "Quels projets",
+		"scope": {
+			"project": "Ce projet",
+			"org": "Organisation"
+		},
+		"periodLabel": "Quelle période",
+		"period": {
+			"season": "Cette saison",
+			"all": "Depuis le début"
+		},
+		"loading": "Lecture du classement sur le serveur de l'équipe…",
+		"error": "Le serveur n'a pas pu donner le classement.",
+		"empty": "Personne n'apparaît encore par son nom ici.",
+		"rank": "{{rank}}ᵉ",
+		"you": "{{name}} (vous)",
+		"points_one": "{{count}} pt",
+		"points_other": "{{count}} pts",
+		"mine": "Votre travail",
+		"mySummary": "{{points}} points : {{delivered}} livrées, {{reviews}} revues de la tâche d'un collègue.",
+		"noBadges": "Aucun badge pour l'instant : livrez une tâche ou relisez celle d'un collègue.",
+		"showMe": "Montrer mon nom à l'équipe",
+		"shown": "Votre nom et votre score apparaissent dans les classements de votre organisation.",
+		"hidden": "Désactivé : votre travail n'est compté que pour vous, personne d'autre ne le voit.",
+		"howItCounts": "Calculé par le serveur de votre équipe, jamais envoyé ailleurs. Une tâche livrée vaut 1 à 3 points selon sa complexité évaluée ; relire la tâche d'un collègue en vaut 2. Aucun jeton ni prix n'est compté.",
+		"badges": {
+			"first_delivery": "Première tâche livrée",
+			"ten_deliveries": "Dix tâches livrées",
+			"complex_delivery": "Une tâche complexe livrée",
+			"first_review": "Première revue de la tâche d'un collègue",
+			"ten_reviews": "Dix revues de tâches de collègues"
+		}
+	},
+	"cosmetics": {
+		"open": "Choisir l'apparence du bureau",
+		"skins": "Personnages",
+		"skin": {
+			"provider": "Couleurs du fournisseur",
+			"classic": "Leurs propres couleurs",
+			"neon": "Néon"
+		},
+		"neonLocked": "Le néon est une récompense : atteignez une fois chaque objectif de saison pour le porter.",
+		"neonEarned": "Néon gagné : chaque objectif de saison a été atteint.",
+		"decor": "Décor gagné"
 	}
 }

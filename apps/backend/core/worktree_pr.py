@@ -76,12 +76,10 @@ class WorktreePRMixin:
         # but we also need to re-attach HEAD to the branch in the worktree so git push works.
         head_check = self._run_git(["rev-parse", "--abbrev-ref", "HEAD"], cwd=info.path)
         if head_check.returncode == 0 and head_check.stdout.strip() == "HEAD":
-            # Resolve the target branch: first check git's worktree registry (which
-            # tracks the original branch even when detached), then fall back to the
-            # expected branch name derived from the spec name.
-            target_branch = self._get_worktree_registered_branch(info.path)
-            if not target_branch:
-                target_branch = self.get_branch_name(spec_name)
+            # A detached worktree has no branch in git's registry either
+            # (`worktree list --porcelain` says "detached"): the task's branch
+            # is the one its spec name gives.
+            target_branch = self.get_branch_name(spec_name)
             debug_warning(
                 "worktree",
                 f"Re-attaching detached HEAD to branch '{target_branch}' before push",
@@ -292,9 +290,7 @@ class WorktreePRMixin:
         creds = self._get_azure_devops_credentials()
         if not creds:
             return base_env
-        _username, pat = creds
-        if not pat:
-            return base_env
+        _username, pat = creds  # never empty: both sources return a password
 
         import base64
 
@@ -1530,15 +1526,15 @@ class WorktreePRMixin:
         Provider-aware and best-effort — used to finalize a task without a
         redundant push when the PR already exists. Never raises.
         """
-        try:
-            provider = detect_git_provider(self.project_dir)
-        except Exception:
-            provider = None
-
+        provider = detect_git_provider(self.project_dir)  # never raises
         if provider == "azure_devops":
             return self._get_existing_azure_pr_url(spec_name, target_branch)
         if provider == "gitlab":
             return self._get_existing_mr_url(spec_name, target_branch)
+        if provider == "bitbucket":
+            from core.bitbucket_pr import existing_bitbucket_pr_url
+
+            return existing_bitbucket_pr_url(self, spec_name, target_branch)
         # Default to GitHub (gh CLI handles the common case).
         return self._get_existing_pr_url(spec_name, target_branch)
 
@@ -1857,6 +1853,19 @@ class WorktreePRMixin:
                 body=body,
                 **group_kwargs,
             )
+        elif provider == "bitbucket":
+            from core.bitbucket_pr import create_bitbucket_pull_request
+
+            pr_result = create_bitbucket_pull_request(
+                self,
+                spec_name,
+                target_branch,
+                title,
+                draft,
+                body,
+                remote=push_result.get("remote"),
+                **group_kwargs,
+            )
         else:
             # Unknown provider
             return PushAndCreatePRResult(
@@ -1865,10 +1874,10 @@ class WorktreePRMixin:
                 remote=push_result.get("remote"),
                 branch=push_result.get("branch"),
                 provider=provider,
-                error="Unable to determine git hosting provider. Supported: GitHub, GitLab, Azure DevOps.",
+                error="Unable to determine git hosting provider. Supported: GitHub, GitLab, Azure DevOps, Bitbucket.",
             )
 
-        if marks is not None and pr_result.get("success"):
+        if marks is not None and pr_result.get("success") and provider != "bitbucket":
             apply_group_label(
                 provider,
                 get_gh_executable() if provider == "github" else get_glab_executable(),

@@ -604,18 +604,20 @@ def _docintel(project_dir: Path, spec_dir: Path | None) -> str:
         return ""
 
 
-def _mobile(project_dir: Path) -> str:
-    """`prompts.mobile_section`, deferred for the same reason as the above.
+def _platform(project_dir: Path, spec_dir: Path, phase_id: str) -> str:
+    """`prompts.platform_section`, deferred for the same reason as the above.
 
     The mobile phases need it by definition, but so does every other phase on a
     phone project: a reviewer that thinks it can open a URL, or an analyst that
     plans an iOS verification on a Linux runner, is reasoning about a machine
-    that does not exist.
+    that does not exist. Same for a WinDev project, whose windows and analysis
+    no agent can write and whose code nothing here can compile.
     """
+    role = "qa" if CONFIG_PHASE.get(phase_id) == "qa" else "planner"
     try:
-        from prompts_pkg.prompts import mobile_section
+        from prompts_pkg.prompts import platform_section
 
-        return mobile_section(project_dir)
+        return platform_section(project_dir, spec_dir, role=role)
     except Exception:  # noqa: BLE001 - a missing section never stops a phase
         return ""
 
@@ -730,9 +732,9 @@ def _build_prompt(
         lines += ["", "---", "", rules]
 
     # The stack, the commands and what this machine cannot build. Empty for
-    # every project that is not a phone application.
-    if mobile := _mobile(ctx.project_dir):
-        lines += ["", "---", "", mobile]
+    # every project that is neither a phone application nor a WinDev one.
+    if platform := _platform(ctx.project_dir, ctx.spec_dir, phase.id):
+        lines += ["", "---", "", platform]
 
     # The project's accepted ADRs and the task's attachments. `analyze` is
     # asked what the plan does that the project forbids, and an ADR is where

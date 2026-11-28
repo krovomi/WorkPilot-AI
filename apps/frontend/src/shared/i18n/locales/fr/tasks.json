@@ -1,4 +1,22 @@
 {
+	"readiness": {
+		"checking": "Pré-analyse de « {{title}} »…",
+		"title": "Avant de démarrer « {{title}} »",
+		"questionsIntro": "La carte est courte : l'agent devrait deviner. Répondez en une ligne, la réponse s'ajoute à la description.",
+		"problemIntro": "Le démarrage échouerait :",
+		"problems": {
+			"no_git": "Le projet n'est pas un dépôt git. WorkPilot construit chaque tâche dans un worktree : lancez « git init » dans le dossier du projet.",
+			"no_commit": "Le dépôt git n'a encore aucun commit. Faites un premier commit, puis redémarrez la carte.",
+			"no_auth": "Le compte Claude n'est pas connecté. Connectez-le dans Paramètres, Profils Claude, puis redémarrez la carte."
+		},
+		"answerLabel": "Réponse",
+		"sectionTitle": "Précisions avant le démarrage",
+		"later": "Plus tard",
+		"close": "Fermer",
+		"startAnyway": "Démarrer quand même",
+		"saveAndStart": "Enregistrer et démarrer",
+		"saveFailed": "Les réponses n'ont pas pu être enregistrées. La carte n'a pas démarré."
+	},
 	"dictation": {
 		"pending": "Ajoutez ou annulez le brouillon vocal avant de continuer.",
 		"start": "Dicter",
@@ -92,6 +110,7 @@
 		"stuck": "Bloqué",
 		"incomplete": "Incomplet",
 		"recovering": "Récupération...",
+		"recoverFailed": "Impossible de récupérer la tâche",
 		"needsRecovery": "Récupération requise",
 		"needsResume": "Reprise requise",
 		"tdd": "TDD",
@@ -106,6 +125,9 @@
 		"sessionCompaction": "Compaction de session",
 		"criticalPhases": "Étapes clés",
 		"lastError": "Dernière erreur",
+		"compactionSummaryClean": "{{completed}}/{{total}} phases terminées, aucun échec.",
+		"compactionSummaryFailed_one": "{{completed}}/{{total}} phases terminées, {{count}} à revoir. Dernier problème à la phase {{index}} : {{title}}",
+		"compactionSummaryFailed_other": "{{completed}}/{{total}} phases terminées, {{count}} à revoir. Dernier problème à la phase {{index}} : {{title}}",
 		"automation": "Automations",
 		"automationTooltip": "Créée par la règle d'automatisation « {{rule}} »"
 	},
@@ -180,14 +202,13 @@
 		"build_failed": "Build rouge",
 		"done": "Terminé",
 		"pr_created": "PR ouverte",
-		"error": "Erreur"
+		"error": "Erreur",
+		"failed": "Échec",
+		"abandoned": "Abandonnée"
 	},
 	"kanban": {
-		"abandoned": {
-			"chip": "{{count}} abandonnée",
-			"chip_other": "{{count}} abandonnées",
-			"hideChip": "Masquer les tâches abandonnées",
-			"showChip": "Afficher les tâches abandonnées"
+		"more": {
+			"label": "Autres actions du tableau"
 		},
 		"emptyBacklog": "Aucune tâche planifiée",
 		"emptyBacklogHint": "Ajoutez une tâche pour commencer",
@@ -199,7 +220,7 @@
 		"emptyPrOpenHint": "Les tâches arrivent ici dès que leur pull request est ouverte, et passent dans Terminé quand elle est fusionnée",
 		"prOpenNeedsPr": "Cette tâche n'a pas encore de pull request. Créez-la depuis la tâche pour la placer dans PR ouverte.",
 		"emptyInProgress": "Rien en cours",
-		"emptyInProgressHint": "Démarrez une tâche depuis le Backlog",
+		"emptyInProgressHint": "Démarrez une tâche depuis la Planification",
 		"emptyAiReview": "Aucune tâche en révision",
 		"emptyAiReviewHint": "L'IA révisera les tâches terminées",
 		"emptyHumanReview": "Rien à réviser",
@@ -245,7 +266,6 @@
 		"undo": "Annuler",
 		"clearSelection": "Effacer la sélection",
 		"mixedColumnWarning": "Colonnes différentes — déplacement impossible",
-		"invalidBulkTransition": "Impossible de déplacer les tâches sélectionnées vers cette colonne",
 		"markAsDone": "Terminer & Créer les PRs",
 		"markAsDoneConfirmTitle": "Terminer les tâches sélectionnées",
 		"markAsDoneConfirmDescription": "Vous êtes sur le point de marquer {{count}} tâche(s) comme terminée(s). Le flux de création de PR va s'ouvrir pour toutes les tâches sélectionnées.",
@@ -254,6 +274,15 @@
 		"tasksToComplete": "Tâches à terminer",
 		"bulkMoveSuccess": "{{count}} tâche(s) déplacée(s) avec succès",
 		"bulkMoveError": "Échec du déplacement de {{failed}} tâche(s) sur {{total}}",
+		"groupMove": {
+			"queued_one": "{{count}} carte attend dans File d'attente : En cours est plein ({{slots}} à la fois).",
+			"queued_other": "{{count}} cartes attendent dans File d'attente : En cours est plein ({{slots}} à la fois).",
+			"skipped_one": "{{count}} carte reste en place (déjà dans cette colonne, ou PR ouverte sans PR).",
+			"skipped_other": "{{count}} cartes restent en place (déjà dans cette colonne, ou PR ouverte sans PR).",
+			"held_one": "{{count}} carte attend vos réponses avant de démarrer.",
+			"held_other": "{{count}} cartes attendent vos réponses avant de démarrer.",
+			"nothing": "Aucune carte à déplacer vers cette colonne"
+		},
 		"dragColumn": "Glisser pour réordonner la colonne",
 		"columnOptions": "Options de la colonne",
 		"collapseColumn": "Réduire la colonne",
@@ -270,7 +299,10 @@
 		"bulkRestoreSuccess": "{{count}} tâche(s) restaurée(s)",
 		"sortActiveDragHint": "Réorganisation manuelle désactivée tant qu'un tri est actif. Repassez en « Ordre manuel » pour glisser-déposer.",
 		"aging": {
-			"idleFor": "Inactive depuis {{duration}}"
+			"idleFor": "Inactive depuis {{duration}}",
+			"days": "{{count}}j",
+			"hours": "{{count}}h",
+			"minutes": "{{count}}min"
 		},
 		"stale": {
 			"chip": "{{count}} inactive(s)",
@@ -295,10 +327,11 @@
 		"views": {
 			"button": "Vues",
 			"title": "Vues sauvegardées",
-			"empty": "Aucune vue sauvegardée. Configure tes filtres puis enregistre-les ici.",
+			"empty": "Aucune vue sauvegardée. Choisis tes filtres, l'affichage et les couloirs, puis enregistre-les ici.",
 			"namePlaceholder": "Nom de la vue…",
 			"save": "Enregistrer la vue actuelle",
-			"delete": "Supprimer la vue"
+			"delete": "Supprimer la vue",
+			"summary": "{{layout}} · couloirs par {{lanes}}"
 		},
 		"wipLimit": {
 			"label": "Limite WIP",
@@ -315,7 +348,8 @@
 			"droppedSimple": "Tâche « {{title}} » déposée.",
 			"cancelled": "Déplacement annulé.",
 			"columnPickedUp": "Colonne {{column}} saisie. Utilisez les flèches pour réordonner.",
-			"columnReordered": "Colonne {{column}} déplacée."
+			"columnReordered": "Colonne {{column}} déplacée.",
+			"cardFocus": "{{position}} sur {{count}}, {{column}}"
 		},
 		"filter": {
 			"button": "Filtrer",
@@ -339,6 +373,13 @@
 				"insights": "Insights",
 				"generated": "Générée par une page",
 				"manual": "Manuelle"
+			},
+			"quickLabel": "Filtres rapides",
+			"labelsLabel": "Étiquettes",
+			"quick": {
+				"flagged": "Bloquées",
+				"recent": "Modifiées cette semaine",
+				"mine": "Mes tâches"
 			}
 		},
 		"sort": {
@@ -370,8 +411,8 @@
 			"runAsTaskHint": "Lancer comme une tâche Kanban interactive (planification, revue, conversation) plutôt qu'une exécution directe.",
 			"taskCreated": "Tâche créée : {{name}}",
 			"uncommitted": "Les fichiers écrits n'ont pas pu être commités sur la branche de revue ; ils sont restés dans {{path}}.",
-			"reviewCard_other": "{{count}} fichiers commités sur {{branch}} (carte « {{card}} », en Revue humaine). Relis le diff puis crée la PR depuis la carte.",
-			"reviewCard_one": "{{count}} fichier commité sur {{branch}} (carte « {{card}} », en Revue humaine). Relis le diff puis crée la PR depuis la carte.",
+			"reviewCard_other": "{{count}} fichiers commités sur {{branch}} (tâche « {{card}} », en Revue humaine). Relis le diff puis crée la PR depuis la tâche.",
+			"reviewCard_one": "{{count}} fichier commité sur {{branch}} (tâche « {{card}} », en Revue humaine). Relis le diff puis crée la PR depuis la tâche.",
 			"helpTitle": "Commandes disponibles"
 		},
 		"blockers": {
@@ -399,11 +440,457 @@
 			"qaIterations_other": "{{count}} passes QA attendues."
 		},
 		"serverBoard": "Tableau partagé · {{role}}",
-		"serverBoardHint": "Ce projet vit sur le serveur WorkPilot : tous ses membres voient les mêmes cartes, et ses builds tournent là-bas. Le tableau se met à jour toutes les quelques secondes.",
+		"serverBoardHint": "Ce projet vit sur le serveur WorkPilot : tous ses membres voient les mêmes tâches, et ses builds tournent là-bas. Le tableau se met à jour toutes les quelques secondes.",
 		"serverRole": {
 			"viewer": "Lecteur",
 			"member": "Membre",
 			"owner": "Propriétaire"
+		},
+		"bulk": {
+			"label": "Tâches sélectionnées",
+			"saveFailed_one": "{{count}} tâche n'a pas pu être modifiée",
+			"saveFailed_other": "{{count}} tâches n'ont pas pu être modifiées"
+		},
+		"undoLabels": {
+			"type": "changement de type",
+			"priority": "changement de priorité",
+			"move_one": "déplacement de {{count}} tâche",
+			"move_other": "déplacement de {{count}} tâches",
+			"delete_one": "suppression de {{count}} tâche",
+			"delete_other": "suppression de {{count}} tâches",
+			"rename": "renommage"
+		},
+		"undone": "Annulé : {{label}}",
+		"undoStale": "Annulation incomplète ({{label}}) : une tâche a changé depuis",
+		"undoNothing": "Rien à annuler",
+		"cardMenu": {
+			"label": "Menu de la tâche",
+			"open": "Ouvrir",
+			"edit": "Modifier…",
+			"type": "Type",
+			"priority": "Priorité",
+			"saveFailed": "La modification n'a pas pu être enregistrée"
+		},
+		"quickAdd": {
+			"addCard": "Ajouter une tâche",
+			"addQueued": "Ajouter et mettre en file",
+			"addStarted": "Ajouter et démarrer",
+			"addTooltip": "Ajouter une tâche (N)",
+			"ariaLabel": "Décrire la nouvelle tâche",
+			"placeholder": "Décrivez la tâche… Collez une liste pour créer une tâche par ligne.",
+			"type": "Type",
+			"noType": "Sans type (déduit automatiquement)",
+			"priority": "Priorité",
+			"noPriority": "Sans priorité",
+			"splitLines_one": "Une tâche par ligne ({{count}})",
+			"splitLines_other": "Une tâche par ligne ({{count}})",
+			"create": "Créer",
+			"queue": "Mettre en file",
+			"createMany_one": "Créer {{count}} tâche",
+			"createMany_other": "Créer {{count}} tâches",
+			"start": "Démarrer",
+			"startMany_one": "Démarrer {{count}} tâche",
+			"startMany_other": "Démarrer {{count}} tâches",
+			"moreOptions": "Plus d'options…",
+			"close": "Fermer (Échap)",
+			"hint": "Entrée pour créer · Maj+Entrée pour aller à la ligne · Échap pour fermer",
+			"created_one": "Tâche créée dans {{column}}",
+			"created_other": "{{count}} tâches créées dans {{column}}",
+			"createFailed": "La tâche n'a pas pu être créée. Le texte est gardé : réessayez."
+		},
+		"rename": {
+			"label": "Titre de la tâche"
+		},
+		"shortcuts": {
+			"open": "Raccourcis clavier",
+			"title": "Raccourcis clavier",
+			"description": "Les touches du tableau. Elles attendent pendant que vous écrivez ou qu'un menu ou une fenêtre est ouvert.",
+			"groups": {
+				"cards": "Tâches",
+				"selection": "Sélection",
+				"board": "Tableau"
+			},
+			"rows": {
+				"navigate": "Passer d'une tâche à l'autre",
+				"open": "Ouvrir la tâche",
+				"rename": "Renommer la tâche (ou double-clic sur son titre)",
+				"menu": "Menu de la tâche (ou clic droit)",
+				"toggle": "Ajouter ou retirer une tâche",
+				"range": "Sélectionner une plage dans une colonne",
+				"column": "Sélectionner la colonne",
+				"clear": "Vider la sélection",
+				"delete": "Supprimer la sélection",
+				"add": "Nouvelle tâche dans Planification",
+				"undo": "Annuler la dernière modification",
+				"help": "Afficher cette liste (ou ?)"
+			},
+			"keys": {
+				"enter": "Entrée",
+				"shift": "Maj",
+				"click": "Clic",
+				"escape": "Échap",
+				"delete": "Suppr"
+			}
+		},
+		"capacity": {
+			"slots": "créneaux",
+			"wip": "limite {{limit}}",
+			"slotsAria": "{{count}} créneaux parallèles occupés sur {{limit}}",
+			"wipAria": "{{count}} tâches, limite {{limit}}"
+		},
+		"pulse": {
+			"urgent_one": "{{count}} urgente",
+			"urgent_other": "{{count}} urgentes",
+			"high_one": "{{count}} prioritaire",
+			"high_other": "{{count}} prioritaires",
+			"next": "Prochaine : {{title}}",
+			"plansToApprove_one": "{{count}} plan à approuver",
+			"plansToApprove_other": "{{count}} plans à approuver",
+			"toReview_one": "{{count}} à relire",
+			"toReview_other": "{{count}} à relire",
+			"needsFix_one": "{{count}} à corriger",
+			"needsFix_other": "{{count}} à corriger",
+			"doneThisWeek_one": "{{count}} cette semaine",
+			"doneThisWeek_other": "{{count}} cette semaine",
+			"label": "Résumé de la colonne",
+			"planning_one": "{{count}} en planification",
+			"planning_other": "{{count}} en planification",
+			"coding_one": "{{count}} en code",
+			"coding_other": "{{count}} en code",
+			"qa_one": "{{count}} en QA",
+			"qa_other": "{{count}} en QA",
+			"paused_one": "{{count}} en pause",
+			"paused_other": "{{count}} en pause",
+			"failedErrors_one": "{{count}} exécution en échec",
+			"failedErrors_other": "{{count}} exécutions en échec",
+			"failedQa_one": "{{count}} refusée par la QA",
+			"failedQa_other": "{{count}} refusées par la QA",
+			"failedContext_one": "{{count}} contexte trop long",
+			"failedContext_other": "{{count}} contextes trop longs",
+			"resolution_wont_do_one": "{{count}} ne sera pas faite",
+			"resolution_wont_do_other": "{{count}} ne seront pas faites",
+			"resolution_duplicate_one": "{{count}} doublon",
+			"resolution_duplicate_other": "{{count}} doublons",
+			"resolution_obsolete_one": "{{count}} obsolète",
+			"resolution_obsolete_other": "{{count}} obsolètes",
+			"resolution_replaced_one": "{{count}} remplacée",
+			"resolution_replaced_other": "{{count}} remplacées",
+			"resolution_pr_closed_one": "{{count}} PR fermée",
+			"resolution_pr_closed_other": "{{count}} PR fermées",
+			"resolution_other_one": "{{count}} autre",
+			"resolution_other_other": "{{count}} autres"
+		},
+		"emptyFailed": "Aucun échec",
+		"emptyFailedHint": "Une exécution qui échoue, ou que la QA n’a pas réussi à faire passer, attend ici d’être relancée ou abandonnée",
+		"emptyAbandoned": "Rien de mis de côté",
+		"emptyAbandonedHint": "Déposez une tâche ici pour l’abandonner : ne sera pas faite, doublon, obsolète, remplacée",
+		"outcome": {
+			"failedDropRefused": "Seule une exécution en échec arrive dans Échec. Relancez la tâche depuis sa carte ou mettez-la en file d’attente.",
+			"doneCannotBeAbandoned": "Une tâche terminée ne peut pas être abandonnée."
+		},
+		"ask": {
+			"button": "Interroger",
+			"open": "Poser une question sur les tickets du tableau",
+			"title": "Interroger le tableau",
+			"description": "Posez votre question dans n'importe quelle langue : tous les tickets liés ressortent, terminés et archivés compris, même rédigés dans une autre langue.",
+			"emptyHint": "Par exemple, avant de planifier une fonctionnalité, demandez si elle a déjà été développée, même en partie.",
+			"examples": {
+				"adminPage": "Comment a été revue la page d'admin ?",
+				"export": "Peut-on déjà exporter les données en CSV ?",
+				"login": "Qu'a-t-on fait sur les erreurs de connexion ?"
+			},
+			"placeholder": "Posez une question sur les tickets…",
+			"send": "Envoyer",
+			"searching": "Lecture des tickets…",
+			"failed": "La question n'a pas pu aboutir. Réessayez dans un instant.",
+			"serverUnreachable": "Les cartes du serveur n'ont pas pu être lues. Vérifiez la connexion au serveur et réessayez.",
+			"modeAi": "Réponse de l'IA",
+			"modeKeywords": "Recherche par mots-clés",
+			"keywordsHint": "Pas de réponse de l'IA (aucun provider, ou il n'a pas répondu) : ces tickets partagent des mots avec la question.",
+			"searched_one": "{{count}} ticket parcouru",
+			"searched_other": "{{count}} tickets parcourus",
+			"noMatch": "Aucun ticket ne correspond à cette question.",
+			"citation": "Ticket {{index}} : {{title}}",
+			"archived": "Archivé",
+			"coverage": {
+				"full": "Déjà couvert",
+				"partial": "En partie",
+				"related": "Lié"
+			},
+			"state": {
+				"done": "Terminé",
+				"in_review": "En revue",
+				"in_progress": "En cours",
+				"planned": "Prévu",
+				"failed": "Échec",
+				"abandoned": "Abandonné"
+			},
+			"privacy": "La question et les tickets vont au provider IA choisi dans les réglages, et à un modèle d'embeddings (celui de cet ordinateur d'abord). Les vecteurs restent sur cet ordinateur.",
+			"newConversation": "Nouvelle conversation",
+			"modeSemantic": "Classés par le sens",
+			"semanticHint": "Pas de réponse de l'IA (aucun provider, ou il n'a pas répondu) : ces tickets sont les plus proches de la question, par le sens et les mots, quelle que soit leur langue.",
+			"semanticTitle": "Un modèle d'embeddings a comparé le sens de la question à celui de chaque ticket",
+			"semanticSource": {
+				"local": "Sens : {{model}}, sur cet ordinateur",
+				"cloud": "Sens : {{model}} (API {{provider}})"
+			},
+			"semanticPartial": "{{indexed}} tickets sur {{total}} lus par le sens pour l'instant ; la suite aux prochaines questions",
+			"semanticMode": {
+				"label": "Par le sens",
+				"auto": "Auto",
+				"local": "Cet ordinateur seulement",
+				"off": "Désactivé",
+				"hint": {
+					"auto": "Un modèle d'embeddings sur cet ordinateur (Ollama, LM Studio), sinon l'API d'embeddings de votre provider (OpenAI, Mistral, Google, Hugging Face)",
+					"local": "Seulement un modèle d'embeddings sur cet ordinateur : pour cette étape, les tickets n'en sortent pas",
+					"off": "Mots-clés et modèle d'IA seulement"
+				}
+			},
+			"tabs": {
+				"label": "Interroger le tableau ou vérifier une idée",
+				"ask": "Poser une question",
+				"idea": "Vérifier une idée"
+			},
+			"idea": {
+				"description": "Collez une fonctionnalité prévue, dans n'importe quelle langue : chacune de ses exigences revient déjà faite, en partie faite ou manquante, avec les tickets qui la portent.",
+				"label": "La fonctionnalité à vérifier",
+				"placeholder": "Décrivez la fonctionnalité : une phrase, une liste de besoins ou une spec collée. Par exemple : « Les admins exportent la liste des utilisateurs en CSV, filtrée par rôle, et reçoivent un e-mail quand elle est prête. »",
+				"check": "Vérifier",
+				"length": "{{count}} / {{max}}",
+				"emptyHint": "Le tableau découpe l'idée en exigences et cherche chacune dans tous les tickets, quelle que soit leur langue. Ctrl + Entrée lance la vérification.",
+				"checking": "Lecture du tableau pour chaque exigence…",
+				"failed": "L'idée n'a pas pu être vérifiée. Réessayez.",
+				"noRequirement": "Aucune exigence n'a pu être lue dans cette idée.",
+				"unjudgedHint": "Aucun modèle n'a jugé ces exigences : les tickets les plus proches sont listés, vérifiez-les avant de décider.",
+				"verdict": {
+					"done": "Déjà fait",
+					"partial": "En partie",
+					"missing": "Manquant",
+					"unknown": "À vérifier"
+				},
+				"tally": {
+					"done_one": "{{count}} déjà faite",
+					"done_other": "{{count}} déjà faites",
+					"partial_one": "{{count}} en partie",
+					"partial_other": "{{count}} en partie",
+					"missing_one": "{{count}} manquante",
+					"missing_other": "{{count}} manquantes",
+					"unknown_one": "{{count}} à vérifier",
+					"unknown_other": "{{count}} à vérifier"
+				},
+				"createCard": "Créer une carte avec ce qui manque",
+				"createHint": "La carte ne reprend que les exigences pas encore faites, avec les tickets sur lesquels elles s'appuient. Elle arrive dans le backlog.",
+				"createFailed": "La carte n'a pas pu être créée.",
+				"created": "Carte créée dans le backlog.",
+				"openCard": "Ouvrir la carte",
+				"allDone": "Toutes les exigences sont déjà faites : rien à créer.",
+				"another": "Vérifier une autre idée",
+				"card": {
+					"untitled": "Fonctionnalité à construire",
+					"section": {
+						"missing": "À construire",
+						"partial": "À terminer",
+						"unknown": "À vérifier",
+						"done": "Déjà fait"
+					},
+					"buildsOn": "S'appuie sur : {{tickets}}",
+					"original": "Idée d'origine"
+				}
+			},
+			"kind": {
+				"roadmap": "Roadmap",
+				"idea": "Idée",
+				"change": "Changement fusionné"
+			},
+			"sources": {
+				"button_one": "{{count}} source",
+				"button_other": "{{count}} sources",
+				"hint": "En plus des cartes, le tableau lit aussi :",
+				"cards": "Cartes du tableau",
+				"roadmap": "Fonctionnalités de la roadmap",
+				"ideas": "Idées d'Ideation",
+				"history": "Changements fusionnés dans la branche (historique git)",
+				"serverBoard": "Les cartes du serveur, selon vos droits"
+			}
+		},
+		"lanes": {
+			"title": "Couloirs",
+			"button": "Couloirs",
+			"buttonActive": "Couloirs : {{grouping}}",
+			"groupings": {
+				"none": "Aucun",
+				"priority": "Priorité",
+				"type": "Type",
+				"area": "Sous-projet",
+				"sprint": "Sprint",
+				"source": "Origine",
+				"parent": "Tâche découpée"
+			},
+			"readOnly": "lecture seule",
+			"pinFlagged": "Cartes bloquées dans un couloir à part, en premier",
+			"flagged": "Bloquées",
+			"noValue": {
+				"none": "Cartes",
+				"priority": "Sans priorité",
+				"type": "Pas encore de type",
+				"area": "Sans sous-projet",
+				"sprint": "Backlog (sans sprint)",
+				"source": "Sans origine",
+				"parent": "Non découpées"
+			},
+			"expand": "Déplier le couloir",
+			"collapse": "Replier le couloir",
+			"addArea": "Ajouter un sous-projet",
+			"addAreaPlaceholder": "Nom du sous-projet",
+			"addAreaHint": "Un couloir vide apparaît : glissez-y des cartes.",
+			"addAreaRefused": "Ce sous-projet existe déjà, ou le nom n'est pas valable.",
+			"readOnlyDrop": "Les cartes ne changent pas de couloir ici : on ne choisit pas « {{grouping}} » en déplaçant une carte.",
+			"undoLabel": "changement de couloir",
+			"saveFailed_one": "{{count}} carte n'a pas pu passer dans ce couloir.",
+			"saveFailed_other": "{{count}} cartes n'ont pas pu passer dans ce couloir."
+		},
+		"sprints": {
+			"title": "Sprints",
+			"button": "Sprints",
+			"allCards": "Toutes les tâches",
+			"backlog": "Backlog (sans sprint)",
+			"empty": "Aucun sprint pour l'instant. Créez-en un, puis ajoutez-y des tâches depuis leur menu ou en les glissant dans son couloir (Couloirs : Sprint).",
+			"unknown": "Sprint inconnu",
+			"states": {
+				"planned": "Planifié",
+				"active": "En cours",
+				"closed": "Terminé"
+			},
+			"progress": "{{done}}/{{cards}} tâches · {{donePoints}}/{{points}} pts",
+			"unestimated_one": "{{count}} non estimée",
+			"unestimated_other": "{{count}} non estimées",
+			"pointsHint": "Les points sont le score de l'estimation intelligente de la tâche (de 1 à 13). Une tâche non estimée compte 0.",
+			"velocity": "Vélocité : {{points}} pts",
+			"velocityHint": "Moyenne des points terminés par les derniers sprints clos (jusqu'à trois).",
+			"report": "Terminées : {{done}} tâches ({{donePoints}} pts) · reportées : {{carried}}",
+			"new": "Nouveau sprint",
+			"newTitle": "Nouveau sprint",
+			"editTitle": "Modifier le sprint",
+			"dialogHint": "Un sprint regroupe des tâches, avec un objectif et des dates facultatifs. Un seul sprint est en cours à la fois.",
+			"name": "Nom",
+			"namePlaceholder": "Sprint 12",
+			"goal": "Objectif",
+			"goalPlaceholder": "Ce que l'équipe s'engage à livrer",
+			"startDate": "Début",
+			"endDate": "Fin",
+			"endBeforeStart": "Le sprint ne peut pas finir avant de commencer.",
+			"create": "Créer",
+			"save": "Enregistrer",
+			"edit": "Modifier",
+			"start": "Démarrer",
+			"complete": "Terminer le sprint",
+			"delete": "Supprimer",
+			"oneActive": "Un autre sprint est en cours : terminez-le d'abord.",
+			"completeTitle": "Terminer « {{name}} »",
+			"completeSummary": "{{done}} tâches terminées ({{donePoints}} pts), {{carried}} non terminées.",
+			"carryTo": "Déplacer les tâches non terminées vers",
+			"deleteTitle": "Supprimer « {{name}} » ?",
+			"deleteHint": "Ses tâches retournent au backlog. Seul un sprint planifié peut être supprimé.",
+			"saveFailed": "Le sprint n'a pas pu être enregistré.",
+			"cardsNotMoved_one": "{{count}} tâche n'a pas pu être déplacée : le sprint n'a pas été modifié.",
+			"cardsNotMoved_other": "{{count}} tâches n'ont pas pu être déplacées : le sprint n'a pas été modifié.",
+			"cardMenu": "Sprint",
+			"noneToJoin": "Aucun sprint ouvert",
+			"undoLabel": "changement de sprint"
+		},
+		"layout": {
+			"label": "Affichage",
+			"board": "Tableau",
+			"list": "Liste",
+			"timeline": "Frise"
+		},
+		"list": {
+			"caption": "Les cartes du tableau, en liste",
+			"empty": "Aucune carte ne correspond aux filtres.",
+			"columns": {
+				"title": "Carte",
+				"status": "Statut",
+				"priority": "Priorité",
+				"sprint": "Sprint",
+				"area": "Sous-projet",
+				"points": "Points",
+				"updated": "Modifiée"
+			}
+		},
+		"reports": {
+			"button": "Rapports",
+			"title": "Rapports",
+			"description": "Mesurés sur les tâches et les sprints du projet, quels que soient les filtres du tableau. Les points sont le score de l'estimation intelligente, jamais une durée.",
+			"day": "Jour",
+			"sprint": "Sprint",
+			"cards": "Tâches",
+			"tabs": {
+				"burndown": "Burndown",
+				"velocity": "Vélocité",
+				"flow": "Flux cumulé",
+				"cycle": "Temps de cycle",
+				"throughput": "Débit",
+				"ends": "Fins non abouties"
+			},
+			"burndown": {
+				"empty": "Aucun sprint en cours. Démarre-en un depuis le menu « Sprints » pour suivre son burndown.",
+				"chart": "Burndown de {{name}}",
+				"summary": "{{name}} : {{left}} points restants sur {{scope}}.",
+				"ideal": "Idéal",
+				"remaining": "Points restants"
+			},
+			"velocity": {
+				"empty": "Aucun sprint terminé : la vélocité apparaît avec le premier.",
+				"chart": "Points engagés et terminés par sprint",
+				"summary": "Moyenne des 3 derniers sprints : {{points}} points.",
+				"committed": "Engagés",
+				"done": "Terminés"
+			},
+			"flow": {
+				"chart": "Tâches par étape, 30 derniers jours",
+				"summary": "Tâches par étape à la fin de chaque jour des 30 derniers jours. Une bande qui s'élargit, c'est du travail qui s'accumule.",
+				"bands": {
+					"todo": "À faire",
+					"doing": "En cours",
+					"review": "En revue",
+					"done": "Terminées"
+				}
+			},
+			"cycle": {
+				"empty": "Aucune tâche terminée ces 90 derniers jours avec un début connu.",
+				"chart": "Temps de cycle des tâches terminées ces 90 derniers jours",
+				"summary_one": "{{count}} tâche terminée : {{median}} jours entre le début et la fin.",
+				"summary_other": "{{count}} tâches terminées : médiane de {{median}} jours entre le début et la fin, 85 % en {{p85}} jours ou moins.",
+				"span": "Du début à la fin",
+				"bins": {
+					"lt1": "< 1 jour",
+					"d1to3": "1 à 3 jours",
+					"d3to7": "3 à 7 jours",
+					"d7to14": "1 à 2 semaines",
+					"gt14": "> 2 semaines"
+				}
+			},
+			"throughput": {
+				"chart": "Tâches terminées par semaine",
+				"summary_one": "{{count}} tâche terminée ces {{weeks}} dernières semaines.",
+				"summary_other": "{{count}} tâches terminées ces {{weeks}} dernières semaines.",
+				"week": "Semaine du"
+			},
+			"ends": {
+				"empty": "Aucune tâche terminée sans succès.",
+				"failed": "En échec",
+				"abandoned": "Abandonnées",
+				"reasons": {
+					"errors": "Erreurs de build",
+					"prompt_too_long": "Prompt trop long",
+					"qa_rejected": "Refusée par la QA"
+				}
+			}
+		},
+		"timeline": {
+			"card": "Tâche",
+			"span": "{{status}} : du {{start}} au {{end}}",
+			"running": "{{status}} : depuis le {{start}}, en cours"
 		}
 	},
 	"queue": {
@@ -574,7 +1061,12 @@
 		"otherProjectWarning": "Un émulateur semble déjà actif pour un autre projet. Redémarrez pour basculer vers cette tâche."
 	},
 	"metadata": {
-		"severity": "sévérité",
+		"securitySeverity": {
+			"low": "Gravité faible",
+			"medium": "Gravité moyenne",
+			"high": "Gravité élevée",
+			"critical": "Gravité critique"
+		},
 		"pullRequest": "Pull Request",
 		"showMore": "Afficher plus",
 		"showLess": "Afficher moins",
@@ -588,6 +1080,8 @@
 		"acEmpty": "Aucun critère défini. Cliquez pour en ajouter.",
 		"acSyncFromAdo": "Synchroniser depuis Azure DevOps",
 		"acSyncing": "Synchronisation…",
+		"acSyncErrorTitle": "Synchronisation impossible",
+		"acSyncErrorDesc": "Les critères d'acceptation n'ont pas pu être lus depuis Azure DevOps.",
 		"acPlaceholder": "Un critère par ligne…",
 		"acEdit": "Modifier",
 		"acSave": "Enregistrer",
@@ -611,6 +1105,8 @@
 		"extraNotePlaceholder": "Ajoutez des précisions, contraintes ou indices. Ces notes sont transmises à toutes les phases du pipeline (plan, code, QA, review).",
 		"extraNoteHelp": "Enregistré dans requirements.json comme additional_context.",
 		"extraNoteSaved": "Enregistré.",
+		"extraNoteSaveErrorTitle": "Enregistrement impossible",
+		"extraNoteSaveErrorDesc": "La note n'a pas pu être enregistrée.",
 		"extraNoteSave": "Enregistrer la note",
 		"extraNoteSaving": "Enregistrement…",
 		"blockedBy": {
@@ -647,7 +1143,8 @@
 			"visual-canvas": "Canvas visuel",
 			"tech-debt": "Dette technique",
 			"automation": "Automatisation",
-			"generated": "Code généré"
+			"generated": "Code généré",
+			"self-healing": "Self-Healing"
 		},
 		"cicdRun": {
 			"triggered_pr": "Pipeline {{provider}} lancé à l'ouverture de la PR, {{when}}",
@@ -682,6 +1179,47 @@
 			"default": "par défaut"
 		},
 		"help": "Décidé sans IA d'après la catégorie, l'élément importé ou les mots du titre. Changez-le s'il est faux : les prochaines versions choisiront le parcours à partir de lui."
+	},
+	"cardType": {
+		"label": "Type de tâche",
+		"values": {
+			"feature": "Fonctionnalité",
+			"ux": "UI / UX",
+			"bug": "Bug",
+			"hotfix": "Correctif urgent",
+			"security": "Sécurité",
+			"perf": "Performance",
+			"refactor": "Refactoring",
+			"test": "Tests",
+			"investigation": "Investigation",
+			"spike": "Spike / POC",
+			"docs": "Documentation",
+			"run": "Exploitation (RUN)",
+			"upgrade": "Montée de version",
+			"infra": "Infra / maintenance"
+		},
+		"proposedTitle": "{{type}} (proposé, à confirmer dans le détail de la tâche)",
+		"also": "Aussi : {{type}}",
+		"basis": {
+			"user": "choisi par vous",
+			"category": "d'après la catégorie",
+			"import": "d'après l'élément importé",
+			"keywords": "d'après le titre",
+			"severity": "d'après la sévérité de sécurité",
+			"origin": "d'après l'origine de la tâche"
+		},
+		"preview": {
+			"field": "{{label}} : {{value}}",
+			"progress": "{{status}} · {{percent}} %",
+			"blockedBy": "Attend : {{titles}}"
+		},
+		"families": {
+			"build": "Construire",
+			"fix": "Corriger",
+			"quality": "Fiabiliser",
+			"know": "Comprendre",
+			"ops": "Exploiter"
+		}
 	},
 	"images": {
 		"removeImageAriaLabel": "Supprimer l'image {{filename}}",
@@ -761,7 +1299,7 @@
 		"dialogTitle": "Abandonner la tâche",
 		"dialogPrefix": "Voulez-vous abandonner",
 		"dialogSuffix": " ? Le développement s'arrête et la tâche est mise de côté.",
-		"dialogReversible": "Rien n'est supprimé : la tâche est grisée sur le tableau et vous pourrez la reprendre à tout moment.",
+		"dialogReversible": "Rien n’est supprimé : la tâche passe dans la colonne Abandonnée et vous pourrez la reprendre à tout moment.",
 		"reasonPlaceholder": "Raison (facultatif) — ex. : le product owner ne veut plus la développer",
 		"abandoning": "Abandon…",
 		"abandonedTitle": "Tâche abandonnée",
@@ -769,7 +1307,29 @@
 		"failedTitle": "Échec de l'abandon",
 		"failedDescription": "Impossible d'abandonner la tâche. Veuillez réessayer.",
 		"resumeFailedTitle": "Échec de la reprise",
-		"resumeFailedDescription": "Impossible de reprendre la tâche. Veuillez réessayer."
+		"resumeFailedDescription": "Impossible de reprendre la tâche. Veuillez réessayer.",
+		"dialogTitleMany_one": "Abandonner {{count}} tâche",
+		"dialogTitleMany_other": "Abandonner {{count}} tâches",
+		"dialogMany_one": "Abandonner {{count}} tâche ? Le développement s’arrête et elle est mise de côté.",
+		"dialogMany_other": "Abandonner {{count}} tâches ? Le développement s’arrête et elles sont mises de côté.",
+		"resolutionLabel": "Pourquoi",
+		"reasonLabel": "Note",
+		"linkNone": "Pas sur le tableau",
+		"linkLabel": {
+			"duplicate": "Doublon de",
+			"replaced": "Remplacée par"
+		},
+		"resolutions": {
+			"wont_do": "Ne sera pas faite",
+			"duplicate": "Doublon",
+			"obsolete": "Obsolète",
+			"replaced": "Remplacée par une autre tâche",
+			"pr_closed": "PR fermée sans fusion",
+			"other": "Autre"
+		},
+		"abandonedTitleMany_one": "Tâche abandonnée",
+		"abandonedTitleMany_other": "{{count}} tâches abandonnées",
+		"abandonMenu": "Abandonner…"
 	},
 	"edit": {
 		"title": "Modifier la tâche",
@@ -821,8 +1381,8 @@
 		},
 		"errors": {
 			"descriptionRequired": "Veuillez fournir une description",
-			"maxImagesReached": "Maximum de 5 images autorisé",
-			"invalidImageType": "Type d'image non valide. Autorisés : PNG, JPEG, GIF, WebP",
+			"maxImagesReached": "{{max}} images au maximum",
+			"invalidImageType": "Type d'image non valide. Autorisés : {{types}}",
 			"processPasteFailed": "Échec du traitement de l'image collée",
 			"processDropFailed": "Échec du traitement de l'image déposée"
 		},
@@ -842,7 +1402,11 @@
 					"bug_fix": "Correction de bug",
 					"refactoring": "Refactoring",
 					"documentation": "Documentation",
-					"security": "Sécurité"
+					"security": "Sécurité",
+					"performance": "Performance",
+					"ui_ux": "UI/UX",
+					"infrastructure": "Infrastructure",
+					"testing": "Tests"
 				},
 				"priority": {
 					"low": "Basse",
@@ -1050,11 +1614,21 @@
 		"capture": "Capturer",
 		"capturing": "Capture...",
 		"noSources": "Aucun écran ou fenêtre trouvé",
+		"kind": {
+			"screen": "Écran",
+			"window": "Fenêtre"
+		},
 		"errors": {
 			"getSources": "Échec de l'obtention des sources de capture d'écran",
 			"fetchSources": "Échec de la récupération des sources de capture d'écran",
 			"capture": "Échec de la capture d'écran",
-			"captureFailed": "Échec de la capture d'écran"
+			"captureFailed": "Échec de la capture d'écran",
+			"codes": {
+				"sources_failed": "Impossible de lister les écrans et les fenêtres. Vérifiez que l'app a le droit d'enregistrer l'écran.",
+				"invalid_source": "Aucun écran ni aucune fenêtre n'a été choisi.",
+				"source_not_found": "Cet écran ou cette fenêtre n'est plus disponible. Actualisez la liste et choisissez-le de nouveau.",
+				"capture_failed": "La capture n'a pas abouti. Réessayez."
+			}
 		},
 		"devMode": {
 			"title": "Capture d'écran non disponible",
@@ -1214,6 +1788,7 @@
 			"stopTask": "Arrêter la tâche",
 			"startTask": "Démarrer la tâche",
 			"deleteTask": "Supprimer la tâche",
+			"edit": "Modifier la tâche",
 			"close": "Fermer",
 			"watchLive": "Regarder en direct",
 			"activating": "Activation...",
@@ -1321,6 +1896,7 @@
 			"rejecting": "Rejet en cours...",
 			"rejectionReason": "Raison des modifications (optionnel)",
 			"rejectionPlaceholder": "Décrivez ce qui doit être modifié dans le plan...",
+			"sendRejection": "Envoyer la demande",
 			"conflictsChecking": "Vérification des chevauchements de fichiers avec les tâches parallèles...",
 			"conflictsNone": "Aucun chevauchement de fichiers avec les autres tâches actives",
 			"conflictsTitle": "Conflits potentiels avec des tâches parallèles",
@@ -1338,9 +1914,10 @@
 		"saveError": "Impossible d'enregistrer le plan"
 	},
 	"codeEditor": {
-		"deleteFile": "Supprimer le fichier",
-		"contentPlaceholder": "Contenu du fichier...",
-		"selectFile": "Sélectionnez un fichier à modifier"
+		"hint": "Retirez les fichiers que cette sous-tâche ne doit pas toucher. Les fichiers eux-mêmes ne changent pas.",
+		"removeFile": "Retirer {{name}} de cette sous-tâche",
+		"filesRemoved_one": "{{count}} fichier retiré du plan",
+		"filesRemoved_other": "{{count}} fichiers retirés du plan"
 	},
 	"failure": {
 		"title": "Cette tâche a échoué",
@@ -1911,7 +2488,14 @@
 		"onlyResumedPhase": "Seulement pour la phase reprise ({{phase}}) — les phases suivantes gardent leur moteur",
 		"effortNotApplied": "Ce modèle n'a pas de réglage d'effort que WorkPilot puisse atteindre : le niveau choisi n'a aucun effet sur lui.",
 		"effortSentAs": "Envoyé au fournisseur comme « {{value}} », le niveau le plus proche que ce modèle accepte.",
-		"effortRuntime": "Appliqué au lancement si le modèle l'accepte ; le journal de la tâche dit ce qui a été envoyé."
+		"effortRuntime": "Appliqué au lancement si le modèle l'accepte ; le journal de la tâche dit ce qui a été envoyé.",
+		"codeMode": {
+			"label": "Mode code",
+			"default": "Comme les Paramètres",
+			"off": "Arrêté",
+			"auto": "Auto",
+			"on": "Activé"
+		}
 	},
 	"redTeam": {
 		"title": "Red team",
@@ -2006,7 +2590,7 @@
 			"screenshots": "Captures",
 			"scenario": "Scénario (rejoué après la QA)",
 			"findings": "Constats",
-			"cardScenario": "Scénario écrit sur la carte"
+			"cardScenario": "Scénario écrit sur la tâche"
 		},
 		"kind": {
 			"web-frontend": "front web",
@@ -2488,7 +3072,7 @@
 		"button": "Purger",
 		"buttonTitle": "Libérer la place des worktrees dont le travail est terminé",
 		"title": "Purger les worktrees terminés",
-		"description": "Chaque carte travaille dans une copie complète du projet. Celles-ci appartiennent à des cartes dont la PR est fusionnée, ou qui sont terminées, archivées ou abandonnées. Purger supprime le dossier et la branche locale workpilot/… ; la carte, sa spec et sa PR restent. Une PR fusionnée est purgée automatiquement.",
+		"description": "Chaque tâche travaille dans une copie complète du projet. Celles-ci appartiennent à des tâches dont la PR est fusionnée, ou qui sont terminées, archivées ou abandonnées. Purger supprime le dossier et la branche locale workpilot/… ; la tâche, sa spec et sa PR restent. Une PR fusionnée est purgée automatiquement.",
 		"loading": "Calcul de la place occupée…",
 		"empty": "Aucun worktree à purger : rien n'occupe de place inutilement.",
 		"dirty": "modifications non commitées, conservé",
@@ -2550,5 +3134,282 @@
 			"switch": "Switch : déployer le code qui ne lit plus que la nouvelle structure.",
 			"contract": "Contract : quand plus aucune version en service ne s'en sert, supprimer l'ancienne structure dans une migration suivante."
 		}
+	},
+	"budgetPause": {
+		"chip": "Budget atteint : {{spent}} / {{limit}}",
+		"stallChip": "En pause : aucun progrès",
+		"floor": " (au moins, un modèle sans prix connu)",
+		"task": "Cette tâche a dépensé {{spent}}{{floor}} sur son plafond de {{limit}}. Elle s'est mise en pause avant sa prochaine session, sans rien perdre.",
+		"project": "Le projet a dépensé {{spent}}{{floor}} sur son budget de {{limit}} pour la période. La tâche s'est mise en pause avant sa prochaine session.",
+		"projectHint": "Relevez le budget du projet dans Coûts, ou passez-le en simple avertissement, puis reprenez la tâche.",
+		"stall": "{{spent}} dépensés depuis la dernière sous-tâche terminée ({{done}}/{{total}}), au-delà des {{limit}} que la tâche s'accordait.",
+		"stallHint": "Lisez les journaux pour voir où elle tourne en rond. Reprendre lui redonne la même marge.",
+		"newLimit": "Nouveau plafond de la tâche (USD)",
+		"raise": "Relever et reprendre",
+		"tooLow": "Le plafond doit dépasser les {{spent}} déjà dépensés",
+		"saveFailed": "Le plafond n'a pas pu être enregistré",
+		"resumed": "Plafond relevé à {{limit}}, la tâche reprend"
+	},
+	"appliedLessons": {
+		"title_one": "{{count}} leçon appliquée à cette tâche",
+		"title_other": "{{count}} leçons appliquées à cette tâche",
+		"description": "Ce que la boucle d'apprentissage a donné aux agents de cette tâche : les règles adoptées en revue, les motifs appris des builds précédents, et les points de contrôle du type de tâche quand l'historique QA de ce dépôt les demande.",
+		"disabledCount": "{{count}} désactivée(s)",
+		"show": "Afficher",
+		"hide": "Masquer",
+		"kind": {
+			"rule": "Règle",
+			"pattern": "Motif",
+			"checkpoint": "Point de contrôle"
+		},
+		"patternType": {
+			"success": "à appliquer",
+			"failure": "à éviter",
+			"optimization": "astuce"
+		},
+		"confidence": "confiance {{value}}",
+		"agents": "Donnée à",
+		"off": "Désactivée pour cette tâche",
+		"disable": "Désactiver pour cette tâche",
+		"enable": "Réactiver",
+		"disabledHint": "Les prochains prompts de cette tâche la laissent de côté ; les autres tâches la gardent.",
+		"error": "Impossible de modifier la leçon : {{error}}"
+	},
+	"breakerPause": {
+		"chip": "Coupe-circuit : {{tool}}",
+		"body": "L'agent a appelé {{tool}} {{repeats}} fois avec les mêmes arguments et a reçu chaque fois le même résultat, sans modifier de fichier entre-temps. La tâche s'est mise en pause plutôt que de payer une boucle.",
+		"hint": "Lisez ses journaux. Reprendre relance la phase avec la même conversation ; si elle boucle encore, changez de modèle ou précisez la tâche.",
+		"killSwitch": "Arrêtée par « Arrêter tous les agents »",
+		"voiceStop": "Arrêtée à la voix après son étape"
+	},
+	"safetyPause": {
+		"anomalyChip": "Score de confiance : {{score}}/100",
+		"anomalyBody": "Le score de confiance de l'agent est tombé à {{score}}/100 (pause à {{pause}}). La tâche s'est mise en pause ; ses fichiers sont tels que l'agent les a laissés.",
+		"anomalyStopped": "Le score de confiance de l'agent est tombé à {{score}}/100, au seuil d'arrêt ({{stop}}) ou en dessous. La session a été arrêtée.",
+		"types": {
+			"mass_file_deletion": "Suppression massive de fichiers",
+			"unexpected_network_access": "Accès réseau vers une autre machine",
+			"system_config_modification": "Écriture dans la configuration de sécurité",
+			"excessive_token_usage": "Consommation de jetons excessive",
+			"rapid_file_changes": "Changements de fichiers très rapides",
+			"sensitive_file_access": "Accès à un secret ou à l'historique git",
+			"unusual_command_execution": "Commande dangereuse",
+			"long_running_session": "Session très longue",
+			"repetitive_errors": "Erreurs répétées",
+			"path_traversal_attempt": "Chemin hors du projet ou vers le système"
+		},
+		"sandboxChip": {
+			"restricted_path": "Bac à sable : écriture hors des chemins permis",
+			"file_size": "Bac à sable : fichier trop gros",
+			"files_written": "Bac à sable : trop de fichiers",
+			"session_time": "Bac à sable : session trop longue"
+		},
+		"sandboxBody": {
+			"restricted_path": "L'agent a écrit {{path}}, hors des chemins que permet le bac à sable restreint. La session a été arrêtée.",
+			"file_size": "L'agent a écrit {{path}} ({{value}} octets), au-delà de la limite du bac à sable de {{limit}} octets par fichier. La session a été arrêtée.",
+			"files_written": "L'agent a écrit {{value}} fichiers en une session, au-delà de la limite du bac à sable de {{limit}}. La tâche s'est mise en pause ; ses fichiers sont tels que l'agent les a laissés.",
+			"session_time": "La session a duré {{value}} secondes, au-delà de la limite du bac à sable de {{limit}}. La tâche s'est mise en pause ; ses fichiers sont tels que l'agent les a laissés."
+		},
+		"rolledBack": "Ses fichiers ont été ramenés à l'instantané pris avant cette session. L'état qu'ils remplaçaient est gardé lui aussi en instantané.",
+		"rollbackFailed": "La restauration de l'instantané a échoué : les fichiers sont tels que l'agent les a laissés. Restaurez-en un ci-dessous.",
+		"hint": "Lisez ses journaux avant de reprendre. Limites et seuils : Réglages, Bac à sable et Détection d'anomalies.",
+		"snapshots": {
+			"open": "Instantanés…",
+			"none": "Aucun instantané pour cette tâche.",
+			"restore": "Restaurer",
+			"confirm": "Confirmer la restauration",
+			"restored": "Instantané restauré.",
+			"failed": "Restauration impossible : {{error}}",
+			"listFailed": "Impossible de lire les instantanés : {{error}}",
+			"hint": "Restaurer réécrit le worktree de la tâche ; l'état actuel est d'abord gardé en instantané, la restauration peut donc être annulée.",
+			"labels": {
+				"planning": "avant la planification",
+				"coding": "avant le code",
+				"qa_review": "avant la QA",
+				"before_rollback": "avant une restauration"
+			}
+		},
+		"anomalyLine_one": "{{label}}",
+		"anomalyLine_other": "{{label}} (×{{count}})"
+	},
+	"policyPause": {
+		"hoursChip": "Hors des heures permises",
+		"hoursBody": "workpilot.policy.yaml permet aux agents de travailler {{hours}} ({{timezone}}). La tâche s'est mise en pause une fois son action en cours terminée.",
+		"budgetChip": "Budget de jetons atteint",
+		"budgetBody": "Les agents du projet ont dépensé {{spent}} jetons dans la dernière heure, autant ou plus que les {{limit}} permis par workpilot.policy.yaml.",
+		"taskBudgetChip": "Budget de jetons de la tâche atteint",
+		"taskBudgetBody": "Les agents de cette tâche ont dépensé {{spent}} jetons, autant ou plus que les {{limit}} par tâche permis par workpilot.policy.yaml.",
+		"invalidChip": "Politique invalide",
+		"invalidBody_one": "La politique de garde-fous a {{count}} erreur : aucun agent ne tourne tant qu'elle n'est pas corrigée. Réglages > Garde-fous la détaille.",
+		"invalidBody_other": "La politique de garde-fous a {{count}} erreurs : aucun agent ne tourne tant qu'elles ne sont pas corrigées. Réglages > Garde-fous les détaille.",
+		"hint": "Reprenez-la quand la politique le permet de nouveau ; la décision figure dans le journal d'audit de Réglages > Garde-fous."
+	},
+	"suitePlacement": {
+		"modes": {
+			"auto": "Automatique",
+			"machine": "Cette machine",
+			"ci": "La CI de la forge"
+		},
+		"modeHints": {
+			"auto": "Les tests tournent sur cette machine si elle n'est pas trop chargée. Sinon, ils partent sur la CI de votre dépôt ou sur le serveur WorkPilot, ou attendent leur tour ici.",
+			"machine": "La suite complète tourne toujours sur la machine où tourne WorkPilot.",
+			"ci": "La branche de la tâche est poussée (sans pull request s'il n'y en a pas encore) et la CI de la forge lance la suite complète. Les tests du changement tournent toujours ici."
+		},
+		"project": {
+			"label": "Où tournent les longues suites de tests",
+			"manual": "Manuel",
+			"autoHint": "Les tests tournent sur cette machine si elle n'est pas trop chargée. Sinon, ils partent sur la CI de votre dépôt ou sur le serveur WorkPilot, ou attendent leur tour pour ne pas ralentir la machine.",
+			"manualHint": "Vous choisissez où tournent les tests de chaque tâche.",
+			"branchPush": "Pousser la branche de la tâche sans pull request pour lancer la CI",
+			"branchPushHint": "La suite démarre sur la CI dès la fin de la QA, sans attendre que vous créiez la pull request."
+		},
+		"form": {
+			"label": "Où tournent les longues suites de cette tâche",
+			"project": "Réglage du projet",
+			"projectHint": "Suit le choix du projet.",
+			"options": {
+				"auto": "Automatique",
+				"machine": "Manuel : cette machine",
+				"ci": "Manuel : la CI de la forge"
+			}
+		},
+		"targets": {
+			"machine": "cette machine",
+			"server": "le serveur WorkPilot",
+			"ci": "la CI",
+			"queue": "la file d'attente"
+		},
+		"badge": {
+			"queued": "Suite en file d'attente",
+			"sent": "Suite sur {{target}}",
+			"pending": "Suite en cours sur la CI",
+			"passed": "Suite verte sur la CI",
+			"failed": "Suite rouge sur la CI",
+			"not_started": "Suite CI non lancée"
+		},
+		"reasons": {
+			"chosen": "Choisi pour cette tâche ou ce projet.",
+			"alone": "Aucune autre tâche en cours : la suite tourne ici.",
+			"room": "La machine a la place pour la suite.",
+			"pr": "Il manque {{short}} à la machine : la suite tourne sur la CI de la pull request.",
+			"server": "Il manque {{short}} à la machine : la suite tourne sur le serveur WorkPilot.",
+			"branch_push": "Il manque {{short}} à la machine : la branche a été poussée sans pull request pour lancer la CI.",
+			"no_route": "Il manque {{short}} à la machine et rien d'autre ne peut la lancer : la suite attend son tour ici.",
+			"turn": "Son tour est venu : la suite tourne ici.",
+			"not_followed": "La CI n'est pas encore suivie pour ce projet : la suite tourne ici."
+		},
+		"short": {
+			"cpu": "du CPU",
+			"ram": "de la RAM",
+			"vram": "de la VRAM"
+		},
+		"notStarted": {
+			"push_failed": "La branche n'a pas pu être poussée. La suite complète n'a pas tourné : lancez-la avant de fusionner.",
+			"no_remote": "Le projet n'a pas de dépôt distant où pousser. La suite complète n'a pas tourné : lancez-la avant de fusionner.",
+			"no_pipeline": "Aucun pipeline n'a démarré sur le commit poussé en 20 minutes. Les prochaines suites restent sur cette machine pendant 24 heures."
+		},
+		"mergeHeld": "La suite complète tourne sur la CI pour ce commit. La fusion sera possible dès qu'elle sera verte.",
+		"mergeHeldLink": "Ouvrir le run"
+	},
+	"flag": {
+		"badge": "Bloquée",
+		"flag": "Signaler bloquée",
+		"flagMenu": "Signaler bloquée…",
+		"unflag": "Lever le blocage",
+		"dialogTitle_one": "Signaler la tâche bloquée",
+		"dialogTitle_other": "Signaler {{count}} tâches bloquées",
+		"dialogDescription_one": "La tâche garde sa colonne ; le drapeau dit à tous qu'elle ne peut pas avancer tant que l'obstacle n'est pas levé.",
+		"dialogDescription_other": "Les tâches gardent leur colonne ; le drapeau dit à tous qu'elles ne peuvent pas avancer tant que l'obstacle n'est pas levé.",
+		"reasonLabel": "Ce qui la bloque",
+		"reasonPlaceholder": "Ce qui la bloque (facultatif), par ex. on attend la clé d'API du client",
+		"failedTitle": "Drapeau non enregistré",
+		"failedDescription": "Impossible d'enregistrer le drapeau. Réessayez."
+	},
+	"runFacts": {
+		"title": "Bilan",
+		"unknown": "inconnu",
+		"automation": "Automatisation",
+		"agentTime": "Temps de travail des agents",
+		"leadTime": "Du lancement à la fin",
+		"spendTitle": "Tokens et coût de toutes les sessions d'agents",
+		"tokens": "{{value}} tokens",
+		"tokensEstimated": "≈ {{value}} tokens",
+		"tokensUnknown": "Tokens inconnus",
+		"costShort": "· {{cost}}",
+		"tokensLabel": "Tokens",
+		"tokensDetail": "{{total}} (entrée {{input}}, sortie {{output}}, cache {{cache}})",
+		"costLabel": "Coût",
+		"estimatedNote_one": "{{count}} session sur {{total}} estimée : son fournisseur n'a donné aucun compte.",
+		"estimatedNote_other": "{{count}} sessions sur {{total}} estimées : leur fournisseur n'a donné aucun compte.",
+		"models": "Modèles",
+		"createdBy": "Créée par",
+		"startedBy": "Lancée par",
+		"peopleShort": "{{creator}} → {{launcher}}",
+		"peopleTitle": "Créée par {{creator}}, lancée par {{launcher}}",
+		"duration": {
+			"seconds": "{{seconds}} s",
+			"minutes": "{{minutes}} min",
+			"hours": "{{hours}} h {{minutes}} min",
+			"days": "{{days}} j {{hours}} h",
+			"hoursOnly": "{{hours}} h",
+			"daysOnly": "{{days}} j"
+		}
+	},
+	"approvalTier": {
+		"cardBadge": "{{tier}} · {{outcome}}",
+		"tooltip": "Niveau de validation : {{outcome}}. Pourquoi : {{reasons}}",
+		"outcome": {
+			"merged": "fusionnée seule",
+			"waiting": "attend une personne",
+			"observed": "observé",
+			"mergeFailed": "fusion refusée"
+		},
+		"reasons": {
+			"sensitive_paths": "chemins sensibles",
+			"protected_files": "fichiers de politique ou d'agent",
+			"requires_review": "fichiers à faire relire",
+			"ci_files": "fichiers de CI",
+			"ci_files_bump": "montée qui touche la CI",
+			"feature": "nouvelle feature",
+			"breaking": "changement cassant",
+			"migration": "migration",
+			"contract": "contrat public",
+			"layers": "plusieurs couches",
+			"size_files": "beaucoup de fichiers",
+			"size_lines": "beaucoup de lignes",
+			"trust": "score de confiance bas",
+			"major_bump": "montée majeure",
+			"bump_with_code": "montée avec du code",
+			"bump_unknown": "montée de niveau inconnu",
+			"dependency_bump": "montée de dépendance",
+			"docs_only": "documentation seule",
+			"empty": "aucun changement",
+			"code_change": "changement de code",
+			"review_missing": "pas de revue croisée sur ce code",
+			"review_inconclusive": "revue croisée sans verdict",
+			"policy_invalid": "section approvals invalide",
+			"rule": "règle du projet",
+			"claude_approvals_pending": "Claude Approvals encore en cours",
+			"claude_approvals_failed": "Claude Approvals n'est pas passé",
+			"unsandboxed": "lancée sans bac à sable",
+			"blocked_hosts": "a tenté un hôte refusé"
+		}
+	},
+	"cardLabels": {
+		"cardMenu": "Étiquettes…",
+		"dialogTitle": "Étiquettes",
+		"dialogDescription": "Des mots courts pour retrouver « {{title}} » et filtrer le tableau.",
+		"listLabel": "Étiquettes",
+		"none": "Aucune étiquette pour l'instant.",
+		"remove": "Retirer l'étiquette {{label}}",
+		"placeholder": "Nouvelle étiquette",
+		"inputLabel": "Étiquette à ajouter",
+		"add": "Ajouter",
+		"full": "Une tâche porte {{count}} étiquettes au plus.",
+		"suggestions": "Déjà sur le tableau",
+		"suggest": "+ {{label}}",
+		"filterBy": "Voir les tâches étiquetées {{label}}",
+		"failedTitle": "Étiquettes non enregistrées",
+		"failedDescription": "La tâche n'a pas pu être enregistrée. Réessaie."
 	}
 }

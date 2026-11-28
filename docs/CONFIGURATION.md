@@ -123,7 +123,10 @@ Implemented in [apps/backend/core/auth.py](../apps/backend/core/auth.py)
 | 3 | `config_dir` argument | Explicitly passed by the caller. |
 | 4 | `CLAUDE_CONFIG_DIR` env var | Profile-specific config directory. |
 | 5 | `.credentials.json` in (3) or (4) | File-based storage. |
-| 6 | System credential store | macOS Keychain, Windows Credential Manager, Linux Secret Service (via `secretstorage`). |
+| 6 | System credential store | macOS Keychain; on Windows the credential files Claude Code writes (`%USERPROFILE%\.claude\.credentials.json`…); on Linux the Secret Service (via `secretstorage`; a locked keyring is skipped, never unlocked, since its prompt would hang the API), then `~/.claude/.credentials.json`. A profile (3 or 4) reads only its own entry, never the default one. |
+
+A token in Claude Code's encrypted form (`enc:…`) is not decrypted: the build stops
+and says to run `claude setup-token` or to set a plaintext `CLAUDE_CODE_OAUTH_TOKEN`.
 
 ### API profile mode (`ANTHROPIC_BASE_URL`)
 
@@ -193,7 +196,9 @@ unprivileged user `workpilot` (uid 10001: mount SSH keys under `/home/workpilot/
 through `deploy/server-entrypoint.sh`: `alembic upgrade head` first, and a failed migration stops
 the container instead of serving. CI builds it and migrates a PostgreSQL 16 with it on every PR.
 Operating it — TLS reverse proxy, backups, upgrades, quotas, audit, key changes — is covered,
-in French, by [server-operations.md](server-operations.md).
+in French, by [server-operations.md](server-operations.md); setting it up, configuring it for a
+team and using it, with complete `.env.server` examples and the API with `curl`, by
+[server-guide.md](server-guide.md).
 
 | Variable | Default | What it does |
 |---|---|---|
@@ -327,6 +332,33 @@ Entra sign-in is on only when both Entra variables are set; local accounts work
 either way. Neither identifier is a secret: `GET /auth/config` hands both to the
 sign-in page.
 
+An Entra sign-in finds its account by the person's object id (`oid`). The first
+sign-in links to, or creates, an account only with an address Entra vouches for:
+the user principal name of a member of the tenant, or the `email` claim when the
+optional `xms_edov` claim says its domain is verified. Guests (`idp` from another
+directory) need `xms_edov` in the app registration's optional claims. An account
+keeps the Entra sign-in it was first linked to.
+
+Any other OpenID Connect provider (Okta, Google, Keycloak, Auth0...) signs in
+the same way, next to Entra. The server reads the provider's discovery document
+(`<issuer>/.well-known/openid-configuration`) and checks it before use; see
+[architecture/spec-approval-sso.md](architecture/spec-approval-sso.md).
+
+| Variable | Default | Meaning |
+| --- | ---: | --- |
+| `WORKPILOT_OIDC_ISSUER` | — | The provider's issuer, an https URL without query or fragment (http only on loopback). It must equal the `issuer` of the discovery document. |
+| `WORKPILOT_OIDC_CLIENT_ID` | — | The client ID of a **public** client (native or desktop app, PKCE, no secret), checked as the token audience. Register the redirect URI `http://localhost` (any port, path `/callback`). |
+| `WORKPILOT_OIDC_NAME` | `SSO` | The provider's name on the button, "Sign in with {name}" (40 printable characters at most). |
+| `WORKPILOT_OIDC_SCOPES` | `openid profile email` | The scopes asked for; `openid` is always added. The provider must return a verified `email` (`email_verified`) for a person it has not signed in before. |
+| `WORKPILOT_SELF_APPROVAL` | `when-alone` | Whether the author of a card approves its own spec: `allow`, `deny`, or `when-alone` (only while the others who may approve on the project could not give the approvals the card needs). Any other value is logged and replaced by the default. |
+| `WORKPILOT_APPROVAL_QUORUM` | `low=1,medium=1,high=1` | How many people approve a card, by its criticality, e.g. `low=1,medium=2,high=3` (1 to 10; a level left out needs 1). A card is `medium` unless an approver sets it, or its spec's assessment says it is complex (`high`). |
+| `WORKPILOT_APPROVAL_ROLES` | — | The roles one of a card's approvers must hold, by criticality, as role slugs joined by `+`, e.g. `high=tech-lead+security` (5 per level at most). |
+| `WORKPILOT_APPROVAL_ESCALATION_HOURS` | — (never) | How long a card's plan waits for its approvals before a second group of approvers hears of it, in hours: `24` for every criticality, or `low=72,medium=24,high=4` (0 to 720; a level left out never escalates). The wait starts when the spec run ended; a card escalates once per spec run. |
+| `WORKPILOT_APPROVAL_ESCALATION_ROLES` | `owner+admin` | The second group: the organization's people who hold one of these roles (slugs joined by `+`, 5 at most) and may approve on the project, other than the card's author and those who approved it. They hear of it on their "Needs you" channels. |
+
+The provider sign-in is on only when both `WORKPILOT_OIDC_ISSUER` and
+`WORKPILOT_OIDC_CLIENT_ID` are set; neither is a secret.
+
 The phone app signs in with the same app registration, as a public client
 (authorization code with PKCE, no secret on the phone). Add a **Mobile and
 desktop applications** platform to the registration with the redirect URI
@@ -341,15 +373,23 @@ desktop applications** platform to the registration with the redirect URI
 | `WORKPILOT_PUSH_ENABLED` | `false` | Send notifications to the mobile app (a run you started succeeded or failed) through Expo's push service (`exp.host`), which hands them to Apple and Google. They carry the project's name, the card's number, the phase and its result, never a card's text. Off: nothing leaves the server and phones get no push. |
 | `WORKPILOT_NEEDS_YOU_ENABLED` | `false` | Tell each person, on the ntfy, Telegram or Teams channel they set up in the app (Settings, My notifications from the server), that a run they started needs them: a plan to approve, work to review, a stop on an error. Only the project's name and the card's number are sent. The server then posts to hosts its users chose, https only and never to a private address. Storing a channel also needs `WORKPILOT_SECRETS_MASTER_KEY`. Off: nothing is sent. |
 | `WORKPILOT_INVITATION_TTL_HOURS` | 72 | How long an invitation link stays usable. |
+| `WORKPILOT_PASSWORD_RESET_TTL_MINUTES` | 60 | How long a forgotten-password link stays usable, kept between 5 and 1440 minutes. A new link cancels the previous one; the link works once and signs the account out everywhere. |
+| `WORKPILOT_USAGE_RETENTION_DAYS` | 365 | How many days the server keeps token use per run and job and each person's presence days, kept between 30 and 3650; older rows are erased every hour. What is recorded: [server-usage-data.md](server-usage-data.md) (French). |
+| `WORKPILOT_PAGE_ACTIVITY_RETENTION_DAYS` | 183 | How many days the server keeps page activity (off by default; each organization turns it on in Administration → Usage), kept between 30 and 3650. An organization may set its own retentions there; these two variables apply to the organizations that did not. |
+| `WORKPILOT_METRICS_TOKEN` | — | Bearer token a Prometheus scraper sends to `/metrics` in server mode, at least 32 characters; without it `/metrics` answers 404. A secret: keep it in `.env.server`. |
+| `WORKPILOT_REPORT_TIMEZONE` | Europe/Paris | Time zone (IANA name) of the daily usage report for the organizations that did not set their own; an unknown name reads as UTC. |
+| `WORKPILOT_REPORT_LANGUAGE` | fr | Language (`fr` or `en`) of the usage report for the organizations that did not set their own. |
 | `WORKPILOT_PASSWORD_MIN_LENGTH` | 12 | Minimum length of a local password. It can only raise the floor: a value below 12 keeps 12. |
 | `WORKPILOT_PASSWORD_HIBP_CHECK` | `false` | Refuses a new local password found in Have I Been Pwned. Only the first five hex characters of its SHA-1 leave the server; when the service cannot be reached, the password is accepted. |
 | `WORKPILOT_ADMIN_PASSWORD` | — | Password of the first administrator, read by `python -m server.scripts.create_admin <email>` (run from `apps/backend`) instead of prompting. Remove it from the environment once the account exists. |
 
 ### Invitation email (SMTP)
 
-Invitation emails go out only when both `WORKPILOT_SMTP_HOST` and
+Invitation and forgotten-password emails go out only when both `WORKPILOT_SMTP_HOST` and
 `WORKPILOT_SMTP_FROM` are set. Otherwise, or when sending fails, the API returns
-the link for the administrator to pass on.
+the link for the administrator to pass on. Without SMTP, the sign-in screen's
+"Forgot password?" sends people to a platform administrator, who issues the link from
+Administration, Members.
 
 | Variable | Default | Meaning |
 | --- | ---: | --- |
@@ -393,7 +433,7 @@ These apply with or without server mode.
 
 | Variable | Default | Meaning |
 | --- | ---: | --- |
-| `WORKPILOT_EXTRA_CORS_ORIGINS` | — | Comma-separated origins added to the local API's built-in localhost and Electron list, with credentials allowed. Never `*`: with credentials allowed, it lets any origin in. |
+| `WORKPILOT_EXTRA_CORS_ORIGINS` | — | Comma-separated origins added to the local API's built-in localhost and Electron list, with credentials allowed. Never `*`: with credentials allowed, it lets any origin in. Their hosts are also accepted in the `Host` header: otherwise the local API answers only `127.0.0.1`, `localhost` and `::1` (421 for the rest). |
 | `WORKPILOT_WS_ALLOWED_ORIGINS` | `http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000,file://` | Comma-separated browser origins allowed to open the streaming WebSocket. It replaces the default list, entries are not trimmed: write them without spaces. |
 | `AUDIT_TRAIL_ALLOWED_ROOTS` | — | Desktop mode: directories, separated by `:` (`;` on Windows), under which the audit-trail panel may keep a project's trail (`<project>/.workpilot/audit-trail`); a directory outside them is refused. Unset, any directory is accepted. In server mode a client cannot name a directory at all (see [Paths are no longer supplied by the client](#paths-are-no-longer-supplied-by-the-client)). |
 | `AUDIT_TRAIL_FERNET_KEY` | — | Fernet key encrypting each new audit-trail line on disk; lines written before stay readable. Every process that writes trails needs it: the API and the build agents. There is one key and no rotation: changing it makes the lines encrypted with the old one unreadable. |
@@ -427,9 +467,6 @@ is taken so the user knows the output is not live data:
 - **Bounty board** — contestants fall back to a `[stub:...]` output string
   when the `llm_client` module is not importable. Logs a warning per
   contestant.
-- **Analytics API** ([apps/backend/analytics/api_minimal.py](../apps/backend/analytics/api_minimal.py))
-  currently returns empty/mock payloads for every endpoint. Treat it as a
-  scaffold until a real database-backed implementation lands.
 
 ## QA validation loop
 
@@ -445,12 +482,17 @@ environment wins:
 | `WORKPILOT_QA_TARGETED` | 1 | `0` turns the targeted QA off alone: small code changes get the full review (see *Small code changes* below). |
 | `WORKPILOT_QA_SCHEMA_GUARD` | `warn` | The schema guard after QA ([schema-guard.md](architecture/schema-guard.md)): what the task's migrations do to a live database (data loss, renames, NOT NULL without default, an applied migration edited; PostgreSQL locks, type changes, a missing down), on every stack. `warn` shows the findings without blocking; `strict` sends an error back to the fixer with the expand/contract plan; `off` switches it off, and the hard gate `migration-safe` then reads unknown. A workflow that declares `migration-safe` runs it `strict`. Any other value reads as `warn`. |
 | `WORKPILOT_QA_RECHECK` | 1 | `0` turns the re-review by delta off: from the second QA pass on, the reviewer no longer checks the fixer's delta first ([docs/architecture/qa-recheck.md](architecture/qa-recheck.md)). |
+| `WORKPILOT_REVIEW_CONTRADICTION_CHECK` | 1 | `0` turns off the PR review's contradiction check ([review-feedback.md](architecture/review-feedback.md)): nearby findings of one file that may ask for opposite changes are no longer sent to the model. On, it makes one completion on the selected provider per review that has such a pair, none otherwise. |
 | `WORKPILOT_LEARNING_LOOP_MODEL` | 1 | `0` turns off the learning loop's model analysis (after each build and from its dashboard): only the rule-based patterns remain. On, it makes one completion on the selected provider, whichever it is. |
 | `WORKPILOT_QA_MIN_COVERAGE` | 100 | Minimum coverage, in percent, of the `unit` **and** `integration` tests; `e2e` below it only warns. `0` disables the gate. Clamped to 0–100; a value that is not a number falls back to 100. |
 | `WORKPILOT_QA_API_CONTRACT` | `warn` | The API contract watcher after QA ([api-contract-watcher.md](architecture/api-contract-watcher.md)): `warn` records the contract changes and lists them in the PR body; `strict` also sends a breaking change the contract does not acknowledge back to the fixer; `off` stops it. Any other value reads as `warn`. |
 | `WORKPILOT_QA_DOC_DRIFT` | `warn` | The documentation drift detector after QA ([docs-and-drift.md](architecture/docs-and-drift.md)): `warn` logs the doc comments, documents and examples the task's change left behind; `strict` also sends a high one (a parameter the code no longer has, an example importing or calling what no longer exists) back to the fixer; `off` stops it. Any other value reads as `warn`. |
 | `WORKPILOT_QA_MIN_MUTATION` | unset | The mutation gate `tests-bite` ([mutation-gate.md](architecture/mutation-gate.md)): minimum share, in percent, of the mutants planted in the lines the task wrote that its tests catch. Unset: the gate runs only for workflows that declare `tests-bite` (the `test` workflow), at 60. Above `0`: it runs for every task at that threshold. `0` switches it off; the hard gate then reads unknown, never a pass. A value that is not a number falls back to 60. |
 | `WORKPILOT_QA_RED_TEAM` | `complex` | The red team after QA ([red-team.md](architecture/red-team.md)): `complex` attacks the tasks whose spec was assessed complex, `always` every task that changed source code, `off` never (the hard gate `attack-resistant` then reads unknown). A workflow that declares `attack-resistant` runs it unless `off`. Any other value reads as `complex`. |
+| `WORKPILOT_QA_ARTIFACT_EXPOSURE` | `warn` | The artifact exposure gate after QA ([rea.md](architecture/rea.md)): REA's static audit of the build output the task left (Electron or Tauri bundle, APK, web build and its source maps, .NET publish folder, jar, wheel, Rust executable), never a build. `warn` shows what REA found without blocking and only uses REA already installed at the pinned version; `strict` sends a check exposed at the threshold back to the fixer, and may fetch the pinned release with npx (never under strict offline mode); `off` switches it off, and the hard gate `artifact-exposure` then reads unknown. A workflow that declares `artifact-exposure` runs it `strict`. Any other value reads as `warn`. `unknown` and `not_assessed` never block. |
+| `WORKPILOT_QA_DOTNET_API` | `warn` | The .NET public API gate after QA ([rea.md](architecture/rea.md)): each library project the task's .NET changes reach is built at the task's base and as QA reviewed it, each in a disposable copy, and REA compares the two assemblies. `warn` reports a public member removed, hidden, renamed or with a changed signature without blocking, and builds nothing unless REA is already installed at the pinned version; `strict` sends the break back to the fixer and may fetch the pinned release with npx (never under strict offline mode); `off` switches it off, and the hard gate `public-api-stable` then reads unknown. A .NET migration staged by the preflight, or a workflow that declares `public-api-stable`, runs it `strict`. Any other value reads as `warn`. A failed build or a member REA could not pair never blocks. |
+| `WORKPILOT_QA_DOTNET_API_TIMEOUT` | `600` | Seconds each `dotnet` or REA command of the .NET public API gate may take (60 to 3600). |
+| `WORKPILOT_QA_ARTIFACT_EXPOSURE_FAIL_ON` | `high` | The lowest severity of an exposed check that fails the artifact exposure gate: `high`, `medium` or `low`. Any other value reads as `high`. |
 | `WORKPILOT_DEPENDENCY_GUARD` | 1 | `0` switches off the dependency guard (a package the task added must exist on its registry, see [dependency-guard.md](architecture/dependency-guard.md)); the hard gate `deps-exist` then reads unknown, never a pass. |
 | `WORKPILOT_TOOL_RESULT_GUARD` | `warn` | The tool result guard ([tool-result-guard.md](architecture/tool-result-guard.md)): `warn` passes a flagged result on fenced, behind a warning; `block` also withholds a result rated blocked; `off` stops the scan. Any other value reads as `warn`. |
 
@@ -547,6 +589,8 @@ Agent commands run under bubblewrap (Linux) or Seatbelt (macOS), see
 | Variable | Default | Meaning |
 | --- | ---: | --- |
 | `WORKPILOT_SANDBOX` | `auto` | `auto`: sandboxed when the machine can, otherwise the build runs and its card says commands are not isolated. `required`: a build that cannot be sandboxed does not start. `off`: never sandboxed (the card says so). |
+| `WORKPILOT_CODE_MODE` | `off` | Code mode (`run_script`) for the providers of the WorkPilot loop. Set by Settings, Code mode. `off`: no agent is offered it. `auto`: coding, QA and the analyses of the code. `on`: every agent that declares tools. A task's `codeMode` or `phaseCodeMode` in `task_metadata.json` chooses within it, never while it is `off`. See [code-mode.md](architecture/code-mode.md). |
+| `WORKPILOT_CODE_MODE_TIMEOUT` | `600` | Seconds one script may run, at most 600. |
 | `WORKPILOT_SANDBOX_HOSTS` | — | Extra hosts a sandboxed process may reach, comma separated: `nexus.corp.example`, `*.corp.example` (subdomains only), `127.0.0.1:5000` (a local port). Remote hosts open 443 and 80 only. |
 
 On Ubuntu 24.04 and later, unprivileged user namespaces are restricted by AppArmor and bubblewrap
@@ -659,7 +703,6 @@ planner, coder, QA…).
 | `AUTO_CLAUDE_OTEL_ENDPOINT` | — | OTLP endpoint, such as `http://localhost:4318`. When set, each session exports traces, metrics and logs over OTLP `http/protobuf` as the service `workpilot-<agent type>`, and these settings replace any `OTEL_*` variable of the same name. It also turns on WorkPilot's own GenAI spans for every provider (`invoke_agent`, `chat`, `execute_tool`; no prompt or output), sent to `<endpoint>/v1/traces` as the service `workpilot`, with any key read from `OTEL_EXPORTER_OTLP_HEADERS` ([genai-traces.md](architecture/genai-traces.md)). Point it only at a collector you control. |
 | `AUTO_CLAUDE_CODER_USER_SETTINGS` | on | `0`, `false`, `no` or `off`: the coder loads the project's Claude settings only, without your own `~/.claude` (your CLAUDE.md, skills and hooks) or the project's `.claude/settings.local.json`. Every other agent type (planner, QA, spec, analysis, PR review…) loads the project's settings only, whatever this says ([agent-instructions.md](architecture/agent-instructions.md)). |
 | `AUTO_CLAUDE_SETTING_SOURCES` | per agent type | Comma list among `project`, `user` and `local`, for every agent type, beating the variable above. `project` is always kept; other names are ignored, and an empty value is no override. `project,user,local` restores the former behaviour, your settings in every session. |
-| `AUTO_CLAUDE_AGENT_DEBUGGER` | off | `1`, `true`, `yes` or `on` attaches the Agent Debugger's breakpoints to every session, even when the debugger was not opened for that task. |
 | `CLAUDE_CLI_PATH` | the SDK's bundled CLI | `claude` executable the SDK launches. Ignored when it is not an existing file or holds shell metacharacters, `..` or a variable reference. The desktop app sets it from detection or the Claude path setting. |
 | `CLAUDE_CODE_GIT_BASH_PATH` | detected | Windows only: the Git for Windows `bash.exe` the Claude Code CLI needs; WorkPilot also looks for `git.exe` next to it. The desktop app sets it when it finds one. |
 
@@ -671,7 +714,7 @@ setting them by hand matters mainly for the CLI and headless runs.
 
 | Variable | Default | Meaning |
 | --- | ---: | --- |
-| `AUTO_CLAUDE_PROVIDER` | — | Default provider when nothing more specific names one: a task's own engine, the provider picked in the UI, `SELECTED_LLM_PROVIDER` and `task_metadata.json` all win over it. Accepted: `claude`, `copilot`, `openai`, `google`, `gemini`, `ollama`, `meta`, `mistral`, `deepseek`, `grok`, `aws`, `windsurf`, `cursor`, `custom`, `opencode`, `antigravity`, `agy`, `pi`, `gemini-cli`. Any other value, `anthropic` included, is ignored. |
+| `AUTO_CLAUDE_PROVIDER` | — | Default provider when nothing more specific names one: a task's own engine, the provider picked in the UI, `SELECTED_LLM_PROVIDER` and `task_metadata.json` all win over it. Accepted: `claude`, `copilot`, `openai`, `google`, `gemini`, `ollama`, `meta`, `mistral`, `deepseek`, `grok`, `openrouter`, `huggingface`, `aws`, `windsurf`, `cursor`, `custom`, `opencode`, `antigravity`, `agy`, `pi`, `gemini-cli`, and `anthropic` (read as `claude`). Any other value is ignored. |
 | `WORKPILOT_PI_MODE` | `json` | `rpc` keeps one pi process per session (`compact` on demand, `abort` on cancel, the model's context window read from `get_state`); `json` starts one per turn. Any other value is `json`. |
 | `PI_CODING_AGENT_DIR` | `~/.pi/agent` | Where pi keeps `trust.json`, `mcp.json` and `models.json`; read by the pi provider and by `brain connect`. The provider sets `PI_CODING_AGENT_SESSION_DIR` (the task's `<spec>/pi-sessions`) and `PI_SKIP_VERSION_CHECK=1` on the pi subprocess itself. Guide: [`integrations/pi.md`](integrations/pi.md). |
 | `GEMINI_API_KEY` | — | Read only by the `gemini-cli` (ACP) provider, to sign Gemini CLI in with its `gemini-api-key` method when a session asks for a login; otherwise sign in once with `gemini`. Guide: [`architecture/acp.md`](architecture/acp.md). |
@@ -682,9 +725,22 @@ setting them by hand matters mainly for the CLI and headless runs.
 | `MISTRAL_BASE_URL` | `https://api.mistral.ai` | Mistral API base, with or without `/v1`. |
 | `DEEPSEEK_BASE_URL` | `https://api.deepseek.com` | Same, for DeepSeek. |
 | `GROK_BASE_URL` | `https://api.x.ai` | Same, for xAI Grok. |
+| `OPENROUTER_API_KEY` | — | Key of the `openrouter` provider (Settings → AI accounts → OpenRouter). Secret. |
+| `OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | OpenRouter API base. |
+| `HUGGINGFACE_API_KEY` | — | Hugging Face token of the `huggingface` provider, a fine-grained token with "Make calls to Inference Providers"; `HF_TOKEN` is read when it is unset. Secret. |
+| `HUGGINGFACE_BASE_URL` | `https://router.huggingface.co/v1` | Hugging Face Inference Providers router. |
+| `OPENROUTER_FALLBACK_MODELS` | — | Up to 3 OpenRouter model ids, comma-separated, tried in order when the default model fails (sent as `models`). Set from the OpenRouter page (Routing). |
+| `OPENROUTER_PROVIDER_SORT` | — | `price`, `throughput` or `latency`: order of the providers OpenRouter tries (`provider.sort`). |
+| `OPENROUTER_DATA_COLLECTION` | — | `deny`: only providers that do not store or train on prompts (`provider.data_collection`). |
+| `OPENROUTER_ZDR` | — | `1`: only zero-data-retention providers (`provider.zdr`). |
+| `HUGGINGFACE_ROUTING_POLICY` | — | `fastest` or `cheapest`: Hugging Face router policy, added to the request's model id unless it names a provider. |
+| `OPENROUTER_MODEL`, `HUGGINGFACE_MODEL` | registry default | Default model of the gateway, chosen on its provider page or with « Try in the cloud » in the Hub model search; the app sets it for the backend. |
 
-For the three base URLs, agent sessions prefer the variable to the URL saved in
-the provider configuration; the model list does the opposite.
+For these base URLs, agent sessions prefer the variable to the URL saved in
+the provider configuration; the model list does the opposite. OpenRouter and
+Hugging Face answer their model list without a key, so their dropdowns are
+live even before a key is set; see
+[`architecture/gateway-providers.md`](architecture/gateway-providers.md).
 
 The `meta`, `aws` and `cursor` providers have no adapter of their own: their
 credentials only feed the provider status, and their builds run on Claude.
@@ -748,24 +804,35 @@ uses no network.
 
 | Variable | Default | Meaning |
 | --- | ---: | --- |
-| `UTILITY_MODEL_ID` | `DEFAULT_UTILITY_MODEL` ([foundation/model_config.py](../apps/backend/foundation/model_config.py)) | Model of the utility calls: the AI merge resolver and, when a pull request is created, the template filler and the impact analysis. The desktop app sets it for merges from the utility model in Settings. |
-| `UTILITY_THINKING_BUDGET` | off | Thinking budget, in tokens, of the same calls; empty or `0` turns it off. The desktop app sets it for merges. |
+| `UTILITY_MODEL_ID` | `DEFAULT_UTILITY_MODEL` ([foundation/model_config.py](../apps/backend/foundation/model_config.py)) | Model of the utility calls made when a pull request is created: the template filler and the impact analysis. The AI merge does not read it: it asks the user's provider, with a quick then a capable Claude model on Claude and the provider's own model elsewhere. |
+| `UTILITY_THINKING_BUDGET` | off | Thinking budget, in tokens, of the same calls; empty or `0` turns it off. |
 | `INSIGHT_EXTRACTION_ENABLED` | `true` | After each coder session, an LLM pass extracts insights into the project memory. Only `true`, `1` or `yes` keep it on (`on` turns it off). It also needs a Claude token. |
 | `INSIGHT_EXTRACTOR_MODEL` | `DEFAULT_EXTRACTION_MODEL` ([analysis/insight_extractor.py](../apps/backend/analysis/insight_extractor.py)) | Model of that pass. It always runs on Claude: give a Claude model id. |
+| `BRAIN_CONFLICT_EMBEDDINGS` | on | After a brain sync, an embeddings model that a local server (Ollama, else LM Studio) already has also reads the received gotchas and patterns, to flag two notes that disagree in different words ([memory-lifecycle.md](architecture/memory-lifecycle.md)). `0`, `false`, `no` or `off` turns it off; unset, the switch in Settings > Brain decides (`brain.json`). Nothing is pulled and nothing leaves the machine: only `OLLAMA_BASE_URL` / `LMSTUDIO_BASE_URL` on a loopback address is asked, with a timeout, so strict offline mode allows it. Without a local server or an embeddings model, only shared words count, as before. At most 200 notes are sent per sync; vectors are cached in `.workpilot-brain/embeddings.json` (ignored by git). |
+| `BRAIN_CONFLICT_EMBEDDINGS_MODEL` | first listed | The local model of that pass (`nomic-embed-text`, `bge-m3`… in Ollama, where `x` also matches `x:latest`; `text-embedding-nomic-embed-text-v1.5`… in LM Studio). Unset, the model named in Settings > Brain, else the first embeddings model the server lists, multilingual ones first. A named model is looked for on each server asked; one no server lists turns the pass off: it is never pulled nor loaded by name. |
+| `BRAIN_CONFLICT_EMBEDDINGS_PROVIDER` | automatic | The local server of that pass: `ollama` or `lm-studio` (`lmstudio` too). Unset, the one chosen in Settings > Brain (`brain.json`, `conflictEmbeddingsProvider`), else Ollama, else LM Studio (its OpenAI-compatible `/v1/models` and `/v1/embeddings`). A server named here is the only one asked: when it is down or has no embeddings model, only shared words count. Another value counts as automatic. |
 
 ## Forges, notifications and MCP servers
 
 ### Forges
 
-Project settings writes `GITHUB_REPO` and `GITLAB_PROJECT` into the project's
-`.workpilot/.env`.
+Project settings writes `GITHUB_REPO`, `GITLAB_PROJECT` and the `BITBUCKET_*` keys into the project's
+`.workpilot/.env` ([architecture/bitbucket.md](architecture/bitbucket.md)). `CICD_PROVIDER=bitbucket` picks Bitbucket Pipelines for the CI loop; `auto` picks it when the Bitbucket settings are complete and Azure DevOps, GitHub and GitLab are not.
 
 | Variable | Default | Meaning |
 | --- | ---: | --- |
 | `GITHUB_REPO` | detected | The project's `owner/repo`, for the GitHub views, the CI loop and the GitHub runner when it cannot detect it. |
 | `GITLAB_PROJECT` | — | The project's `group/project`, for the same uses on GitLab. |
+| `BITBUCKET_ENABLED` | off | `true` shows the project's Bitbucket Cloud views (local projects only). Without it, a stored token turns them on. |
+| `BITBUCKET_WORKSPACE`, `BITBUCKET_REPO` | from the remote | The repository's workspace and slug on bitbucket.org. Project settings fills them from a bitbucket.org remote when empty; `BITBUCKET_REPO` also takes `workspace/repo` or a clone URL. A value that is not a slug, or a URL on another host, gives no Bitbucket config. A task's pull request uses the pushed remote first. |
+| `BITBUCKET_USERNAME` | — | With an API token or an app password, the account's email or username (HTTP Basic). Empty: `BITBUCKET_TOKEN` is sent as a Bearer access token (repository or workspace access token). |
+| `BITBUCKET_TOKEN` | — | Reads issues, pull requests and pipelines; opening a task's pull request also needs pull request write access. Stored `enc:` in `.workpilot/.env` and given to the backend only in its environment; sent only to `https://api.bitbucket.org/2.0`. Secret. |
+| `BITBUCKET_ACCOUNT_ID` | — | A Bitbucket account saved once for the app (Settings, Forge accounts): its username and token take the place of `BITBUCKET_USERNAME` and `BITBUCKET_TOKEN`. The file holds only the id; an id that names no Bitbucket account gives no token. `GITHUB_ACCOUNT_ID`, `GITLAB_ACCOUNT_ID` and `AZURE_DEVOPS_ACCOUNT_ID` do the same for the other forges. |
+| `BITBUCKET_AUTO_SYNC` | off | Stored like the GitHub and GitLab switches. |
 | `AZURE_DEVOPS_EXT_PAT` | — | Read when `AZURE_DEVOPS_PAT` is unset (it is the Azure DevOps CLI's name for it): pushes a task branch and opens its pull request. Secret. |
 | `GITHUB_BOT_TOKEN` | — | Token of the GitHub automation runner's bot account (PR review, auto-fix, triage) when `--bot-token` is not given. It only identifies that account, so the runner skips what the bot wrote itself; nothing is posted with it. Secret. |
+| `ISSUE_EMBEDDINGS_PROVIDER` | first with a key | Which service compares issues by meaning for triage's possible duplicates: `huggingface`, `openai`, `voyage`, `local` (sentence-transformers), or `none` for shared title words. Unset, the first of Hugging Face, OpenAI and Voyage with a key; under strict offline mode only `local`, and only when named. A failing service falls back to shared words. |
+| `ISSUE_EMBEDDINGS_MODEL` | service default | Embedding model of that service (`thenlper/gte-large` on Hugging Face, `text-embedding-3-small`, `voyage-large-2`, `all-MiniLM-L6-v2`). Vectors are cached per service and model in `.workpilot/github/embeddings/`. |
 | `MAX_PR_WORKTREES` | 10 | PR-review worktrees kept in `.workpilot/github/pr/worktrees`; the oldest go beyond that. |
 | `PR_WORKTREE_MAX_AGE_DAYS` | 7 | Age, in days, past which a PR-review worktree is removed, checked before each new review. `0` removes them all. |
 
@@ -794,6 +861,14 @@ planned, what runs, what is blocked and why, the QA pass. The first one comes
 one interval after the build started, so a short task sends none, and a build
 resumed after a restart waits for the rest of the interval
 ([task-digest.md](architecture/task-digest.md)).
+
+`WORKPILOT_MEMORY_CONFLICT_NOTIFY` (off by default; `true` turns it on) also
+announces on the same channels a memory conflict that a teammate's brain sync
+queued for a person: the project, the kind of note, the two titles, a short
+cleaned preview and the authors' git names (never an e-mail). Each pair is
+announced once for the team; nothing is sent under the strict offline policy
+([memory-lifecycle.md](architecture/memory-lifecycle.md)). The switch is in
+Project settings > Notifications.
 
 ### Third-party MCP servers
 
@@ -841,9 +916,13 @@ Opt-in features. Those marked *API* are read by the local API: put them in
 | Variable | Default | Meaning |
 | --- | ---: | --- |
 | `WORKPILOT_LOOP_DETECTION_ENABLED` | off | `1`, `true`, `yes` or `on`: from the coder's second iteration, a diff that repeats one of the last four pauses the build, with the event in the audit trail. It resumes like any paused build. |
+| `WORKPILOT_COGNITIVE_CONTEXT_ENABLED` | off | `1`, `true`, `yes` or `on`: when the coder inlines file context (providers that do not read files through tools, low effort), the subtask's declared files are packed by the cognitive context optimizer: the slices matching the subtask's wording, declarations kept, in every stack, instead of each file's first 200 lines. Only files inside the project are read. |
+| `WORKPILOT_COGNITIVE_CONTEXT_BUDGET` | 8000 | Token budget of that packed context (100 or more). |
 | `WORKPILOT_AUTO_PROMOTE_THRESHOLD` | off | *API.* Integer from 0 to 100. Enables "Accept & skip human review" in the QA promotion dialog when the build's QA score reaches it; the score is 0 unless QA signed off. Nothing moves a card on its own. |
 | `AUTO_TEST_GENERATION` | on | `false`, and only `false`, removes the "automated tests" section from each subtask's coding prompt. That section tells the coder which kinds of tests to write, with the test libraries the project already has. |
 | `AUTO_FIX_MAX_ATTEMPTS` | 5 | CLI: attempts of `run.py --spec … --auto-fix` when `--auto-fix-max-attempts` is not given. |
+| `WORKPILOT_BRAIN_BRANCH` | unset | Set by WorkPilot, not by a person: the git branch of the build a `workpilot-brain` MCP server was started for (empty when it could not be read). Its `brain_recall` and `query_graph` leave out a memory scoped `branch:` to another branch, or to any branch when it is empty. Unset (a person's own agent), the server reads the branch of the folder it runs in. See [memory-lifecycle.md](architecture/memory-lifecycle.md). |
+| `WORKPILOT_RECALL_TEAMS` | unset | Set by the server for each run, never passed from its own environment: the groups of the person who started it in the project's organization, a JSON list of names (`[]` for none). A run's agents recall a memory scoped `team:<name>` only when one of those groups has that name. Unset (desktop, CLI), `team:` memories are recalled by every build. |
 
 ## Debug and console output
 

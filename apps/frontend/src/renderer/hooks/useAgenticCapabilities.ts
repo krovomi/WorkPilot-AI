@@ -14,6 +14,7 @@
  */
 
 import { useEffect, useState } from "react";
+import { localBackendFetch } from "../lib/local-backend";
 
 export interface AgenticCapability {
 	hasAdapter: boolean;
@@ -37,8 +38,7 @@ export type AgenticCapabilities = Record<string, AgenticCapability>;
  */
 export async function fetchAgenticCapabilities(): Promise<AgenticCapabilities> {
 	try {
-		const baseUrl = import.meta.env?.VITE_BACKEND_URL || "";
-		const res = await fetch(`${baseUrl}/providers/agentic-capabilities`);
+		const res = await localBackendFetch("/providers/agentic-capabilities");
 		if (!res.ok) return {};
 		const data = (await res.json()) as {
 			providers?: AgenticCapabilities;
@@ -61,6 +61,14 @@ function canonical(provider: string): string {
 	if (value === "lm-studio") return "lmstudio";
 	if (value === "llama-cpp") return "local";
 	return value;
+}
+
+/** A provider's entry in the matrix, whatever spelling the UI gives it. */
+export function capabilityOf(
+	capabilities: AgenticCapabilities,
+	provider: string,
+): AgenticCapability | undefined {
+	return capabilities[canonical(provider)];
 }
 
 export interface AgenticCapabilitiesState {
@@ -95,18 +103,18 @@ export function useAgenticCapabilities(): AgenticCapabilitiesState {
 	return {
 		capabilities,
 		hasAdapter: (provider) =>
-			capabilities[canonical(provider)]?.hasAdapter !== false,
+			capabilityOf(capabilities, provider)?.hasAdapter !== false,
 		degradesTo: (provider) => {
-			const entry = capabilities[canonical(provider)];
+			const entry = capabilityOf(capabilities, provider);
 			if (!entry || entry.hasAdapter) return null;
 			return entry.degradesTo || "claude";
 		},
 		contextCompact: (provider) => {
-			const value = capabilities[canonical(provider)]?.contextCompact;
+			const value = capabilityOf(capabilities, provider)?.contextCompact;
 			return value === "native" || value === "emulated" ? value : null;
 		},
 		contextUsage: (provider) => {
-			const value = capabilities[canonical(provider)]?.contextUsage;
+			const value = capabilityOf(capabilities, provider)?.contextUsage;
 			return value === "exact" || value === "reported" || value === "estimated"
 				? value
 				: null;

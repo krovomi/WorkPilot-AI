@@ -28,6 +28,7 @@ import {
 	readTrustedSources,
 	writeTrustedSources,
 } from "./injection-guard-tool-results";
+import { decodeRunnerError } from "../utils/runner-error";
 
 interface RunRequest {
 	projectPath: string;
@@ -147,7 +148,7 @@ export function registerInjectionGuardHandlers(): void {
 							console.error("[InjectionGuard] Bad result line:", err);
 						}
 					} else if (line.startsWith(ERROR_PREFIX)) {
-						errorMessage = line.slice(ERROR_PREFIX.length);
+						errorMessage = decodeRunnerError(line.slice(ERROR_PREFIX.length));
 					}
 				}
 			});

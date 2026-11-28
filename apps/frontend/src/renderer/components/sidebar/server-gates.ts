@@ -13,6 +13,9 @@ import type { SidebarView } from "../Sidebar";
  */
 export const SERVER_PROJECT_VIEWS: ReadonlySet<SidebarView> = new Set<SidebarView>([
 	"kanban",
+	// Its execution waves, planned and run by the server
+	// (`main/conflict-waves/server-waves.ts`); no session of this computer.
+	"mission-control",
 	// Read from the server's runs, jobs and ledgers (main/server-workspace.ts)
 	"dashboard",
 	"analytics",
@@ -35,6 +38,14 @@ export const SERVER_PROJECT_VIEWS: ReadonlySet<SidebarView> = new Set<SidebarVie
 	// Built on the server from its board and its clone, shared like an
 	// analysis (`ipc-handlers/server-changelog.ts`).
 	"changelog",
+	// Its workpilot.policy.yaml, audit trail, approvals and kill switch, read
+	// and run by the server (`main/server-governance.ts`); the rules editor of
+	// this computer is not shown for it.
+	"guardrails",
+	// Its board's cards in the office, and the team leaderboard computed by
+	// the server (`main/server-pixel-office.ts`); no terminal is opened on the
+	// mirror and no local runner reads it.
+	"pixel-office",
 	"administration",
 ]);
 

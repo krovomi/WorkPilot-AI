@@ -30,11 +30,27 @@ LANGUAGES = {
 }
 
 
+# Below this, Whisper's guess of the spoken language is not reported.
+DETECTION_CONFIDENCE = 0.5
+
+
 def transcribe_audio(model, audio: bytes, language: str) -> str:
+    return transcribe_with_language(model, audio, language)[0]
+
+
+def transcribe_with_language(
+    model, audio: bytes, language: str
+) -> tuple[str, str | None]:
+    """The text, and the language Whisper heard when it was asked to detect it.
+
+    The detected language is reported only from the closed list above and
+    when Whisper is confident enough, so the app can read the sentence (and
+    ask its model) in the language actually spoken.
+    """
     language = language.split("-")[0]
     if language not in LANGUAGES:
         raise ValueError("language")
-    segments, _ = model.transcribe(
+    segments, info = model.transcribe(
         io.BytesIO(audio),
         language=None if language == "auto" else language,
         task="transcribe",
@@ -42,7 +58,18 @@ def transcribe_audio(model, audio: bytes, language: str) -> str:
         vad_filter=True,
         condition_on_previous_text=False,
     )
-    return " ".join(s.text.strip() for s in segments if s.text.strip())
+    text = " ".join(s.text.strip() for s in segments if s.text.strip())
+    return text, _detected(info) if language == "auto" and text else None
+
+
+def _detected(info) -> str | None:
+    heard = getattr(info, "language", None)
+    confidence = getattr(info, "language_probability", 0)
+    if heard == "auto" or heard not in LANGUAGES:
+        return None
+    if not isinstance(confidence, (int, float)) or confidence < DETECTION_CONFIDENCE:
+        return None
+    return heard
 
 
 def emit(**result):
@@ -88,7 +115,8 @@ def main():
             audio = base64.b64decode(request["audio"], validate=True)
             if len(audio) > 8_000_000:
                 raise ValueError("audio too large")
-            emit(text=transcribe_audio(model, audio, request["language"]))
+            text, spoken = transcribe_with_language(model, audio, request["language"])
+            emit(text=text, **({"language": spoken} if spoken else {}))
         except Exception:
             emit(error="transcription")
 

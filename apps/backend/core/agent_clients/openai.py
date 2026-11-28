@@ -35,6 +35,7 @@ from .base import (
     MessageRole,
     SubagentDefinition,
 )
+from .mcp_bridge import McpBridgeMixin
 
 # The name the monolith logged under, kept so logging configuration and log
 # filters keyed on it still match: `core.agent_client`, or
@@ -170,6 +171,7 @@ class _OpenAIAdapter(ChatCompletionsAdapter):
         if client._reasoning_effort:
             payload["reasoning_effort"] = client._reasoning_effort
         payload.update(client._effort_params)
+        payload.update(client._routing_params)
         if client._prompt_cache_key:
             payload["prompt_cache_key"] = client._prompt_cache_key
 
@@ -262,7 +264,7 @@ class _OpenAIAdapter(ChatCompletionsAdapter):
         }
 
 
-class OpenAIAgentClient(AgentClient):
+class OpenAIAgentClient(McpBridgeMixin, AgentClient):
     """Agent client backed by OpenAI API (direct REST calls).
 
     Requires a valid OpenAI API key (sk-...) from https://platform.openai.com/api-keys.
@@ -305,6 +307,9 @@ class OpenAIAgentClient(AgentClient):
         # Provider-specific effort fields beyond `reasoning_effort` (DeepSeek's
         # `thinking`, …); set by the subclasses that have them.
         self._effort_params: dict[str, Any] = {}
+        # A gateway's routing fields (OpenRouter `models` / `provider`, the
+        # Hugging Face policy suffix of `model`); kept when an effort is refused.
+        self._routing_params: dict[str, Any] = {}
         self._prompt_cache_key = prompt_cache_key
         # Headers a provider documents for cache routing (xAI's
         # `x-grok-conv-id`); set by the subclasses that have them.
@@ -393,43 +398,8 @@ class OpenAIAgentClient(AgentClient):
             self._freeze_tools(definitions)
         return self
 
-    async def _bridge_mcp_tools(self) -> list[dict[str, Any]]:
-        """The tools of the configured MCP servers, bridged for this session.
-
-        Only the servers this type may reach: the same per-agent answer the
-        Claude SDK gets from `create_client`. Best-effort: an MCP error never
-        fails client setup.
-        """
-        try:
-            from core.mcp_tools import MCPToolManager, load_mcp_server_configs_for
-
-            servers = load_mcp_server_configs_for(
-                self._agent_type, self._project_dir, getattr(self, "_spec_dir", None)
-            )
-            if servers:
-                manager = MCPToolManager(
-                    self._project_dir,
-                    servers,
-                    spec_dir=getattr(self, "_spec_dir", None),
-                )
-                await manager.connect()
-                mcp_defs = manager.tool_definitions()
-                if mcp_defs:
-                    self._mcp_manager = manager
-                    logger.info(
-                        f"[OpenAIAgentClient] MCP enabled: {len(mcp_defs)} tool(s) "
-                        f"from {len(servers)} server(s)"
-                    )
-                    return mcp_defs
-                await manager.aclose()
-        except Exception as e:  # noqa: BLE001 — MCP must never block client setup
-            logger.warning(f"[OpenAIAgentClient] MCP bridge unavailable: {e}")
-        return []
-
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        if self._mcp_manager is not None:
-            await self._mcp_manager.aclose()
-            self._mcp_manager = None
+        await self._close_mcp_bridge()
         if self._http_client is not None:
             await self._http_client.close()
             self._http_client = None

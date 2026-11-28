@@ -72,9 +72,16 @@ def write_pause_state(
     subtask_id: str | None = None,
     provider: str | None = None,
     model: str | None = None,
+    reason: str | None = None,
+    detail: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Mark the build paused, recording where it stopped."""
-    state = {
+    """Mark the build paused, recording where it stopped.
+
+    ``reason`` says why when the backend paused the build itself (``budget``
+    when a cost limit was reached); the UI reads it, with ``detail``, to say
+    what a resume needs. A pause from the Pause button has none.
+    """
+    state: dict[str, Any] = {
         "enabled": True,
         "paused_at": datetime.now(UTC).isoformat(),
         "paused_phase": phase if phase in PAUSE_PHASES else "coding",
@@ -82,8 +89,38 @@ def write_pause_state(
         "provider": provider,
         "model": model,
     }
+    if reason:
+        state["reason"] = reason
+    if detail:
+        state.update(detail)
     _write(spec_dir, state)
     return state
+
+
+def task_spec_dirs(spec_dir: Path) -> list[Path]:
+    """The task's spec directory and, for a worktree build, the main project's copy.
+
+    A worktree build runs from ``<root>/.workpilot/worktrees/tasks/<t>/.workpilot/
+    specs/<t>``; the card reads its pause from ``<root>/.workpilot/specs/<t>``.
+    Both get a pause the backend writes, as the Pause button writes both.
+    """
+    own = Path(spec_dir)
+    found = [own]
+    parts = own.resolve().parts
+    if ".workpilot" in parts[1:]:
+        root = Path(*parts[: parts.index(".workpilot", 1)])
+        main = root / ".workpilot" / "specs" / own.name
+        if main.is_dir() and main.resolve() != own.resolve():
+            found.append(main)
+    return found
+
+
+def pause_task(
+    spec_dir: Path, *, phase: str, reason: str, detail: dict[str, Any]
+) -> None:
+    """Pause the build from the backend, in every copy of its spec directory."""
+    for folder in task_spec_dirs(spec_dir):
+        write_pause_state(folder, phase=phase, reason=reason, detail=detail)
 
 
 def clear_pause_state(spec_dir: Path) -> None:

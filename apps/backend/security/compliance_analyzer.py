@@ -249,7 +249,7 @@ class ComplianceAnalyzer:
             ):
                 self._check_security_controls_in_file(file_path, lines, report)
 
-        except Exception:
+        except OSError:
             # Skip files that can't be read
             pass
 
@@ -281,7 +281,9 @@ class ComplianceAnalyzer:
                                 severity=ComplianceSeverity.HIGH,
                                 title=f"Personal data without consent: {description}",
                                 description=f"Found {description.lower()} without explicit consent mechanism",
-                                file=str(file_path.relative_to(self.project_path)),
+                                file=file_path.relative_to(
+                                    self.project_path
+                                ).as_posix(),
                                 line=line_num,
                                 remediation="Implement explicit user consent before collecting personal data (GDPR Article 6)",
                                 references=[
@@ -299,7 +301,9 @@ class ComplianceAnalyzer:
                                 severity=ComplianceSeverity.MEDIUM,
                                 title=f"Unencrypted personal data: {description}",
                                 description=f"Found {description.lower()} without encryption",
-                                file=str(file_path.relative_to(self.project_path)),
+                                file=file_path.relative_to(
+                                    self.project_path
+                                ).as_posix(),
                                 line=line_num,
                                 remediation="Implement encryption for personal data at rest and in transit (GDPR Article 32)",
                                 references=["https://gdpr-info.eu/art-32-gdpr/"],
@@ -336,7 +340,9 @@ class ComplianceAnalyzer:
                                 severity=ComplianceSeverity.CRITICAL,
                                 title=f"Unencrypted PHI: {description}",
                                 description=f"Protected Health Information ({description}) must be encrypted",
-                                file=str(file_path.relative_to(self.project_path)),
+                                file=file_path.relative_to(
+                                    self.project_path
+                                ).as_posix(),
                                 line=line_num,
                                 remediation="Implement HIPAA-compliant encryption (AES-256) for PHI",
                                 references=[
@@ -353,7 +359,9 @@ class ComplianceAnalyzer:
                                 severity=ComplianceSeverity.HIGH,
                                 title="Missing access controls for PHI",
                                 description="Protected Health Information requires role-based access controls",
-                                file=str(file_path.relative_to(self.project_path)),
+                                file=file_path.relative_to(
+                                    self.project_path
+                                ).as_posix(),
                                 line=line_num,
                                 remediation="Implement role-based access control (RBAC) for PHI access",
                                 references=[
@@ -378,7 +386,9 @@ class ComplianceAnalyzer:
                                 severity=ComplianceSeverity.CRITICAL,
                                 title="Prohibited storage of CVV/CVC",
                                 description="PCI-DSS strictly prohibits storing CVV/CVC data after authorization",
-                                file=str(file_path.relative_to(self.project_path)),
+                                file=file_path.relative_to(
+                                    self.project_path
+                                ).as_posix(),
                                 line=line_num,
                                 remediation="Remove all CVV/CVC storage. Use tokenization for card data.",
                                 references=[
@@ -403,7 +413,9 @@ class ComplianceAnalyzer:
                                 severity=ComplianceSeverity.CRITICAL,
                                 title=f"Unencrypted cardholder data: {description}",
                                 description="All cardholder data must be encrypted or tokenized",
-                                file=str(file_path.relative_to(self.project_path)),
+                                file=file_path.relative_to(
+                                    self.project_path
+                                ).as_posix(),
                                 line=line_num,
                                 remediation="Use strong encryption (AES-256) or tokenization for all cardholder data",
                                 references=[
@@ -430,7 +442,7 @@ class ComplianceAnalyzer:
                             severity=severity,
                             title=f"Security control issue: {description}",
                             description=f"Found {description} which violates security best practices",
-                            file=str(file_path.relative_to(self.project_path)),
+                            file=file_path.relative_to(self.project_path).as_posix(),
                             line=line_num,
                             remediation=self._get_remediation_for_pattern(description),
                             references=[
@@ -529,11 +541,16 @@ class ComplianceAnalyzer:
             "target",
         }
 
-        return [
+        # Only the folders inside the project count: a project checked out
+        # under `build/` or `env/` is still analysed.
+        return sorted(
             f
             for f in source_files
-            if not any(pattern in f.parts for pattern in ignore_patterns)
-        ]
+            if not any(
+                part in ignore_patterns
+                for part in f.relative_to(self.project_path).parts[:-1]
+            )
+        )
 
     def _get_remediation_for_pattern(self, description: str) -> str:
         """Get remediation advice for a security pattern."""

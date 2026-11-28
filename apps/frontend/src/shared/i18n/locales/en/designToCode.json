@@ -59,7 +59,10 @@
 			"projectReady_one": "ready · {{count}} file to write",
 			"projectReady_other": "ready · {{count}} files to write",
 			"projectWritten_one": "{{count}} file in review",
-			"projectWritten_other": "{{count}} files in review"
+			"projectWritten_other": "{{count}} files in review",
+			"codeLoop": "iteration {{iteration}}/{{max}}",
+			"codeLoopDone_one": "{{score}} % match · {{count}} iteration",
+			"codeLoopDone_other": "{{score}} % match · {{count}} iterations"
 		}
 	},
 	"steps": {
@@ -78,7 +81,8 @@
 		},
 		"code": {
 			"kicker": "Code",
-			"title": "Generate the components"
+			"title": "Generate the components",
+			"toggle": "Render, compare and correct the code"
 		},
 		"tests": {
 			"kicker": "Visual tests",
@@ -190,14 +194,16 @@
 		"visual_test_generation": "Visual tests",
 		"figma_sync": "Figma sync",
 		"complete": "Done",
-		"error": "Error"
+		"error": "Error",
+		"render_loop": "Render loop"
 	},
 	"errors": {
 		"missingInput": "Add an image or a Figma link."
 	},
 	"code": {
 		"copy": "Copy",
-		"copied": "Copied"
+		"copied": "Copied",
+		"copyFailed": "Clipboard refused"
 	},
 	"composer": {
 		"target": "Target",
@@ -215,6 +221,7 @@
 		"taskCreated": "Task created",
 		"creatingTask": "Creating…",
 		"createTask": "Create a Kanban task",
+		"taskFailed": "The task could not be created. Try again.",
 		"regenerate": "Regenerate",
 		"written_one": "{{count}} file in review",
 		"written_other": "{{count}} files in review",
@@ -233,5 +240,160 @@
 		"components": "Components found",
 		"palette": "Palette",
 		"files": "Generated files"
+	},
+	"loop": {
+		"title": "Render loop",
+		"kicker": "Render · compare · correct",
+		"status": {
+			"converged": "Converged: {{score}} % match",
+			"max_iterations": "Stopped at the iteration cap: {{score}} % match",
+			"budget": "Time budget spent: {{score}} % match",
+			"stalled": "No more progress: {{score}} % match",
+			"failed": "Stopped on an error: {{score}} % match",
+			"skipped": "The render loop did not run",
+			"budget_tokens": "Token budget spent: {{score}} % match",
+			"budget_cost": "Cost budget spent: {{score}} % match"
+		},
+		"reason": {
+			"no_model": "No model answered the generation: there is nothing real to correct.",
+			"no_files": "No file was generated.",
+			"unsupported_target": "The design cannot be compared pixel by pixel (SVG or unreadable image).",
+			"no_vision_route": "The provider {{provider}} has no vision route here. Choose Claude, OpenAI, Copilot, Gemini or a local Ollama vision model.",
+			"no_credentials": "The provider {{provider}} has no key or sign-in in this run.",
+			"model_without_vision": "{{model}} does not read images (model catalogue). Choose a vision model.",
+			"local_unavailable": "The local vision model {{model}} is not available: {{detail}}.",
+			"no_preview": "The model gave no static HTML mirror to render.",
+			"no_browser": "No headless browser could start here: install Playwright's Chromium.",
+			"no_playwright": "Playwright is not installed in the backend's environment.",
+			"load_failed": "The generated page did not load in the browser."
+		},
+		"mirror": "Rendered from a static HTML mirror of the generated files, kept in step with the code by the model; the components themselves are not rendered.",
+		"target": "Target",
+		"render": "Render",
+		"diff": "Diff map",
+		"iteration": "v{{index}}",
+		"generated": "generated",
+		"kept": "kept",
+		"score": "{{score}} %",
+		"iterationsLabel": "Iterations",
+		"issues": "Differences",
+		"noIssues": "No difference found.",
+		"issueStatus": {
+			"resolved": "resolved",
+			"open": "open",
+			"abandoned": "abandoned"
+		},
+		"issue": {
+			"color": "{{region}}: background {{render}} instead of {{target}}",
+			"offset": "{{region}}: content moved {{px}} px ({{axis}})",
+			"size": "{{region}}: {{axis}} off by {{px}} px",
+			"structure": "{{region}}: layout or shapes differ"
+		},
+		"edits_one": "{{count}} edit applied",
+		"edits_other": "{{count}} edits applied",
+		"noEdits": "no applicable edit",
+		"missingFonts": "Fonts missing on this machine, replaced in the render: {{fonts}}",
+		"masked": "Ignored zones (dynamic content): {{zones}}",
+		"live": "Iteration {{iteration}}/{{max}}: {{stage}}",
+		"stage": {
+			"render": "rendering",
+			"correct": "correcting",
+			"responsive": "responsive pass",
+			"states": "hover and focus pass",
+			"fix_passes": "correcting from the passes"
+		},
+		"axis": {
+			"x": "horizontal",
+			"y": "vertical",
+			"width": "width",
+			"height": "height"
+		},
+		"spend": {
+			"tokens": "{{tokens}} tokens of {{max}}",
+			"tokensEstimated": "about {{tokens}} tokens of {{max}} (estimated: the provider reported none)",
+			"cost": "${{cost}} of ${{max}} (price catalogue)",
+			"flatRate": "no per-token cost (plan or local model)",
+			"unknownCost": "cost unknown: the price catalogue has no price for this model",
+			"costUnchecked": "the cost budget could not be checked"
+		},
+		"responsive": {
+			"title": "Responsive pass",
+			"mobile": "Mobile",
+			"tablet": "Tablet",
+			"desktop": "Desktop",
+			"size": "{{width}} × {{height}}",
+			"compared": "compared with the design: {{score}} %",
+			"notCompared": "no design at this width: checked on its own",
+			"clean": "No overflow, cut text or overlap.",
+			"overflow": "The page is {{px}} px wider than the screen",
+			"outside": "{{label}} goes past the right edge",
+			"clipped": "{{label}}: text cut by its box",
+			"overlap": "{{a}} overlaps {{b}}"
+		},
+		"states": {
+			"title": "Hover and focus (first {{limit}} interactive elements)",
+			"noElements": "No interactive element in view.",
+			"summary": "No visible hover: {{hover}} · no visible focus: {{focus}} · not reached with Tab: {{unreached}}",
+			"rest": "At rest",
+			"hover": "Hover",
+			"focus": "Focus",
+			"visible": "changes on screen",
+			"none_hover": "no hover style",
+			"none_focus": "no visible focus (WCAG 2.4.7)",
+			"unreached": "not reached"
+		},
+		"drawnMasks_one": "{{count}} zone drawn on the design left out of the score",
+		"drawnMasks_other": "{{count}} zones drawn on the design left out of the score",
+		"passFix": {
+			"title": "Correction from the passes",
+			"nothing_to_fix": "The passes found nothing to correct.",
+			"budget_tokens": "Not made: the token budget is spent.",
+			"budget_cost": "Not made: the cost budget is spent.",
+			"failed": "The correction could not be made.",
+			"no_edits": "The model proposed no edit that applies.",
+			"regressed": "Discarded: the page drifted from the design ({{score}} % instead of {{scoreBefore}} %).",
+			"no_gain": "Discarded: {{after}} problems remain out of {{before}}.",
+			"kept": "Kept: {{after}} problems left out of {{before}}; {{score}} % at the design's size."
+		}
+	},
+	"loopOptions": {
+		"button": "Loop",
+		"summary": "{{iterations}} × {{threshold}} %",
+		"maxIterations": "Iterations",
+		"threshold": "Threshold",
+		"maxTokens": "Token budget",
+		"maxCostUsd": "Cost budget",
+		"iterationsValue_one": "{{count}} correction",
+		"iterationsValue_other": "{{count}} corrections",
+		"tokensValue": "{{value}}k tokens",
+		"costValue": "${{value}}",
+		"budgetHint": "The cost budget applies when the price catalogue knows the model; the backend keeps every value within its bounds.",
+		"responsive": "Responsive pass (mobile, tablet, desktop)",
+		"states": "Hover and focus captures",
+		"fixPasses": "Correct from the passes (once, kept if it helps)"
+	},
+	"masks": {
+		"draw": "Hide a zone",
+		"drawing": "Drag on the design",
+		"hint": "Zones you draw are left out of the render loop's score: dates, photos, live data.",
+		"count_one": "{{count}} zone hidden (at most {{max}})",
+		"count_other": "{{count}} zones hidden (at most {{max}})",
+		"clear": "Clear the zones",
+		"remove": "Remove zone {{index}}"
+	},
+	"figures": {
+		"kicker": "Render loop on this project",
+		"loops_one": "{{count}} loop, {{converged}} converged",
+		"loops_other": "{{count}} loops, {{converged}} converged",
+		"averageScore": "Average score kept: {{score}} %",
+		"averageIterations": "Average corrections to converge: {{value}}",
+		"noConvergence": "No loop has converged yet.",
+		"accepted_one": "Written without retouch: {{kept}} of {{count}} write",
+		"accepted_other": "Written without retouch: {{kept}} of {{count}} writes",
+		"noneDecided": "No write has reached the project yet.",
+		"pending_one": "{{count}} still on its review branch",
+		"pending_other": "{{count}} still on their review branch",
+		"approximation": "Approximate: each file is compared with its hash when it was written; a later change made for another reason counts as a retouch, and a discarded card too.",
+		"local": "Kept in this project's .workpilot folder, on this computer only."
 	}
 }

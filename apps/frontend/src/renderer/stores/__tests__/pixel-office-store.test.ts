@@ -123,6 +123,13 @@ describe("usePixelOfficeStore.syncAll", () => {
 		expect(agents[0].seatIndex).toBeLessThan(1);
 	});
 
+	it("lets a terminal whose shell exited leave the room", () => {
+		usePixelOfficeStore
+			.getState()
+			.syncAll([terminal("a"), terminal("b", "exited", { isClaudeMode: true })], []);
+		expect(usePixelOfficeStore.getState().agents.map((a) => a.id)).toEqual(["a"]);
+	});
+
 	it("gives each terminal a distinct character", () => {
 		usePixelOfficeStore
 			.getState()

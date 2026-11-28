@@ -24,6 +24,15 @@ vi.mock("../project-store", () => ({
 	},
 }));
 
+const serverMirrors = vi.hoisted(() => ({ paths: [] as string[] }));
+
+vi.mock("../server-projects", () => ({
+	serverProjectAtPath: (value: unknown) =>
+		typeof value === "string" && serverMirrors.paths.includes(value)
+			? { path: value }
+			: undefined,
+}));
+
 import {
 	argsAllowed,
 	DIRECTORY_ARGS,
@@ -60,11 +69,15 @@ function channelValue(expression: string): string | null {
 	return literal ? literal[1] : null;
 }
 
-/** Every `ipcMain.handle/on(channel, (event, a, b) => …)` with its parameter names. */
+/**
+ * Every `ipcMain.handle/on(channel, (event, a, b) => …)` with its parameter
+ * names, a guarded one (`prIpcMain`, `terminalIpcMain`…) included: it
+ * registers on `ipcMain` underneath, so the policy applies to it too.
+ */
 function handlers(): { where: string; channel: string; params: string[] }[] {
 	const found: { where: string; channel: string; params: string[] }[] = [];
 	const pattern =
-		/ipcMain\.(?:handle|on)\(\s*([^,]+?),\s*(?:async\s*)?\(([^)]*)\)\s*(?::\s*[^=]+)?=>/gs;
+		/(?<![\w$])(?:ipcMain|[a-z][\w$]*IpcMain)\.(?:handle|on)\(\s*([^,]+?),\s*(?:async\s*)?\(([^)]*)\)\s*(?::\s*[^=]+)?=>/gs;
 	for (const file of sources(MAIN)) {
 		const text = readFileSync(file, "utf8");
 		for (const match of text.matchAll(pattern)) {
@@ -177,6 +190,24 @@ describe("argsAllowed", () => {
 		expect(argsAllowed("any:channel", [{ projectPath: outside }])).toBe(false);
 		expect(argsAllowed("any:channel", [{ project_dir: outside }])).toBe(false);
 		expect(argsAllowed("any:channel", [{ other: outside }])).toBe(true);
+	});
+
+	it("lets a server project's mirror through, and nothing under or beside it", () => {
+		const mirror = path.join(outside, "server-boards", "abc", "project-1");
+		serverMirrors.paths = [mirror];
+		try {
+			expect(argsAllowed("analyses:sharedReport", ["tech-debt", mirror])).toBe(true);
+			expect(argsAllowed("any:channel", [{ projectPath: mirror }])).toBe(true);
+			for (const dir of [
+				path.join(mirror, ".."),
+				path.join(mirror, "sub"),
+				path.join(outside, "server-boards", "abc", "project-2"),
+			]) {
+				expect(argsAllowed("any:channel", [{ projectPath: dir }]), dir).toBe(false);
+			}
+		} finally {
+			serverMirrors.paths = [];
+		}
 	});
 
 	it("lets an absent optional argument through", () => {

@@ -55,5 +55,171 @@
 	"errors": {
 		"noProject": "Veuillez sélectionner un projet",
 		"generic": "Une erreur est survenue lors de l'analyse"
+	},
+	"waves": {
+		"kicker": "Conflict Predictor",
+		"title": "Vagues d'exécution",
+		"description": "Regroupe les specs en attente (backlog ou file) en vagues qui ne partagent aucun fichier, d'après leurs plans et ce que leurs worktrees ont déjà modifié. Aucun modèle n'est appelé.",
+		"actions": {
+			"plan": "Calculer les vagues",
+			"replan": "Replanifier",
+			"execute": "Exécuter dans l'ordre optimal",
+			"stop": "Arrêter l'exécution"
+		},
+		"options": {
+			"tolerance": "Tolérance",
+			"toleranceHint": "Deux specs dont le score ne dépasse pas cette valeur peuvent partager une vague.",
+			"toleranceValue_0": "Stricte (0)",
+			"toleranceValue_1": "1 fichier commun",
+			"toleranceValue_2": "Score 2",
+			"toleranceValue_4": "Score 4",
+			"unplanned": "Specs sans plan",
+			"unplannedIsolate": "Les lancer seules",
+			"unplannedIndependent": "Les supposer indépendantes",
+			"advance": "Vague suivante",
+			"advanceMerged": "une fois la vague fusionnée",
+			"advanceReview": "une fois la vague en revue",
+			"fragile": "Zones fragiles",
+			"fragileHint": "Les fichiers que les derniers commits modifient ensemble, un dans chaque spec, s'ajoutent au score de la paire.",
+			"fragileOn": "D'après l'historique",
+			"fragileOff": "Désactivées",
+			"code": "Liens de code",
+			"codeHint": "Un fichier d'une spec qui importe un module que l'autre modifie, ou qui utilise un symbole que l'autre supprime, s'ajoute au score de la paire.",
+			"codeOn": "Depuis le code"
+		},
+		"empty": {
+			"noProject": "Sélectionnez un projet pour planifier ses vagues.",
+			"noPlan": "Calculez les vagues pour voir quelles specs peuvent tourner en parallèle.",
+			"noTasks": "Aucune spec n'attend dans le backlog ou la file."
+		},
+		"stats": {
+			"specs": "Specs planifiées",
+			"waves": "Vagues",
+			"parallel": "Tâches parallèles max",
+			"avoided": "Risque évité",
+			"avoidedValue": "{{avoided}} sur {{total}}"
+		},
+		"waveLabel": "Vague {{index}}",
+		"residual": "Risque résiduel {{value}}",
+		"files": "{{count}} fichiers",
+		"unplannedChip": "sans plan",
+		"gantt": {
+			"title": "Plan",
+			"kicker": "Ordre",
+			"task": "Spec",
+			"legend": "Chaque barre est une spec dans sa vague ; les vagues s'enchaînent, les specs d'une vague tournent côte à côte. Aucune durée n'est estimée."
+		},
+		"list": {
+			"title": "Vagues",
+			"kicker": "Ordre de merge",
+			"mergeHint": "Fusionner dans cet ordre : la première spec est celle qui partage le plus avec les vagues suivantes."
+		},
+		"pairs": {
+			"title": "Paires les plus risquées",
+			"kicker": "Scores",
+			"shared": "{{count}} fichiers communs",
+			"unknown": "empreinte inconnue",
+			"together": "peuvent partager une vague",
+			"mergeClean": "merge de test propre",
+			"mergeConflict": "merge de test en conflit",
+			"fragile": "{{count}} liens fragiles",
+			"imports": "{{count}} imports croisés",
+			"symbols": "{{count}} symboles supprimés encore utilisés"
+		},
+		"run": {
+			"running": "Vague {{current}} sur {{total}} en cours.",
+			"done": "Toutes les vagues ont tourné.",
+			"stopped": "Exécution arrêtée à la vague {{current}} sur {{total}}. Les tâches lancées continuent.",
+			"current": "en cours",
+			"finished": "terminée",
+			"blocked": "En attente d'une dépendance non terminée : {{tasks}}",
+			"startFailed": "Impossible de lancer {{task}} : {{error}}"
+		},
+		"notices": {
+			"cycle": "Cycle de dépendances, impossible à planifier sans vous : {{tasks}}",
+			"blockedByCycle": "En attente d'une spec d'un cycle : {{tasks}}",
+			"drift": "{{task}} a touché {{count}} fichiers hors de son plan. Replanifier ?",
+			"runningConflict": "{{task}} partage des fichiers avec {{running}}, déjà en cours.",
+			"unplanned": "{{count}} specs n'ont pas encore de plan : leur empreinte est inconnue.",
+			"error": "Impossible de calculer les vagues : {{error}}"
+		},
+		"mergeCheck": {
+			"split": "{{a}} et {{b}} sont sous la tolérance, mais un merge de test de leurs worktrees est en conflit sur {{files}} : elles passent dans des vagues différentes.",
+			"summary": "Merges de test des paires d'une même vague : {{checked}} vérifiées, {{conflicts}} séparées. Seul le travail commité est fusionné ; aucun worktree ni aucune branche n'est modifié.",
+			"unchecked": "{{count}} paires d'une même vague n'ont pas été testées (limite atteinte).",
+			"failed": "Git n'a pas pu faire le merge de test de {{count}} paires (pas d'historique commun, ou git antérieur à 2.38)."
+		},
+		"resume": {
+			"title": "Une exécution a été interrompue à la vague {{current}} sur {{total}} (enregistrée le {{savedAt}}). Les tâches déjà lancées ont continué.",
+			"resume": "Reprendre l'exécution",
+			"abandon": "L'abandonner",
+			"ignored": "Une exécution enregistrée dans ce projet est illisible ou ne correspond plus à ses tâches : elle a été ignorée.",
+			"waves": "Vagues de l'exécution reprise"
+		},
+		"fragile": {
+			"summary": "Zones fragiles : les fichiers modifiés ensemble dans les {{commits}} derniers commits s'ajoutent aux scores.",
+			"unavailable": "Zones fragiles : git n'a pas pu lire l'historique du projet ; les scores ne comptent que les fichiers partagés."
+		},
+		"code": {
+			"summary": "Liens de code : {{count}} fichiers lus pour les imports et les symboles supprimés, quel que soit le langage.",
+			"capped": "La limite de fichiers est atteinte : certains fichiers n'ont pas été lus."
+		},
+		"history": {
+			"summary": "{{days}} derniers jours : {{runs}} exécutions terminées ({{stopped}} arrêtées), {{conflicts}} conflits évités (risque {{risk}} retiré), {{started}} specs lancées.",
+			"last": "Dernière exécution terminée le {{finishedAt}}.",
+			"ignored": "L'historique des exécutions de ce projet est illisible : il repart de la prochaine exécution."
+		},
+		"conflictTimes": {
+			"resolved_one": "{{days}} derniers jours : {{count}} conflit de fusion résolu, en {{median}} du conflit à la fusion.",
+			"resolved_other": "{{days}} derniers jours : {{count}} conflits de fusion résolus, médiane de {{median}} du conflit à la fusion.",
+			"noneResolved": "{{days}} derniers jours : aucun conflit de fusion résolu.",
+			"open_one": "{{count}} conflit encore ouvert.",
+			"open_other": "{{count}} conflits encore ouverts.",
+			"ignored": "Les temps de résolution des conflits de ce projet sont illisibles : ils repartent du prochain conflit."
+		},
+		"server": {
+			"intro": "Le serveur planifie le backlog de ce projet depuis sa copie du code et l'exécute vague après vague : les cartes qui ne partagent aucun fichier tournent côte à côte, dans l'ordre qui fusionne le mieux. Ouvrir cette vue fait avancer l'exécution.",
+			"loading": "Lecture des vagues du serveur…",
+			"loadError": "Impossible de lire les vagues du serveur : {{error}}",
+			"actionError": "Le serveur ne l'a pas fait : {{error}}",
+			"finished": "La dernière exécution a passé toutes ses vagues.",
+			"ignored": "L'exécution enregistrée était illisible ; elle a été écartée.",
+			"start": "Lancer la première vague",
+			"noRight": "Vous n'avez pas le droit de lancer des agents sur ce projet.",
+			"empty": "Rien à planifier en Planification ni en File.",
+			"step": "Vérifier maintenant",
+			"stopConfirm": "Arrêter l'exécution ? Les cartes lancées continuent ; aucune autre vague ne démarre.",
+			"running": "Vague {{wave}} sur {{total}}",
+			"advance": {
+				"merged": "Vague suivante une fois fusionnée",
+				"review": "Vague suivante une fois en revue"
+			},
+			"failure": {
+				"needs_approval": "attend l'approbation de sa spec",
+				"claimed": "prise par quelqu'un d'autre",
+				"already_running": "déjà en cours",
+				"quota": "au-delà du quota d'agents",
+				"refused": "le serveur a refusé de la lancer",
+				"missing": "n'est plus sur le tableau"
+			},
+			"blocked": "attend une carte dont elle dépend",
+			"gone": "n'est plus sur le tableau",
+			"agentRunning": "agent en cours",
+			"plan_one": "Plan : {{count}} vague, jusqu'à {{parallel}} à la fois",
+			"plan_other": "Plan : {{count}} vagues, jusqu'à {{parallel}} à la fois",
+			"mergeChecks": "Fusions d'essai : {{checked}} vérifiées, {{conflicts}} en conflit",
+			"cycles": "Des cartes dépendent les unes des autres en boucle et sont écartées :",
+			"excluded": {
+				"cycle": "dans une boucle de dépendances",
+				"blocked_by_cycle": "dépend d'une carte prise dans une boucle"
+			},
+			"history": "{{days}} derniers jours",
+			"historyIgnored": "L'historique des exécutions était illisible.",
+			"historyLine": "Exécutions : {{runs}} (arrêtées : {{stopped}}) · conflits évités : {{conflicts}} · risque évité : {{risk}} · cartes lancées : {{started}}",
+			"lastRun": "Dernière exécution terminée le {{at}}",
+			"conflictsLine": "Conflits de fusion résolus : {{resolved}}, en {{median}} (médiane) · encore ouverts : {{open}}",
+			"conflictsNone": "Aucun conflit de fusion résolu · encore ouverts : {{open}}",
+			"conflictsIgnored": "Les temps des conflits de fusion étaient illisibles."
+		}
 	}
 }

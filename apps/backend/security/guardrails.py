@@ -258,21 +258,6 @@ class GuardrailDecision:
     #: What the semantic conditions found, per rule id (tests removed, deps added).
     details: dict[str, list[str]] = field(default_factory=dict)
 
-    def should_block(self) -> bool:
-        return self.action in (GuardrailAction.DENY, GuardrailAction.REQUIRE_APPROVAL)
-
-
-# ---------------------------------------------------------------------------
-# Loader (kept for callers that only want the rules)
-# ---------------------------------------------------------------------------
-
-
-def load_guardrails(project_root: Path) -> list[GuardrailRule]:
-    """The rules that apply to ``project_root`` (a project or one of its worktrees)."""
-    from .guardrail_policy import load_policy
-
-    return load_policy(Path(project_root)).rules
-
 
 # ---------------------------------------------------------------------------
 # Evaluator
@@ -565,6 +550,8 @@ async def guardrails_hook(
     policy itself is invalid.
     """
     from . import guardrail_ledger as ledger
+    from . import policy_audit as audit
+    from .governance_policy import schedule_refusal
     from .guardrail_policy import current_branch, load_policy, main_project
 
     tool_name = str(input_data.get("tool_name") or "")
@@ -573,15 +560,40 @@ async def guardrails_hook(
         return {}
 
     root = Path(project_root) if project_root else Path.cwd()
+    acts = tool_name in WRITE_TOOLS or tool_name == "Bash"
     policy = load_policy(root)
+    project = main_project(root)
+
+    def _audit(
+        decision: str,
+        reason: str,
+        rules: list[str] | None = None,
+        approver: str | None = None,
+    ) -> None:
+        audit.record(
+            project,
+            decision=decision,
+            tool=tool_name,
+            target=ledger.target_of(tool_name, tool_input, root),
+            rules=rules,
+            reason=reason,
+            task=audit.task_of(root),
+            approver=approver,
+        )
+
     if policy.errors:
-        if tool_name in WRITE_TOOLS or tool_name == "Bash":
-            return _deny(
+        if acts:
+            reason = (
                 "The project's guardrails are invalid, so no write or command runs "
                 "until they are fixed (Settings > Guardrails):\n  "
                 + "\n  ".join(policy.errors[:10])
             )
+            _audit("invalid_policy", reason)
+            return _deny(reason)
         return {}
+    if acts and (closed := schedule_refusal(policy.governance)):
+        _audit("outside_hours", closed, ["schedule.allowed_hours"])
+        return _deny(closed)
     if not policy.rules:
         return {}
 
@@ -592,20 +604,23 @@ async def guardrails_hook(
     if decision.action == GuardrailAction.ALLOW:
         return {}
 
-    project = main_project(root)
     target = ledger.target_of(tool_name, tool_input, root)
+    rule_ids = [r.id for r in decision.triggered]
     if decision.action == GuardrailAction.WARN:
         logger.warning("Guardrail WARN: %s", decision.message)
         ledger.record(project, decision, tool_name, target, root)
+        _audit("warn", decision.message, rule_ids)
         return {}
 
     if decision.action == GuardrailAction.REQUIRE_APPROVAL:
-        if ledger.consume_approval(project, decision, target):
+        if approval := ledger.consume_approval(project, decision, target):
             ledger.record(
                 project, decision, tool_name, target, root, outcome="approved"
             )
+            _audit("approved", decision.message, rule_ids, audit.approver_of(approval))
             return {}
         ledger.record(project, decision, tool_name, target, root, outcome="pending")
+        _audit("review", decision.message, rule_ids)
         return _deny(
             "Human approval required before this action. The request is waiting in "
             "Settings > Guardrails; once it is approved, the same call goes through. "
@@ -614,4 +629,5 @@ async def guardrails_hook(
         )
 
     ledger.record(project, decision, tool_name, target, root)
+    _audit("deny", decision.message, rule_ids)
     return _deny(decision.message)

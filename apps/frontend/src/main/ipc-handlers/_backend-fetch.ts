@@ -13,19 +13,19 @@
  * forward the JSON response back. This module hides the boilerplate.
  */
 
-const DEFAULT_BACKEND_URL = "http://127.0.0.1:9000";
+import { localBackendUrl } from "../local-backend-port";
+import { waitForLocalBackend } from "../local-backend-readiness";
 
+/** The local backend, on the port this run chose (local-backend-port.ts). */
 export function getBackendUrl(): string {
-	return (
-		process.env.VITE_BACKEND_URL ||
-		process.env.BACKEND_URL ||
-		DEFAULT_BACKEND_URL
-	);
+	return localBackendUrl();
 }
 
 export interface BackendError {
 	success: false;
 	error: string;
+	/** Nothing answered: the local backend is stopped or still starting. */
+	unreachable?: true;
 }
 
 export type BackendResult<T> = ({ success: true } & T) | BackendError;
@@ -60,7 +60,19 @@ export async function backendFetch<T = Record<string, unknown>>(
 	};
 
 	try {
-		const res = await doFetch();
+		let res: Response;
+		try {
+			res = await doFetch();
+		} catch (err) {
+			// Nothing listening while main is still starting the backend: wait
+			// for that launch, then ask once more (local-backend-readiness.ts).
+			// A timeout of ours is an AbortError and is not retried.
+			const startingUp =
+				(err as { name?: string })?.name !== "AbortError" &&
+				(await waitForLocalBackend());
+			if (!startingUp) throw err;
+			res = await doFetch();
+		}
 		const text = await res.text();
 		if (!res.ok) {
 			return { success: false, error: text || `HTTP ${res.status}` };
@@ -72,6 +84,6 @@ export async function backendFetch<T = Record<string, unknown>>(
 		}
 	} catch (err) {
 		const msg = err instanceof Error ? err.message : String(err);
-		return { success: false, error: msg };
+		return { success: false, error: msg, unreachable: true };
 	}
 }

@@ -1,33 +1,61 @@
 /**
  * #3.11 Agent Health Monitor panel.
  *
- * Lists every agent the monitor has heard about, with score / status /
- * suggested actions. Refresh button + reset button.
+ * Scores each agent (planner, coder, QA) on each provider and model from the
+ * project's own Kanban tasks: the backend reads their `task_logs.json`. It used
+ * to show an in-memory monitor nothing ever fed, so it always said "no run".
  */
 
 import { useEffect } from "react";
+import type {
+	ProjectAgentHealthPending,
+	ProjectAgentHealthScore,
+} from "../../../preload/api/modules/phase35-features-api";
 import { useTranslation } from "react-i18next";
+import { useShallow } from "zustand/react/shallow";
 import { useAgentHealthStore } from "../../stores/phase35-stores";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { PanelShell } from "./_panel-shell";
 
-const STATUS_COLOR: Record<string, string> = {
+const STATUS_COLOR: Record<ProjectAgentHealthScore["status"], string> = {
 	healthy: "bg-success/20 text-success border-success/40",
 	degraded: "bg-warning/20 text-warning border-warning/40",
 	failing: "bg-orange-500/20 text-orange-700 border-orange-500/40",
 	burned_out: "bg-destructive/20 text-destructive border-destructive/40",
 };
 
-export function AgentHealthPanel() {
+function ModelName({ provider, model }: Pick<ProjectAgentHealthPending, "provider" | "model">) {
 	const { t } = useTranslation("phase35");
-	const { phase, error, scores, refresh, resetMonitor } = useAgentHealthStore();
+	if (!provider && !model) {
+		return <span className="text-xs text-muted-foreground">{t("agentHealth.unknownModel")}</span>;
+	}
+	return <code className="text-xs">{[provider, model].filter(Boolean).join(" · ")}</code>;
+}
+
+interface AgentHealthPanelProps {
+	projectPath?: string;
+}
+
+export function AgentHealthPanel({ projectPath = "" }: AgentHealthPanelProps) {
+	const { t } = useTranslation("phase35");
+	const { phase, error, health, refresh } = useAgentHealthStore(
+		useShallow((s) => ({
+			phase: s.phase,
+			error: s.error,
+			// Scores of the project on screen only, never of the one opened before.
+			health: s.projectPath === projectPath ? s.health : null,
+			refresh: s.refresh,
+		})),
+	);
 
 	useEffect(() => {
-		refresh();
-	}, [refresh]);
+		if (projectPath) refresh(projectPath);
+	}, [projectPath, refresh]);
 
 	const isRunning = phase === "running";
+	const scores = health?.scores ?? [];
+	const pending = health?.pending ?? [];
 
 	return (
 		<PanelShell
@@ -35,17 +63,23 @@ export function AgentHealthPanel() {
 			subtitle={t("agentHealth.subtitle")}
 			error={error}
 			actions={
-				<>
-					<Button size="sm" variant="outline" onClick={() => refresh()} disabled={isRunning}>
-						{t("agentHealth.refresh")}
-					</Button>
-					<Button size="sm" variant="ghost" onClick={() => resetMonitor()}>
-						{t("agentHealth.reset")}
-					</Button>
-				</>
+				<Button
+					size="sm"
+					variant="outline"
+					onClick={() => refresh(projectPath)}
+					disabled={isRunning || !projectPath}
+				>
+					{t("agentHealth.refresh")}
+				</Button>
 			}
 		>
-			{scores.length === 0 && !isRunning && (
+			{!projectPath && <p className="text-sm text-muted-foreground">{t("agentHealth.noProject")}</p>}
+			{health && (
+				<p className="mb-3 text-xs text-muted-foreground">
+					{t("agentHealth.source", { count: health.tasks_read })}
+				</p>
+			)}
+			{health && scores.length === 0 && pending.length === 0 && !isRunning && (
 				<p className="text-sm text-muted-foreground">{t("agentHealth.noAgents")}</p>
 			)}
 			<ul className="space-y-3">
@@ -53,8 +87,9 @@ export function AgentHealthPanel() {
 					<li key={s.agent_name} className="rounded border p-3">
 						<div className="flex items-center justify-between">
 							<div className="flex items-center gap-3">
-								<span className="font-mono font-medium">{s.agent_name}</span>
-								<Badge className={STATUS_COLOR[s.status] ?? "bg-muted"}>
+								<span className="font-medium">{t(`agentHealth.roles.${s.role}` as never)}</span>
+								<ModelName provider={s.provider} model={s.model} />
+								<Badge className={STATUS_COLOR[s.status]}>
 									{t(`agentHealth.status${s.status[0].toUpperCase()}${s.status.slice(1).replace("_o", "O")}` as never)}
 								</Badge>
 								<span className="text-2xl font-bold">{s.score.toFixed(0)}</span>
@@ -74,7 +109,7 @@ export function AgentHealthPanel() {
 								<span className="text-xs text-muted-foreground mr-2">{t("agentHealth.actions")}:</span>
 								{s.actions.map((a) => (
 									<Badge key={a} variant="outline" className="text-xs">
-										{a}
+										{t(`agentHealth.actionLabels.${a}` as never, { defaultValue: a })}
 									</Badge>
 								))}
 							</div>
@@ -82,6 +117,22 @@ export function AgentHealthPanel() {
 					</li>
 				))}
 			</ul>
+			{health && pending.length > 0 && (
+				<div className="mt-4">
+					<p className="text-xs font-medium text-muted-foreground">
+						{t("agentHealth.pendingTitle", { min: health.min_runs })}
+					</p>
+					<ul className="mt-1 space-y-1 text-xs text-muted-foreground">
+						{pending.map((p) => (
+							<li key={p.agent_name} className="flex flex-wrap items-center gap-2">
+								<span>{t(`agentHealth.roles.${p.role}` as never)}</span>
+								<ModelName provider={p.provider} model={p.model} />
+								<span>{t("agentHealth.pendingRuns", { count: p.runs })}</span>
+							</li>
+						))}
+					</ul>
+				</div>
+			)}
 		</PanelShell>
 	);
 }

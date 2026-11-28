@@ -27,6 +27,8 @@ import {
 	AlertDialogTitle,
 } from "./ui/alert-dialog";
 import { type CliPresence, useReportCliPresence } from "./cli-tool-order";
+import { type CliUpdateReporter, useReportCliUpdate } from "./cli-update-all";
+import { CliUpdateChip } from "./CliUpdateSection";
 import { Button } from "./ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import {
@@ -46,6 +48,8 @@ interface CopilotCliStatusBadgeProps {
 	readonly isCollapsed?: boolean;
 	/** Where the « Outils CLI » panel places this badge, once its check answers. */
 	readonly onPresenceChange?: (presence: CliPresence) => void;
+	/** Hands this badge's update to the panel's « Tout mettre à jour ». */
+	readonly onUpdateChange?: CliUpdateReporter;
 }
 
 interface CopilotIconProps {
@@ -61,9 +65,7 @@ type StatusType =
 	| "gh-missing"
 	| "error";
 
-const _CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const VERSION_RECHECK_DELAY_MS = 5000;
-const _UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000; // Check for updates every 5 minutes when outdated
 
 /**
  * GitHub Copilot icon (simplified SVG)
@@ -100,6 +102,7 @@ export function CopilotCliStatusBadge({
 	onNavigateToTerminals,
 	isCollapsed = false,
 	onPresenceChange,
+	onUpdateChange,
 }: CopilotCliStatusBadgeProps) {
 	const { t } = useTranslation(["common", "navigation", "settings"]);
 	const { data, refreshCopilot } = useCliStatus();
@@ -240,7 +243,7 @@ export function CopilotCliStatusBadge({
 					return;
 				}
 				if (!result.error?.startsWith("gh_missing")) {
-					setInstallError(result.error || "Installation failed");
+					setInstallError(result.error || t("navigation:cliStatus.installFailed"));
 					return;
 				}
 			}
@@ -251,7 +254,7 @@ export function CopilotCliStatusBadge({
 
 			const opened = await openTerminalWithCommand(label, command);
 			if (!opened) {
-				setInstallError("Failed to open terminal");
+				setInstallError(t("navigation:cliStatus.terminalUnavailable"));
 				return;
 			}
 
@@ -261,7 +264,7 @@ export function CopilotCliStatusBadge({
 		} catch (err) {
 			console.error("Failed to install Copilot CLI:", err);
 			setInstallError(
-				err instanceof Error ? err.message : "Installation failed",
+				err instanceof Error ? err.message : t("navigation:cliStatus.installFailed"),
 			);
 		} finally {
 			setIsInstalling(false);
@@ -287,7 +290,7 @@ export function CopilotCliStatusBadge({
 
 		try {
 			if (!globalThis.electronAPI?.setCopilotCliActivePath) {
-				setInstallError("Path switching not available");
+				setInstallError(t("navigation:cliStatus.pathSwitchUnavailable"));
 				return;
 			}
 
@@ -302,12 +305,12 @@ export function CopilotCliStatusBadge({
 					fetchInstallations();
 				}, VERSION_RECHECK_DELAY_MS);
 			} else {
-				setInstallError(result.error || "Failed to switch CLI path");
+				setInstallError(result.error || t("navigation:cliStatus.pathSwitchFailed"));
 			}
 		} catch (err) {
 			console.error("Failed to switch Copilot CLI path:", err);
 			setInstallError(
-				err instanceof Error ? err.message : "Failed to switch CLI path",
+				err instanceof Error ? err.message : t("navigation:cliStatus.pathSwitchFailed"),
 			);
 		} finally {
 			setIsInstalling(false);
@@ -319,6 +322,7 @@ export function CopilotCliStatusBadge({
 	const handleInstall = () => {
 		performInstall();
 	};
+	useReportCliUpdate(onUpdateChange, status === "outdated", isInstalling, performInstall);
 
 	// Handle installation selection
 	const handleInstallationSelect = (cliPath: string) => {
@@ -446,11 +450,7 @@ export function CopilotCliStatusBadge({
 											? ` (${versionInfo.installed})`
 											: ""}
 									</span>
-									{status === "outdated" && (
-										<span className="ml-auto text-3xs bg-warning/20 text-warning px-1.5 py-0.5 rounded">
-											{t("common:update", "Update")}
-										</span>
-									)}
+									{status === "outdated" && <CliUpdateChip isUpdating={isInstalling} />}
 									{(status === "not-found" ||
 										status === "gh-missing" ||
 										status === "error") && (

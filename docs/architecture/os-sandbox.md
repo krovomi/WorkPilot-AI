@@ -1,3 +1,12 @@
+---
+feature: Bac à sable de l'OS
+summary: >-
+  Processus d'agent sous bubblewrap (Linux) ou Seatbelt (macOS) : écritures dans le worktree,
+  identifiants masqués, réseau par un proxy filtrant (provider + registres) ; sans bac à sable la
+  carte le dit au lancement, `WORKPILOT_SANDBOX=required` refuse de démarrer ; en option (coupée
+  par défaut), une microVM Docker Sandboxes (`sbx`) par tâche, seule isolation sous Windows.
+---
+
 # Bac à sable de l'OS autour des commandes d'agent
 
 > [Annexe G8](../audit/annexes/G8.md) du cahier d'audit. Code :
@@ -95,11 +104,101 @@ autorisées, refus d'écriture sur la lecture seule, refus de lecture et d'écri
 `(deny network-outbound)` puis `localhost:*` seulement, où écoute le proxy (TCP). Les variantes
 `/private/…` des chemins sont ajoutées (`/tmp` et `/var` sont des liens).
 
-### Windows : pas encore
+### Windows : la microVM, sinon rien
 
-AppContainer et job object ne sont pas livrés. Le probe répond `unavailable` avec la raison
-« AppContainer is planned », et la carte dit que les commandes ne sont pas isolées. Ce n'est pas
-présenté comme un bac à sable qui marche.
+AppContainer et job object ne sont pas livrés. Sans la microVM ci-dessous, le probe répond
+`unavailable` avec la raison « AppContainer is planned », et la carte dit que les commandes ne sont
+pas isolées. Ce n'est pas présenté comme un bac à sable qui marche.
+
+## En option : une microVM Docker Sandboxes par tâche
+
+`os_sandbox/microvm.py`. Coupée par défaut : Paramètres > Sandbox, « Lancer chaque tâche dans une
+microVM Docker » (`agentSafety.sandbox.microvm`, porté par `WORKPILOT_AGENT_SAFETY` et relu, borné,
+par `security/agent_safety_settings.py`). Coupée, rien de ce qui précède ne change.
+
+**Ce qui y tourne (lot C1)** : les commandes de la boucle WorkPilot (`run_command`), par
+`sbx exec`. Les appels au modèle restent dans le backend, sur l'hôte : aucun identifiant n'entre
+dans la VM, et seules `LANG`, `LC_ALL`, `TZ`, `CI`, `NO_COLOR` et `FORCE_COLOR` y passent. Un CLI qui
+lance ses propres commandes garde le bac à sable de l'OS (`session_sandbox(…, microvm=False)`),
+sauf avec le second interrupteur ci-dessous.
+Le modèle est prévenu dans la description de `run_command` que ses commandes tournent en
+`/bin/sh` dans une VM Linux, quel que soit l'hôte.
+
+**Une VM par worktree**, `workpilot-<hash du chemin>`, créée au lancement de la première session
+(`ensure_vm`, appelée par `session_sandbox`) et reprise par les suivantes (planification,
+code, QA) : ce qu'une session installe reste pour la suivante. Sa configuration est fixée à la
+création ; une VM créée pour d'autres montages ou une autre allowlist est supprimée et recréée
+(empreinte dans `<scratch>/sandbox-vm/<nom>/vm.json`). `remove_vm` la supprime avec le worktree.
+
+| Ce que la VM voit | Comment |
+|---|---|
+| Le worktree, la spec, le dépôt git où il commite, `WORKPILOT_WRITE_ROOTS` | montés en lecture-écriture, le worktree en premier (dossier par défaut de `sbx exec`) ; au même chemin sous macOS et Linux, sous `/<lecteur>/…` sous Windows (`C:\Users\…` → `/c/Users/…`). Le worktree est donné sans cible (sbx 0.54 en refuse une pour le premier montage : « primary workspace is mounted at its host path ») ; les autres avec une cible explicite au même endroit. Un chemin réseau (UNC) n'est pas monté : la VM n'est pas créée et le bac à sable de l'OS prend le relais |
+| `.git/hooks`, `.git/config`, la configuration de sécurité | remontés en lecture seule par-dessus |
+| `.workpilot/.env` et les autres chemins masqués à l'intérieur des montages | couverts par un fichier ou un dossier vide, en lecture seule |
+| Le dossier personnel, ses identifiants, les caches de paquets de l'hôte | jamais montés : la VM a les siens |
+| Le pointeur `.git` d'un worktree, sous Windows | un fichier `gitdir:` réécrit pour la VM, monté par-dessus ; celui de l'hôte n'est pas touché |
+| Git | `safe.directory '*'` et le `core.autocrlf` de l'hôte, dans la configuration globale de la VM, jamais dans celle du dépôt |
+
+**Réseau** : la VM est créée avec `--deny-network`, puis reçoit l'allowlist du bac à sable de l'OS
+en règles propres à elle (`sbx policy allow network --sandbox <nom>`, ports 443 et 80), plus les
+sources de son système et de son moteur Docker (`VM_HOSTS`). Une entrée locale (`127.0.0.1:11434`)
+devient `localhost:11434`, joint depuis la VM par `host.docker.internal`. Les refus sont lus dans
+`sbx policy log --json` et ajoutés à la sortie de la commande comme ceux du proxy.
+
+**Taille** : la mémoire et les processeurs des réglages, sinon `vm_resources` : la mémoire libre
+partagée entre cette tâche et les builds en cours (`test_placement.machine`), entre 2 et 16 Gio,
+et la moitié des cœurs, au moins 2. Sans `--memory`, sbx donnerait la moitié de la RAM à chaque VM.
+
+**Quand la VM n'est pas là** (sbx absent, pas connecté par `sbx login`, plateforme d'hyperviseur
+Windows coupée, création refusée) : le bac à sable de l'OS prend le relais et la ligne du fil
+dit « Docker Sandboxes microVM not used: … » avec les mots de sbx ; sans bac à sable de l'OS non
+plus, la raison réunit les deux, et `WORKPILOT_SANDBOX=required` refuse de démarrer. Le probe
+lance `sbx version` et `sbx ls --json` ; la vraie preuve est la création.
+
+**RGPD** : chaque appel à `sbx` porte `SBX_NO_TELEMETRY=1` ; en local, aucun code ni prompt ne part
+chez Docker. Un compte Docker reste exigé par `sbx login` : c'est pourquoi l'option est coupée par
+défaut.
+
+Une commande lancée dans la VM n'a pas de stdin (`DEVNULL`) : sbx attend sur un tube ouvert que la commande ne lit pas. Celle qui lit son stdin le demande (`wrap(…, stdin=True)`, qui ajoute `sbx exec -i`).
+
+Vérifié sous Windows 11 avec sbx 0.54.1 : création (55 s la première fois, image comprise, puis 7 s), git dans le worktree par le pointeur réécrit, écriture du worktree vue par l'hôte, `.git` en lecture seule refusé à l'écriture, codes de sortie (3 donne 3, commande inconnue 127), `-e`, `-w`, `--memory` et `--cpus`. Restent à vérifier : le réseau (`--deny-network` puis règles par VM, champs de `policy log`), `host.docker.internal`, et la commande tuée au délai.
+
+Limites connues : sous Windows, les dépendances installées dans la VM sont des binaires Linux (un
+`node_modules` installé par l'hôte n'y tourne pas toujours, et inversement) ; une commande arrêtée
+par le délai l'est côté hôte (`sbx exec`), son processus dans la VM n'est pas encore tué ; sbx
+exige Windows 11 avec la plateforme d'hyperviseur, macOS 14 sur Apple silicon ou Ubuntu 24.04 avec
+KVM. La purge avec le worktree et l'état de sbx sont dans Paramètres > Sandbox.
+
+### Un CLI d'agent dans la VM (lot C2, expérimental)
+
+Second interrupteur, coupé par défaut : « Lancer aussi les CLI d'agents dans la microVM »
+(`agentSafety.sandbox.microvm.cliAgents`, lu seulement si la microVM est allumée). Il vaut pour un
+CLI dont le bloc `sandbox:` de `capabilities/providers.yaml` a une entrée `microvm:` (OpenCode
+aujourd'hui) : `command` (son nom dans la VM), `install` (une ligne, jouée une fois par VM) et
+`secrets` (service sbx → variables du CLI). `core/agent_clients/cli_microvm.py` décide (`plan`) et
+ouvre la session (`open_session`).
+
+**Les clés restent dans sbx.** WorkPilot ne copie aucune clé : la personne la range elle-même
+(`sbx secret set openai`…). `secret_services()` lit la liste des services rangés (`sbx secret ls`),
+jamais leur valeur. Dans la VM, les variables du CLI valent `proxy-managed` et le proxy de sbx
+ajoute la vraie clé aux requêtes qui en sortent ; aucune clé de l'hôte n'est passée
+(`sbx exec -e` n'accepte qu'un nom de variable valide et une valeur sur une ligne). Le modèle choisi
+doit être celui d'un service rangé (`anthropic/…` demande `anthropic`).
+
+**Le CLI reste sur l'hôte**, dans le bac à sable de l'OS, et la carte dit pourquoi
+(`fallback_reason`) : pas de profil microVM, pas de clé rangée dans sbx pour ce CLI ou ce modèle
+(une connexion par abonnement, un modèle local), sbx pas prêt, ou installation ratée dans la VM.
+Interrupteur coupé, rien ne change.
+
+**Installation** : `ensure_tool` lance `command -v <cmd> || { <install>; }` dans la VM, sous le
+verrou de la VM, et le note dans son état ; les sessions suivantes ne le refont pas. Les hôtes du
+CLI (`network`) s'ajoutent aux règles de la VM par `sbx policy allow network --sandbox`, sans la
+recréer : les règles d'une VM ne font que grandir.
+
+Limites : le CLI doit aussi être installé sur l'hôte (sa détection reste celle de l'hôte) ; ses
+serveurs MCP ne sont pas lancés dans la VM (ils sont retirés de la session, avec un avertissement) ;
+le format de `sbx secret ls` et la présence de Node dans l'image `shell` restent à vérifier sur une
+machine réelle.
 
 ## Le garde-fou : la carte le dit au lancement
 
@@ -148,6 +247,9 @@ isolées ou déléguées. La raison vient du backend en anglais stable et s'affi
   chaînage d'un proxy amont.
 - `tests/os_sandbox/test_session.py` : les trois modes, `required` qui refuse le lancement, le
   rapport émis une fois, le choix par type de client, le CLI lancé par son enveloppe.
+- `tests/os_sandbox/test_microvm.py` : la microVM par un faux `sbx` : chemins et noms, montages
+  (lecture seule, masques, pointeur git sous Windows), règles réseau, taille, création, reprise,
+  recréation, refus, commande sans les secrets de l'hôte, repli sur le bac à sable de l'OS.
 - `tests/os_sandbox/test_real_sandbox.py` : le vrai bac à sable, sur une machine qui en a un
   (écriture hors projet refusée, allowlist en lecture seule, `~/.ssh` illisible, réseau limité à
   l'allowlist, `run_command`). Sous `WORKPILOT_EXPECT_SANDBOX` (runners Linux et macOS de la CI),

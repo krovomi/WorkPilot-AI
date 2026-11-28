@@ -14,6 +14,7 @@ import type {
 } from "../../../shared/types";
 import { stripAnsiCodes } from "../../../shared/utils/ansi-sanitizer";
 import { getToolPath } from "../../cli-tool-manager";
+import { recordMergeOutcome } from "../../conflict-waves/conflict-times";
 import { killProcessGracefully } from "../../platform";
 import { parsePythonCommand } from "../../python-detector";
 import { findServerCard } from "../../server-board-actions";
@@ -37,6 +38,7 @@ import {
 	getUtilitySettings,
 	isGitWorkTree,
 } from "./worktree-handler-utils";
+import { ciPipelineService } from "../../ci-pipeline-service";
 
 export function registerWorktreeMergeHandlers(
 	pythonEnvManager: PythonEnvManager,
@@ -223,7 +225,7 @@ export function registerWorktreeMergeHandlers(
 					hasConfigDir: !!profileEnv.CLAUDE_CONFIG_DIR,
 				});
 
-				return new Promise((resolve) => {
+				return await new Promise((resolve) => {
 					const MERGE_TIMEOUT_MS = 600000; // 10 minutes timeout for AI merge operations with many files
 					let timeoutId: NodeJS.Timeout | null = null;
 					let resolved = false;
@@ -560,6 +562,11 @@ export function registerWorktreeMergeHandlers(
 								// The worktree will be cleaned up when user moves task to "Done" status.
 							}
 
+							// A merge that went through resolves the task's open conflict, if any.
+							if (!isStageOnly || hasActualStagedChanges || mergeAlreadyCommitted) {
+								recordMergeOutcome(project.path, task.specId, "merged");
+							}
+
 							debug(
 								"Merge result. isStageOnly:",
 								isStageOnly,
@@ -724,13 +731,9 @@ export function registerWorktreeMergeHandlers(
 
 							// IMPORTANT: Wait for plan updates to complete before responding (fixes #243)
 							// Previously this was "fire and forget" which caused a race condition:
-							// resolve() would return before files were written, and UI refresh would read old status
-							try {
-								await updatePlans();
-							} catch (err) {
-								debug("Plan update failed:", err);
-								// Non-fatal: UI will still update, but status may not persist across refresh
-							}
+							// resolve() would return before files were written, and UI refresh would read old status.
+							// It never throws: each plan's failure is caught and logged above.
+							await updatePlans();
 
 							// Route status change through TaskStateManager (XState) to avoid dual emission
 							taskStateManager.handleManualStatusChange(
@@ -739,6 +742,12 @@ export function registerWorktreeMergeHandlers(
 								task,
 								project,
 							);
+							// The base moved: the other green cards take it and run their suite again.
+							if (!staged) {
+								ciPipelineService.refreshAfterMerge(project, task.id).catch((error: unknown) => {
+									console.warn("[MERGE] Green cards not refreshed:", error);
+								});
+							}
 
 							resolve({
 								success: true,
@@ -765,6 +774,7 @@ export function registerWorktreeMergeHandlers(
 								pattern.test(combinedOutput),
 							);
 							debug("Merge failed. hasConflicts:", hasConflicts);
+							if (hasConflicts) recordMergeOutcome(project.path, task.specId, "conflict");
 
 							resolve({
 								success: true,
@@ -974,7 +984,7 @@ export function registerWorktreeMergeHandlers(
 				// Get Python environment for bundled packages
 				const previewPythonEnv = pythonEnvManagerSingleton.getPythonEnv();
 
-				return new Promise((resolve) => {
+				return await new Promise((resolve) => {
 					// Parse Python command to handle space-separated commands like "py -3"
 					const [pythonCommand, pythonBaseArgs] =
 						parsePythonCommand(pythonPath);
@@ -1030,6 +1040,9 @@ export function registerWorktreeMergeHandlers(
 								// response unchanged.
 								// biome-ignore lint/suspicious/noExplicitAny: dynamic JSON from Python CLI
 								const result = parsed as any;
+								if (result.gitConflicts?.hasConflicts === true) {
+									recordMergeOutcome(project.path, task.specId, "conflict");
+								}
 								console.warn(
 									"[IPC] merge-preview result:",
 									JSON.stringify(result, null, 2),

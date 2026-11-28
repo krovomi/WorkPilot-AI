@@ -89,15 +89,18 @@ def active(root: Path | None = None) -> bool:
     """Turned on, and a brain actually exists to serve."""
     if not enabled():
         return False
-    try:
-        return is_brain(root or brain_dir())
-    except OSError:
-        return False
+    # `is_brain` answers False for a folder it cannot look into.
+    return is_brain(root or brain_dir())
 
 
 def mcp_server_config(
-    root: Path | None = None, task: str | None = None
+    root: Path | None = None,
+    task: str | None = None,
+    project_dir: Path | str | None = None,
 ) -> dict[str, Any]:
+    """The ``workpilot-brain`` server of a WorkPilot agent. With the folder
+    it builds in (*project_dir*), the server recalls for its branch, and on a
+    server for the run's starter's teams (`lifecycle.scopes`)."""
     env = {
         "WORKPILOT_BRAIN_DIR": str(root or brain_dir()),
         # Marks the server as WorkPilot's own: its agents' instructions are
@@ -106,6 +109,13 @@ def mcp_server_config(
     }
     if task:
         env["WORKPILOT_BRAIN_TASK"] = task
+    if project_dir is not None:
+        from .lifecycle import scopes
+
+        recall = scopes.audience(project_dir)
+        env[scopes.BRANCH_ENV] = recall.branch or ""
+        if scopes.TEAMS_ENV in os.environ:
+            env[scopes.TEAMS_ENV] = os.environ[scopes.TEAMS_ENV]
     return {
         "command": sys.executable,
         "args": [str(_BACKEND / "runners" / "brain_mcp.py")],
@@ -126,7 +136,8 @@ def awareness_section(root: Path | None = None) -> str:
         from .memories import instructions
 
         items = sorted(
-            instructions(root), key=lambda i: (-len(i.agents), i.text.lower())
+            instructions(root, signed_only=True),
+            key=lambda i: (-len(i.agents), i.text.lower()),
         )
     except Exception:  # noqa: BLE001 - a malformed note never breaks a prompt
         items = []
@@ -211,7 +222,10 @@ def _call(
     arguments: dict[str, Any],
     task: str | None = None,
     max_chars: int | None = None,
+    project_dir: Path | str | None = None,
 ) -> str:
+    from .lifecycle import scopes
+    from .mcp_server import RECALL_TOOLS
     from .mcp_server import _call as call
     from .vault import Brain
 
@@ -223,6 +237,8 @@ def _call(
             trusted=False,
             task=task,
             max_chars=max_chars,
+            # Read only for a recall: a write needs no git call.
+            audience=scopes.audience(project_dir) if name in RECALL_TOOLS else None,
         )
     except (KeyError, ValueError, OSError) as exc:
         detail = f"missing argument {exc}" if isinstance(exc, KeyError) else str(exc)
@@ -237,10 +253,12 @@ async def execute_tool(
     arguments: dict[str, Any],
     task: str | None = None,
     max_chars: int | None = None,
+    project_dir: Path | str | None = None,
 ) -> str:
     """Run a brain tool off the event loop: a read may pull, a write pushes.
 
     ``max_chars`` pages a note or a skill under the caller's result cap
-    rather than the stdio server's.
+    rather than the stdio server's; *project_dir*, the folder the agent
+    builds in, says which branch its recall is for (`lifecycle.scopes`).
     """
-    return await asyncio.to_thread(_call, name, arguments, task, max_chars)
+    return await asyncio.to_thread(_call, name, arguments, task, max_chars, project_dir)

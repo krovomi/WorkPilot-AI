@@ -8,7 +8,13 @@
 export const NEEDS_YOU_CHANNELS = ["ntfy", "telegram", "teams"] as const;
 export type NeedsYouChannelKind = (typeof NEEDS_YOU_CHANNELS)[number];
 
-export const NEEDS_YOU_EVENTS = ["plan_review", "review_ready", "failed"] as const;
+export const NEEDS_YOU_EVENTS = [
+	"plan_review",
+	"review_ready",
+	"failed",
+	"approval_escalated",
+	"review_feedback_held",
+] as const;
 export type NeedsYouEventKind = (typeof NEEDS_YOU_EVENTS)[number];
 
 export const NEEDS_YOU_MASK = "********";

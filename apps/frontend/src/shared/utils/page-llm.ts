@@ -57,6 +57,10 @@ export const PAGE_LLM_FEATURES = {
 	"voice-control": "voiceControl",
 	// The Best-of-N arbiter (`task/best-of-n-handlers.ts`); the Consensus Arbiter view names its engine.
 	"consensus-arbiter": "arbiter",
+	// Fonctions avancées: the AI participant of a Pair Programming room (`pair-ai-partner.ts`).
+	"phase35-hub": "insights",
+	// Pixel Office's mini-scenes, when the person asks for them (`pixel-office-handlers.ts`).
+	"pixel-office": "utility",
 } as const satisfies Record<string, PageLlmFeature>;
 
 /** Une page qui accepte une formule propre. */

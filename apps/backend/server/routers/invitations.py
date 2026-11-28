@@ -30,8 +30,8 @@ from server.auth.invitations import (
     lookup_invitation,
 )
 from server.auth.invitations import revoke as revoke_invitation
-from server.auth.jwt_tokens import issue_token_pair
 from server.auth.local import LocalAuthError
+from server.auth.sign_in import signed_in
 from server.authz.deps import require_org, require_permission
 from server.authz.principal import Principal
 from server.config import get_settings
@@ -85,6 +85,7 @@ async def create_invitation_endpoint(
             org_id=org_id,
             role=body.role,
             invited_by=admin.id,
+            org_role=body.org_role,
             project_id=body.project_id,
             project_role=body.project_role,
         )
@@ -176,7 +177,7 @@ async def accept_invitation_endpoint(
         raise HTTPException(status_code=400, detail=str(e))
 
     ua, ip = _client_meta(request)
-    pair = await issue_token_pair(db, user, user_agent=ua, ip=ip)
+    pair = await signed_in(db, user, method="invite", user_agent=ua, ip=ip)
     return TokenResponse(
         access_token=pair.access_token,
         refresh_token=pair.refresh_token,

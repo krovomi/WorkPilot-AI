@@ -3,6 +3,8 @@
  */
 
 import type { EngineTrio, TaskKind } from "./task";
+import type { RemoteProvider } from "../utils/git-remote-provider";
+import type { TestPlacementMode } from "./suite-placement";
 
 export interface Project {
 	id: string;
@@ -76,6 +78,17 @@ export interface ProjectSettings {
 	/** Maximum parallel tasks allowed (default: 3) */
 	maxParallelTasks?: number;
 	/**
+	 * Where the long suites of this project's tasks run (`test_placement/`):
+	 * `auto` (default) computes from the machine, `machine` or `ci` decide.
+	 * A card's own `testPlacement` wins.
+	 */
+	testPlacement?: TestPlacementMode;
+	/**
+	 * Auto may push a task's branch without a pull request to run the forge's
+	 * CI. Default: on when the project has a CI; `false` turns it off.
+	 */
+	testPlacementBranchPush?: boolean;
+	/**
 	 * Split a task whose plan is too big for one small pull request into
 	 * several tasks (`apps/backend/task_split/`). On by default; the ceilings
 	 * default to 400 changed lines and 25 files per pull request, and a task
@@ -86,6 +99,11 @@ export interface ProjectSettings {
 	description?: string;
 	/** Provider IA sélectionné (optionnel) */
 	provider?: string;
+	/**
+	 * The AI account each provider runs on for this project's tasks
+	 * (`ai-account-pins.ts`); a card's own pin wins. Absent = default account.
+	 */
+	aiAccounts?: import("./ai-accounts").AiAccountPins;
 }
 
 /** The kinds of task the automatic split measures (the others stay whole). */
@@ -265,6 +283,14 @@ export interface MemoryEpisode {
 	content: string;
 	session_number?: number;
 	score?: number;
+	/** The note's vault path: how the lifecycle actions name it. */
+	path?: string;
+	/** Pinned: no automatic removal (`brain/lifecycle/store.py`). */
+	pinned?: boolean;
+	/** Where the memory applies (a part of the code); empty: everywhere. */
+	applies_to?: string;
+	/** `false`: no trusted key signed its last change; kept from agents (`brain/lifecycle/provenance.py`). */
+	verified?: boolean;
 	// For PR reviews - extracted from content for quick access
 	prNumber?: number;
 	repo?: string;
@@ -275,6 +301,8 @@ export interface ContextSearchResult {
 	content: string;
 	score: number;
 	type: string;
+	/** `false`: no trusted key signed its last change. */
+	verified?: boolean;
 }
 
 export interface ProjectContextData {
@@ -308,6 +336,8 @@ export interface ProjectEnvConfig {
 	githubEnabled: boolean;
 	githubToken?: string;
 	githubRepo?: string; // Format: owner/repo
+	/** A saved forge account (forge-accounts) whose token the project uses; "" = its own token. */
+	githubAccountId?: string;
 	githubAutoSync?: boolean; // Auto-sync issues on project load
 	githubAuthMethod?: "oauth" | "pat"; // How the token was obtained
 
@@ -315,12 +345,27 @@ export interface ProjectEnvConfig {
 	gitlabEnabled: boolean;
 	gitlabInstanceUrl?: string; // Default: https://gitlab.com, or self-hosted URL
 	gitlabToken?: string;
+	/** A saved GitLab account: its token and instance replace the project's. */
+	gitlabAccountId?: string;
 	gitlabProject?: string; // Format: group/project or numeric ID
 	gitlabAutoSync?: boolean; // Auto-sync issues on project load
+	gitlabAuthMethod?: "oauth" | "pat"; // How the token was obtained
+
+	// Bitbucket Cloud Integration (main/ipc-handlers/bitbucket/env-config.ts)
+	bitbucketEnabled?: boolean;
+	bitbucketWorkspace?: string; // Workspace slug
+	bitbucketRepo?: string; // Repository slug, `workspace/repo` or a clone URL
+	bitbucketUsername?: string; // Atlassian account (Basic auth); empty = access token (Bearer)
+	bitbucketToken?: string; // API token, app password or access token
+	/** A saved Bitbucket account (Settings, Forge accounts); its username and token replace the two above. */
+	bitbucketAccountId?: string;
+	bitbucketAutoSync?: boolean;
 
 	// Azure DevOps Integration
 	azureDevOpsEnabled: boolean;
 	azureDevOpsPat?: string; // Personal Access Token
+	/** A saved Azure DevOps account: its PAT and organization replace the project's. */
+	azureDevOpsAccountId?: string;
 	azureDevOpsOrgUrl?: string; // Organization URL (e.g., https://dev.azure.com/your-org)
 	azureDevOpsProject?: string; // Default project name
 	azureDevOpsRepository?: string; // Repository name
@@ -337,7 +382,7 @@ export interface ProjectEnvConfig {
 	// CI/CD pipeline loop (« Build rouge » — see ci-pipeline-service.ts)
 	// Azure DevOps / GitHub / GitLab credentials are reused from the sections
 	// above; only the provider choice, the loop knobs and Jenkins live here.
-	cicdProvider?: "" | "azure" | "github" | "gitlab" | "jenkins" | "none"; // "" = auto-detect
+	cicdProvider?: "" | "azure" | "github" | "gitlab" | "bitbucket" | "jenkins" | "none"; // "" = auto-detect
 	cicdAutoFix?: boolean; // default true: agent repairs red builds automatically
 	cicdPollSeconds?: number; // default 60
 	cicdJenkinsUrl?: string; // Jenkins base URL
@@ -416,6 +461,8 @@ export interface ProjectEnvConfig {
 	// Generic webhook (flat JSON POST)
 	notifyWebhookEnabled?: boolean;
 	notifyWebhookUrl?: string;
+	/** Also announce a memory conflict a teammate's sync queued (`WORKPILOT_MEMORY_CONFLICT_NOTIFY`). */
+	memoryConflictNotify?: boolean;
 
 	// Per-agent MCP overrides (add/remove MCPs from specific agents)
 	agentMcpOverrides?: AgentMcpOverrides;
@@ -470,6 +517,19 @@ export interface CustomMcpServer {
 	headers?: Record<string, string>;
 	/** Optional description shown in UI */
 	description?: string;
+	/**
+	 * Run in the OS sandbox with only these hosts on the network, plus the
+	 * registry its launcher installs from (type 'command' only). The main
+	 * writes it when the project's MCP policy has `confineBelow`; the backend
+	 * never starts the server another way (`core/mcp_confinement.py`).
+	 */
+	confine?: McpServerConfinement;
+}
+
+/** The network a confined custom MCP server may reach. */
+export interface McpServerConfinement {
+	/** `api.example.com`, `*.example.com`, or a local `127.0.0.1:5432`; 32 at most. */
+	hosts: string[];
 }
 
 /**
@@ -516,6 +576,8 @@ export interface McpTestConnectionResult {
 	tools?: string[];
 	/** Response time in milliseconds */
 	responseTime?: number;
+	/** Not tested: the server runs confined, started only by an agent (#369 lot 5). */
+	confined?: boolean;
 }
 
 // WorkPilot AI Initialization Types
@@ -554,7 +616,7 @@ export interface GitStatus {
 }
 
 export interface RepoProviderDetectionResult {
-	provider: "github" | "azure_devops" | "unknown";
+	provider: RemoteProvider;
 	remoteName?: string;
 	remoteUrl?: string;
 }

@@ -9,6 +9,8 @@
  * here is still reachable by its label.
  */
 
+import type { VoiceDestination } from "@shared/types/voice-assistant";
+
 export interface ViewHint {
 	hint: string;
 	words: readonly string[];
@@ -167,6 +169,11 @@ export const VIEW_HINTS: Readonly<Record<string, ViewHint>> = {
 		hint: "the repository's GitLab merge requests",
 		words: ["merge request", "mrs gitlab"],
 	},
+	"bitbucket-issues": { hint: "the repository's Bitbucket issues", words: ["issues bitbucket"] },
+	"bitbucket-pull-requests": {
+		hint: "the repository's Bitbucket pull requests and pipelines",
+		words: ["prs bitbucket", "pipelines bitbucket"],
+	},
 	context: {
 		hint: "the project's memory and context for agents",
 		words: ["contexte", "context", "memoire du projet", "memory"],
@@ -223,3 +230,12 @@ export const VIEW_HINTS: Readonly<Record<string, ViewHint>> = {
 	guardrails: { hint: "rules agents must follow", words: ["guardrails", "garde-fous", "regles des agents"] },
 	sandbox: { hint: "preview changes before applying them", words: ["apercu des changements", "change preview"] },
 };
+
+/** The views the assistant may open: the sidebar's, with what each is for, not itself. */
+export function offeredDestinations(
+	destinations: readonly VoiceDestination[],
+): VoiceDestination[] {
+	return destinations
+		.filter((d) => d.id !== "voice-control")
+		.map((d) => (VIEW_HINTS[d.id] ? { ...d, hint: VIEW_HINTS[d.id].hint } : d));
+}

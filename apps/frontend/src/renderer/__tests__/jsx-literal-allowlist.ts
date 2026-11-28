@@ -37,6 +37,7 @@ export const TERMS: ReadonlySet<string> = new Set([
 	"Anthropic",
 	"AWS",
 	"Azure",
+	"Bitbucket",
 	"Canny",
 	"Claude",
 	"Codex",
@@ -114,6 +115,7 @@ export const TERMS: ReadonlySet<string> = new Set([
  */
 export const NAMES: ReadonlySet<string> = new Set([
 	"Azure DevOps Pipelines",
+	"Bitbucket Pipelines",
 	"Claude Code",
 	"Claude Code CLI",
 	"Cursor",
@@ -165,10 +167,6 @@ export const FILE_EXEMPTIONS: Readonly<
 		{ text: "git add -A", reason: SHELL },
 		{ text: 'git commit -m "Initial commit"', reason: SHELL },
 	],
-	"components/phase35/AuditTrailPanel.tsx": [
-		{ text: "actor=", reason: "audit record field key" },
-		{ text: "cid=", reason: "audit record field key" },
-	],
 	"components/api-explorer/ApiExplorer.tsx": [
 		{ text: "deprecated", reason: OPENAPI },
 	],
@@ -182,6 +180,8 @@ export const FILE_EXEMPTIONS: Readonly<
 		{ text: "?↗ ref", reason: OPENAPI },
 		{ text: "items:", reason: OPENAPI },
 		{ text: "?any", reason: OPENAPI },
+	],
+	"components/api-explorer/RequestAuthTab.tsx": [
 		{ text: "Authorization: Bearer ••••", reason: HTTP_HEADER },
 		{ text: "@placeholder=X-API-Key", reason: HTTP_HEADER },
 		{
@@ -202,6 +202,9 @@ export const FILE_EXEMPTIONS: Readonly<
 			reason: "example shell command",
 		},
 	],
+	"components/task-detail/GoalCard.tsx": [
+		{ text: "@placeholder=dotnet test", reason: "example shell command" },
+	],
 	"components/task-detail/TaskVerify.tsx": [
 		{ text: "?2xx", reason: "HTTP status class" },
 		{ text: "@label=LCP", reason: "Web Vitals metric name" },
@@ -216,7 +219,4 @@ export const FILE_EXEMPTIONS: Readonly<
  * and the sidebar being restructured. Translate them there, then delete the
  * entry. Counts may only go down.
  */
-export const PENDING: Readonly<Record<string, number>> = {
-	"components/task-detail/TaskDetailModal.tsx": 1,
-	"components/task-detail/GoalCard.tsx": 1,
-};
+export const PENDING: Readonly<Record<string, number>> = {};

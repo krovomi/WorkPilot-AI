@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
+import { StyleSheet } from "react-native";
 import type { Api } from "../api/endpoints";
 import type { CardDetails } from "../api/types";
 import "../i18n";
@@ -96,6 +97,29 @@ describe("ChangesSection", () => {
 		expect(screen.getByText("-old")).toBeTruthy();
 	});
 
+	it("colours a diff like git: additions, removals, hunks and headers apart from context", async () => {
+		await render(
+			<ChangesSection
+				changes={{
+					exists: true,
+					files: [
+						{
+							path: "src/a.cs",
+							status: "modified",
+							additions: 1,
+							deletions: 1,
+							patch: "diff --git a/src/a.cs b/src/a.cs\n@@ -1,2 +1,2 @@\n unchanged\n-old\n+new",
+						},
+					],
+				}}
+			/>,
+		);
+		await fireEvent.press(screen.getByRole("button", { name: /src\/a\.cs/ }));
+		const color = (text: string) => StyleSheet.flatten(screen.getByText(text).props.style).color;
+		const colors = ["diff --git a/src/a.cs b/src/a.cs", "@@ -1,2 +1,2 @@", " unchanged", "-old", "+new"].map(color);
+		expect(new Set(colors).size).toBe(5);
+	});
+
 	it("says when a file has no diff to show", async () => {
 		await render(
 			<ChangesSection
@@ -107,6 +131,30 @@ describe("ChangesSection", () => {
 		);
 		await fireEvent.press(screen.getByRole("button", { name: /logo\.png/ }));
 		expect(screen.getByText(/No diff to show/)).toBeTruthy();
+	});
+});
+
+describe("ChangesSection, edges", () => {
+	it("says when the card has no workspace yet, and shows nothing without an answer", async () => {
+		await render(<ChangesSection changes={{ exists: false, files: [] }} />);
+		expect(screen.getByText("No build workspace yet.")).toBeTruthy();
+		const view = await render(<ChangesSection changes={null} />);
+		expect(view.toJSON()).toBeNull();
+	});
+
+	it("counts the files an older server lists without totals, closes a diff on a second tap, and cuts a long one", async () => {
+		const long = ["@@ -1 +1 @@", "", ...Array.from({ length: MAX_PATCH_LINES + 5 }, (_, i) => `+line ${i}`)].join("\n");
+		await render(
+			<ChangesSection
+				changes={{ exists: true, files: [{ path: "src/big.go", status: "added", additions: 405, deletions: 0, patch: long }] }}
+			/>,
+		);
+		expect(screen.getByText("1 files · +0 −0")).toBeTruthy();
+		const row = screen.getByRole("button", { name: /src\/big\.go/ });
+		await fireEvent.press(row);
+		expect(screen.getByText("The diff is cut here; read the rest on the desktop.")).toBeTruthy();
+		await fireEvent.press(row);
+		expect(screen.queryByText("+line 0")).toBeNull();
 	});
 });
 
@@ -126,6 +174,42 @@ describe("SettingsSection", () => {
 		expect(screen.getByText("Engine: openai · gpt-5.5 · high")).toBeTruthy();
 		expect(screen.getByText("Priority: urgent")).toBeTruthy();
 		expect(screen.getByText("pytest -q")).toBeTruthy();
+	});
+
+	it("names the automatic profile, a priority it does not know, and a goal it cannot read", async () => {
+		await render(
+			<SettingsSection
+				settings={{
+					engine: { provider: "claude", model: "x", isAutoProfile: true },
+					priority: "someday" as never,
+					category: null,
+					goal: null,
+					goalError: "bad TOML",
+				}}
+			/>,
+		);
+		expect(screen.getByText("Engine: claude · auto")).toBeTruthy();
+		expect(screen.getByText("Priority: someday")).toBeTruthy();
+		expect(screen.getByText("The goal cannot be read: bad TOML")).toBeTruthy();
+		expect(screen.queryByText("Done when this passes:")).toBeNull();
+	});
+
+	it("shows a priority without an engine", async () => {
+		await render(
+			<SettingsSection settings={{ engine: null, priority: "high", category: null, goal: null, goalError: null }} />,
+		);
+		expect(screen.getByText("Priority: high")).toBeTruthy();
+		expect(screen.queryByText(/^Engine:/)).toBeNull();
+	});
+
+	it("shows the engine alone when the card sets nothing else", async () => {
+		await render(
+			<SettingsSection
+				settings={{ engine: { provider: "codex", model: "gpt-5.5" }, priority: null, category: null, goal: null, goalError: null }}
+			/>,
+		);
+		expect(screen.getByText("Engine: codex · gpt-5.5")).toBeTruthy();
+		expect(screen.queryByText(/Priority/)).toBeNull();
 	});
 
 	it("shows nothing when the card sets none, or the server is older", async () => {
@@ -166,6 +250,61 @@ describe("LogsSection", () => {
 		expect(screen.queryByText("planned it")).toBeNull();
 		await fireEvent.press(screen.getByRole("button", { name: /Planning/ }));
 		expect(screen.getByText("planned it")).toBeTruthy();
+	});
+
+	it("tells errors, successes and tool calls apart, and says when an opened phase is empty", async () => {
+		const entries = [
+			{ timestamp: "t", type: "error", content: "Build failed" },
+			{ timestamp: "t", type: "success", content: "Tests pass" },
+			{ timestamp: "t", type: "tool_start", content: "dotnet test", tool_name: "Bash" },
+			{ timestamp: "t", type: "text", content: "Thinking" },
+		];
+		await render(
+			<LogsSection
+				logs={{
+					phases: {
+						planning: phase("planning", "completed", []),
+						coding: { ...phase("coding", "failed", []), entries },
+						validation: phase("validation", "pending", []),
+					},
+				}}
+			/>,
+		);
+		expect(screen.getByText("failed")).toBeTruthy();
+		const color = (text: string | RegExp) => StyleSheet.flatten(screen.getByText(text).props.style).color;
+		expect(new Set([color("Build failed"), color("Tests pass"), color(/dotnet test/), color("Thinking")]).size).toBe(4);
+		expect(screen.getByText(/\[Bash\] /)).toBeTruthy();
+		await fireEvent.press(screen.getByRole("button", { name: /Planning/ }));
+		expect(screen.getByText("Nothing written in this phase yet.")).toBeTruthy();
+	});
+
+	it("opens the last phase that wrote when none is running, and says when the server cut the log", async () => {
+		await render(
+			<LogsSection
+				logs={{
+					truncated: true,
+					phases: {
+						planning: phase("planning", "completed", ["planned it"]),
+						coding: phase("coding", "completed", ["coded it"]),
+						validation: phase("validation", "pending", []),
+					},
+				}}
+			/>,
+		);
+		expect(screen.getByText("coded it")).toBeTruthy();
+		expect(screen.queryByText("planned it")).toBeNull();
+		expect(screen.getByText("The server sent only the latest lines.")).toBeTruthy();
+	});
+
+	it("opens the only phase that wrote when an older server sends no others", async () => {
+		await render(<LogsSection logs={{ phases: { planning: phase("planning", "completed", ["planned it"]) } } as never} />);
+		expect(screen.getByText("planned it")).toBeTruthy();
+	});
+
+	it("shows only the phases an older server sends", async () => {
+		await render(<LogsSection logs={{ phases: { coding: phase("coding", "active", ["coding it"]) } } as never} />);
+		expect(screen.getByText("coding it")).toBeTruthy();
+		expect(screen.queryByRole("button", { name: /Planning/ })).toBeNull();
 	});
 
 	it("says when no run wrote anything yet", async () => {

@@ -11,8 +11,20 @@ import time
 import uuid
 from typing import Any
 
+from . import metrics
 from .agent_slot import AgentRole, AgentSlot, AgentStatus
 from .decision_tree import DecisionTree
+from .helper import HELPER_ROLE, helper_task, plan_helper
+from .model_pick import normalise_provider
+from .rebalance import (
+    STEP_PERIOD_MAX,
+    STEP_REPEATS,
+    detect_loop,
+    detect_step_loop,
+    plan_rebalance,
+    reason_of,
+)
+from .session_plan import SessionPlan, session_entry
 
 logger = logging.getLogger(__name__)
 
@@ -28,11 +40,13 @@ class MissionControlOrchestrator:
     def __init__(self):
         self._slots: dict[str, AgentSlot] = {}
         self._decision_trees: dict[str, DecisionTree] = {}
-        self._subscribers: set[Any] = set()
         self._session_id: str = f"mc-{uuid.uuid4().hex[:8]}"
         self._created_at: float = time.time()
         self._is_active: bool = False
         self._event_log: list[dict[str, Any]] = []
+        self._plan = SessionPlan()
+        self._rebalances = 0
+        self._recorded = False
 
     # ---------------------------------------------------------------
     # Session lifecycle
@@ -40,6 +54,11 @@ class MissionControlOrchestrator:
 
     def start_session(self) -> dict[str, Any]:
         """Start a new Mission Control session."""
+        if self._is_active:
+            self._record()
+        self._plan = SessionPlan()
+        self._rebalances = 0
+        self._recorded = False
         self._is_active = True
         self._created_at = time.time()
         self._session_id = f"mc-{uuid.uuid4().hex[:8]}"
@@ -53,10 +72,51 @@ class MissionControlOrchestrator:
         for slot in self._slots.values():
             if slot.status == AgentStatus.RUNNING:
                 slot.complete()
+        self._record()
         logger.info(f"Mission Control session stopped: {self._session_id}")
+
+    def _record(self) -> None:
+        """Leave the session's line in the metrics ledger, once."""
+        if self._recorded:
+            return
+        self._recorded = True
+        entry = session_entry(list(self._slots.values()), self._plan, self._rebalances)
+        if entry is not None:
+            metrics.record_session(entry)
+
+    def _totals(self) -> tuple[int, float]:
+        slots = self._slots.values()
+        tokens = sum(s.tokens.total_tokens for s in slots)
+        return tokens, sum(s.tokens.estimated_cost_usd for s in slots)
+
+    def over_budget(self) -> bool:
+        return self._plan.over_budget(*self._totals())
+
+    def set_plan(
+        self,
+        *,
+        providers: list[str] | None = None,
+        budget_usd: float | None = None,
+        budget_tokens: int | None = None,
+        auto_rebalance: bool | None = None,
+    ) -> dict[str, Any]:
+        """A crew's providers and budget (both replaced), or the rebalancing switch."""
+        if providers is not None:
+            order: list[str] = []
+            for raw in providers:
+                name = normalise_provider(raw)
+                if name and name not in order:
+                    order.append(name)
+            self._plan.providers = order
+            self._plan.budget_usd = budget_usd
+            self._plan.budget_tokens = budget_tokens
+        if auto_rebalance is not None:
+            self._plan.auto_rebalance = auto_rebalance
+        return self._plan.to_dict()
 
     def get_session_info(self) -> dict[str, Any]:
         """Get current session information."""
+        tokens, cost = self._totals()
         return {
             "session_id": self._session_id,
             "is_active": self._is_active,
@@ -65,11 +125,12 @@ class MissionControlOrchestrator:
             "running_count": sum(
                 1 for s in self._slots.values() if s.status == AgentStatus.RUNNING
             ),
-            "total_tokens": sum(s.tokens.total_tokens for s in self._slots.values()),
-            "total_cost_usd": round(
-                sum(s.tokens.estimated_cost_usd for s in self._slots.values()), 6
-            ),
+            "total_tokens": tokens,
+            "total_cost_usd": round(cost, 6),
             "elapsed_seconds": round(time.time() - self._created_at, 1),
+            "plan": self._plan.to_dict(),
+            "over_budget": self._plan.over_budget(tokens, cost),
+            "rebalance_count": self._rebalances,
         }
 
     # ---------------------------------------------------------------
@@ -83,8 +144,10 @@ class MissionControlOrchestrator:
         provider: str = "",
         model: str = "",
         model_label: str = "",
+        origin: str = "manual",
+        estimated_tokens: int = 0,
     ) -> AgentSlot:
-        """Create a new agent slot."""
+        """Create a new agent slot; ``origin`` ``auto`` for a composed crew's."""
         try:
             agent_role = AgentRole(role)
         except ValueError:
@@ -96,6 +159,8 @@ class MissionControlOrchestrator:
             provider=provider,
             model=model,
             model_label=model_label or model,
+            origin="auto" if origin == "auto" else "manual",
+            estimated_tokens=max(0, estimated_tokens),
         )
         self._slots[slot.id] = slot
         self._decision_trees[slot.id] = DecisionTree(slot.id)
@@ -175,22 +240,37 @@ class MissionControlOrchestrator:
     # Agent control (pause / resume / start / stop)
     # ---------------------------------------------------------------
 
-    def start_agent(self, agent_id: str, task: str = "") -> bool:
-        """Start or restart an agent."""
+    def start_agent(
+        self, agent_id: str, task: str = "", *, rebalanced: bool = False
+    ) -> bool:
+        """Mark an agent running on ``task``; a restart without one reuses the last.
+
+        ``rebalanced``: the same work again after ``rebalance_agent``; the tree
+        goes on, and the rebalancings of this task still count.
+
+        This only records the state. The model call itself runs in the Electron
+        main process (``main/mission-control/``), which has the user's provider
+        credentials, and reports back through ``/agents/{id}/update``.
+        """
         slot = self._slots.get(agent_id)
         if not slot:
             return False
+        task = task or slot.current_task
+        if not rebalanced:
+            slot.rebalances = 0
+            slot.tried_providers = []
+            slot.helper_id = ""
         slot.start(task)
         tree = self._decision_trees.get(agent_id)
-        if tree:
+        if tree and not rebalanced:
             tree.create_root(f"Task: {task[:80]}" if task else "Start")
-        self._log_event(
-            "agent_started",
-            {
-                "agent_id": agent_id,
-                "task": task,
-            },
+        # A helper's task is a prompt written for its model, not the person's.
+        started = (
+            {"agent_id": agent_id}
+            if slot.helper_of
+            else {"agent_id": agent_id, "task": task}
         )
+        self._log_event("agent_started", started)
         return True
 
     def pause_agent(self, agent_id: str) -> bool:
@@ -198,8 +278,10 @@ class MissionControlOrchestrator:
         slot = self._slots.get(agent_id)
         if not slot:
             return False
+        before = slot.status
         slot.pause()
-        self._log_event("agent_paused", {"agent_id": agent_id})
+        if slot.status != before:
+            self._log_event("agent_paused", {"agent_id": agent_id})
         return True
 
     def resume_agent(self, agent_id: str) -> bool:
@@ -207,8 +289,10 @@ class MissionControlOrchestrator:
         slot = self._slots.get(agent_id)
         if not slot:
             return False
+        before = slot.status
         slot.resume()
-        self._log_event("agent_resumed", {"agent_id": agent_id})
+        if slot.status != before:
+            self._log_event("agent_resumed", {"agent_id": agent_id})
         return True
 
     def stop_agent(self, agent_id: str) -> bool:
@@ -233,6 +317,7 @@ class MissionControlOrchestrator:
         tree = self._decision_trees.get(agent_id)
         if tree:
             tree.add_thinking(thinking)
+            self._check_steps(slot, tree)
 
     def update_agent_tool_call(
         self,
@@ -249,6 +334,19 @@ class MissionControlOrchestrator:
         tree = self._decision_trees.get(agent_id)
         if tree:
             tree.add_tool_call(tool_name, tool_input)
+            self._check_steps(slot, tree)
+
+    def _check_steps(self, slot: AgentSlot, tree: DecisionTree) -> None:
+        """Flag a running agent whose tree repeats the same steps."""
+        if slot.loop_detected or slot.status != AgentStatus.RUNNING:
+            return
+        if detect_step_loop(tree.steps(STEP_PERIOD_MAX * STEP_REPEATS)):
+            self._flag_loop(slot, "steps")
+
+    def _flag_loop(self, slot: AgentSlot, source: str) -> None:
+        # The producer reads it in its next update and stops the run.
+        slot.loop_detected = True
+        self._log_event("agent_loop_detected", {"agent_id": slot.id, "source": source})
 
     def update_agent_file(self, agent_id: str, file_path: str):
         """Track file changes by the agent."""
@@ -288,17 +386,169 @@ class MissionControlOrchestrator:
         if current_step:
             slot.current_step = current_step
 
+    def update_agent_output(self, agent_id: str, text: str):
+        """Append a chunk of the agent's answer, while it is still running."""
+        slot = self._slots.get(agent_id)
+        if not slot or slot.status != AgentStatus.RUNNING:
+            return
+        slot.append_output(text)
+        if not slot.loop_detected and detect_loop(slot.output):
+            self._flag_loop(slot, "answer")
+
+    def rebalance_agent(
+        self,
+        agent_id: str,
+        *,
+        error: str = "",
+        rate_limited: bool = False,
+        alternate_profile: bool = False,
+    ) -> dict[str, str] | None:
+        """Decide what to do with a run that went wrong, and apply it to the slot.
+
+        The main process calls it before reporting the failure; on an action
+        other than ``none`` it starts the same task again on the new model.
+        """
+        slot = self._slots.get(agent_id)
+        if not slot:
+            return None
+        reason = reason_of(error, rate_limited=rate_limited, loop=slot.loop_detected)
+        if not self._plan.auto_rebalance:
+            decision = {"action": "none", "reason": reason, "skipped": "disabled"}
+        else:
+            decision = plan_rebalance(
+                role=slot.role.value,
+                provider=slot.provider,
+                model=slot.model,
+                reason=reason,
+                providers=self._plan.fallback_providers(self._slots.values()),
+                tried=set(slot.tried_providers),
+                count=slot.rebalances,
+                over_budget=self.over_budget(),
+                alternate_profile=alternate_profile,
+            ).to_dict()
+        if decision["action"] == "none" and decision["skipped"] in (
+            "limit",
+            "no_alternative",
+        ):
+            decision = self._spawn_helper(slot, reason) or decision
+        if decision["action"] == "helper":
+            return decision
+        if decision["action"] == "none":
+            self._log_event(
+                "agent_rebalance_skipped",
+                {
+                    "agent_id": agent_id,
+                    "reason": reason,
+                    "skipped": decision["skipped"],
+                },
+            )
+            return decision
+        before = slot.model_label or slot.model or slot.provider
+        current = normalise_provider(slot.provider)
+        if decision["provider"] != current and current not in slot.tried_providers:
+            slot.tried_providers.append(current)
+        slot.provider = decision["provider"]
+        slot.model = decision["model"]
+        slot.model_label = decision["model_label"]
+        slot.rebalances += 1
+        self._rebalances += 1
+        after = slot.model_label or slot.model or slot.provider
+        # A slot and its tree are created and removed together.
+        self._decision_trees[agent_id].add_result(
+            "Rebalanced", f"{reason}: {before} -> {after}", success=False
+        )
+        self._log_event(
+            "agent_rebalanced",
+            {
+                "agent_id": agent_id,
+                "reason": reason,
+                "action": decision["action"],
+                "from": before,
+                "to": after,
+                "provider": slot.provider,
+            },
+        )
+        return decision
+
+    def _spawn_helper(self, slot: AgentSlot, reason: str) -> dict[str, str] | None:
+        """Start a helper beside ``slot`` when nothing else is left (``helper.py``).
+
+        One per agent and task, none for a helper, none over budget.
+        """
+        if slot.helper_of or slot.helper_id or self.over_budget():
+            return None
+        found = plan_helper(
+            provider=slot.provider,
+            model=slot.model,
+            reason=reason,
+            providers=self._plan.fallback_providers(self._slots.values()),
+            tried=set(slot.tried_providers),
+        )
+        if found is None:
+            return None
+        helper = self.create_agent(
+            slot.name,
+            HELPER_ROLE,
+            found.provider,
+            found.model,
+            found.model_label,
+            origin=slot.origin,
+        )
+        helper.helper_of = slot.id
+        helper.helper_of_name = slot.name
+        helper.current_task = helper_task(slot.current_task, slot.output, reason)
+        slot.helper_id = helper.id
+        self._rebalances += 1
+        before = slot.model_label or slot.model or slot.provider
+        after = found.model_label or found.model or found.provider
+        self._decision_trees[slot.id].add_result(
+            "Helper", f"{reason}: {after}", success=False
+        )
+        self._log_event(
+            "agent_rebalanced",
+            {
+                "agent_id": slot.id,
+                "reason": reason,
+                "action": "helper",
+                "from": before,
+                "to": after,
+                "provider": found.provider,
+                "helper_id": helper.id,
+            },
+        )
+        return {**found.to_dict(), "helper_id": helper.id}
+
     def update_agent_status(self, agent_id: str, status: str, error: str = ""):
-        """Update agent status directly."""
+        """Update agent status; an end of run stops its clock and closes its tree."""
         slot = self._slots.get(agent_id)
         if not slot:
             return
         try:
-            slot.status = AgentStatus(status)
+            new_status = AgentStatus(status)
         except ValueError:
             return
+        if new_status in (AgentStatus.COMPLETED, AgentStatus.ERROR):
+            self._finish_agent(slot, new_status, error)
+            return
+        slot.status = new_status
         if error:
             slot.error_message = error
+
+    def _finish_agent(self, slot: AgentSlot, status: AgentStatus, error: str):
+        """Record the end of a run once; a stopped agent is not reopened by it."""
+        if slot.status != AgentStatus.RUNNING:
+            return
+        tree = self._decision_trees.get(slot.id)
+        if status == AgentStatus.COMPLETED:
+            slot.complete()
+            if tree:
+                tree.add_result("Answer", slot.output, success=True)
+            self._log_event("agent_completed", {"agent_id": slot.id})
+            return
+        slot.fail(error)
+        if tree:
+            tree.add_result("Error", error, success=False)
+        self._log_event("agent_failed", {"agent_id": slot.id, "error": error[:300]})
 
     # ---------------------------------------------------------------
     # Decision tree access
@@ -350,7 +600,9 @@ class MissionControlOrchestrator:
             self._event_log = self._event_log[-200:]
 
     def get_event_log(self, limit: int = 50) -> list[dict[str, Any]]:
-        """Get recent events."""
+        """The ``limit`` most recent events (none for 0 or less)."""
+        if limit <= 0:
+            return []
         return self._event_log[-limit:]
 
 

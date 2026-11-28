@@ -43,6 +43,7 @@ import type {
 	TaskComplexity,
 	TaskImpact,
 	TaskPriority,
+	TestPlacementMode,
 	ThinkingLevel,
 } from "../../shared/types";
 import type { ContextPolicy } from "../../shared/types/task";
@@ -72,6 +73,7 @@ import { useMobileSetup } from "./task-form/useMobileSetup";
 import {
 	buildEngineMetadata,
 	defaultEngineProvider,
+	engineProviders,
 	isUniformEngine,
 	resolveTaskEngine,
 	sameTrio,
@@ -80,7 +82,14 @@ import {
 	uniformEngine,
 } from "../../shared/utils/task-engine";
 import { BenchEngineHint } from "./bench/BenchRecommendation";
+import type { AiAccountPins } from "../../shared/types/ai-accounts";
+import { pinsForProviders, sanitizeAccountPins } from "../../shared/utils/ai-account-pins";
 import { TaskEngineEditor } from "./task-engine/TaskEngineEditor";
+import {
+	normalizePhaseCodeMode,
+	type PhaseCodeMode,
+	phaseCodeModeToSave,
+} from "../../shared/utils/code-mode";
 import { TaskFormFields } from "./task-form/TaskFormFields";
 import { TaskModalLayout } from "./task-form/TaskModalLayout";
 import type { FileReferenceData } from "./task-form/useImageUpload";
@@ -91,6 +100,7 @@ import {
 	autoSplitValueFrom,
 	isAutoSplitValueValid,
 } from "./task-form/AutoSplitFields";
+import { placementModeOf } from "./suite-placement/suite-hold";
 import {
 	autoSplitCeilingFor,
 	kindFromCategory,
@@ -227,6 +237,17 @@ export function TaskEditDialog({
 	);
 	const [engine, setEngine] = useState<TaskEngine>(engineForTask);
 	const initialEngineRef = useRef<string>(JSON.stringify(engine));
+	const [phaseCodeMode, setPhaseCodeMode] = useState<PhaseCodeMode>(() =>
+		normalizePhaseCodeMode(task.metadata?.phaseCodeMode),
+	);
+	// The AI account the card pins per provider (absent = the project's, else the default).
+	const [aiAccounts, setAiAccounts] = useState<AiAccountPins | undefined>(() =>
+		sanitizeAccountPins(task.metadata?.aiAccounts),
+	);
+	const projectAiAccounts = useMemo(
+		() => projects.find((p) => p.id === task.projectId)?.settings?.aiAccounts,
+		[projects, task.projectId],
+	);
 
 	// Agent profile / model configuration
 	const [profileId, setProfileId] = useState<string>(() => {
@@ -278,6 +299,9 @@ export function TaskEditDialog({
 	// TDD override (per-task)
 	const [tddMode, setTddMode] = useState(task.metadata?.tddMode ?? false);
 	const [verifyLoop, setVerifyLoop] = useState(task.metadata?.verifyLoop ?? true);
+	const [testPlacement, setTestPlacement] = useState<TestPlacementMode | undefined>(() =>
+		placementModeOf(task.metadata?.testPlacement),
+	);
 	const [autoSplit, setAutoSplit] = useState<AutoSplitValue>(() =>
 		autoSplitValueFrom(task.metadata),
 	);
@@ -366,6 +390,7 @@ export function TaskEditDialog({
 		);
 		setTddMode(task.metadata?.tddMode ?? false);
 		setVerifyLoop(task.metadata?.verifyLoop ?? true);
+		setTestPlacement(placementModeOf(task.metadata?.testPlacement));
 		setAutoSplit(autoSplitValueFrom(task.metadata));
 		setVerifyWindow(task.metadata?.verifyWindow ?? "");
 		setVerifyScenario(task.metadata?.verifyScenario ?? "");
@@ -374,6 +399,8 @@ export function TaskEditDialog({
 		const openedEngine = engineForTask();
 		setEngine(openedEngine);
 		initialEngineRef.current = JSON.stringify(openedEngine);
+		setPhaseCodeMode(normalizePhaseCodeMode(task.metadata?.phaseCodeMode));
+		setAiAccounts(sanitizeAccountPins(task.metadata?.aiAccounts));
 		setError(null);
 		setStep(1);
 
@@ -461,8 +488,15 @@ export function TaskEditDialog({
 		// The engine is "changed" only when it differs from what the dialog
 		// opened with, so plain edits rewrite none of it.
 		const engineChanged = JSON.stringify(engine) !== initialEngineRef.current;
+		// The card's account pins, for the providers its engine uses.
+		const pinsToSave = pinsForProviders(aiAccounts, engineProviders(engine));
+		const accountsChanged =
+			JSON.stringify(pinsToSave ?? null) !==
+			JSON.stringify(sanitizeAccountPins(task.metadata?.aiAccounts) ?? null);
 		const splitBefore = autoSplitMetadata(autoSplitValueFrom(task.metadata));
 		const splitAfter = autoSplitMetadata(autoSplit);
+		const testPlacementChanged =
+			testPlacement !== placementModeOf(task.metadata?.testPlacement);
 		const autoSplitChanged =
 			splitBefore.noSplit !== splitAfter.noSplit ||
 			splitBefore.splitMaxLines !== splitAfter.splitMaxLines;
@@ -481,10 +515,12 @@ export function TaskEditDialog({
 				complexity !== (task.metadata?.complexity || "") ||
 				impact !== (task.metadata?.impact || "") ||
 				engineChanged ||
+				accountsChanged ||
 				requireReviewBeforeCoding !==
 					(task.metadata?.requireReviewBeforeCoding ?? false) ||
 				tddMode !== (task.metadata?.tddMode ?? false) ||
 				verifyLoop !== (task.metadata?.verifyLoop ?? true) ||
+				testPlacementChanged ||
 				autoSplitChanged ||
 				verifyWindow.trim() !== (task.metadata?.verifyWindow ?? "") ||
 				verifyScenario.trim() !== (task.metadata?.verifyScenario ?? "") ||
@@ -512,6 +548,14 @@ export function TaskEditDialog({
 		// writes it only when it was changed here.
 		if (isDuplicate || engineChanged) {
 			Object.assign(metadataUpdates, buildEngineMetadata(engine));
+		}
+		// `undefined` removes the key: the card follows its project's accounts again.
+		if (isDuplicate || accountsChanged) metadataUpdates.aiAccounts = pinsToSave;
+		// Its code mode per phase too: written when changed, removed when back to Settings'.
+		const ownCodeMode = phaseCodeModeToSave(phaseCodeMode);
+		const savedCodeMode = phaseCodeModeToSave(normalizePhaseCodeMode(task.metadata?.phaseCodeMode));
+		if (isDuplicate || JSON.stringify(ownCodeMode) !== JSON.stringify(savedCodeMode)) {
+			metadataUpdates.phaseCodeMode = ownCodeMode;
 		}
 		// Always set attachedImages to persist removal when all images are deleted
 		metadataUpdates.attachedImages = images.length > 0 ? images : [];
@@ -548,6 +592,8 @@ export function TaskEditDialog({
 		if (verifyLoop !== (task.metadata?.verifyLoop ?? true)) {
 			metadataUpdates.verifyLoop = verifyLoop;
 		}
+		// `undefined` removes the key: the task follows the project's placement again.
+		if (isDuplicate || testPlacementChanged) metadataUpdates.testPlacement = testPlacement;
 		// `undefined` removes the key: the task is back on the project's ceiling.
 		if (isDuplicate || autoSplitChanged) Object.assign(metadataUpdates, splitAfter);
 		if (verifyWindow.trim() !== (task.metadata?.verifyWindow ?? "")) {
@@ -755,6 +801,11 @@ export function TaskEditDialog({
 							onChange={setEngine}
 							idPrefix={`task-engine-${task.id}`}
 							disabled={isSaving}
+							phaseCodeMode={phaseCodeMode}
+							onPhaseCodeModeChange={setPhaseCodeMode}
+							accounts={aiAccounts}
+							onAccountsChange={setAiAccounts}
+							inheritedAccounts={projectAiAccounts}
 						/>
 					</div>
 				}
@@ -798,6 +849,8 @@ export function TaskEditDialog({
 				autoSplitProjectDisabled={projectAutoSplit?.enabled === false}
 				verifyLoop={verifyLoop}
 				onVerifyLoopChange={setVerifyLoop}
+				testPlacement={testPlacement}
+				onTestPlacementChange={setTestPlacement}
 				verifyWindow={verifyWindow}
 				onVerifyWindowChange={setVerifyWindow}
 				verifyScenario={verifyScenario}

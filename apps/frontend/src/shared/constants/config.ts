@@ -68,6 +68,9 @@ export const DEFAULT_APP_SETTINGS = {
 	sentryEnabled: true,
 	// Auto-name Claude terminals based on initial message (enabled by default)
 	autoNameClaudeTerminals: true,
+	// One-line summary under each Kanban column title
+	kanbanColumnSummary: true,
+	kanbanAbandonClosedPrs: true,
 };
 
 // ============================================
@@ -103,6 +106,8 @@ export const AUTO_BUILD_PATHS = {
 	// Cooperative pause flag. Lives beside the spec rather than inside the
 	// plan so it exists during planning too — see foundation/pause_state.py.
 	PAUSE_STATE: "pause_state.json",
+	// Every status change of the task (main/task-status-history.ts).
+	STATUS_HISTORY: "status_history.json",
 	SPEC_FILE: "spec.md",
 	QA_REPORT: "qa_report.md",
 	BUILD_PROGRESS: "build-progress.txt",

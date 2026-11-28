@@ -5,6 +5,17 @@ import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+	checkDevPort,
+	chooseDevPort,
+	DEV_HOST,
+	exitCodeAfterUvicorn,
+	invalidPortMessage,
+	movedPortMessage,
+	noFreePortMessage,
+	parsePort,
+} from "./dev-port.mjs";
+import { devReloadArgs } from "./dev-reload-args.mjs";
 
 const isWin = process.platform === "win32";
 const __filename = fileURLToPath(import.meta.url);
@@ -45,37 +56,44 @@ function ensureDeps(cb) {
 	});
 }
 
-function runUvicorn() {
+function runUvicorn(devPort) {
 	const uvicornArgs = [
 		"-m",
 		"uvicorn",
 		"provider_api:app",
 		"--host",
-		"127.0.0.1",
+		DEV_HOST,
 		"--port",
-		"9000",
-		"--reload",
-		// Watch only the backend source directory. The shared virtualenv lives at
-		// the repo root (../../.venv), so scoping the watcher to apps/backend keeps
-		// pip installs (PythonEnvManager) from triggering an endless reload storm.
-		// NOTE: do not use glob --reload-exclude patterns like ".venv/*" here: the
-		// bundled Windows python.exe expands wildcard argv, turning the pattern into
-		// extra positional args and making uvicorn exit with code 2.
-		"--reload-dir",
-		__dirname,
-		// The Electron PythonEnvManager installs into apps/backend/.venv, which
-		// is INSIDE the watched dir — without this exclude, every pip install
-		// reload-storms the server. No wildcard => safe from the argv expansion
-		// issue above. Must be ABSOLUTE: uvicorn's FileFilter matches exclude
-		// dirs against the changed file's (absolute) parents.
-		"--reload-exclude",
-		join(__dirname, ".venv"),
+		String(devPort),
+		// Watch only the backend source directory; the shared virtualenv lives at
+		// the repo root (../../.venv). Why the .venv exclude is conditional:
+		// dev-reload-args.mjs.
+		...devReloadArgs(__dirname),
 	];
 	const proc = spawn(venvPython(), uvicornArgs, {
 		stdio: "inherit",
 		cwd: __dirname,
 	});
-	proc.on("exit", (code) => process.exit(code));
+	// A busy port fails uvicorn with exit code 3; why that is not always a
+	// failure of `pnpm run dev`: dev-port.mjs.
+	proc.on("exit", async (code) =>
+		process.exit(await exitCodeAfterUvicorn(code, { port: devPort })),
+	);
 }
 
-ensureVenv(() => ensureDeps(runUvicorn));
+// `pnpm run dev` (scripts/dev.mjs) passes the port it chose for the backend
+// and the app; run alone, this launcher makes the same choice, and the app's
+// main (local-backend-port.ts) finds the backend there.
+const raw = process.env.BACKEND_PORT;
+const chosen = parsePort(raw);
+if (raw !== undefined && raw !== "" && chosen === null) console.warn(invalidPortMessage(raw));
+const choice = await chooseDevPort({ chosen });
+if (choice === null) {
+	console.error(noFreePortMessage());
+	process.exit(1);
+}
+if (choice.movedFrom !== undefined) console.log(movedPortMessage(choice.movedFrom, choice.port));
+const devPort = choice.port;
+const port = await checkDevPort({ port: devPort });
+if (port.start) ensureVenv(() => ensureDeps(() => runUvicorn(devPort)));
+else process.exit(port.exitCode);

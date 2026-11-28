@@ -80,6 +80,8 @@ _CONTRIBUTOR = _VIEWER | {
     "agent.write",
     "agent.execute",
     "agent.cancel",
+    # Who runs agents may run them on their own AI accounts.
+    "settings.account.write",
 }
 
 _OPERATOR = _VIEWER | {
@@ -90,6 +92,7 @@ _OPERATOR = _VIEWER | {
     "agent.cancel",
     "analytics.write",
     "audit.export",
+    "settings.account.write",
 }
 
 _MAINTAINER = _CONTRIBUTOR | {
@@ -102,6 +105,9 @@ _MAINTAINER = _CONTRIBUTOR | {
     "project.member.read",
     "ops.write",
     "settings.write",
+    # The organization's team reviews of catalogue MCP servers (#369): read
+    # by every member, written by maintainers and administrators.
+    "marketplace.write",
 }
 
 # Org admin: everything inside the tenant, nothing across tenants.

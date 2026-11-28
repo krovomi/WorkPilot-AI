@@ -13,6 +13,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { app, safeStorage } from "electron";
+import { asyncEncryptionUsable } from "./secret-storage";
 
 export type ConnectionMode = "local" | "server";
 
@@ -68,12 +69,9 @@ function stateFilePath(): string {
 // Writes are chained so an older state never lands after a newer one.
 let persistChain: Promise<void> = Promise.resolve();
 
-async function encryptionAvailable(): Promise<boolean> {
-	try {
-		return await safeStorage.isAsyncEncryptionAvailable();
-	} catch {
-		return false;
-	}
+/** Never waits on a keyring that did not answer at startup (secret-storage.ts). */
+function encryptionAvailable(): Promise<boolean> {
+	return asyncEncryptionUsable();
 }
 
 async function writeState(state: {
@@ -234,7 +232,19 @@ async function serverFetch<T>(
 export async function getServerAuthConfig(
 	url: string,
 ): Promise<
-	| { ok: true; data: { local_enabled: boolean; entra_enabled: boolean; entra_tenant_id: string | null; entra_client_id: string | null } }
+	| {
+			ok: true;
+			data: {
+				local_enabled: boolean;
+				entra_enabled: boolean;
+				entra_tenant_id: string | null;
+				entra_client_id: string | null;
+				/** Any OpenID Connect provider; read with `providerFromConfig`. */
+				sso_enabled?: boolean;
+				sso_name?: string;
+				[key: string]: unknown;
+			};
+		  }
 	| { ok: false; error: string }
 > {
 	try {
@@ -252,12 +262,14 @@ export async function getServerAuthConfig(
 /**
  * Authenticated request against the current server, attaching the access
  * token and the organization it acts in. An expired access token is refreshed
- * once, shared with any concurrent caller, and the request sent again.
+ * once, shared with any concurrent caller, and the request sent again. With
+ * `as: "text"` the answer comes back as text (a CSV or a file to save).
  */
 export async function authedFetch<T>(
 	pathName: string,
 	method: string,
 	body?: unknown,
+	as: "json" | "text" = "json",
 ): Promise<{ ok: true; data: T } | { ok: false; error: string }> {
 	if (!serverUrl) return { ok: false, error: "No server URL configured" };
 	if (!accessToken) return { ok: false, error: "Not authenticated" };
@@ -288,6 +300,7 @@ export async function authedFetch<T>(
 				return { ok: false, error: text || `HTTP ${res.status}` };
 			}
 		}
+		if (as === "text") return { ok: true, data: text as T };
 		return { ok: true, data: (text ? JSON.parse(text) : null) as T };
 	} catch (err) {
 		return {
@@ -375,6 +388,7 @@ export async function acceptInvite(
 export async function createInvite(payload: {
 	email: string;
 	role?: string;
+	org_role?: string | null;
 	project_id?: string | null;
 	project_role?: string | null;
 }): Promise<
@@ -419,6 +433,18 @@ export async function loginWithEntraIdToken(
 	idToken: string,
 ): Promise<{ ok: true; user: ServerUser } | { ok: false; error: string }> {
 	const result = await serverFetch<TokenResponse>("/auth/oidc/exchange", {
+		id_token: idToken,
+	});
+	if (!result.ok) return result;
+	applyTokens(result.data);
+	return { ok: true, user: result.data.user };
+}
+
+/** Hand the id_token of the server's OpenID Connect provider to the server. */
+export async function loginWithSsoIdToken(
+	idToken: string,
+): Promise<{ ok: true; user: ServerUser } | { ok: false; error: string }> {
+	const result = await serverFetch<TokenResponse>("/auth/sso/exchange", {
 		id_token: idToken,
 	});
 	if (!result.ok) return result;
@@ -543,6 +569,8 @@ export interface QuotaSummary {
 	used_users: number;
 	used_projects: number;
 	used_concurrent_runs: number;
+	/** Every token the organization's runs and jobs used this month. */
+	used_tokens_this_month?: number;
 }
 
 export interface AuditEntry {
@@ -555,6 +583,9 @@ export interface AuditEntry {
 	payload: Record<string, unknown> | null;
 	ip: string | null;
 	created_at: string;
+	/** The sign-in the action was made under, and how the person signed in. */
+	login_id?: string | null;
+	login_method?: string | null;
 }
 
 export interface SessionSummary {
@@ -654,8 +685,9 @@ export const adminApi = {
 		authedFetch<{ deleted: boolean }>(`/admin/roles/${roleId}`, "DELETE"),
 
 	listMembers: () => authedFetch<OrgMemberSummary[]>("/admin/members", "GET"),
-	addMember: (body: { user_id: string; role_slug: string }) =>
-		authedFetch<OrgMemberSummary>("/admin/members", "POST", body),
+	addMember: (
+		body: { user_id: string; role_slug: string } | { email: string; role_slug: string },
+	) => authedFetch<OrgMemberSummary>("/admin/members", "POST", body),
 	updateMemberRole: (userId: string, roleSlug: string) =>
 		authedFetch<OrgMemberSummary>(`/admin/members/${userId}`, "PATCH", {
 			role_slug: roleSlug,

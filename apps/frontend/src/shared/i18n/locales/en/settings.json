@@ -38,8 +38,6 @@
 			"title": "Accounts",
 			"description": "Accounts & API endpoints",
 			"alerts": {
-				"noProviders": "No provider configured. Configure your API keys to get started.",
-				"providerErrors": "{{count}} provider(s) with errors",
 				"sophisticated": {
 					"noProvidersTitle": "Get started with your first provider",
 					"noProvidersDescription": "Configure at least one provider to start using the application.",
@@ -64,7 +62,6 @@
 			"autoSwitching": {
 				"globalTitle": "Automatic Account Switching",
 				"globalDescription": "Automatically switch between your accounts based on usage and rate limits.",
-				"title": "Auto-switching",
 				"providerAdded": "Provider added to auto-switching",
 				"providerRemoved": "Provider removed from auto-switching",
 				"providerDescription": "{{providerName}} has been {{action}} to auto-switching list",
@@ -90,6 +87,7 @@
 					"openWindsurfLogin": "windsurf.com/account",
 					"tokenDetected": "API key detected",
 					"saveAndConnect": "Save & Connect",
+					"saveFailed": "Could not save the detected Windsurf token. Detect it again, or paste a key in the API Key tab.",
 					"saveSuccess": "Windsurf connection saved successfully!",
 					"accountInfo": "Authenticated Account",
 					"accountName": "Name",
@@ -144,40 +142,8 @@
 				}
 			},
 			"providerCard": {
-				"configure": "Configure",
-				"test": "Test",
-				"edit": "Edit",
-				"apiKey": "API Key",
 				"authentication": "Authentication",
-				"authCli": "CLI Auth",
-				"authOauth": "OAuth",
-				"authLocal": "Local",
-				"cliAuthenticated": "CLI authenticated",
-				"oauthConnected": "OAuth connected",
-				"localRunning": "Local instance",
 				"oauthCli": "OAuth (CLI)",
-				"notConfigured": "Not configured",
-				"lastTest": "Last test",
-				"neverTested": "Never tested",
-				"usage": "Usage",
-				"usageThisMonth": "Usage this month",
-				"week": "week",
-				"notAvailable": "Not available",
-				"source": "Source",
-				"statusLabel": "Status",
-				"status": {
-					"notConfigured": "Not configured",
-					"error": "Error",
-					"active": "Active"
-				},
-				"rateLimited": "Rate limited",
-				"needsReauth": "Needs re-authentication",
-				"toggleDetails": "Show details",
-				"keySaved": "Key saved",
-				"keySavedToday": "today",
-				"keySavedDaysAgo_one": "{{count}} day ago",
-				"keySavedDaysAgo_other": "{{count}} days ago",
-				"keySavedUnknown": "date unknown",
 				"keyRenewal_one": "Key saved {{count}} day ago: consider renewing it (over {{threshold}} days)",
 				"keyRenewal_other": "Key saved {{count}} days ago: consider renewing it (over {{threshold}} days)",
 				"statusNested": {
@@ -189,14 +155,7 @@
 				"testSuccessDescription": "The {{providerName}} provider is working correctly",
 				"testError": "Test failed",
 				"testErrorDescription": "The {{providerName}} provider failed: {{error}}",
-				"deleteConfirm": "Are you sure you want to delete this provider configuration?",
-				"testDetails": {
-					"modelsAvailable": "{{count}} models available",
-					"modelUsed": "Model used: {{model}}"
-				},
-				"errors": {
-					"unknownError": "Unknown error"
-				}
+				"deleteConfirm": "Are you sure you want to delete this provider configuration?"
 			},
 			"providers": {
 				"meta": "Official Meta AI models",
@@ -205,6 +164,8 @@
 				"aws": "AWS Bedrock and Amazon services",
 				"copilot": "GitHub Copilot",
 				"grok": "Grok xAI models",
+				"openrouter": "Hundreds of models from many vendors (Kimi, GLM, DeepSeek, Claude, GPT…) with one OpenRouter key",
+				"huggingface": "Open models of the Hugging Face Hub through Inference Providers, billed to your Hugging Face account",
 				"windsurf": "Windsurf AI Provider",
 				"cursor": "Cursor AI Provider",
 				"ollama": "Local open-source models with Ollama",
@@ -216,13 +177,6 @@
 				"antigravity": "Google's coding agent, driven through the agy CLI",
 				"pi": "Minimal coding agent, driven through the pi CLI",
 				"gemini-cli": "Google's open-source Gemini CLI, driven over the Agent Client Protocol"
-			},
-			"providerToggle": {
-				"enabled": "Provider enabled",
-				"disabled": "Provider disabled",
-				"description": "{{providerId}} has been {{action}} successfully",
-				"error": "Error",
-				"errorDescription": "Failed to {{action}} provider {{providerId}}"
 			},
 			"localModels": {
 				"title": "Locally installed models",
@@ -330,7 +284,59 @@
 					"unverified": "● Tool-calling to verify",
 					"unverifiedDetail": "— not confirmed from the name; open the model card. \"~GB\" sizes are estimates (4-bit quant)."
 				},
-				"estimatedSize": " · ~{{size}} GB"
+				"estimatedSize": " · ~{{size}} GB",
+				"cloudBadge": "Cloud",
+				"cloudBadgeTitle": "Served by the Hugging Face router with tool calling",
+				"cloudPrice": "{{price}} per M tokens",
+				"tryInCloud": "Try in the cloud",
+				"tryInCloudTooltip": "Make {{id}} the Hugging Face cloud model, nothing to download",
+				"cloudDefault": "Cloud model",
+				"cloudChosen": "{{id}} is now the Hugging Face cloud model. Pick the Hugging Face engine on a task to try it, nothing to download.",
+				"cloudNeedsToken": "Add a Hugging Face token on the Hugging Face provider page first.",
+				"cloudSaveFailed": "The cloud model could not be saved."
+			},
+			"gatewayCatalog": {
+				"title": "Models of {{name}}",
+				"description": "The live list of the models {{name}} serves with tool calling, with their price. Click one to make it the default model.",
+				"searchPlaceholder": "Filter models…",
+				"empty": "No model matches.",
+				"more": "{{count}} more: refine the filter.",
+				"price": "{{price}} per M tokens",
+				"context": "{{size}} context",
+				"providers_one": "{{count}} provider",
+				"providers_other": "{{count}} providers",
+				"default": "Default",
+				"setDefault": "Make {{id}} the default model",
+				"offline": "Offline list: {{name}} could not be reached.",
+				"loading": "Loading the models…"
+			},
+			"gatewayRouting": {
+				"title": "Routing",
+				"description": {
+					"openrouter": "How OpenRouter picks the provider that answers, and what that provider may do with your prompts.",
+					"huggingface": "How the Hugging Face router picks the inference provider that answers."
+				},
+				"sort": "Provider order",
+				"sortDefault": "OpenRouter's choice (load balancing)",
+				"sorts": {
+					"price": "Cheapest first",
+					"throughput": "Fastest output first",
+					"latency": "Lowest latency first"
+				},
+				"denyDataCollection": "Only providers that do not store or train on prompts",
+				"zeroRetention": "Only zero-data-retention providers",
+				"fallbacks": "Fallback models",
+				"fallbacksHint": "Tried in order when the default model is down, rate-limited or refuses the request. Up to {{count}}.",
+				"fallbackAria": "Fallback model {{index}}",
+				"fallbackPlaceholder": "vendor/model",
+				"invalidModel": "Not a model id: {{id}}",
+				"policy": "Router policy",
+				"policyDefault": "Hugging Face default",
+				"policies": {
+					"fastest": "Fastest provider",
+					"cheapest": "Cheapest provider"
+				},
+				"saveFailed": "The routing could not be saved."
 			}
 		},
 		"updates": {
@@ -351,101 +357,128 @@
 		},
 		"sandbox": {
 			"title": "Sandbox",
-			"description": "Agent execution isolation & rollback",
-			"defaultMode": {
-				"title": "Default Sandbox Mode",
-				"description": "Choose the default isolation mode for agent execution.",
+			"description": "Snapshots before each agent session, and the limits a session works within",
+			"snapshots": {
+				"title": "Snapshots & rollback",
+				"description": "Before each agent session (planning, coding, QA), the task's worktree is saved as a hidden git commit. It works for every language and stack: ignored files (node_modules, bin, obj, .venv…) are not copied. Restore one from the card of a paused task.",
+				"enable": "Snapshot before each session",
+				"enableHint": "Only in task worktrees; the project's main checkout is never touched.",
+				"autoRollback": "Restore automatically when a session is stopped",
+				"autoRollbackHint": "When the anomaly watch stops a session, or the agent writes outside the sandbox's rules. The replaced state is kept as a snapshot too.",
+				"keep": "Snapshots kept per task",
+				"keepHint": "Older ones are removed."
+			},
+			"mode": {
+				"title": "Write mode",
+				"description": "Inside the project. Writes outside it are always refused.",
 				"normal": {
 					"label": "Normal",
-					"description": "Whitelist + resource limits"
+					"description": "The agent writes anywhere in its worktree."
 				},
 				"restricted": {
 					"label": "Restricted",
-					"description": "Strict whitelist, reduced limits"
-				},
-				"dryRun": {
-					"label": "Dry-run",
-					"description": "Plan only, no file changes"
-				},
-				"docker": {
-					"label": "Docker",
-					"description": "Full container isolation"
+					"description": "Only the paths listed below are writable (the task's own files stay writable)."
 				}
 			},
-			"fileAccess": {
-				"title": "File Access Whitelist",
-				"description": "Paths agents are allowed to access. Sensitive paths (.git/, .env, .ssh/) are always blocked.",
-				"placeholder": "e.g. lib/ or config/app.json",
-				"read": "Read",
-				"write": "Write",
-				"readWrite": "Read/Write",
-				"readOnly": "Read Only",
-				"add": "Add"
+			"paths": {
+				"title": "Writable paths (restricted mode)",
+				"description": "Relative to the project, folders or files. Refused before the write where the provider goes through WorkPilot's hooks; for CLI agents that write with their own tools, the write is detected, the session stopped and the snapshot restored.",
+				"placeholder": "e.g. src/ or tests/unit",
+				"add": "Add",
+				"remove": "Remove {{path}}",
+				"invalid": "A path inside the project, without .. and not absolute.",
+				"emptyRestricted": "Restricted mode with no path: the agent can only write the task's own files."
 			},
-			"resourceLimits": {
-				"title": "Resource Limits",
-				"description": "Maximum resources an agent can consume per execution.",
-				"cpu": "CPU (%)",
-				"ram": "RAM (MB)",
-				"maxTime": "Max Time (s)",
-				"maxFiles": "Max Files",
-				"maxFileSize": "Max File Size (MB)"
+			"limits": {
+				"title": "Limits per session",
+				"description": "Counted for every provider. 0 means no limit.",
+				"none": "no limit",
+				"maxFiles": "Files written",
+				"maxFilesHint": "Distinct files; over it, the task is paused.",
+				"maxFileSize": "Largest file",
+				"maxFileSizeHint": "A larger write is refused (or stops the session).",
+				"maxSession": "Longest session",
+				"maxSessionHint": "Over it, the task is paused."
 			},
-			"snapshots": {
-				"title": "Snapshots & Rollback",
-				"description": "A file snapshot is automatically created before each agent execution. If the agent fails, files are restored automatically.",
-				"warning": "Snapshots are created per-sandbox and stored in memory. Auto-rollback triggers when an agent execution fails or is terminated by the anomaly detector. Manual rollback is available in the task detail view."
-			},
-			"blockedCommands": {
-				"title": "Blocked Commands (default)",
-				"description": "These commands are always blocked inside the sandbox."
+			"always": "Always on, whatever these settings: the command allowlist, writes confined to the build's folders, protected security files, and the OS sandbox around commands where the system has one.",
+			"microvm": {
+				"title": "Docker microVM per task",
+				"description": "Each task's commands run in its own Docker Sandboxes microVM, with its own kernel and Docker engine: only the worktree and the task's files are mounted, the network is closed except for the package registries and the provider. Works on Windows 11, macOS (Apple silicon) and Linux with KVM.",
+				"enable": "Run each task in a Docker microVM",
+				"enableHint": "Off: commands run in the OS sandbox as before. On, without a working sbx, the OS sandbox takes over and the task says why.",
+				"memory": "Memory per task",
+				"memoryHint": "Auto: a share of the free memory, between 2 and 16 GiB.",
+				"cpus": "CPUs per task",
+				"cpusHint": "Auto: half the machine's cores.",
+				"cliAgents": "Run agent CLIs in the microVM too (experimental)",
+				"cliAgentsHint": "OpenCode runs inside the task's microVM, with only the API keys you stored in sbx (sbx secret set openai, anthropic…): the sbx proxy adds them, the VM never sees them. Without a key in sbx, or for a subscription sign-in, the CLI stays on this machine in the OS sandbox, and the card says so.",
+				"auto": "auto",
+				"requirements": "Needs the sbx command (Windows: winget install -h Docker.sbx; macOS: brew install docker/tap/sbx) and a Docker account: run sbx login once. On Windows, enable Windows Hypervisor Platform. WorkPilot turns sbx telemetry off; no code or prompt leaves the machine. In this version, commands of the WorkPilot loop (OpenAI, Google, Mistral, Copilot, local models...) run in the VM; CLI agents keep the OS sandbox.",
+				"status": {
+					"unknown": "Not checked yet.",
+					"ready": "sbx {{version}} is ready · {{count}} task VM(s) now.",
+					"notReady": "sbx is installed but not ready: {{reason}}",
+					"missing": "sbx was not found on this machine.",
+					"check": "Check"
+				}
 			}
+		},
+		"codeMode": {
+			"title": "Code mode",
+			"description": "Agents chain their tools in a short script instead of one model turn per call",
+			"mode": {
+				"title": "When agents may write a script",
+				"description": "A script searches, reads, edits and runs commands in one step, several at a time, and returns only what the agent needs. Off keeps every agent as it works today.",
+				"off": {
+					"label": "Off",
+					"description": "No agent writes a script. The default."
+				},
+				"auto": {
+					"label": "Auto",
+					"description": "Only where it pays: coding, QA and the analyses of the code. Spec writing, reviews and ideation stay as they are."
+				},
+				"on": {
+					"label": "On",
+					"description": "Every agent that has tools may write a script."
+				}
+			},
+			"safety": {
+				"title": "Each call of a script is checked like a direct call",
+				"description": "The script itself reads no file, starts no process and reaches no network. Each of its calls goes through the agent's rights, the protected paths, the guardrails, the command allowlist and the OS sandbox, and the anomaly watch scores every one."
+			},
+			"providers": "Works with every provider whose tools WorkPilot runs: OpenAI, Google, Mistral, Copilot, Windsurf, Ollama, LM Studio and the compatible providers and gateways. Claude tasks use Claude Code's own code mode in their worktree, on the Anthropic API with Opus or Sonnet 5.5 and later, and terminals get it too. A task can choose its own mode per phase."
 		},
 		"anomaly-detection": {
 			"title": "Anomaly Detection",
-			"description": "Agent behavior monitoring & alerts",
+			"description": "The trust score of each agent session, and what pauses or stops it",
 			"enable": {
-				"title": "Enable Anomaly Detection",
-				"description": "Monitor all agent sessions for suspicious behavior"
+				"title": "Enable anomaly detection",
+				"description": "Watch every agent session, whatever the provider"
 			},
 			"trustScore": {
-				"title": "Trust Score Thresholds",
-				"description": "Each agent session starts at 100. Anomalies reduce the score. Actions trigger at these thresholds.",
-				"pauseThreshold": "Pause threshold",
-				"pauseDescription": "Agent is paused and a notification is sent",
-				"terminateThreshold": "Terminate threshold",
-				"terminateDescription": "Agent is terminated immediately"
+				"title": "Trust score thresholds",
+				"description": "Each agent session starts at 100; each anomaly lowers it.",
+				"pauseThreshold": "Pause at or below",
+				"pauseDescription": "The task is paused and a notification is sent; its files stay as they are.",
+				"stopThreshold": "Stop at or below",
+				"stopDescription": "The session is stopped and, if enabled in Sandbox, its files are restored to the snapshot taken before it."
 			},
 			"detectionLimits": {
-				"title": "Detection Limits",
-				"description": "Fine-tune when specific anomaly types trigger.",
-				"massDeletionCount": "Mass deletion count",
-				"massDeletionDesc": "File deletions before alert",
-				"maxRepetitiveErrors": "Max repetitive errors",
-				"maxRepetitiveDesc": "Errors before alert",
-				"rapidChangeWindow": "Rapid change window (s)",
-				"rapidChangeDesc": "Time window for rapid changes",
-				"tokenUsageMultiplier": "Token usage multiplier",
-				"tokenUsageDesc": "× baseline before alert"
+				"title": "Detection limits",
+				"description": "When some anomalies count.",
+				"massDeletionCount": "Mass deletion",
+				"massDeletionDesc": "Files deleted in one session before it counts",
+				"maxRepetitiveErrors": "Repeated errors",
+				"maxRepetitiveDesc": "Failed tool calls in one session before it counts",
+				"rapidChangeWindow": "Rapid changes window (s)",
+				"rapidChangeDesc": "20 writes within this window count as rapid changes"
 			},
 			"anomalyTypes": {
-				"title": "Anomaly Types",
-				"description": "10 anomaly types are monitored. Each reduces the trust score by a fixed amount.",
+				"title": "What lowers the score",
+				"description": "Commands are judged on the programs they run, paths on whole file names: rsync is not nc, .env.example is not .env.",
 				"anomaly": "Anomaly",
 				"severity": "Severity",
-				"scoreImpact": "Score Impact",
-				"types": {
-					"massFileDeletion": "Mass file deletion",
-					"sensitiveFileAccess": "Sensitive file access",
-					"dangerousCommand": "Dangerous command",
-					"unexpectedNetworkAccess": "Unexpected network access",
-					"pathTraversalAttempt": "Path traversal attempt",
-					"rapidFileChanges": "Rapid file changes",
-					"excessiveTokenUsage": "Excessive token usage",
-					"systemConfigModification": "System config modification",
-					"repetitiveErrors": "Repetitive errors",
-					"longRunningSession": "Long running session"
-				},
+				"scoreImpact": "Score",
 				"severityLevels": {
 					"critical": "critical",
 					"high": "high",
@@ -454,8 +487,80 @@
 				}
 			},
 			"sensitivePaths": {
-				"title": "Sensitive Paths (always monitored)",
-				"description": "These paths are always monitored for suspicious activity."
+				"title": "Sensitive paths",
+				"description": "Reading or writing one of these lowers the score, once per file."
+			}
+		},
+		"approvals": {
+			"title": "Approval tiers",
+			"description": "The tier of each task's pull request, and whether it merges by itself once green",
+			"mode": {
+				"title": "Mode",
+				"description": "For every project and every provider. A project's workpilot.policy.yaml can only make it stricter.",
+				"off": {
+					"label": "Off",
+					"description": "No tier. A person merges every pull request, as before."
+				},
+				"observe": {
+					"label": "Observe",
+					"description": "The tier shows on the card. Nothing merges by itself."
+				},
+				"enforce": {
+					"label": "Enforce",
+					"description": "A green N0, or N1 agreed by the cross-review, merges by itself. N2 and N3 wait for a person."
+				}
+			},
+			"express": {
+				"title": "Express lane for dependency PRs",
+				"description": "The Dependabot and Renovate pull requests of your projects merge by themselves when their tier is N0 and every check passed. Only when the tiers enforce.",
+				"toggle": "Merge the bots' green N0 pull requests",
+				"toggleDescription": "About every half hour, for each local project on GitHub. A major bump, a change to code or CI files, a red or running check, a draft or a fork is left to a person.",
+				"needsEnforce": "Off while the mode is not Enforce."
+			},
+			"tiers": {
+				"title": "The four tiers",
+				"N0": {
+					"badge": "N0",
+					"when": "Dependency bump or documentation only: merges once CI is green."
+				},
+				"N1": {
+					"badge": "N1",
+					"when": "A change in one layer, under the limits: merges once CI is green and the cross-review agrees."
+				},
+				"N2": {
+					"badge": "N2",
+					"when": "A feature, several layers, a migration, a public contract, a major bump: a person approves."
+				},
+				"N3": {
+					"badge": "N3",
+					"when": "Secrets, auth, personal data, payment, CI or policy files: a person approves, always."
+				}
+			},
+			"policyNote": "The tier is read without a model, from the files the pull request changes, its title and the facts the task measured. Rules in the approvals section of workpilot.policy.yaml can only raise it.",
+			"claudeShip": {
+				"title": "Claude Ship",
+				"description": "Claude Code Review, Claude Approvals and PR Steward, for a Claude organization on a Team or Enterprise plan. On, their checks on a task's GitHub PR count: Code Review stands in for a missing cross-review, Approvals can only hold a merge, and WorkPilot stops its own fixes on a PR the Steward watches.",
+				"auto": {
+					"label": "Automatic",
+					"description": "On when a signed-in Claude account is on a Team or Enterprise plan."
+				},
+				"on": {
+					"label": "On",
+					"description": "Always read Claude Ship's checks."
+				},
+				"off": {
+					"label": "Off",
+					"description": "Never read them, whatever the plan."
+				},
+				"checking": "Looking at the Claude accounts…",
+				"detected": "Detected: {{accounts}}",
+				"notDetected": "No signed-in Claude account on a Team or Enterprise plan.",
+				"plan": {
+					"team": "Team",
+					"enterprise": "Enterprise"
+				},
+				"active": "Claude Ship is used for task PRs.",
+				"inactive": "Claude Ship is not used."
 			}
 		}
 	},
@@ -630,6 +735,10 @@
 		"description": "Choose how logs are displayed in the task detail view",
 		"chronological": "Chronological (oldest first)",
 		"reverseChronological": "Reverse-chronological (newest first)"
+	},
+	"kanbanColumnSummary": {
+		"label": "Column summary",
+		"description": "Show a one-line summary under each Kanban column title (urgent tasks, agent phases, plans to approve…)."
 	},
 	"general": {
 		"providerSection": "Default provider",
@@ -868,6 +977,23 @@
 				"byKindTitle": "Lines to review per PR, by kind of task",
 				"byKindHelp": "Code counts in full, tests and documentation count half, generated files and lockfiles don't count. Defaults follow code review studies: past 200 to 400 lines or an hour, a reviewer finds fewer defects. Leave empty for the default.",
 				"neverSplit": "Investigations, spikes and operations are never split: they open no code to review."
+			},
+			"groups": {
+				"agent": {
+					"description": "The model that works on tasks and what it reads from the project."
+				},
+				"planning": {
+					"title": "Before coding",
+					"description": "How a task is prepared: its size and what is written before any code."
+				},
+				"coding": {
+					"title": "While coding",
+					"description": "How the agent writes the code."
+				},
+				"checks": {
+					"title": "Before review",
+					"description": "What is checked before a task reaches review, and where its tests run."
+				}
 			}
 		},
 		"autoBuild": {
@@ -1073,7 +1199,13 @@
 			"remoteSaveFailed": "Could not save the remote.",
 			"mainBranchPlaceholder": "main",
 			"mainBranchDetect": "Auto-detect",
-			"mainBranchHint": "Base branch for task worktrees. Saved with this dialog."
+			"mainBranchHint": "Base branch for task worktrees. Saved with this dialog.",
+			"copyPathAria": "Copy the repository path",
+			"copyRemoteAria": "Copy the remote URL",
+			"copyWorkpilotAria": "Copy the WorkPilot folder path",
+			"repathFailed": "Could not change the folder.",
+			"openTerminalFailed": "Could not open a terminal.",
+			"mainBranchDetectFailed": "No main branch found: type one."
 		}
 	},
 	"workspace": {
@@ -1206,11 +1338,6 @@
 		}
 	},
 	"accounts": {
-		"multiConnector": {
-			"title": "AI Provider Management",
-			"description": "Connect and manage multiple AI providers (Claude, OpenAI, Mistral, etc.).",
-			"loadingProviders": "Loading providers..."
-		},
 		"tabs": {
 			"aiProvider": "AI Authentication",
 			"llmProviders": "LLM Providers"
@@ -1278,36 +1405,18 @@
 		},
 		"priority": {
 			"title": "Account Priority Order",
-			"description": "Drag to reorder. System will switch to the next available account in order.",
-			"noAccounts": "No accounts configured. Add accounts above to set priority.",
-			"noEmail": "No email",
 			"active": "Active",
-			"inUse": "In Use",
-			"next": "Next",
 			"unlimited": "Unlimited",
 			"unavailable": "Unavailable",
-			"typeOAuth": "OAuth",
-			"typeAPI": "API",
-			"payPerUse": "Pay-per-use",
-			"needsAuth": "Not authenticated",
-			"duplicateUsage": "Duplicate usage detected",
-			"duplicateUsageHint": "This profile has identical usage to another profile, suggesting they may be authenticated to the same Anthropic account. Re-authenticate with a different account to fix.",
-			"needsReauth": "Needs re-auth",
-			"needsReauthHint": "This profile's refresh token is invalid. Click to re-authenticate.",
-			"sessionUsage": "Session usage (5-hour window)",
-			"weeklyUsage": "Weekly usage (7-day window)",
 			"oauthSection": "Claude Accounts (cycle through first)",
 			"apiSection": "Fallback Endpoints (when all accounts exhausted)",
-			"tipTitle": "How priority works",
-			"tipDescription": "Claude accounts are included in your subscription and will be cycled through first. API endpoints charge per request and are used as fallbacks when all Claude accounts hit their limits.",
 			"status": {
 				"healthy": "Healthy",
 				"moderate": "Moderate",
 				"highUsage": "High usage",
 				"nearLimit": "Near limit",
 				"rateLimited": "Rate limited"
-			},
-			"providerAuth": "Authenticated via API key"
+			}
 		},
 		"priorityOrder": {
 			"title": "Provider priority order",
@@ -1382,7 +1491,6 @@
 		"addServer": "Add Server",
 		"addMcpTo": "Add MCP Server to {{agent}}",
 		"addMcpDescription": "Select an MCP server to add to this agent",
-		"allMcpsAdded": "All available MCP servers are already added",
 		"added": "added",
 		"removed": "removed",
 		"remove": "Remove",
@@ -1461,6 +1569,10 @@
 			"teams": {
 				"name": "Microsoft Teams",
 				"description": "Send messages to Teams channels. Requires TEAMS_WEBHOOK_URL env var."
+			},
+			"workpilotVerify": {
+				"name": "WorkPilot Verify",
+				"description": "Launches the app, reads its logs, drives it in a browser and traces its performance during verification"
 			}
 		},
 		"customServers": "Custom Servers",
@@ -1482,10 +1594,7 @@
 		"headerName": "Header Name",
 		"headerValue": "Header Value",
 		"noCustomServers": "No custom servers configured. Add one to use with your agents.",
-		"errorNameRequired": "Server name is required",
 		"errorIdExists": "A server with this ID already exists",
-		"errorCommandRequired": "Command is required for command-based servers",
-		"errorUrlRequired": "URL is required for HTTP-based servers",
 		"testConnection": "Test",
 		"testing": "Testing...",
 		"authToken": "Authentication Token",
@@ -1542,7 +1651,18 @@
 				"long": "unusually long ({{detail}} characters)",
 				"injection": "prompt injection: {{detail}}"
 			}
-		}
+		},
+		"healthCheckFailed": "Health check failed",
+		"connectionTestFailed": "Connection test failed",
+		"errorNameNoId": "The name needs at least one letter or digit",
+		"removeHeader": "Remove header {{name}}",
+		"confine": {
+			"label": "Run confined (OS sandbox)",
+			"hint": "The server starts only in the OS sandbox: it writes only in the project and reaches only the hosts below and the registry its launcher installs from. Where there is no sandbox (Windows), it does not start.",
+			"hosts": "Hosts it may reach",
+			"hostsHint": "Separated by spaces or commas: api.example.com, *.example.com, or a local 127.0.0.1:5432."
+		},
+		"confinedNotTested": "Not tested: this server runs confined, and only an agent starts it, in the OS sandbox."
 	},
 	"terminalFonts": {
 		"title": "Terminal Fonts",
@@ -1758,6 +1878,10 @@
 		"pr_template_filler": {
 			"label": "PR Template Filler",
 			"description": "AI-fills GitHub PR templates from code changes"
+		},
+		"verifier": {
+			"label": "Verifier",
+			"description": "Runs the verification loop: launches the app, fixes what breaks, drives it to the change, traces performance (Chrome DevTools MCP)."
 		}
 	},
 	"agentProfile": {
@@ -1785,11 +1909,33 @@
 		"customDescription": "Choose specific model and thinking level",
 		"clickToCustomize": "Click to customize",
 		"selectThinkingLevel": "Select thinking level",
-		"autoLabel": "Auto (Optimized)",
-		"autoDescription": "Uses Opus across all phases with optimized thinking levels",
 		"autoDescriptionModel": "Uses {{model}} across all phases with optimized thinking levels",
 		"phaseConfiguration": "Phase Configuration",
 		"phaseConfigurationDescription": "Configure models and thinking levels for each development pipeline phase",
+		"presets": {
+			"auto": {
+				"name": "Auto (Optimized)"
+			},
+			"complex": {
+				"name": "Complex Tasks",
+				"description": "For intricate, multi-step implementations requiring deep analysis"
+			},
+			"balanced": {
+				"name": "Balanced",
+				"description": "Good balance of speed and quality for most tasks"
+			},
+			"quick": {
+				"name": "Quick Edits",
+				"description": "Fast iterations for simple changes and quick fixes"
+			}
+		},
+		"thinkingLevelDescriptions": {
+			"none": "No extended thinking",
+			"low": "Brief consideration",
+			"medium": "Moderate analysis",
+			"high": "Deep thinking",
+			"ultrathink": "Maximum reasoning depth"
+		},
 		"phases": {
 			"spec": {
 				"label": "Spec Creation",
@@ -1838,7 +1984,7 @@
 		"done": "Done",
 		"cancel": "Cancel",
 		"importing": "Importing...",
-		"importButton_one": "Import Work Items from Azure DevOps",
+		"importButton_one": "Import {{count}} item",
 		"importButton_other": "Import {{count}} items",
 		"moreItems": "+{{count}} more item(s)",
 		"sidePanelTitle": "Import from Azure DevOps",
@@ -1853,11 +1999,11 @@
 		"importConfirmDescription": "The following items will be imported into the {{column}} column.",
 		"importConfirmButton": "Import {{count}} item(s)",
 		"selectedItems": "{{count}} item(s) selected",
-		"toggleSelection": "Toggle selection for work item {{id}}",
 		"importError": "Azure DevOps import failed",
 		"repositoryLabel": "Repository:",
 		"sidePanelAriaLabel": "Azure DevOps import panel",
-		"resizeHandleAriaLabel": "Resize the panel"
+		"resizeHandleAriaLabel": "Resize the panel",
+		"priorityBadge": "P{{priority}}"
 	},
 	"azureDevOps": {
 		"enableSyncLabel": "Enable Azure DevOps Sync",
@@ -1874,6 +2020,8 @@
 		"patDescriptionSuffix": "Requires scope: Work Items (Read & Write).",
 		"patLinkLabel": "Azure DevOps User Settings",
 		"patPlaceholder": "Enter your PAT",
+		"patShow": "Show the token",
+		"patHide": "Hide the token",
 		"repositoryLabel": "Repository",
 		"repositoryDescription": "Select the Azure DevOps repository to use for this project",
 		"repositoryPlaceholder": "Select a repository...",
@@ -1925,30 +2073,11 @@
 	},
 	"autoSwitching": {
 		"title": "Auto-switching",
-		"enableLabel": "Enable auto-switching",
-		"enableDescription": "Automatically switch between accounts based on usage",
-		"enabled": "Auto-switching enabled",
-		"disabled": "Auto-switching disabled",
-		"enabledDescription": "Accounts will switch automatically",
-		"disabledDescription": "Accounts will no longer switch automatically",
-		"proactiveMonitoring": "Proactive Monitoring",
-		"proactiveDescription": "Switch before reaching limits",
-		"sessionThreshold": "Session Threshold",
-		"sessionThresholdDescription": "Switch when usage reaches this percentage",
-		"rateLimitSwitching": "Switch on Rate Limit",
-		"rateLimitDescription": "Change account when rate limit is reached",
-		"authFailureSwitching": "Switch on Auth Failure",
-		"authFailureDescription": "Change account if authentication fails",
 		"priorityOrder": {
-			"title": "Account Priority Order",
 			"description": "Define the order in which accounts will be used for auto-switching"
 		},
 		"debug": {
 			"accountsFound": "Debug: {{count}} account(s) found"
-		},
-		"toast": {
-			"error": "Error",
-			"errorDescription": "Unable to update settings"
 		}
 	},
 	"jira": {
@@ -2016,7 +2145,9 @@
 				"name": "Generic webhook",
 				"hint": "Raw JSON POST to any HTTP endpoint (custom integrations)"
 			}
-		}
+		},
+		"triggerMemoryConflict": "When a teammate's sync brings a memory that contradicts another one",
+		"triggerMemoryConflictHint": "Opt-in: posts the two notes' titles, a short cleaned preview and their authors' names (never an e-mail)."
 	},
 	"cicd": {
 		"title": "CI/CD Pipeline",
@@ -2038,6 +2169,33 @@
 		"autoFixDescription": "When a build goes red, launch the agent automatically to fix it",
 		"pollLabel": "Polling interval (seconds)",
 		"pollDescription": "How often the pipeline status is checked (minimum 15s, default 60s)"
+	},
+	"serverSession": {
+		"navLabel": "Team server",
+		"connect": {
+			"title": "Sign in to a team server",
+			"description": "You are working in local mode, on this computer's projects only. Sign in to your team's WorkPilot server to share its projects and board, with a password, an invitation, Microsoft or your SSO.",
+			"button": "Sign in to a server"
+		},
+		"title": "My session on the server",
+		"description": "Who is signed in to the team server on this computer, and how the session was opened, as the server reports it.",
+		"loading": "Loading the session",
+		"unavailable": "The session cannot be read from the server",
+		"server": "Server",
+		"identity": "Signed in as",
+		"identityValue": "{{name}} ({{email}})",
+		"role": "Role",
+		"method": "Opened with",
+		"methods": {
+			"local": "Password",
+			"entra": "Microsoft Entra ID",
+			"oidc": "Single sign-on: {{name}}",
+			"invite": "Accepted invitation",
+			"unknown": "Not recorded (session opened before the server named sign-ins)"
+		},
+		"issuer": "Identity provider",
+		"signedInAt": "Signed in at",
+		"signOut": "Sign out"
 	},
 	"serverTokens": {
 		"navLabel": "My tokens on the server",
@@ -2121,7 +2279,9 @@
 		"events": {
 			"plan_review": "A plan waits for approval",
 			"review_ready": "Work is ready for my review",
-			"failed": "A run stopped on an error"
+			"failed": "A run stopped on an error",
+			"approval_escalated": "A plan waited too long for its approvers",
+			"review_feedback_held": "A member's rejection of a review finding waits for a maintainer"
 		},
 		"language": "Language of the messages",
 		"enabled": "{{channel}} on",
@@ -2170,14 +2330,18 @@
 		"role": "Role",
 		"roleMember": "Member",
 		"roleViewer": "Viewer",
-		"roleAdmin": "Administrator",
+		"roleAdmin": "Server administrator",
 		"create": "Invite",
 		"emailSent": "Invitation sent by email. You can also share the link:",
 		"emailNotSent": "Email not sent (SMTP not configured). Share this single-use link:",
 		"pending": "Pending invitations",
 		"none": "No pending invitations.",
 		"expires": "expires",
-		"revoke": "Revoke"
+		"revoke": "Revoke",
+		"copyLink": "Copy the link",
+		"copyFailed": "The link could not be copied",
+		"orgRole": "Role in the organization",
+		"orgRoleDefault": "Default for this access"
 	},
 	"jiraImport": {
 		"title": "Import Jira Issues",
@@ -2228,7 +2392,8 @@
 		"statusLabel": "Status",
 		"allStatuses": "All Statuses",
 		"dragHint": "Drag selected issues to a Kanban column to import",
-		"resize": "Resize"
+		"resize": "Resize",
+		"sidePanelAriaLabel": "Jira import panel"
 	},
 	"instructions": {
 		"title": "GitHub Copilot Instructions",
@@ -2308,41 +2473,6 @@
 				"step2": "Copy the token (starts with ghp_, gho_, or ghu_)",
 				"step3": "Configure the token in settings"
 			}
-		}
-	},
-	"providerGrid": {
-		"search": {
-			"placeholder": "Search for a provider...",
-			"results_one": "{{count}} result for \"{{query}}\"",
-			"results_other": "{{count}} results for \"{{query}}\"",
-			"noResults": "No providers found",
-			"noProviders": "No providers available",
-			"adjustCriteria": "Try adjusting your search criteria.",
-			"addFirst": "Start by adding your first provider.",
-			"addFirstButton": "Add your first provider"
-		},
-		"filters": {
-			"placeholder": "Filter",
-			"all": "All",
-			"configured": "Configured",
-			"unconfigured": "Unconfigured",
-			"errors": "With errors"
-		},
-		"sort": {
-			"placeholder": "Sort by",
-			"name": "Name",
-			"category": "Category",
-			"status": "Status",
-			"usage": "Usage"
-		},
-		"stats": {
-			"total": "{{count}} total",
-			"configured": "{{count}} configured",
-			"errors": "{{count}} errors"
-		},
-		"actions": {
-			"refresh": "Refresh",
-			"add": "Add"
 		}
 	},
 	"collaboration": {
@@ -2430,20 +2560,6 @@
 			"pending": "Pending",
 			"complete": "Complete",
 			"failed": "Failed"
-		}
-	},
-	"llmRouter": {
-		"routingStrategy": {
-			"title": "Default Routing Strategy",
-			"description": "How the router selects a provider when multiple are available.",
-			"bestPerformance": "Best Performance",
-			"bestPerformanceDescription": "Prioritize quality score",
-			"cheapest": "Cheapest",
-			"cheapestDescription": "Minimize cost per task",
-			"lowestLatency": "Lowest Latency",
-			"lowestLatencyDescription": "Fastest response time",
-			"roundRobin": "Round Robin",
-			"roundRobinDescription": "Distribute evenly"
 		}
 	},
 	"specApproval": {
@@ -2888,7 +3004,10 @@
 		"copyThenOpen": "Copy this code, then open the link below to authenticate.",
 		"accountConnected": "Your GitHub account is now connected",
 		"timedOut": "Authentication Timed Out",
-		"failed": "Authentication Failed"
+		"failed": "Authentication Failed",
+		"timedOutDescription": "The sign-in window stayed open too long. Please try again.",
+		"tokenFailed": "Could not read the GitHub CLI sign-in",
+		"cliCheckFailed": "Could not check the GitHub CLI"
 	},
 	"apiKeyConfig": {
 		"apiUrl": "API URL",
@@ -3033,7 +3152,8 @@
 		"awaiting": "This recipe runs commands on your machine. It runs only once you approve it as it is now.",
 		"approve": "Approve",
 		"saveHint": "Save it as .workpilot/worktree.toml to edit it (copy files, ports, teardown).",
-		"saveDetected": "Save as worktree.toml"
+		"saveDetected": "Save as worktree.toml",
+		"failed": "The worktree recipe could not be read or saved."
 	},
 	"kicker": "WorkPilot · Configuration",
 	"headerDescription": "Application and project settings, grouped by theme.",
@@ -3078,5 +3198,359 @@
 			"scheduler": "Scheduling",
 			"updates": "Updates"
 		}
+	},
+	"aiAccounts": {
+		"title": "AI accounts",
+		"description": "Every provider WorkPilot can run on: how it signs in, whether it answers, and which one takes over when a task hits a limit.",
+		"loading": "Loading providers…",
+		"tabs": {
+			"label": "AI accounts views",
+			"providers": "Providers",
+			"failover": "Auto failover"
+		},
+		"stats": {
+			"connected": "Connected",
+			"connectedValue": "{{connected}} / {{total}}",
+			"default": "Default provider",
+			"failover": "Auto failover",
+			"failoverOn_one": "On · {{count}} account",
+			"failoverOn_other": "On · {{count}} accounts",
+			"failoverOff": "Off",
+			"attention": "Need attention",
+			"none": "None"
+		},
+		"filters": {
+			"label": "Filter providers",
+			"all": "All",
+			"connected": "Connected",
+			"available": "To connect",
+			"attention": "Attention"
+		},
+		"search": "Search a provider",
+		"groups": {
+			"connected": "Connected",
+			"available": "To connect"
+		},
+		"empty": {
+			"title": "No provider matches",
+			"body": "Change the search or the filter."
+		},
+		"noneConnected": "No provider is connected yet. Connect one to run tasks.",
+		"toast": {
+			"testOkModels": "{{name}} answers ({{count}} models available)."
+		},
+		"card": {
+			"status": {
+				"connected": "Connected",
+				"reauth": "Sign in again",
+				"failing": "Not answering",
+				"off": "Not connected"
+			},
+			"auth": {
+				"oauth": "Sign-in",
+				"api-key": "API key",
+				"cli": "CLI",
+				"local": "Local"
+			},
+			"default": "Default",
+			"setDefault": "Make default",
+			"test": "Test",
+			"testing": "Testing…",
+			"edit": "Edit",
+			"connect": "Connect",
+			"reconnect": "Reconnect",
+			"lastTest": "Tested {{date}}",
+			"neverTested": "Never tested",
+			"keyToday": "Key set today",
+			"keyAge_one": "Key set {{count}} day ago",
+			"keyAge_other": "Key set {{count}} days ago",
+			"usage": "Session {{session}} %",
+			"usageWeekly": "Session {{session}} % · week {{weekly}} %",
+			"account": "Account: {{name}}",
+			"accounts_one": "Accounts · {{count}}",
+			"accounts_other": "Accounts · {{count}}"
+		},
+		"failover": {
+			"masterTitle": "Auto failover",
+			"masterOn": "A task stopped by a limit or a lost sign-in resumes on the next account of the chain, from the phase it stopped in.",
+			"masterOff": "Off: a task stopped by a limit waits for you.",
+			"triggersTitle": "When to switch",
+			"rateLimit": "On a usage limit",
+			"rateLimitHint": "The provider refuses requests until its limit resets, or the account's quota or credit is spent.",
+			"authFailure": "On a lost sign-in",
+			"authFailureHint": "The account's sign-in or key no longer works.",
+			"sameProviderFirst": "Other accounts of the same provider first",
+			"sameProviderFirstHint": "A task stopped on one account moves to the next account of that provider in the chain before trying another provider.",
+			"proactive": "Before the limit (Claude accounts)",
+			"proactiveHint": "Moves to another Claude account when usage passes these thresholds.",
+			"session": "Session threshold",
+			"weekly": "Weekly threshold",
+			"chainTitle": "Failover chain",
+			"chainDescription": "Accounts are tried from top to bottom. Drag to reorder; the switch takes an account out of the chain.",
+			"chainEmpty": "No connected account yet.",
+			"chainSingle": "Only one account is in the chain: connect or include another one so a stopped task has somewhere to go.",
+			"kind": {
+				"oauth": "Claude account",
+				"api": "API profile",
+				"account": "Account",
+				"provider": "Provider"
+			},
+			"active": "In use",
+			"include": "Include {{name}} in the chain",
+			"dragHandle": "Move {{name}}",
+			"saveError": "The failover settings could not be saved.",
+			"orderError": "The chain order could not be saved."
+		},
+		"accounts": {
+			"title": "{{provider}} accounts",
+			"description": "Each account signs in on its own. The default account is the one new tasks, connection tests and views run on; switch it here or from the usage popover at the top right.",
+			"apiKeyIntro": "Save one account per {{provider}} key (personal, company, client). Keys are encrypted on this computer and never shown again.",
+			"empty": "No account yet.",
+			"mainKey": "Main key",
+			"mainKeyHint": "The key typed in this provider's Edit dialog.",
+			"default": "Default",
+			"useByDefault": "Use by default",
+			"name": "Name",
+			"namePlaceholder": "Personal, Company, Client X…",
+			"key": "API key",
+			"keyPlaceholder": "Paste the account's API key",
+			"keyKeep": "Leave empty to keep the saved key",
+			"keySet": "Key saved",
+			"keySetOn": "Key saved on {{date}}",
+			"noKey": "No key",
+			"add": "Add an account",
+			"addAndTest": "Add and test",
+			"save": "Save",
+			"cancel": "Cancel",
+			"test": "Test",
+			"testOk": "The account answers.",
+			"testOkModels": "The account answers ({{count}} models available).",
+			"testFailed": "Test failed: {{error}}",
+			"edit": "Edit {{name}}",
+			"rename": "Rename {{name}}",
+			"delete": "Delete {{name}}",
+			"deleteTitle": "Delete the account \"{{name}}\"?",
+			"deleteDescription": "Its key is erased from this computer.",
+			"deleteDefaultDescription": "It is the default account: the provider goes back to its main key, if it has one. Its key is erased from this computer.",
+			"saveFailed": "The account could not be saved.",
+			"deleteFailed": "The account could not be deleted.",
+			"defaultFailed": "The default account could not be changed.",
+			"singleAccount": "{{provider}} signs in through its own tool (CLI or IDE): it runs on the account that tool is signed in with. Several accounts for it come in a later update.",
+			"claude": {
+				"intro": "Each Claude account signs in in its own folder, so several subscriptions can sit side by side. Automatic failover can move a stopped task to the next one.",
+				"signedIn": "Signed in",
+				"signedOut": "Not signed in",
+				"signIn": "Sign in",
+				"reconnect": "Sign in again",
+				"signInFailed": "The sign-in could not start.",
+				"invalidName": "Use at least one letter or digit in the name.",
+				"addAndSignIn": "Add and sign in",
+				"deleteDescription": "Its sign-in folder stays on disk; WorkPilot stops using it."
+			},
+			"login": {
+				"title": "{{cli}} sign-ins",
+				"intro": "Each {{cli}} account signs in in a folder of its own, so several subscriptions can sit side by side. Tasks run on the default account; without one, {{cli}} uses the sign-in of this computer.",
+				"system": "Sign-in of this computer",
+				"systemHint": "The account {{cli}} is signed in with outside WorkPilot.",
+				"signedIn": "Signed in",
+				"signedOut": "Not signed in",
+				"signIn": "Sign in",
+				"reconnect": "Sign in again",
+				"signInFailed": "The sign-in could not start.",
+				"addAndSignIn": "Add and sign in",
+				"deleteDescription": "Its {{cli}} sign-in folder is erased from this computer.",
+				"terminalTitle": "Sign in to {{cli}} as \"{{name}}\"",
+				"stepRun": "Press Enter to run the command shown.",
+				"stepFollow": "Follow the steps it prints (a browser page may open).",
+				"stepClose": "Close this terminal once it says you are signed in."
+			},
+			"keyId": "Access key ID",
+			"secretKey": "Secret access key",
+			"secretPlaceholder": "Paste the account's secret access key",
+			"secretKeep": "Leave empty to keep the saved secret",
+			"region": "Region",
+			"testUnchecked": "Key saved. {{provider}} offers no check WorkPilot can run with it: the first task tells whether it works."
+		},
+		"spend": {
+			"month": "This month: {{cost}} · {{tokens}} tokens",
+			"monthShort": "Spent this month",
+			"floor": "(at least)",
+			"floorHint": "Some sessions used tokens with no known price: the real cost is higher.",
+			"noBudget": "No monthly budget",
+			"budget": "{{pct}} % of {{budget}} a month",
+			"editBudget": "Set the monthly budget",
+			"budgetLabel": "Monthly budget in US dollars",
+			"budgetPlaceholder": "e.g. 50 (empty: none)",
+			"invalid": "Type an amount in dollars, or leave it empty for no budget."
+		},
+		"pins": {
+			"loginChoice": "{{name}} ({{cli}} sign-in)",
+			"title": "AI account",
+			"projectDescription": "The account each provider runs on for this project's tasks. A card can pick another one.",
+			"cardDescription": "The account each provider of this card runs on. Leave it to follow the project, or the provider's default account.",
+			"inheritDefault": "Default account ({{name}})",
+			"inheritProject": "Project's account ({{name}})",
+			"removed": "Deleted account (the default one is used)"
+		}
+	},
+	"governance": {
+		"kicker": "Governance",
+		"title": "Hours, files and token budget",
+		"hint": "What workpilot.policy.yaml says to every agent on every provider. Read only: change the file in the repository and have it reviewed like code.",
+		"refresh": "Refresh",
+		"loadFailed": "The governance policy could not be read: {{error}}",
+		"invalid": "workpilot.policy.yaml is refused: until it is fixed, every task pauses before its next session and no agent writes a file or runs a command.",
+		"none": "workpilot.policy.yaml sets no hours, files or token budget.",
+		"scheduleTitle": "Allowed hours",
+		"noSchedule": "Any time",
+		"openNow": "Open now",
+		"closedNow": "Closed now",
+		"scheduleLine": "{{hours}} ({{timezone}}), {{days}}",
+		"filesTitle": "Files",
+		"forbidden": "Forbidden",
+		"requiresReview": "Review required",
+		"noFiles": "No file rule",
+		"budgetTitle": "Token budget",
+		"noBudget": "No token limit",
+		"budgetLine": "{{spent}} of {{limit}} tokens in the last hour",
+		"taskBudgetLine": "At most {{limit}} tokens per task",
+		"loopTitle": "Circuit breaker",
+		"loopLine": "Pauses an agent after {{count}} identical tool calls",
+		"noLoop": "The app's own limit",
+		"metricsBlocked_one": "{{count}} agent action stopped in the last 24 h",
+		"metricsBlocked_other": "{{count}} agent actions stopped in the last 24 h",
+		"metricsTrips_one": "{{count}} circuit-breaker trip in the last 7 days",
+		"metricsTrips_other": "{{count}} circuit-breaker trips in the last 7 days",
+		"decisionsTitle": "Last decisions",
+		"noDecisions": "The policy has not taken any decision yet.",
+		"exportCsv": "Export CSV",
+		"exportJson": "Export JSON",
+		"exported_one": "{{count}} decision exported to {{path}}",
+		"exported_other": "{{count}} decisions exported to {{path}}",
+		"exportFailed": "The export failed: {{error}}",
+		"approvedBy": "approved by {{name}}",
+		"localApprover": "On this computer an approval is given in your name, with no verified identity. On a server, the account that approves and its roles are recorded.",
+		"serverApprover": "Any member of the project who may approve reviews answers, under their server account.",
+		"serverReviewers": "Approved by a member holding one of these roles: {{roles}}. Anyone who may approve can refuse.",
+		"serverTitle": "Governance of the server project",
+		"serverHint": "This project's agents run on the server: its workpilot.policy.yaml, its audit trail, the calls its agents wait on and its kill switch are read and run there. The server checks your rights on every action.",
+		"agentsLine": "Agents running on the server: {{mine}} yours, {{project}} in all",
+		"stopMine": "Stop my agents",
+		"stopProject": "Stop every agent of the project",
+		"stopProjectConfirm_one": "Confirm: stop {{count}} agent, whoever started it",
+		"stopProjectConfirm_other": "Confirm: stop {{count}} agents, whoever started them",
+		"stopped_one": "{{count}} agent stopped. Its card can be started again.",
+		"stopped_other": "{{count}} agents stopped. Their cards can be started again.",
+		"stopFailed": "The agents could not be stopped: {{error}}",
+		"pendingTitle_one": "{{count}} call waiting for an approval",
+		"pendingTitle_other": "{{count}} calls waiting for an approval",
+		"approve": "Approve",
+		"refuse": "Refuse",
+		"answered": {
+			"approved": "Approved in your name: the agent's next identical call goes through, once.",
+			"refused": "Refused: the agent keeps being denied this call."
+		},
+		"answerFailed": "The answer was not recorded: {{error}}",
+		"decisions": {
+			"deny": "Refused",
+			"review": "Review",
+			"approved": "Approved",
+			"warn": "Warned",
+			"outside_hours": "Outside hours",
+			"budget_exceeded": "Budget reached",
+			"invalid_policy": "Invalid policy",
+			"tool_loop": "Circuit breaker"
+		}
+	},
+	"forgeBinding": {
+		"mismatchTitle": "This project points at {{saved}}, which is not one of its remotes",
+		"mismatchDescription": "The repository may come from another project. Use the repository of this project's own remote:",
+		"mismatchNoRemote": "None of this project's remotes is on this forge: this repository probably belongs to another project. Check it, or turn this integration off for this project.",
+		"useRemote": "Use {{repo}}",
+		"detected": "No repository saved: this project uses the one of its git remote, {{repo}}.",
+		"saveDetected": "Save it in the settings"
+	},
+	"forgeAccounts": {
+		"navLabel": "Forge accounts",
+		"title": "Forge accounts",
+		"description": "Save your GitHub, GitLab, Azure DevOps and Bitbucket accounts once (work, personal, a client…). Each project then picks the one it works with in its own settings. Tokens stay encrypted on this computer and are never shown again.",
+		"empty": "No forge account saved yet.",
+		"add": "Add an account",
+		"forge": "Forge",
+		"label": "Name",
+		"labelPlaceholder": "Work, Personal, Client X…",
+		"gitlabHost": "GitLab instance",
+		"azureHost": "Azure DevOps organization",
+		"bitbucketUsername": "Username or email (optional)",
+		"bitbucketUsernameHint": "With an API token or an app password, the username or Atlassian email it signs in with. Leave empty for a workspace or repository access token.",
+		"token": "Token",
+		"tokenPlaceholder": "Personal access token",
+		"tokenKeep": "Leave empty to keep the saved token",
+		"save": "Save",
+		"cancel": "Cancel",
+		"tokenSet": "Token saved",
+		"noToken": "No token",
+		"test": "Test",
+		"testOk": "Connected as {{username}}",
+		"testFailed": "Connection failed: {{error}}",
+		"edit": "Edit {{label}}",
+		"delete": "Delete {{label}}",
+		"deleteTitle": "Delete the account {{label}}?",
+		"deleteDescription": "Projects that use it will have no token for this forge until you pick another account or enter a token of their own.",
+		"picker": {
+			"label": "Account",
+			"ownToken": "This project's own token",
+			"withUsername": "{{label}} ({{username}})",
+			"missing": "Deleted account",
+			"hint": "A saved account brings its token and its address. Manage accounts in Settings, Forge accounts.",
+			"noneHint": "To use the same account in several projects, save it once in Settings, Forge accounts.",
+			"missingHint": "The account this project used was deleted: pick another one or enter a token for this project."
+		}
+	},
+	"serverReplayLinks": {
+		"navLabel": "Replay links",
+		"title": "My replay team links",
+		"description": "Every team link to a replay you made, on every project of this server you are still a member of. Revoke a link here to end it at once: whoever has it can no longer open it.",
+		"refresh": "Refresh",
+		"empty": "You have not made any team link yet.",
+		"project": "Project: {{project}}"
+	},
+	"kanbanAbandonClosedPrs": {
+		"label": "Set aside cards whose PR was closed",
+		"description": "A card whose pull request was closed without a merge moves to Abandoned, with the reason « PR closed without merge ». Resume it to work on it again."
+	},
+	"kanbanAutoArchive": {
+		"label": "Archive finished cards",
+		"description": "A card done for longer than this is archived. « Show archived » on the Done column brings it back. Local projects only.",
+		"off": "Never",
+		"after_one": "After {{count}} day",
+		"after_other": "After {{count}} days"
+	},
+	"myUsage": {
+		"navLabel": "My usage",
+		"title": "My usage",
+		"description": "What this organization's administrators see of you over the last 30 days: totals, action names, runs and jobs. Never a prompt, code, typed text or file name.",
+		"export": "Download everything kept about me (JSON)",
+		"notice": "Read again what is measured",
+		"failed": "The server refused: {{error}}",
+		"visibleTo": "Readable by: {{roles}}, and the server's platform administrators."
+	},
+	"usageNotice": {
+		"title": "What this server measures about you",
+		"intro": "This organization's server keeps a few figures about each member, to follow its use and costs.",
+		"measured": {
+			"tokens": "The tokens and cost of the agents you start, by provider and model",
+			"runs": "Your runs: phase, status, start and end",
+			"jobs": "Your project jobs: feature, status, start and end",
+			"sign_ins": "Your sign-ins: time, method, address and app",
+			"presence": "The days you were connected, and when you were last seen",
+			"pages": "How many times a day you open each page of the app (its name only)"
+		},
+		"never": "Never a prompt, code, typed text or file name.",
+		"retention": "These figures are kept {{days}} days.",
+		"pageRetention": "Page counts are kept {{days}} days.",
+		"visibleTo": "Readable by: {{roles}}, and the server's platform administrators.",
+		"rights": "You can see them and download everything kept about you in Settings, My usage. To have your account erased, ask a platform administrator.",
+		"understood": "I understand"
 	}
 }

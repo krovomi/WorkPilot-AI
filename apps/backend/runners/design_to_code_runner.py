@@ -58,6 +58,16 @@ class DesignToCodeRunner:
         style: str = "",
         use_design_tokens: bool = True,
         write_files: bool = True,
+        render_loop: bool = False,
+        loop_max_iterations: int = 5,
+        loop_threshold: float = 0.95,
+        loop_budget_seconds: float = 600.0,
+        loop_max_tokens: int = 400_000,
+        loop_max_cost_usd: float = 2.0,
+        loop_responsive: bool = False,
+        loop_states: bool = False,
+        loop_fix_passes: bool = False,
+        loop_masks: tuple[tuple[float, float, float, float], ...] = (),
     ):
         self.project_dir = Path(project_dir)
         self.image_path = image_path
@@ -74,6 +84,17 @@ class DesignToCodeRunner:
         # The desktop app reviews the files first and writes them itself
         # (``--no-write``); the CLI writes them where it was told.
         self.write_files = write_files
+        # Render → diff → correct after the generation (#379).
+        self.render_loop = render_loop
+        self.loop_max_iterations = loop_max_iterations
+        self.loop_threshold = loop_threshold
+        self.loop_budget_seconds = loop_budget_seconds
+        self.loop_max_tokens = loop_max_tokens
+        self.loop_max_cost_usd = loop_max_cost_usd
+        self.loop_responsive = loop_responsive
+        self.loop_states = loop_states
+        self.loop_fix_passes = loop_fix_passes
+        self.loop_masks = loop_masks
 
     async def run(self) -> dict:
         """Run the complete design-to-code pipeline."""
@@ -144,6 +165,10 @@ class DesignToCodeRunner:
             use_design_tokens=self.use_design_tokens,
         )
 
+        loop_report = None
+        if self.render_loop and result.success:
+            loop_report = await self._run_render_loop(service, result, image_data)
+
         # Write generated files to disk
         if self.write_files and result.success and result.generated_files:
             await self._write_generated_files(result)
@@ -151,7 +176,39 @@ class DesignToCodeRunner:
         # Print summary
         self._print_summary(result)
 
-        return self._serialize_result(result)
+        data = self._serialize_result(result)
+        if loop_report is not None:
+            data["render_loop"] = loop_report
+        return data
+
+    async def _run_render_loop(self, service, result, image_data: str) -> dict:
+        """Refine the generated files against the design; the loop's report."""
+        from design_to_code.loop import LoopConfig
+        from services.design_to_code_render_loop import run_render_loop
+
+        def on_loop(detail: dict) -> None:
+            payload = {"phase": "render_loop", "status": "", "detail": {"loop": detail}}
+            print(f"{PHASE_PREFIX}{json.dumps(payload)}", flush=True)
+
+        config = LoopConfig(
+            max_iterations=self.loop_max_iterations,
+            threshold=self.loop_threshold,
+            budget_seconds=self.loop_budget_seconds,
+            max_tokens=self.loop_max_tokens,
+            max_cost_usd=self.loop_max_cost_usd,
+            responsive=self.loop_responsive,
+            states=self.loop_states,
+            fix_passes=self.loop_fix_passes,
+            masks=self.loop_masks,
+        )
+        return await run_render_loop(
+            service,
+            result,
+            image_data=image_data,
+            framework=self.framework,
+            config=config,
+            on_progress=on_loop,
+        )
 
     async def _resolve_image_data(self) -> str:
         """Resolve image data from path, base64, or Figma URL."""
@@ -184,8 +241,11 @@ class DesignToCodeRunner:
             b64 = base64.b64encode(data).decode("utf-8")
             return f"data:{mime};base64,{b64}"
 
-        # Load from Figma
+        # Load from Figma, a cloud service: refused under strict offline mode.
         if self.figma_url:
+            from services.design_to_code_providers import guard_cloud
+
+            guard_cloud(self.project_dir)
             try:
                 from src.connectors.figma_connector import FigmaConnector
 
@@ -277,6 +337,42 @@ def serialize_for_renderer(result) -> dict:
     return data
 
 
+def _bounded_int(low: int, high: int):
+    def parse(value: str) -> int:
+        number = int(value)
+        if not low <= number <= high:
+            raise argparse.ArgumentTypeError(f"expected {low}-{high}")
+        return number
+
+    return parse
+
+
+def _bounded_float(low: float, high: float):
+    def parse(value: str) -> float:
+        number = float(value)
+        if not low <= number <= high:
+            raise argparse.ArgumentTypeError(f"expected {low}-{high}")
+        return number
+
+    return parse
+
+
+#: Zones the person may draw on the design for the render loop, at most.
+MAX_LOOP_MASKS = 12
+
+
+def _mask(value: str) -> tuple[float, float, float, float]:
+    """``x,y,w,h`` as fractions of the design, inside it and not empty."""
+    try:
+        x, y, w, h = (float(part) for part in value.split(","))
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("expected x,y,w,h") from exc
+    finite = all(0.0 <= v <= 1.0 for v in (x, y, w, h))
+    if not finite or w <= 0 or h <= 0 or x + w > 1.0001 or y + h > 1.0001:
+        raise argparse.ArgumentTypeError("expected fractions inside the design")
+    return x, y, w, h
+
+
 async def main():
     """CLI entry point for the Design-to-Code runner."""
     parser = argparse.ArgumentParser(
@@ -332,9 +428,70 @@ async def main():
     parser.add_argument(
         "--output-dir", default="", help="Output directory (default: project dir)"
     )
+    parser.add_argument(
+        "--render-loop",
+        action="store_true",
+        help="Render the generated code, compare it with the design and correct it",
+    )
+    parser.add_argument(
+        "--loop-max-iterations",
+        type=_bounded_int(1, 10),
+        default=5,
+        help="Corrections the render loop may make (1-10, default 5)",
+    )
+    parser.add_argument(
+        "--loop-threshold",
+        type=_bounded_float(0.5, 0.999),
+        default=0.95,
+        help="Score at which the render loop stops (0.5-0.999, default 0.95)",
+    )
+    parser.add_argument(
+        "--loop-budget-seconds",
+        type=_bounded_float(30, 3600),
+        default=600.0,
+        help="Time the render loop may spend (30-3600 s, default 600)",
+    )
+    parser.add_argument(
+        "--loop-max-tokens",
+        type=_bounded_int(10_000, 5_000_000),
+        default=400_000,
+        help="Tokens the corrections may spend (10000-5000000, default 400000)",
+    )
+    parser.add_argument(
+        "--loop-max-cost",
+        type=_bounded_float(0.01, 100),
+        default=2.0,
+        help="US dollars the corrections may spend, when the model is priced "
+        "(0.01-100, default 2)",
+    )
+    parser.add_argument(
+        "--loop-responsive",
+        action="store_true",
+        help="Render the version kept at the mobile, tablet and desktop widths",
+    )
+    parser.add_argument(
+        "--loop-states",
+        action="store_true",
+        help="Capture hover and focus of the first interactive elements",
+    )
+    parser.add_argument(
+        "--loop-fix-passes",
+        action="store_true",
+        help="Send what the passes found back to the model once, kept if it helps",
+    )
+    parser.add_argument(
+        "--loop-mask",
+        type=_mask,
+        action="append",
+        default=[],
+        help=f"A zone of the design left out of the score, x,y,w,h as fractions "
+        f"(repeatable, at most {MAX_LOOP_MASKS})",
+    )
     parser.add_argument("--json", action="store_true", help="Output result as JSON")
 
     args = parser.parse_args()
+    if len(args.loop_mask) > MAX_LOOP_MASKS:
+        parser.error(f"--loop-mask: at most {MAX_LOOP_MASKS}")
 
     runner = DesignToCodeRunner(
         project_dir=args.project_dir,
@@ -350,6 +507,16 @@ async def main():
         style=args.style,
         use_design_tokens=not args.no_tokens,
         write_files=not args.no_write,
+        render_loop=args.render_loop,
+        loop_max_iterations=args.loop_max_iterations,
+        loop_threshold=args.loop_threshold,
+        loop_budget_seconds=args.loop_budget_seconds,
+        loop_max_tokens=args.loop_max_tokens,
+        loop_max_cost_usd=args.loop_max_cost,
+        loop_responsive=args.loop_responsive,
+        loop_states=args.loop_states,
+        loop_fix_passes=args.loop_fix_passes,
+        loop_masks=tuple(args.loop_mask),
     )
 
     try:

@@ -384,23 +384,29 @@ export function SubtaskFilesViewer({
 		[files, diffByPath],
 	);
 
-	const totals = useMemo(() => {
+	// The subtask's own lines and folders: the worktree diff covers the whole
+	// branch, so only the files of this subtask are counted, each once (its
+	// diff loaded on demand first, else the one from the whole diff).
+	const { totals, folderCount } = useMemo(() => {
 		let additions = 0;
 		let deletions = 0;
-		// Évite de compter deux fois un fichier présent dans l'agrégat ET en lazy.
-		const counted = new Set<string>();
-		for (const [path, diff] of Object.entries(lazyDiffs)) {
-			additions += diff.additions;
-			deletions += diff.deletions;
-			counted.add(path);
-		}
-		for (const [path, diff] of diffByPath.entries()) {
-			if (counted.has(path)) continue;
-			additions += diff.additions;
-			deletions += diff.deletions;
-		}
-		return { additions, deletions };
-	}, [diffByPath, lazyDiffs]);
+		let folders = 0;
+		const walk = (nodes: FileTreeNode[]) => {
+			for (const node of nodes) {
+				// A folder is a node with children.
+				if (node.children) {
+					folders += 1;
+					walk(node.children);
+					continue;
+				}
+				const diff = lazyDiffs[node.path] ?? node.diff;
+				additions += diff?.additions ?? 0;
+				deletions += diff?.deletions ?? 0;
+			}
+		};
+		walk(fileTree);
+		return { totals: { additions, deletions }, folderCount: folders };
+	}, [fileTree, lazyDiffs]);
 
 	const handleToggle = (path: string) => {
 		setExpanded((prev) => ({ ...prev, [path]: !prev[path] }));
@@ -480,7 +486,6 @@ export function SubtaskFilesViewer({
 	};
 
 	const fileCount = files.length;
-	const folderCount = fileTree.filter((node) => node.isFolder).length;
 
 	return (
 		<div className="h-full flex flex-col bg-background border-l border-border">
@@ -516,6 +521,7 @@ export function SubtaskFilesViewer({
 						variant="ghost"
 						size="sm"
 						onClick={onClose}
+						aria-label={t("common:buttons.close")}
 						className="h-8 w-8 p-0 flex-shrink-0 hover:bg-destructive/10"
 					>
 						<X className="h-4 w-4" />
@@ -556,18 +562,19 @@ export function SubtaskFilesViewer({
 			{/* File Tree */}
 			<ScrollArea className="flex-1">
 				<div className="p-4">
+					{/* Without the worktree's diff (none yet, or unreadable) the
+					    planned files are still listed, without their lines. */}
+					{loadError && !isLoading && (
+						<p role="status" className="mb-3 flex items-center gap-2 text-xs text-muted-foreground">
+							<Package className="h-4 w-4 opacity-60" aria-hidden />
+							{t("subtasks.filesViewer.loadError")}
+						</p>
+					)}
 					{isLoading ? (
 						<div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
 							<Loader2 className="h-6 w-6 mb-3 animate-spin opacity-70" />
 							<span className="text-sm font-medium">
 								{t("subtasks.filesViewer.loading")}
-							</span>
-						</div>
-					) : loadError ? (
-						<div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-							<Package className="h-8 w-8 mb-3 opacity-40" />
-							<span className="text-sm font-medium">
-								{t("subtasks.filesViewer.loadError")}
 							</span>
 						</div>
 					) : fileTree.length === 0 ? (

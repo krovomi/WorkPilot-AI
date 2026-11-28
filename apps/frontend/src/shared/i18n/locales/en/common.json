@@ -69,7 +69,9 @@
 		"hideTokenEntryAriaLabel": "Hide token entry",
 		"enterTokenManuallyAriaLabel": "Enter token manually",
 		"renameProfileAriaLabel": "Rename profile",
-		"deleteProfileAriaLabel": "Delete profile"
+		"deleteProfileAriaLabel": "Delete profile",
+		"showSecretAriaLabel": "Show the value",
+		"hideSecretAriaLabel": "Hide the value"
 	},
 	"diffViewer": {
 		"noContent": "No diff content available for this file",
@@ -238,7 +240,9 @@
 			"checkTerminal": "Check the Agent Terminals section in the sidebar to complete OAuth login.",
 			"authStartFailed": "Failed to start authentication",
 			"addProfileFailed": "Failed to add profile",
-			"tryAgain": "Please try again."
+			"tryAgain": "Please try again.",
+			"autoSwitchFailed": "Failed to save the auto-switch setting",
+			"switchFailed": "Failed to switch account"
 		},
 		"sdk": {
 			"title": "AI Rate Limit",
@@ -271,7 +275,9 @@
 			"addClaudeSubscription": "Add another Claude subscription to automatically switch when you hit rate limits.",
 			"willOpenClaudeLogin": "This will open Claude login to authenticate the new account.",
 			"switchClaudeRetry": "Switch to another Claude account and retry the operation:",
-			"connectClaude": "Connect a Claude account:"
+			"connectClaude": "Connect a Claude account:",
+			"yourAccount": "your account",
+			"defaultAccount": "Default"
 		},
 		"recommendedAria": "Recommended"
 	},
@@ -306,7 +312,8 @@
 			"largest": "Largest"
 		},
 		"pullRequests": "Pull Requests",
-		"open": "open",
+		"openCount_one": "{{count}} open",
+		"openCount_other": "{{count}} open",
 		"selectPRToView": "Select a pull request to view details",
 		"loadingPRs": "Loading pull requests...",
 		"noOpenPRs": "No open pull requests",
@@ -326,6 +333,17 @@
 		"reviewComplete": "Review Complete",
 		"reviewStatus": "Review Status",
 		"files": "files",
+		"files_one": "file",
+		"files_other": "files",
+		"fileStatus": {
+			"added": "added",
+			"removed": "removed",
+			"modified": "modified",
+			"renamed": "renamed",
+			"copied": "copied",
+			"changed": "changed",
+			"unchanged": "unchanged"
+		},
 		"filesChanged": "{{count}} files changed",
 		"clickToViewFiles": "Click to view changed files",
 		"loadingFiles": "Loading files...",
@@ -338,7 +356,8 @@
 		"merge": "Merge",
 		"mergeViaGitHub": "Merge via GitHub CLI. May fail if branch protection rules require additional reviews or checks.",
 		"autoApprovePR": "Approve PR",
-		"suggestions": "with {{count}} suggestions",
+		"suggestions_one": "with {{count}} suggestion",
+		"suggestions_other": "with {{count}} suggestions",
 		"postedFindings_one": "Posted {{count}} finding",
 		"postedFindings_other": "Posted {{count}} findings",
 		"resolved_one": "{{count}} resolved",
@@ -368,13 +387,14 @@
 		},
 		"category": {
 			"security": "Security",
-			"logic": "Logic",
 			"quality": "Quality",
-			"performance": "Performance",
 			"style": "Style",
-			"documentation": "Documentation",
-			"testing": "Testing",
-			"other": "Other"
+			"test": "Testing",
+			"docs": "Documentation",
+			"pattern": "Pattern",
+			"performance": "Performance",
+			"verification_failed": "Not verified",
+			"redundancy": "Redundancy"
 		},
 		"state": {
 			"open": "Open",
@@ -383,6 +403,7 @@
 		},
 		"selectCriticalHigh": "Select Blocker/Required ({{count}})",
 		"selectAll": "Select All",
+		"selectSeverityGroup": "Select every {{severity}} finding",
 		"clear": "Clear",
 		"noIssuesFound": "No issues found! The code looks good.",
 		"allFindingsPosted": "All findings posted to GitHub",
@@ -390,28 +411,8 @@
 		"findingsPostedCount_other": "{{count}} findings posted to GitHub",
 		"selectedOfTotal": "{{selected}}/{{total}} selected",
 		"suggestedFix": "Suggested fix:",
-		"runAIReviewDesc": "Run an AI review to analyze this PR",
-		"newCommitsSinceFollowup_one": "{{count}} new commit since follow-up. Run another follow-up review.",
-		"newCommitsSinceFollowup_other": "{{count}} new commits since follow-up. Run another follow-up review.",
-		"allIssuesResolved_one": "All {{count}} issue resolved. This PR can be merged.",
-		"allIssuesResolved_other": "All {{count}} issues resolved. This PR can be merged.",
-		"nonBlockingSuggestions_one": "{{resolved}} resolved. {{count}} non-blocking suggestion remains.",
-		"nonBlockingSuggestions_other": "{{resolved}} resolved. {{count}} non-blocking suggestions remain.",
 		"blockingIssues": "Blocking Issues",
-		"blockingIssuesDesc_one": "{{resolved}} resolved, {{count}} blocking issue still open.",
-		"blockingIssuesDesc_other": "{{resolved}} resolved, {{count}} blocking issues still open.",
-		"newCommitsSinceReview_one": "{{count}} new commit since review. Run follow-up to check if issues are resolved.",
-		"newCommitsSinceReview_other": "{{count}} new commits since review. Run follow-up to check if issues are resolved.",
-		"noBlockingIssues": "No blocking issues found. This PR can be merged.",
-		"findingsPostedWaiting_one": "{{count}} finding posted. Waiting for contributor to address issues.",
-		"findingsPostedWaiting_other": "{{count}} findings posted. Waiting for contributor to address issues.",
-		"findingsPostedNoBlockers_one": "{{count}} finding posted. No blocking issues remain.",
-		"findingsPostedNoBlockers_other": "{{count}} findings posted. No blocking issues remain.",
 		"needsAttention": "Needs Attention",
-		"findingsNeedPosting_one": "{{count}} finding need to be posted to GitHub.",
-		"findingsNeedPosting_other": "{{count}} findings need to be posted to GitHub.",
-		"findingsFoundSelectPost_one": "{{count}} finding found. Select and post to GitHub.",
-		"findingsFoundSelectPost_other": "{{count}} findings found. Select and post to GitHub.",
 		"reviewLogs": "Review Logs",
 		"followup": "Follow-up",
 		"initial": "Initial",
@@ -439,8 +440,6 @@
 		"cleanReviewMessageStatus": "**Status:** All code is good",
 		"cleanReviewMessageFooter": "*This automated review found no issues. Generated by WorkPilot AI.*",
 		"failedPostCleanReview": "Failed to post clean review",
-		"viewErrorDetails": "View details",
-		"hideErrorDetails": "Hide details",
 		"postBlockedStatus": "Post Status",
 		"postingBlockedStatus": "Posting...",
 		"blockedStatusPosted": "Status posted to PR",
@@ -474,13 +473,52 @@
 			"pastBugs": "Past Bugs in Area",
 			"regressionRisks": "Regression Risks",
 			"gatheringTime": "Context gathered in {{ms}}ms",
-			"noContext": "No deep context available",
-			"canImportFrom": "Can import from: {{imports}}"
+			"canImportFrom": "Can import from: {{imports}}",
+			"violationSeverity": {
+				"error": "Error",
+				"warning": "Warning"
+			}
 		},
 		"deepContextSections_one": "{{count}} section",
 		"deepContextSections_other": "{{count}} sections",
 		"verdictOutdated": "AI verdict may be outdated",
-		"rerunReviewSuggestion": "Consider re-running the review after resolving these issues."
+		"rerunReviewSuggestion": "Consider re-running the review after resolving these issues.",
+		"feedback": {
+			"groupLabel": "Feedback on this finding",
+			"accept": "Accept",
+			"reject": "Reject",
+			"notApplicable": "Not applicable",
+			"reasonLabel": "Reason (optional)",
+			"noReason": "No reason",
+			"reasons": {
+				"too_pedantic": "Too pedantic",
+				"project_convention": "Project convention differs",
+				"false_positive": "False positive",
+				"legacy_exception": "Legacy code exception",
+				"other": "Other"
+			},
+			"noteLabel": "Details (optional)",
+			"notePlaceholder": "Why this does not apply here",
+			"save": "Save",
+			"cancel": "Cancel",
+			"held": "Waiting for a maintainer: the reviewer learns from this rejection once a project owner approves it.",
+			"show": "Show",
+			"hide": "Hide",
+			"learnedBadge_one": "Rejected {{count}} time on this project",
+			"learnedBadge_other": "Rejected {{count}} times on this project",
+			"learnedHint": "This kind of finding was rejected often on this project, so its severity was lowered.",
+			"suppressed_one": "{{count}} finding hidden by what this project rejected before",
+			"suppressed_other": "{{count}} findings hidden by what this project rejected before",
+			"suppressedHint": "Kinds of finding rejected often enough are no longer raised. Security and critical findings are never hidden.",
+			"rejectedCount_one": "(rejected {{count}} time)",
+			"rejectedCount_other": "(rejected {{count}} times)",
+			"errors": {
+				"invalid": "This feedback could not be read.",
+				"not_found": "This finding is no longer in the saved review.",
+				"server_project": "Feedback on findings is not available for server projects yet.",
+				"write_failed": "The feedback could not be saved."
+			}
+		}
 	},
 	"downloads": {
 		"toggleExpand": "Toggle download details",
@@ -497,7 +535,10 @@
 		"cancel": "Cancel this download",
 		"retry": "Retry",
 		"cancelledLabel": "Cancelled",
-		"hint": "Downloads keep running in the background, even if you close this task."
+		"hint": "Downloads keep running in the background, even if you close this task.",
+		"hoursRemaining": "{{count}}h remaining",
+		"minutesRemaining": "{{count}}m remaining",
+		"secondsRemaining": "{{count}}s remaining"
 	},
 	"ideation": {
 		"converting": "Converting...",
@@ -518,13 +559,15 @@
 	},
 	"usage": {
 		"claudeCodeSubscription": "Claude Code",
-		"claudeCodeSubscriptionPro": "Claude Code Pro",
-		"claudeCodeSubscriptionMax": "Claude Code Max",
 		"claudeCodeSubscriptionUnknown": "Claude Code",
 		"dataUnavailable": "Usage data unavailable",
 		"dataUnavailableDescription": "The usage monitoring endpoint for this provider is not available or not supported.",
 		"dataUnavailableAnthropic": "Anthropic usage data is not available. You can check your usage directly on claude.ai/settings.",
 		"activeAccount": "Active Account",
+		"planApiKey": "API key · pay as you go",
+		"planApiKeyHint": "Billed per use through an API key: no plan windows apply.",
+		"planSubscription": "Subscription",
+		"planSubscriptionHint": "Plan of this account, as the provider reports it.",
 		"usageAlert": "Usage Alert",
 		"accountExceedsThreshold": "Account usage exceeds 90% threshold",
 		"authentication": "Authentication",
@@ -631,10 +674,6 @@
 			"text": "Check that your OpenAI API key is linked to a billing-enabled organization.",
 			"link": "View OpenAI dashboard"
 		},
-		"debugProfiles": "Debug detected profiles:",
-		"noProfileDetected": "No profile detected",
-		"selectedProvider": "Selected provider: {{provider}}",
-		"openaiError": "OpenAI Error:",
 		"openaiDetailTitle": "OpenAI Detail",
 		"completionsLabel": "Completions (tokens by model):",
 		"costByModelLabel": "Cost by model:",
@@ -671,11 +710,12 @@
 		"lensAutoWith": "Automatic ({{provider}})",
 		"lensRunning": "{{provider}} — running",
 		"lensTooltip": "Which provider's usage the badges show. Automatic follows the tasks in progress. This changes nothing about what a task runs on.",
-		"debugProvider": "provider:",
 		"needsReauthTitle": "Needs re-authentication",
 		"sessionUsage": "Session usage",
 		"weeklyUsage": "Weekly usage",
-		"inOut": "{{model}}: {{input}} in, {{output}} out"
+		"inOut": "{{model}}: {{input}} in, {{output}} out",
+		"providerAccounts": "Accounts of this provider",
+		"accountSwitchFailed": "Could not switch: {{error}}"
 	},
 	"oauth": {
 		"enterCode": "Manual Code Entry (Fallback)",
@@ -720,6 +760,9 @@
 		"hasAuthenticatedAccount": "You have at least one authenticated Claude account. You can continue to the next step.",
 		"authNotDetected": "Authentication not detected. Please complete /login in the terminal first.",
 		"noProfileSelected": "No profile selected for verification",
+		"profilesLoadFailed": "Could not read the Claude profiles",
+		"terminalOpenFailed": "Could not open the sign-in terminal",
+		"verifyFailed": "Could not check the sign-in",
 		"alerts": {
 			"profileCreatedAuthFailed": "Profile created, but failed to start authentication: {{error}}",
 			"authPrepareFailed": "Failed to prepare authentication: {{error}}",
@@ -880,7 +923,14 @@
 		"stopping": "Stopping...",
 		"progress": "Progress",
 		"lastActivityPrefix": "last activity",
-		"lastProgressUpdateTooltip": "Last progress update received"
+		"lastProgressUpdateTooltip": "Last progress update received",
+		"timeAgo": {
+			"justNow": "just now",
+			"seconds": "{{count}}s ago",
+			"minutes": "{{count}}m ago",
+			"hours": "{{count}}h ago",
+			"days": "{{count}}d ago"
+		}
 	},
 	"time": {
 		"justNow": "just now",
@@ -893,6 +943,8 @@
 		"daysAgo": "{{count}}d ago",
 		"daysAgo_one": "{{count}}d ago",
 		"daysAgo_other": "{{count}}d ago",
+		"weeksAgo_one": "{{count}}w ago",
+		"weeksAgo_other": "{{count}}w ago",
 		"today": "Today",
 		"yesterday": "Yesterday"
 	},
@@ -966,7 +1018,10 @@
 			"optional": "Optional",
 			"agents": "Agents that use it",
 			"agentsHint": "You can change this later in Agent Tools.",
-			"noAgent": "Pick at least one agent."
+			"noAgent": "Pick at least one agent.",
+			"showValue": "Show the value",
+			"hideValue": "Hide the value",
+			"openHelp": "Where to get {{name}}"
 		},
 		"installedTab": {
 			"empty": "No MCP server in this project",
@@ -1007,12 +1062,59 @@
 			"httpConfiguration": "HTTP Configuration",
 			"transformTemplate": "Transform Template",
 			"transformPlaceholder": "Template for transforming input data...",
-			"paramDescriptionPlaceholder": "Description"
+			"paramDescriptionPlaceholder": "Description",
+			"addTool": "Add a tool",
+			"removeParam": "Remove the parameter",
+			"paramName": "Parameter name",
+			"paramType": "Parameter type",
+			"paramDescription": "Parameter description",
+			"colorCode": "Color code",
+			"httpMethod": "HTTP method",
+			"httpPath": "Path",
+			"chain": "Chain",
+			"paramTypes": {
+				"string": "Text",
+				"number": "Number",
+				"boolean": "Yes / no",
+				"array": "List",
+				"object": "Object"
+			}
 		},
 		"officialOnly": "Official",
 		"official": "Official",
 		"community": "Community",
 		"noProject": "Select a project: servers are installed per project.",
+		"failures": {
+			"builderSaveFailed": "The builder file could not be written.",
+			"builderDeleteFailed": "The builder file could not be written.",
+			"invalidBuilderRequest": "The request sent to the app was not valid.",
+			"securityServerRequired": "No catalog server was named.",
+			"securityInvalidProject": "The project named is not valid.",
+			"securityUnknownServer": "This server is not in the catalog.",
+			"securityFailed": "The security score could not be computed.",
+			"tooManyBuilderProjects": "The builder already holds as many servers as it can keep.",
+			"watchProjectRequired": "No project was named.",
+			"watchServerRequired": "No catalog server was named.",
+			"watchUnknownProject": "This project is not registered in the app.",
+			"policyReadFailed": "The project's MCP policy could not be read.",
+			"watchReadFailed": "The alerts of the installed servers could not be read.",
+			"acknowledgeFailed": "The alerts could not be marked as seen."
+		},
+		"errors": {
+			"loadCatalog": "The catalog could not be loaded.",
+			"loadBuilder": "Your builder servers could not be loaded.",
+			"unknownServer": "{{name}} is not in the catalog.",
+			"missingValues": "Fill in: {{name}}.",
+			"alreadyInstalled": "{{name}} is already installed in this project.",
+			"readSettings": "The project settings could not be read: nothing was changed.",
+			"saveSettings": "The project settings could not be saved.",
+			"install": "The server could not be installed.",
+			"uninstall": "The server could not be removed.",
+			"saveBuilder": "The server could not be saved.",
+			"deleteBuilder": "The server could not be deleted.",
+			"policyRefused": "The project's MCP policy refused {{name}}.",
+			"acknowledge": "The alerts could not be acknowledged."
+		},
 		"requires": {
 			"uv": "Needs uv (uvx) on this machine.",
 			"az": "Needs the Azure CLI, signed in with az login."
@@ -1020,7 +1122,187 @@
 		"agents": {
 			"planner": "Planner",
 			"coder": "Coder",
-			"qa_reviewer": "QA reviewer"
+			"qa_reviewer": "QA reviewer",
+			"analyzer": "Investigator"
+		},
+		"security": {
+			"badge": "Security {{score}}",
+			"badgeTitle": "Security score {{score}}/100: {{level}}",
+			"level": {
+				"high": "high",
+				"medium": "medium",
+				"low": "low"
+			},
+			"title": "Security",
+			"checking": "Reading the registry and known vulnerabilities…",
+			"recheck": "Check again",
+			"readFailed": "The registry could not be read.",
+			"checkedAt": "Registry read {{date}}",
+			"unchecked": {
+				"remote": "Runs on its vendor's servers: nothing of it runs on this machine, and there is no package to check.",
+				"offline": "This project is in strict offline mode: the score uses the catalog and the last registry read only.",
+				"unreachable": "The registry could not be reached: the score uses the catalog and the last registry read only.",
+				"notYet": "From the catalog only; open the details to read the registry and known vulnerabilities."
+			},
+			"lowScore": "Low score: install it only on projects you trust, and review its tools before approving them.",
+			"dimensions": {
+				"publisher": "Publisher",
+				"permissions": "Permissions",
+				"execution": "Where it runs",
+				"freshness": "Freshness",
+				"supplyChain": "Known vulnerabilities",
+				"maintainers": "Maintainers",
+				"code": "Source code"
+			},
+			"reasons": {
+				"official": "Maintained by {{author}}, the vendor of the product.",
+				"community": "Community server ({{author}}), not the product's vendor.",
+				"readsOnly": "Its tools only read.",
+				"writes": "Some of its tools change data.",
+				"executes": "Tools that run commands: {{tools}}.",
+				"readOnlyFlag": "Started in read-only mode.",
+				"remote": "Runs remotely, not on this machine.",
+				"localPinned": "Runs on this machine with your rights, at a pinned version.",
+				"localUnpinned": "Runs on this machine with your rights; its latest version is fetched at each start.",
+				"unknown": "Not checked yet.",
+				"recent": "Latest release {{days}} days ago.",
+				"stale": "No release for {{days}} days: possibly abandoned.",
+				"deprecated": "Deprecated by its publisher.",
+				"vulnerable": "{{count}} known vulnerabilities for this version.",
+				"noKnownVulnerability": "No known vulnerability for version {{version}}.",
+				"changed": "New maintainers since the first check: {{names}}.",
+				"noSource": "The package names no source repository.",
+				"stable": "Same {{count}} maintainers as at the first check.",
+				"codeUnknown": "Its code has not been read yet.",
+				"codeClean": "Nothing risky found in the {{files}} source files of version {{version}}.",
+				"undeclaredCommands": "Its code starts other programs, while none of its tools says it runs commands.",
+				"dynamicCode": "Its code runs code it builds or loads at run time.",
+				"hardcodedSecret": "Its code holds a string shaped like a credential.",
+				"undeclaredWrites": "Its code writes files, while all its tools only read.",
+				"sourceUnavailable": {
+					"missing": "The archive of version {{version}} is no longer on the registry: its code cannot be audited.",
+					"noArchive": "The registry publishes no archive for version {{version}}: its code cannot be audited.",
+					"unsupported": "The archive of version {{version}} could not be read: its code cannot be audited.",
+					"tooLarge": "The archive of version {{version}} is too large to read: its code cannot be audited.",
+					"integrity": "The archive of version {{version}} does not match the registry's digest: its code cannot be audited."
+				}
+			},
+			"alerts": {
+				"maintainerChanged": "Maintainers changed: {{names}}. A new maintainer can publish anything under this name; check before updating.",
+				"vulnerability": "{{id}}: {{summary}}",
+				"abandoned": "No release for {{days}} days: it may be abandoned.",
+				"deprecated": "The publisher deprecated this package.",
+				"noSource": "Source code unavailable: it cannot be audited.",
+				"unpinned": "Not pinned: each start runs the newest release, whatever it contains.",
+				"executesCommands": "It can run commands ({{tools}}): give it only to the agents that need it.",
+				"sourceUnavailable": "The code of version {{version}} could not be read: it cannot be audited.",
+				"undeclaredCommands": "Starts other programs without a tool that says so ({{files}}): review it before installing.",
+				"dynamicCode": "Runs code built or loaded at run time ({{files}}): what it runs cannot be read in advance.",
+				"hardcodedSecret": "A string shaped like a credential is in its code ({{files}})."
+			},
+			"code": {
+				"title": "Code scan of version {{version}}: {{files}} source files",
+				"partial_one": "{{count}} file was too large or beyond the limit and was not read.",
+				"partial_other": "{{count}} files were too large or beyond the limit and were not read.",
+				"none": "No pattern found.",
+				"more_one": "and {{count}} more match",
+				"more_other": "and {{count}} more matches",
+				"accepted": "accepted by the project's MCP policy: {{reason}}",
+				"rules": {
+					"shellExec": "Starts programs",
+					"dynamicCode": "Dynamic code",
+					"hardcodedSecret": "Credential-shaped string",
+					"fileWrite": "Writes files",
+					"network": "Network access"
+				}
+			}
+		},
+		"policy": {
+			"active": "This project has an MCP policy (.workpilot/mcp-policy.json): only what it allows can be installed.",
+			"allowed": "Allowed catalog servers: {{ids}}.",
+			"allowedNone": "No catalog server is allowed.",
+			"minScore": "Lowest security score: {{min}}.",
+			"confineBelow": "Servers with a security score under {{min}}, and servers outside the catalog, run confined (OS sandbox, network limited to the hosts they list).",
+			"customBlocked": "Servers outside the catalog are refused.",
+			"invalidTitle": "The project's MCP policy (.workpilot/mcp-policy.json) is invalid: no server can be installed until it is fixed.",
+			"invalid": {
+				"unreadable": "The file could not be read.",
+				"notJson": "The file is not valid JSON.",
+				"schema": "A field is unknown or has a wrong value.",
+				"schemaField": "Unknown or wrong field: {{field}}.",
+				"outsideProject": "The file, or its folder, links outside the project.",
+				"notAFile": "It is not a regular file.",
+				"tooLarge": "The file is larger than 64 KB."
+			},
+			"refusals": {
+				"policyInvalid": "{{name}} cannot be installed: the project's MCP policy is invalid.",
+				"notAllowed": "The project's MCP policy does not allow {{name}}.",
+				"scoreTooLow": "{{name}} has a security score of {{score}}; the project's MCP policy needs {{minScore}} or more.",
+				"customBlocked": "The project's MCP policy refuses servers outside the catalog ({{name}})."
+			},
+			"acceptedFindings_one": "{{count}} finding of the code scan accepted, with its reason.",
+			"acceptedFindings_other": "{{count}} findings of the code scan accepted, each with its reason."
+		},
+		"watch": {
+			"title": "Security alerts",
+			"alertCount_one": "{{count}} alert",
+			"alertCount_other": "{{count}} alerts",
+			"unverifiable": "Not verifiable",
+			"unverifiableHint": "Not a catalog server: it is never checked on the network.",
+			"status": {
+				"watched": "Checked daily; last reading {{date}}.",
+				"pending": "Will be read by the next daily check.",
+				"remote": "Runs on its vendor's servers: no package to check.",
+				"offline": "Strict offline mode: this project's servers are not checked."
+			},
+			"acknowledge": "Acknowledge",
+			"detectedAt": "Found {{date}}",
+			"alerts": {
+				"newVulnerability": "New advisory for version {{version}}: {{id}}, {{summary}}",
+				"maintainerAdded": "New maintainer: {{names}}. A new maintainer can publish anything under this name; check its latest release.",
+				"deprecated": "The publisher deprecated or withdrew this package.",
+				"lowScore": "The security score fell to {{score}} (it was {{previous}}).",
+				"newCodeFinding": "Version {{version}} brings code that the previous one did not have: {{rule}} ({{file}}).",
+				"sourceUnavailable": "The code of version {{version}} can no longer be read: it cannot be audited."
+			}
+		},
+		"reviews": {
+			"title": "Team reviews",
+			"hint": "What your organization saw using this server, shared by all its projects. Only members of this organization read them; maintainers and administrators write them.",
+			"loading": "Loading the reviews",
+			"none": "No one in the organization has reviewed this server yet.",
+			"by": "by {{author}}",
+			"unknownAuthor": "a former member",
+			"delete": "Delete this review",
+			"write": "Your review",
+			"yours": "Your review (saving replaces it)",
+			"comment": "Comment",
+			"commentPlaceholder": "What did you see? Hosts it calls, files it reads, anything the docs do not say.",
+			"save": "Post the review",
+			"update": "Update the review",
+			"verdicts": {
+				"safe": "Safe",
+				"caution": "Use with caution",
+				"unsafe": "Unsafe"
+			},
+			"errors": {
+				"too_many_reviews": "This organization holds as many reviews as it can.",
+				"review_not_found": "This review no longer exists.",
+				"failed": "The server refused or could not be reached."
+			}
+		},
+		"sandbox": {
+			"refused": "Not started on this machine: this server must run confined, in the OS sandbox, and there is none here. It is never started without it.",
+			"policyRefused": "On this machine, the servers this policy confines do not start: there is no OS sandbox here.",
+			"why": "Why?",
+			"recheck": "Check again",
+			"kinds": {
+				"off": "The OS sandbox is turned off (WORKPILOT_SANDBOX=off).",
+				"unsupported": "This system has no OS sandbox WorkPilot can use yet (Windows, for now).",
+				"missing": "The sandbox program ({{backend}}) is not installed on this machine.",
+				"refused": "The sandbox program ({{backend}}) is installed, but the system refused to run it.",
+				"unknown": "WorkPilot could not check this machine's OS sandbox."
+			}
 		}
 	},
 	"terminalGrid": {
@@ -1075,7 +1357,8 @@
 			"installing": "Installing...",
 			"uninstall": "Uninstall",
 			"enable": "Enable",
-			"disable": "Disable"
+			"disable": "Disable",
+			"uninstallNamed": "Uninstall {{name}}"
 		},
 		"sdk": {
 			"title": "Plugin SDK",
@@ -1146,19 +1429,34 @@
 			"openFolderFailed": "Could not open the plugin folder",
 			"done": "Done",
 			"namePlaceholder": "My Awesome Plugin",
-			"untitled": "Untitled"
+			"createFailed": "Could not create the plugin",
+			"copyFailed": "Could not copy the configuration",
+			"fieldIdInvalid": "Use lowercase letters, digits and single hyphens (my-plugin)",
+			"fieldTemplateContentPlaceholder": "# Spec template\n\n## Requirements\n...",
+			"configFile": "Written to plugin.config.json in the plugin folder"
 		},
 		"byAuthor": "by {{author}}",
 		"noProject": "Select a project: plugins are installed into a project's skills.",
 		"installedIn": "In {{paths}}",
 		"howToUse": "Run it with /{{id}} in the Kanban command bar, or let the agent pick it up.",
 		"showSkill": "Show the skill",
-		"hideSkill": "Hide the skill"
+		"hideSkill": "Hide the skill",
+		"sortBy": "Sort plugins",
+		"loading": "Loading plugins",
+		"errors": {
+			"loadCatalog": "Failed to load catalog",
+			"loadInstalled": "Could not read the plugins installed in this project",
+			"install": "Installation failed",
+			"uninstall": "Uninstall failed"
+		}
 	},
 	"chatHistory": {
 		"title": "Chat History",
 		"byTeammate": "By {{name}}, read only",
 		"noConversations": "No conversations yet",
+		"titleInputLabel": "Conversation title",
+		"renameFailed": "The conversation could not be renamed.",
+		"deleteFailed": "The conversation could not be deleted.",
 		"today": "Today",
 		"yesterday": "Yesterday",
 		"daysAgo": "{{count}} days ago",
@@ -1207,6 +1505,7 @@
 		}
 	},
 	"modelCatalog": {
+		"freeText": "Other (free text)",
 		"live": "Up to date (provider)",
 		"registry": "Up to date (public registry)",
 		"cache": "Cached · {{when}}",
@@ -1295,11 +1594,31 @@
 		"description": "Sign in to a shared server, or continue in local mode.",
 		"serverUrl": "Server URL",
 		"entraButton": "Sign in with Microsoft",
+		"ssoButton": "Sign in with {{name}}",
 		"email": "Email",
 		"password": "Password",
 		"localAccountButton": "Sign in",
 		"localModeButton": "Local mode",
-		"haveInvite": "I have an invitation"
+		"haveInvite": "I have an invitation",
+		"forgotPassword": "Forgot password?",
+		"failed": "Could not sign in"
+	},
+	"passwordReset": {
+		"title": "Reset your password",
+		"askDescription": "Enter your account's email: if the server knows it, it sends you a link to choose a new password.",
+		"setDescription": "Paste the link you received, then choose your new password. You will be signed out everywhere else.",
+		"noEmail": "This server cannot send email. Ask a server administrator for a reset link (Administration, Members), then choose \"I have a link\".",
+		"send": "Send the link",
+		"sent": "If an account uses this address, a link is on its way. It works once and expires soon.",
+		"haveLink": "I have a link",
+		"needLink": "I need a link",
+		"link": "Reset link or code",
+		"forAccount": "For the account {{email}}",
+		"newPassword": "New password",
+		"save": "Set my password",
+		"invalidLink": "This reset link is invalid or has expired",
+		"failed": "The password could not be reset",
+		"done": "Your password was changed. Sign in with the new one."
 	},
 	"acceptInvite": {
 		"title": "Create your account",
@@ -1326,20 +1645,36 @@
 		"parent": "⬆ Parent",
 		"noFolders": "No folder found.",
 		"checkPath": "Check the path or your access rights.",
-		"dragReferences": "Drag files to add as references"
-	},
-	"imageUpload": {
-		"largeFile": "Large file - consider compressing",
-		"limits": "{{types}} up to 10MB each ({{count}}/{{max}})",
-		"maxImages": "{{max}} images maximum",
-		"dropOrBrowse": "Drop images here or click to browse",
-		"maxReached": "Maximum images reached"
+		"dragReferences": "Drag files to add as references",
+		"loadFailed": "Could not open this folder."
 	},
 	"shortcutsOverlay": {
 		"title": "Keyboard Shortcuts",
 		"pressBefore": "Press",
 		"escapeKey": "Escape",
-		"pressAfter": "to close · Single-key shortcuts work when not typing in an input"
+		"pressAfter": "to close · Menu shortcuts (two letters, typed one after the other) work when a project is open and you are not typing in a field",
+		"groups": {
+			"navigation": "Navigation",
+			"general": "General",
+			"terminal": "Terminals",
+			"menu": "Menu"
+		},
+		"items": {
+			"goKanban": "Go to Kanban",
+			"goTerminals": "Go to Terminals",
+			"goInsights": "Go to Insights",
+			"goRoadmap": "Go to Roadmap",
+			"openSettings": "Open Settings",
+			"commandPalette": "Command palette",
+			"shortcuts": "Keyboard shortcuts",
+			"newTask": "New task",
+			"addProject": "Add a project (outside Terminals)",
+			"voiceAssistant": "Voice assistant",
+			"stopAgents": "Stop all agents",
+			"closeDialog": "Close a dialog or overlay",
+			"newTerminal": "New terminal (in Terminals)",
+			"closeTerminal": "Close the terminal (in Terminals)"
+		}
 	},
 	"learningMode": {
 		"level": "Level: {{level}}",
@@ -1363,8 +1698,6 @@
 			"specCreated": "Spec created from issue",
 			"retry": "Retry Auto Fix",
 			"button": "Auto Fix",
-			"processing_one": "Processing {{count}} issue...",
-			"processing_other": "Processing {{count}} issues...",
 			"newIssues": "Auto-Fix New",
 			"newIssuesDescription": "Automatically fix new issues as they come in.",
 			"failed": "Auto-fix failed",
@@ -1377,8 +1710,8 @@
 			"selectedBatches_other": "{{count}} batches selected ({{issues}} issues)",
 			"plusSingle_one": "+ {{count}} single issue",
 			"plusSingle_other": "+ {{count}} single issues",
-			"approveCreate": "Approve & Create ({{count}})",
-			"issueCount": "{{count}} issues",
+			"issueCount_one": "{{count}} issue",
+			"issueCount_other": "{{count}} issues",
 			"similar": "{{percent}}% similar",
 			"title": "Analyze & Group Issues",
 			"intro": "This will analyze up to 200 open issues, group similar ones together, and let you review the proposed batches before creating any tasks.",
@@ -1397,6 +1730,7 @@
 			"approveCreateCount_one": "Approve & Create ({{count}} batch)",
 			"approveCreateCount_other": "Approve & Create ({{count}} batches)",
 			"defaultName": "Batch {{number}}",
+			"approveFailed": "Could not create the tasks of these batches",
 			"computing": "Computing similarity and validating batches...",
 			"stepIntro": "Analyze open issues and group similar ones for batch processing.",
 			"stepAnalyzing": "Analyzing issues for semantic similarity...",
@@ -1420,13 +1754,32 @@
 		},
 		"createTask": "Create Task",
 		"done": "Done",
-		"commentsCount": "{{count}} comments",
+		"commentsCount_one": "{{count}} comment",
+		"commentsCount_other": "{{count}} comments",
+		"state": {
+			"open": "Open",
+			"closed": "Closed"
+		},
+		"complexity": {
+			"simple": "Simple",
+			"standard": "Standard",
+			"complex": "Complex"
+		},
 		"taskId": "Task ID: {{id}}",
 		"viewTask": "View Task",
 		"taskLinked": "Task Linked",
 		"assignees": "Assignees",
 		"milestone": "Milestone",
-		"openCount": "{{count}} open",
+		"openCount_one": "{{count}} open",
+		"openCount_other": "{{count}} open",
+		"noIssues": "No issues found",
+		"loadFailed": "Could not load the issues",
+		"loadMoreFailed": "Could not load more issues",
+		"importFailed": "Could not create tasks from the issues",
+		"createCardFailed": "Failed to create the card",
+		"unknownError": "Unknown error",
+		"selectIssue": "Select an issue to view details",
+		"filterLabel": "Show issues",
 		"searchPlaceholder": "Search issues...",
 		"filters": {
 			"open": "Open",
@@ -1446,7 +1799,21 @@
 		"less": "Less",
 		"more": "More",
 		"streaming": "Streaming",
-		"running": "Running"
+		"running": "Running",
+		"phase": {
+			"context": "Context Gathering",
+			"analysis": "AI Analysis",
+			"synthesis": "Synthesis"
+		},
+		"activity": {
+			"read_one": "{{count}} file read",
+			"read_other": "{{count}} files read",
+			"search_one": "{{count}} search",
+			"search_other": "{{count}} searches",
+			"other_one": "{{count}} other",
+			"other_other": "{{count}} others"
+		},
+		"showDetail": "Show the details"
 	},
 	"githubCopilot": {
 		"authTerminal": {

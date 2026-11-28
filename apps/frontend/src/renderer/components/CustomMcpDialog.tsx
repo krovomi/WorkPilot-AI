@@ -9,6 +9,7 @@ import { ExternalLink, Globe, Terminal, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { CustomMcpServer } from "../../shared/types";
+import { confinementToSave, McpConfineFields } from "./McpConfineFields";
 import { Button } from "./ui/button";
 import {
 	Dialog,
@@ -21,6 +22,8 @@ import {
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
+
+const HIDDEN_VALUE = "••••••••";
 
 interface CustomMcpDialogProps {
 	readonly open: boolean;
@@ -56,6 +59,8 @@ export function CustomMcpDialog({
 	const [headerValue, setHeaderValue] = useState("");
 	const [bearerToken, setBearerToken] = useState("");
 	const [showAdvancedHeaders, setShowAdvancedHeaders] = useState(false);
+	const [confined, setConfined] = useState(false);
+	const [confineHosts, setConfineHosts] = useState("");
 	const [error, setError] = useState<string | null>(null);
 
 	// Known provider patterns for helpful hints
@@ -105,6 +110,8 @@ export function CustomMcpDialog({
 		if (open && server) {
 			setFormData(server);
 			setArgsInput(server.args?.join(" ") || "");
+			setConfined(server.confine !== undefined);
+			setConfineHosts(server.confine?.hosts.join(" ") ?? "");
 			// Extract bearer token from existing Authorization header
 			const authHeader =
 				server.headers?.Authorization || server.headers?.authorization || "";
@@ -131,6 +138,8 @@ export function CustomMcpDialog({
 				description: "",
 			});
 			setArgsInput("");
+			setConfined(false);
+			setConfineHosts("");
 			setBearerToken("");
 			setShowAdvancedHeaders(false);
 			setError(null);
@@ -147,27 +156,13 @@ export function CustomMcpDialog({
 			.replaceAll(/^-|-$/g, "");
 	};
 
-	// Validation functions
+	// Save stays disabled until a name and a command or URL are typed, so
+	// what is left to check is the id a new server gets from its name.
 	const validateForm = (): string | null => {
-		if (!formData.name.trim()) {
-			return t("mcp.errorNameRequired");
-		}
-
-		const generatedId = isEditing ? formData.id : generateId(formData.name);
-
-		// Check for duplicate ID (only when creating new)
-		if (!isEditing && existingIds.includes(generatedId)) {
-			return t("mcp.errorIdExists");
-		}
-
-		if (formData.type === "command" && !formData.command?.trim()) {
-			return t("mcp.errorCommandRequired");
-		}
-
-		if (formData.type === "http" && !formData.url?.trim()) {
-			return t("mcp.errorUrlRequired");
-		}
-
+		if (isEditing) return null;
+		const generatedId = generateId(formData.name);
+		if (!generatedId) return t("mcp.errorNameNoId");
+		if (existingIds.includes(generatedId)) return t("mcp.errorIdExists");
 		return null;
 	};
 
@@ -179,14 +174,17 @@ export function CustomMcpDialog({
 
 		const finalHeaders: Record<string, string> = {};
 
-		// Copy existing headers (excluding old Authorization if we have a new bearer token)
-		if (formData.headers) {
-			for (const [key, value] of Object.entries(formData.headers)) {
-				if (bearerToken && key.toLowerCase() === "authorization") {
-					continue; // Skip old auth header if we have a new bearer token
-				}
-				finalHeaders[key] = value;
+		// Copy the other headers. A bearer Authorization header is the token
+		// field: emptying the field removes it, typing a new token replaces it.
+		for (const [key, value] of Object.entries(formData.headers || {})) {
+			const isAuthorization = key.toLowerCase() === "authorization";
+			if (
+				isAuthorization &&
+				(bearerToken.trim() || value.toLowerCase().startsWith("bearer "))
+			) {
+				continue;
 			}
+			finalHeaders[key] = value;
 		}
 
 		// Add bearer token as Authorization header
@@ -212,6 +210,7 @@ export function CustomMcpDialog({
 						args: argsInput.split(" ").filter(Boolean),
 						// The dialog has no field for it: keep what the catalog set.
 						...(formData.env ? { env: formData.env } : {}),
+						...confinementToSave(confined, confineHosts),
 					}
 				: {
 						url: formData.url,
@@ -235,15 +234,14 @@ export function CustomMcpDialog({
 		onOpenChange(false);
 	};
 
+	// Its button is enabled once both fields are typed.
 	const addHeader = () => {
-		if (headerKey.trim() && headerValue.trim()) {
-			setFormData((prev) => ({
-				...prev,
-				headers: { ...prev.headers, [headerKey.trim()]: headerValue.trim() },
-			}));
-			setHeaderKey("");
-			setHeaderValue("");
-		}
+		setFormData((prev) => ({
+			...prev,
+			headers: { ...prev.headers, [headerKey.trim()]: headerValue.trim() },
+		}));
+		setHeaderKey("");
+		setHeaderValue("");
 	};
 
 	const removeHeader = (key: string) => {
@@ -382,6 +380,12 @@ export function CustomMcpDialog({
 									{t("mcp.argsHint")}
 								</p>
 							</div>
+							<McpConfineFields
+								confined={confined}
+								hostsInput={confineHosts}
+								onConfinedChange={setConfined}
+								onHostsChange={setConfineHosts}
+							/>
 						</>
 					)}
 
@@ -496,22 +500,22 @@ export function CustomMcpDialog({
 													.filter(
 														([key]) => key.toLowerCase() !== "authorization",
 													)
-													.map(([key, value]) => (
+													.map(([key]) => (
 														<div
 															key={key}
 															className="flex items-center justify-between text-sm bg-muted px-2 py-1 rounded"
 														>
 															<span>
 																<span className="font-medium">{key}:</span>{" "}
+																{/* Typed in a password field: never shown back. */}
 																<span className="text-muted-foreground">
-																	{value.length > 20
-																		? `${value.substring(0, 20)}...`
-																		: value}
+																	{HIDDEN_VALUE}
 																</span>
 															</span>
 															<button
 																type="button"
 																onClick={() => removeHeader(key)}
+																aria-label={t("mcp.removeHeader", { name: key })}
 																className="text-muted-foreground hover:text-destructive transition-colors"
 															>
 																<X className="h-3 w-3" />

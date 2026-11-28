@@ -14,7 +14,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { AppSettings } from "@shared/types/settings";
-import type { UseProjectSettingsReturn } from "@/components/project-settings";
+import type { UseProjectSettingsReturn } from "@/components/project-settings/hooks/useProjectSettings";
 import { TerminalFontSettings } from "@/components/settings/terminal-font-settings";
 import { ScrollArea } from "@/components/ui";
 import { cn } from "@/lib/utils";
@@ -25,6 +25,10 @@ import { InvitationsAdmin } from "../auth/InvitationsAdmin";
 import { CollaborationSettings } from "../collaboration/CollaborationSettings";
 import { ServerMcpSettings } from "./ServerMcpSettings";
 import { ServerNeedsYouSettings } from "./ServerNeedsYouSettings";
+import { ServerReplayLinksSettings } from "./ServerReplayLinksSettings";
+import { ServerConnectSettings } from "./ServerConnectSettings";
+import { MyUsageSettings } from "./MyUsageSettings";
+import { ServerSessionSettings } from "./ServerSessionSettings";
 import { ServerTokensSettings } from "./ServerTokensSettings";
 import { ModuleStage, Notice, toneClass } from "../charter";
 import { Button } from "../ui/button";
@@ -39,6 +43,7 @@ import {
 } from "../ui/full-screen-dialog";
 import { AdvancedSettings } from "./AdvancedSettings";
 import { AnomalyDetectionSettings } from "./AnomalyDetectionSettings";
+import { ApprovalTiersSettings } from "./ApprovalTiersSettings";
 import { CleanProviderSection } from "./CleanProviderSection";
 import { DebugSettings } from "./DebugSettings";
 import { DevToolsSettings } from "./DevToolsSettings";
@@ -49,8 +54,10 @@ import { LanguageSettings } from "./LanguageSettings";
 import { VoiceAssistantSettings } from "./VoiceAssistantSettings";
 import { ProjectSettingsContent } from "./ProjectSettingsContent";
 import { GuardrailsSettings } from "./GuardrailsSettings";
+import { CodeModeSettings } from "./CodeModeSettings";
 import { SandboxSettings } from "./SandboxSettings";
 import { SchedulerSettings } from "./SchedulerSettings";
+import { ForgeAccountsSettings } from "./ForgeAccountsSettings";
 import { SettingsPageContext } from "./SettingsSection";
 import { resolveSettingsLanding } from "./settings-landing";
 import { filterSettingsThemes } from "./settings-search";
@@ -78,6 +85,7 @@ export type AppSection =
 	// Intégrations & Connexions (priorité 2)
 	| "integrations"
 	| "accounts"
+	| "forge-accounts"
 	// Interface & Apparence
 	| "appearance"
 	| "display"
@@ -88,16 +96,21 @@ export type AppSection =
 	| "devtools"
 	| "paths"
 	| "agent"
+	| "code-mode"
 	// Sécurité & Performance
 	| "sandbox"
 	| "guardrails"
 	| "anomaly-detection"
+	| "approvals"
 	// Multi-utilisateurs (serveur ; les invitations pour les admins seulement)
 	| "team-invitations"
+	| "server-session"
+	| "server-my-usage"
 	| "server-tokens"
 	| "server-mcp"
 	| "server-needs-you"
 	| "server-collaboration"
+	| "server-replay-links"
 	// Système & Maintenance
 	| "updates"
 	| "notifications"
@@ -115,6 +128,7 @@ export type ProjectSettingsSection =
 	| "board-mcp"
 	| "github"
 	| "gitlab"
+	| "bitbucket"
 	| "linear"
 	| "teams";
 
@@ -168,11 +182,14 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 	// The person's own tokens on the server: anyone signed in to one.
 	const hidden = new Set([
 		...(isServerAdmin ? [] : ["team-invitations"]),
+		// "server-session" stays: in local mode it is where one signs in.
 		...(serverMode === "server" ? [] : [
+					"server-my-usage",
 					"server-tokens",
 					"server-mcp",
 					"server-needs-you",
 					"server-collaboration",
+					"server-replay-links",
 				]),
 	]);
 	SETTINGS_THEMES.integrations.sections =
@@ -410,6 +427,8 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 						isOpen={open}
 					/>
 				);
+			case "forge-accounts":
+				return <ForgeAccountsSettings />;
 			case "updates":
 				return (
 					<AdvancedSettings
@@ -431,17 +450,31 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 			case "debug":
 				return <DebugSettings />;
 			case "sandbox":
-				return <SandboxSettings />;
+				return <SandboxSettings settings={settings} onSettingsChange={setSettings} />;
+			case "code-mode":
+				return <CodeModeSettings settings={settings} onSettingsChange={setSettings} />;
 			case "guardrails":
 				return <GuardrailsSettings />;
 			case "anomaly-detection":
-				return <AnomalyDetectionSettings />;
+				return (
+					<AnomalyDetectionSettings settings={settings} onSettingsChange={setSettings} />
+				);
+			case "approvals":
+				return <ApprovalTiersSettings settings={settings} onSettingsChange={setSettings} />;
 			case "scheduler":
 				return <SchedulerSettings />;
 			case "swarm-mode":
 				return <SwarmModeSettings />;
 			case "team-invitations":
 				return isServerAdmin ? <InvitationsAdmin /> : null;
+			case "server-session":
+				return serverMode === "server" ? (
+					<ServerSessionSettings />
+				) : (
+					<ServerConnectSettings onConnect={() => onOpenChange(false)} />
+				);
+			case "server-my-usage":
+				return serverMode === "server" ? <MyUsageSettings /> : null;
 			case "server-tokens":
 				return serverMode === "server" ? <ServerTokensSettings /> : null;
 			case "server-mcp":
@@ -450,6 +483,8 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 				return serverMode === "server" ? <ServerNeedsYouSettings /> : null;
 			case "server-collaboration":
 				return serverMode === "server" ? <CollaborationSettings /> : null;
+			case "server-replay-links":
+				return serverMode === "server" ? <ServerReplayLinksSettings /> : null;
 			default:
 				return null;
 		}

@@ -10,6 +10,8 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from importlib import import_module
 
 from fastapi import FastAPI, Request
@@ -24,10 +26,16 @@ PUBLIC_PATHS = {
     "/auth/refresh",
     "/auth/logout",
     "/auth/oidc/exchange",
+    "/auth/sso/exchange",
     "/auth/config",
     "/auth/invitations/lookup",
     "/auth/invitations/accept",
+    "/auth/password-reset/request",
+    "/auth/password-reset/lookup",
+    "/auth/password-reset/confirm",
     "/health",
+    # Opened by its own bearer token, not an account (routers/operations.py).
+    "/metrics",
     "/docs",
     "/openapi.json",
 }
@@ -125,6 +133,12 @@ async def _attach_principal(request: Request, claims: dict) -> bool:
             platform_role=platform_role,
             org_id=org_id,
         )
+        # Approvals lent to someone who cannot approve on their own.
+        delegations: tuple[tuple[str, str], ...] = ()
+        if org_id and "review.approve" not in permissions:
+            from server.authz.delegation import delegations_to
+
+            delegations = await delegations_to(db, user_id=user_id, org_id=org_id)
 
     request.state.org_id = org_id
     request.state.principal = Principal(
@@ -135,8 +149,16 @@ async def _attach_principal(request: Request, claims: dict) -> bool:
         org_id=org_id,
         org_role_slug=org_role_slug,
         permissions=permissions,
+        delegations=delegations,
     )
     return True
+
+
+async def _note_presence(request: Request) -> None:
+    """The caller used the server today, in the organization they act in."""
+    from server.services import presence
+
+    await presence.touch(request.state.user_id, getattr(request.state, "org_id", None))
 
 
 async def _attach_token_principal(request: Request, raw: str) -> JSONResponse | None:
@@ -279,13 +301,46 @@ async def _ensure_db_ready() -> None:
             logger.exception("Could not settle runs interrupted by a restart")
 
 
+def _run_periodic_jobs(app: FastAPI) -> None:
+    """Run the server's periodic jobs for the app's lifetime, inside its lifespan.
+
+    Escalating a plan that waited too long for its approvals
+    (``services/approval_escalation.py``), started only when it is on; and
+    erasing usage data past its retention (``services/usage_retention.py``);
+    and sending each organization's usage report when it is due
+    (``services/usage_report_schedule.py``).
+    """
+    inner = app.router.lifespan_context
+
+    @asynccontextmanager
+    async def lifespan(application: FastAPI) -> AsyncIterator[object]:
+        from server.services import (
+            approval_escalation,
+            usage_report_schedule,
+            usage_retention,
+        )
+
+        async with inner(application) as state:
+            approval_escalation.start(ready=_ensure_db_ready)
+            usage_retention.start(ready=_ensure_db_ready)
+            usage_report_schedule.start(ready=_ensure_db_ready)
+            try:
+                yield state
+            finally:
+                await approval_escalation.stop()
+                await usage_retention.stop()
+                await usage_report_schedule.stop()
+
+    app.router.lifespan_context = lifespan
+
+
 def mount_server_mode(app: FastAPI) -> bool:
     """Activate auth middleware + multi-user routers. Returns True if active."""
     settings = get_settings()
     if not settings.server_mode:
         return False
 
-    from server.auth.jwt_tokens import TokenError, decode_access_token
+    from server.auth.jwt_tokens import TokenError, decode_access_token, login_of
 
     # SECURITY: the auth middleware is registered BEFORE any router is mounted.
     # Starlette applies middleware to the whole app regardless of registration
@@ -314,6 +369,7 @@ def mount_server_mode(app: FastAPI) -> bool:
             )
             if failure is not None:
                 return failure
+            await _note_presence(request)
             return await call_next(request)
         try:
             claims = decode_access_token(auth[len("Bearer ") :].strip())
@@ -332,6 +388,8 @@ def mount_server_mode(app: FastAPI) -> bool:
         request.state.user_id = claims["sub"]
         request.state.user_email = claims.get("email", "")
         request.state.user_role = claims.get("role", "member")
+        # The sign-in this token comes from, for the audit log.
+        request.state.login = login_of(claims)
 
         # Resolve the tenant and the effective permissions once per request.
         # Doing it here rather than in a dependency means every route — the ~150
@@ -349,6 +407,7 @@ def mount_server_mode(app: FastAPI) -> bool:
             return JSONResponse(
                 status_code=401, content={"detail": "Invalid or expired token"}
             )
+        await _note_presence(request)
 
         forbidden = await _reject_client_supplied_paths(request)
         if forbidden is not None:
@@ -362,13 +421,21 @@ def mount_server_mode(app: FastAPI) -> bool:
 
     for module_path, label in (
         ("server.routers.invitations", "invitations"),
+        ("server.routers.password_reset", "password-reset"),
         ("server.routers.projects", "projects"),
         ("server.routers.specs", "specs"),
         ("server.routers.users", "users"),
         ("server.routers.devices", "devices"),
         ("server.routers.preferences", "preferences"),
+        ("server.routers.usage", "usage"),
+        ("server.routers.usage_admin", "usage_admin"),
+        ("server.routers.usage_self", "usage_self"),
+        ("server.routers.operations", "operations"),
+        ("server.routers.usage_report", "usage_report"),
+        ("server.routers.usage_budgets", "usage_budgets"),
         ("server.routers.needs_you", "needs-you"),
         ("server.routers.access_tokens", "access-tokens"),
+        ("server.routers.ai_accounts", "ai-accounts"),
         ("server.routers.admin", "admin"),
     ):
         try:
@@ -378,5 +445,10 @@ def mount_server_mode(app: FastAPI) -> bool:
             continue
         app.include_router(module.router)
 
+    from server.telemetry import RequestSpans
+
+    # Outermost, so a span times the whole answer, refusals included.
+    app.add_middleware(RequestSpans)
+    _run_periodic_jobs(app)
     logger.info("WorkPilot server mode ACTIVE (multi-user, auth required)")
     return True

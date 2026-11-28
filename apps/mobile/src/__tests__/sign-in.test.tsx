@@ -1,11 +1,15 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import SignIn from "../app/sign-in";
 import { SessionProvider, useSession } from "../auth/session";
-import "../i18n";
+import i18n from "../i18n";
+
+const t = (key: string) => i18n.t(key);
 import { Text } from "react-native";
 
 const mockEntraIdToken = jest.fn();
 jest.mock("../auth/entra", () => ({ entraIdToken: (...args: unknown[]) => mockEntraIdToken(...args) }));
+const mockSsoIdToken = jest.fn();
+jest.mock("../auth/sso", () => ({ ssoIdToken: (...args: unknown[]) => mockSsoIdToken(...args) }));
 
 const user = { id: "u1", email: "ada@x.io", display_name: "Ada", role: "member" };
 
@@ -78,6 +82,22 @@ describe("sign-in screen", () => {
 		});
 	});
 
+	it("says so when the server takes no password, and sends none", async () => {
+		const fetchMock = jest.fn((url: string) =>
+			url.endsWith("/auth/config") ? respond({ local_enabled: false, entra_enabled: true }) : respond({}, 500),
+		);
+		globalThis.fetch = fetchMock as unknown as typeof fetch;
+		await app();
+		await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("signedOut:"));
+		await fireEvent.changeText(screen.getByLabelText("Server address"), "wp.example.com");
+		await fireEvent.changeText(screen.getByLabelText("Email"), "ada@x.io");
+		await fireEvent.changeText(screen.getByLabelText("Password"), "secret");
+		// The keyboard's return key signs in like the button.
+		await fireEvent(screen.getByLabelText("Password"), "submitEditing");
+		expect(await screen.findByText("This server doesn't accept passwords: sign in with Microsoft or with single sign-on.")).toBeTruthy();
+		expect(fetchMock.mock.calls.some(([url]) => url.endsWith("/auth/login"))).toBe(false);
+	});
+
 	it("shows the server's refusal", async () => {
 		globalThis.fetch = jest.fn((url: string) =>
 			url.endsWith("/auth/config")
@@ -91,6 +111,30 @@ describe("sign-in screen", () => {
 		await fireEvent.changeText(screen.getByLabelText("Password"), "nope");
 		await fireEvent.press(screen.getByRole("button", { name: "Sign in" }));
 		expect(await screen.findByText("Sign-in failed: Wrong email or password.")).toBeTruthy();
+	});
+
+	it("says an address is not one before asking the server anything", async () => {
+		const fetchMock = jest.fn();
+		globalThis.fetch = fetchMock as unknown as typeof fetch;
+		await app();
+		await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("signedOut:"));
+		await fireEvent.changeText(screen.getByLabelText("Server address"), "ftp://wp.example.com");
+		await fireEvent.changeText(screen.getByLabelText("Email"), "ada@x.io");
+		await fireEvent.changeText(screen.getByLabelText("Password"), "secret");
+		await fireEvent.press(screen.getByRole("button", { name: "Sign in" }));
+		expect(await screen.findByText(t("signIn.invalidUrl"))).toBeTruthy();
+		expect(fetchMock).not.toHaveBeenCalled();
+	});
+
+	it("says why the server failed, other than a refused password", async () => {
+		globalThis.fetch = jest.fn(() => respond({ detail: "database down" }, 503)) as unknown as typeof fetch;
+		await app();
+		await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("signedOut:"));
+		await fireEvent.changeText(screen.getByLabelText("Server address"), "wp.example.com");
+		await fireEvent.changeText(screen.getByLabelText("Email"), "ada@x.io");
+		await fireEvent.changeText(screen.getByLabelText("Password"), "secret");
+		await fireEvent.press(screen.getByRole("button", { name: "Sign in" }));
+		expect(await screen.findByText(/^Sign-in failed: .*database down/)).toBeTruthy();
 	});
 });
 
@@ -154,5 +198,63 @@ describe("Microsoft sign-in", () => {
 			),
 		);
 		expect(await screen.findByText("Sign-in failed: The server refused this Microsoft account.")).toBeTruthy();
+	});
+});
+
+describe("single sign-on", () => {
+	const realFetch = globalThis.fetch;
+	const sso = { local_enabled: false, entra_enabled: false, sso_enabled: true, sso_name: "Okta" };
+	afterEach(() => {
+		globalThis.fetch = realFetch;
+		mockSsoIdToken.mockReset();
+	});
+
+	async function pressSso(fetchMock: jest.Mock) {
+		globalThis.fetch = fetchMock as unknown as typeof fetch;
+		await app();
+		await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("signedOut:"));
+		await fireEvent.changeText(screen.getByLabelText("Server address"), "wp.example.com");
+		await fireEvent.press(screen.getByRole("button", { name: "Sign in with single sign-on" }));
+	}
+
+	it("hands the provider's id_token to the server's SSO exchange", async () => {
+		mockSsoIdToken.mockResolvedValue("sso-token");
+		const fetchMock = jest.fn((url: string) => {
+			if (url.endsWith("/auth/config")) return respond(sso);
+			if (url.endsWith("/auth/sso/exchange"))
+				return respond({ access_token: "a", refresh_token: "r", expires_in: 900, user });
+			if (url.endsWith("/auth/me/permissions"))
+				return respond({ user_id: "u1", is_platform_admin: false, org_id: "org-a", permissions: [], organizations: [] });
+			return respond({ detail: "unexpected" }, 500);
+		});
+		await pressSso(fetchMock);
+		await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("signedIn:org-a"));
+		expect(mockSsoIdToken).toHaveBeenCalledWith(sso);
+		const exchange = fetchMock.mock.calls.find(([url]) => url.endsWith("/auth/sso/exchange"));
+		expect(JSON.parse(String((exchange as unknown as [string, RequestInit])[1].body))).toEqual({ id_token: "sso-token" });
+		expect(fetchMock.mock.calls.some(([url]) => url.endsWith("/auth/oidc/exchange"))).toBe(false);
+	});
+
+	it("stays signed out when the person closes the provider's page", async () => {
+		mockSsoIdToken.mockResolvedValue(null);
+		const fetchMock = jest.fn((_url: string) => respond(sso));
+		await pressSso(fetchMock);
+		await waitFor(() => expect(mockSsoIdToken).toHaveBeenCalled());
+		expect(fetchMock.mock.calls.some(([url]) => url.endsWith("/auth/sso/exchange"))).toBe(false);
+		expect(screen.queryByText(/Sign-in failed/)).toBeNull();
+	});
+
+	it("says when the server offers no single sign-on", async () => {
+		mockSsoIdToken.mockRejectedValueOnce(new Error("sso_disabled"));
+		await pressSso(jest.fn(() => respond({ local_enabled: true, entra_enabled: false })));
+		expect(await screen.findByText("Sign-in failed: This server doesn't offer single sign-on.")).toBeTruthy();
+	});
+
+	it("says the server refused the account", async () => {
+		mockSsoIdToken.mockResolvedValue("sso-token");
+		await pressSso(
+			jest.fn((url: string) => (url.endsWith("/auth/config") ? respond(sso) : respond({ detail: "Email not verified" }, 401))),
+		);
+		expect(await screen.findByText("Sign-in failed: The server refused this account.")).toBeTruthy();
 	});
 });

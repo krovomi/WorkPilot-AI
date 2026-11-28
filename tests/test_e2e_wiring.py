@@ -16,7 +16,12 @@ CI = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
 
 
 def _specs() -> list[Path]:
-    return sorted(E2E.glob("*.e2e.ts")) + _server_specs()
+    return sorted(E2E.glob("*.e2e.ts")) + _journeys() + _server_specs()
+
+
+def _journeys() -> list[Path]:
+    """The specs that cross several features (`e2e/journeys/`, #380)."""
+    return sorted((E2E / "journeys").glob("*.e2e.ts"))
 
 
 def _server_specs() -> list[Path]:
@@ -74,3 +79,13 @@ def test_the_server_specs_keep_the_same_rules():
     assert "...base" in config
     assert "failOnFlakyTests" not in config and "retries" not in config
     assert "server-e2e.ts" in config
+
+
+def test_the_journeys_run_with_the_specs():
+    # Their own project, which `pnpm run test:e2e` (the e2e job) runs with the
+    # others: nothing in CI has to name them for them to run.
+    assert _journeys()
+    config = (E2E / "playwright.config.ts").read_text(encoding="utf-8")
+    assert 'name: "journeys"' in config
+    assert 'testMatch: "journeys/**/*.e2e.ts"' in config
+    assert "--project" not in _job("e2e")

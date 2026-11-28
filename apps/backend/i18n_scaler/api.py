@@ -195,7 +195,9 @@ def report_from_dir(req: ReportFromDirRequest):
         return {"success": False, "error": safe_error(e, logger, "report_from_dir")}
     try:
         scaler = I18nAutoScaler(placeholder_strategy=strategy)
-        found = scaler.discover_locales(path)
+        found = scaler.discover_locales(
+            path, reference=req.source_locale, catalogs=True
+        )
     except ValueError as e:
         return {"success": False, "error": safe_error(e, logger, "report_from_dir")}
     except Exception as e:  # noqa: BLE001
@@ -210,8 +212,11 @@ def report_from_dir(req: ReportFromDirRequest):
         return {
             "success": False,
             "error": (
-                f"No translation files found under {path}. Expected either "
-                f"{path.name}/<lang>/*.json or {path.name}/<lang>.json."
+                f"No translation files found under {path}. Expected "
+                f"{path.name}/<lang>/*.json, {path.name}/<lang>.json, or the "
+                "catalogs of another stack (.resx, values-<lang>/strings.xml, "
+                "<lang>.lproj/*.strings, .po, .arb, .xlf, .properties, Rails "
+                "YAML, Laravel lang/)."
             ),
             "locales_dir": str(path),
             "locales_found": [],
@@ -241,6 +246,7 @@ def report_from_dir(req: ReportFromDirRequest):
         "locales_dir": str(found.root),
         "locales_found": sorted(found.locales),
         "layout": found.layout,
+        "formats": found.formats,
         # Set only when the caller named the inside of one language rather
         # than the root of all of them. The UI says so, because a report about
         # a directory nobody picked is worse than the error it replaces.

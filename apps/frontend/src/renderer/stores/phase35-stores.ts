@@ -7,7 +7,7 @@
 
 import { create } from "zustand";
 import type {
-	AgentHealthScoreData,
+	ProjectAgentHealth,
 	AnomalyReport,
 	AnomalySignal,
 	AuditEvent,
@@ -15,6 +15,8 @@ import type {
 	DomainProfile,
 	DomainSummary,
 	DriftReport,
+	GenerationSummary,
+	GenTestCommand,
 	I18nDict,
 	I18nScalingReport,
 	LicenseScanReport,
@@ -38,18 +40,24 @@ interface BaseSlice {
 
 // ---------- helpers ----------
 
-function unwrap<T>(
-	res: { success: true } & T,
-	fallback?: never,
-): T;
-function unwrap<_T>(res: { success: false; error: string }): never;
-function unwrap<T>(res: { success: boolean; error?: string } & T): T {
-	if (!res.success) throw new Error(res.error ?? "Unknown backend error");
-	return res;
-}
-
 function errorMessage(e: unknown): string {
 	return e instanceof Error ? e.message : String(e);
+}
+
+// ---------- the open project ----------
+
+/**
+ * The project the panels' results belong to, and a counter bumped each time
+ * it changes. An answer that comes back after the project changed is dropped:
+ * it would show the previous project's findings under the new one's name.
+ */
+let boundProject: string | null = null;
+let projectEpoch = 0;
+
+/** True while the project that was open when the call started is still open. */
+function stillOpen(): () => boolean {
+	const epoch = projectEpoch;
+	return () => epoch === projectEpoch;
 }
 
 // ---------- #3.8 Longevity ----------
@@ -69,13 +77,15 @@ export const useLongevityStore = create<LongevityState>((set) => ({
 			set({ phase: "error", error: "projectPath is required" });
 			return;
 		}
+		const live = stillOpen();
 		set({ phase: "running", error: null });
 		try {
 			const res = await globalThis.electronAPI.scoreLongevity(projectPath);
+			if (!live()) return;
 			if (!res.success) throw new Error(res.error ?? "Backend error");
 			set({ phase: "ok", report: res.report ?? null });
 		} catch (e) {
-			set({ phase: "error", error: errorMessage(e) });
+			if (live()) set({ phase: "error", error: errorMessage(e) });
 		}
 	},
 	reset: () => set({ phase: "idle", error: null, report: null }),
@@ -84,34 +94,31 @@ export const useLongevityStore = create<LongevityState>((set) => ({
 // ---------- #3.11 Agent Health ----------
 
 interface AgentHealthState extends BaseSlice {
-	scores: AgentHealthScoreData[];
-	knownAgents: string[];
-	refresh: () => Promise<void>;
-	resetMonitor: (agentName?: string) => Promise<void>;
+	projectPath: string | null;
+	health: ProjectAgentHealth | null;
+	/** Score the agents that ran the project's Kanban tasks, read from their logs. */
+	refresh: (projectPath: string) => Promise<void>;
 }
 
-export const useAgentHealthStore = create<AgentHealthState>((set) => ({
+export const useAgentHealthStore = create<AgentHealthState>((set, get) => ({
 	phase: "idle",
 	error: null,
-	scores: [],
-	knownAgents: [],
-	refresh: async () => {
-		set({ phase: "running", error: null });
+	projectPath: null,
+	health: null,
+	refresh: async (projectPath) => {
+		const live = stillOpen();
+		// Another project's scores are not this one's, even while its own load.
+		const sameProject = get().projectPath === projectPath;
+		set({ phase: "running", error: null, projectPath, ...(sameProject ? {} : { health: null }) });
 		try {
-			const res = await globalThis.electronAPI.scoreAllAgentHealth();
+			const res = await globalThis.electronAPI.scoreProjectAgentHealth(projectPath);
+			if (!live()) return;
 			if (!res.success) throw new Error(res.error ?? "Backend error");
-			set({
-				phase: "ok",
-				scores: res.scores,
-				knownAgents: res.agents_known,
-			});
+			const { scores, pending, tasks_read, min_runs } = res;
+			set({ phase: "ok", health: { scores, pending, tasks_read, min_runs } });
 		} catch (e) {
-			set({ phase: "error", error: errorMessage(e) });
+			if (live()) set({ phase: "error", error: errorMessage(e), health: null });
 		}
-	},
-	resetMonitor: async (agentName) => {
-		await globalThis.electronAPI.resetAgentHealth(agentName);
-		set({ scores: [], knownAgents: [] });
 	},
 }));
 
@@ -158,9 +165,15 @@ interface DomainAgentsState extends BaseSlice {
 	selectedDomain: string | null;
 	profile: DomainProfile | null;
 	bundle: DomainAgentBundle | null;
+	/** The project the next two fields belong to. */
+	projectPath: string | null;
+	projectDomain: string | null;
+	projectLanguages: string[];
 	loadDomains: () => Promise<void>;
 	loadProfile: (domain: string) => Promise<void>;
-	build: (domain: string, role: string) => Promise<void>;
+	build: (domain: string, role: string, projectPath?: string) => Promise<void>;
+	loadProjectDomain: (projectPath: string) => Promise<void>;
+	applyProjectDomain: (projectPath: string, domain: string | null) => Promise<void>;
 }
 
 export const useDomainAgentsStore = create<DomainAgentsState>((set) => ({
@@ -170,6 +183,9 @@ export const useDomainAgentsStore = create<DomainAgentsState>((set) => ({
 	selectedDomain: null,
 	profile: null,
 	bundle: null,
+	projectPath: null,
+	projectDomain: null,
+	projectLanguages: [],
 	loadDomains: async () => {
 		set({ phase: "running", error: null });
 		try {
@@ -190,12 +206,35 @@ export const useDomainAgentsStore = create<DomainAgentsState>((set) => ({
 			set({ phase: "error", error: errorMessage(e) });
 		}
 	},
-	build: async (domain, role) => {
+	build: async (domain, role, projectPath) => {
+		const live = stillOpen();
 		set({ phase: "running", error: null });
 		try {
-			const res = await globalThis.electronAPI.buildDomainBundle(domain, role);
+			const res = await globalThis.electronAPI.buildDomainBundle(domain, role, projectPath);
+			// Built for the previous project: its libraries are not this one's.
+			if (!live()) return set({ phase: "idle" });
 			if (!res.success) throw new Error(res.error ?? "Backend error");
 			set({ phase: "ok", bundle: res.bundle });
+		} catch (e) {
+			set(live() ? { phase: "error", error: errorMessage(e) } : { phase: "idle" });
+		}
+	},
+	loadProjectDomain: async (projectPath) => {
+		set({ projectPath, projectDomain: null, projectLanguages: [] });
+		try {
+			const res = await globalThis.electronAPI.getProjectDomain(projectPath);
+			if (!res.success) throw new Error(res.error ?? "Backend error");
+			set({ projectPath, projectDomain: res.domain, projectLanguages: res.languages });
+		} catch (e) {
+			set({ phase: "error", error: errorMessage(e) });
+		}
+	},
+	applyProjectDomain: async (projectPath, domain) => {
+		set({ phase: "running", error: null });
+		try {
+			const res = await globalThis.electronAPI.setProjectDomain(projectPath, domain);
+			if (!res.success) throw new Error(res.error ?? "Backend error");
+			set({ phase: "ok", projectPath, projectDomain: res.domain });
 		} catch (e) {
 			set({ phase: "error", error: errorMessage(e) });
 		}
@@ -231,7 +270,7 @@ export const useCicdAnomalyStore = create<CicdAnomalyState>((set) => ({
 		try {
 			const res = await globalThis.electronAPI.analyseCicdLogs(samples);
 			if (!res.success) throw new Error(res.error ?? "Backend error");
-			set({ phase: "ok", report: res.report });
+			set({ phase: "ok", report: res.report, signals: res.report.signals });
 		} catch (e) {
 			set({ phase: "error", error: errorMessage(e) });
 		}
@@ -242,9 +281,12 @@ export const useCicdAnomalyStore = create<CicdAnomalyState>((set) => ({
 
 interface LicenseState extends BaseSlice {
 	report: LicenseScanReport | null;
+	/** Whether the last scan could ask the public registries. */
+	online: boolean | null;
 	scan: (
 		projectPath: string,
 		policy?: "permissive_only" | "open_source_friendly" | "saas_safe",
+		online?: boolean,
 	) => Promise<void>;
 }
 
@@ -252,18 +294,26 @@ export const useLicenseStore = create<LicenseState>((set) => ({
 	phase: "idle",
 	error: null,
 	report: null,
-	scan: async (projectPath, policy) => {
+	online: null,
+	scan: async (projectPath, policy, online = true) => {
 		if (!projectPath) {
 			set({ phase: "error", error: "projectPath is required" });
 			return;
 		}
+		const live = stillOpen();
 		set({ phase: "running", error: null });
 		try {
-			const res = await globalThis.electronAPI.scanLicenses(projectPath, policy);
+			const res = await globalThis.electronAPI.scanLicenses(
+				projectPath,
+				policy,
+				undefined,
+				online,
+			);
+			if (!live()) return;
 			if (!res.success) throw new Error(res.error ?? "Backend error");
-			set({ phase: "ok", report: res.report });
+			set({ phase: "ok", report: res.report, online: res.online ?? online });
 		} catch (e) {
-			set({ phase: "error", error: errorMessage(e) });
+			if (live()) set({ phase: "error", error: errorMessage(e) });
 		}
 	},
 }));
@@ -274,6 +324,8 @@ interface ArchDriftState extends BaseSlice {
 	scanReport: ArchitectureScanReport | null;
 	driftReport: DriftReport | null;
 	configSource: string | null;
+	/** Findings recorded by the last "save baseline", or null when none was saved this session. */
+	baselineCount: number | null;
 	scan: (projectPath: string) => Promise<void>;
 	saveBaseline: (projectPath: string) => Promise<void>;
 	compare: (projectPath: string) => Promise<void>;
@@ -285,96 +337,165 @@ export const useArchDriftStore = create<ArchDriftState>((set) => ({
 	scanReport: null,
 	driftReport: null,
 	configSource: null,
+	baselineCount: null,
 	scan: async (projectPath) => {
+		const live = stillOpen();
 		set({ phase: "running", error: null });
 		try {
 			const res = await globalThis.electronAPI.scanArchitecture(projectPath);
+			if (!live()) return;
 			if (!res.success) throw new Error(res.error ?? "Backend error");
 			set({ phase: "ok", scanReport: res.report, configSource: res.config_source });
 		} catch (e) {
-			set({ phase: "error", error: errorMessage(e) });
+			if (live()) set({ phase: "error", error: errorMessage(e) });
 		}
 	},
 	saveBaseline: async (projectPath) => {
+		const live = stillOpen();
 		set({ phase: "running", error: null });
 		try {
 			const res = await globalThis.electronAPI.saveArchBaseline(projectPath);
+			if (!live()) return;
 			if (!res.success) throw new Error(res.error ?? "Backend error");
-			set({ phase: "ok" });
+			set({ phase: "ok", baselineCount: res.violation_count, configSource: res.config_source });
 		} catch (e) {
-			set({ phase: "error", error: errorMessage(e) });
+			if (live()) set({ phase: "error", error: errorMessage(e) });
 		}
 	},
 	compare: async (projectPath) => {
+		const live = stillOpen();
 		set({ phase: "running", error: null });
 		try {
 			const res = await globalThis.electronAPI.compareArchDrift(projectPath);
+			if (!live()) return;
 			if (!res.success) throw new Error(res.error ?? "Backend error");
-			set({ phase: "ok", driftReport: res.drift });
+			set({ phase: "ok", driftReport: res.drift, configSource: res.config_source });
 		} catch (e) {
-			set({ phase: "error", error: errorMessage(e) });
+			if (live()) set({ phase: "error", error: errorMessage(e) });
 		}
 	},
 }));
 
 // ---------- #3.10 Generational Tests ----------
 
+export type GenSource = "run" | "report";
+export type GenMode = "capture" | "compare";
+
 interface GenTestsState extends BaseSlice {
-	generations: string[];
+	generations: GenerationSummary[];
 	regression: RegressionReport | null;
+	/** The project's test commands; null until detected. */
+	commands: GenTestCommand[] | null;
+	/** What the last capture or compare read: a command, or a report's format. */
+	lastSource: { kind: GenSource; value: string } | null;
+	running: GenMode | null;
 	listGenerations: (projectPath: string) => Promise<void>;
-	capture: (projectPath: string, label: string, junitXml: string) => Promise<void>;
-	compare: (projectPath: string, baseline: string, junitXml: string) => Promise<void>;
+	detect: (projectPath: string) => Promise<void>;
+	capture: (projectPath: string, label: string, report: string) => Promise<boolean>;
+	compare: (projectPath: string, baseline: string, report: string) => Promise<void>;
+	/** Runs the project's own suite once, then captures it or compares it. */
+	runSuite: (projectPath: string, mode: GenMode, label: string, commandId: string) => Promise<boolean>;
+	cancel: () => Promise<void>;
+	/** The report file the person picks, or null when they cancel. */
+	importFile: () => Promise<{ name: string; content: string } | null>;
 	deleteGen: (projectPath: string, label: string) => Promise<void>;
+	reset: () => void;
 }
 
-export const useGenTestsStore = create<GenTestsState>((set, get) => ({
-	phase: "idle",
+const GEN_IDLE = {
+	phase: "idle" as Phase,
 	error: null,
 	generations: [],
 	regression: null,
+	commands: null,
+	lastSource: null,
+	running: null,
+};
+
+export const useGenTestsStore = create<GenTestsState>((set, get) => ({
+	...GEN_IDLE,
 	listGenerations: async (projectPath) => {
-		set({ phase: "running", error: null });
 		try {
 			const res = await globalThis.electronAPI.listGenerations(projectPath);
 			if (!res.success) throw new Error(res.error ?? "Backend error");
-			set({ phase: "ok", generations: res.generations });
+			set({ generations: res.details ?? [] });
 		} catch (e) {
 			set({ phase: "error", error: errorMessage(e) });
 		}
 	},
-	capture: async (projectPath, label, junitXml) => {
-		set({ phase: "running", error: null });
+	detect: async (projectPath) => {
+		const res = await globalThis.electronAPI.detectGenTestCommands(projectPath);
+		set({ commands: res.success ? res.commands : [] });
+	},
+	capture: async (projectPath, label, report) => {
+		set({ phase: "running", running: "capture", error: null });
 		try {
-			const res = await globalThis.electronAPI.captureGeneration(
-				projectPath,
-				label,
-				junitXml,
-			);
+			const res = await globalThis.electronAPI.captureGeneration(projectPath, label, report);
 			if (!res.success) throw new Error(res.error ?? "Backend error");
+			set({ phase: "ok", lastSource: { kind: "report", value: res.format } });
 			await get().listGenerations(projectPath);
+			return true;
 		} catch (e) {
 			set({ phase: "error", error: errorMessage(e) });
+			return false;
+		} finally {
+			set({ running: null });
 		}
 	},
-	compare: async (projectPath, baseline, junitXml) => {
-		set({ phase: "running", error: null });
+	compare: async (projectPath, baseline, report) => {
+		set({ phase: "running", running: "compare", error: null, regression: null });
 		try {
-			const res = await globalThis.electronAPI.compareGeneration(
-				projectPath,
-				baseline,
-				junitXml,
-			);
+			const res = await globalThis.electronAPI.compareGeneration(projectPath, baseline, report);
 			if (!res.success) throw new Error(res.error ?? "Backend error");
-			set({ phase: "ok", regression: res.report });
+			set({
+				phase: "ok",
+				regression: res.report,
+				lastSource: { kind: "report", value: res.format },
+			});
 		} catch (e) {
 			set({ phase: "error", error: errorMessage(e) });
+		} finally {
+			set({ running: null });
 		}
+	},
+	runSuite: async (projectPath, mode, label, commandId) => {
+		set({
+			phase: "running",
+			running: mode,
+			error: null,
+			...(mode === "compare" ? { regression: null } : {}),
+		});
+		try {
+			const res = await globalThis.electronAPI.runGenTests(projectPath, mode, label, commandId);
+			if (!res.success) throw new Error(res.error ?? "Backend error");
+			set({
+				phase: "ok",
+				lastSource: { kind: "run", value: res.command },
+				...(mode === "compare" ? { regression: res.report ?? null } : {}),
+			});
+			if (mode === "capture") await get().listGenerations(projectPath);
+			return true;
+		} catch (e) {
+			set({ phase: "error", error: errorMessage(e) });
+			return false;
+		} finally {
+			set({ running: null });
+		}
+	},
+	cancel: async () => {
+		await globalThis.electronAPI.cancelGenTests();
+	},
+	importFile: async () => {
+		const res = await globalThis.electronAPI.importGenTestsReport();
+		if (res.success) return { name: res.name, content: res.content };
+		if (res.error !== "cancelled") set({ phase: "error", error: res.error });
+		return null;
 	},
 	deleteGen: async (projectPath, label) => {
 		await globalThis.electronAPI.deleteGeneration(projectPath, label);
 		await get().listGenerations(projectPath);
 	},
+	reset: () => set(GEN_IDLE),
 }));
 
 // ---------- #3.12 i18n Scaler ----------
@@ -387,6 +508,8 @@ interface I18nScalerState extends BaseSlice {
 	scannedDir: string | null;
 	/** Set only when the picked directory was one language, not the root. */
 	redirectedFrom: string | null;
+	/** Catalog formats read, when the folder held another stack's catalogs rather than JSON. */
+	formats: string[];
 	runReport: (localesDir: string, sourceLocale?: string) => Promise<void>;
 }
 
@@ -398,8 +521,9 @@ export const useI18nScalerStore = create<I18nScalerState>((set) => ({
 	diff: null,
 	scannedDir: null,
 	redirectedFrom: null,
+	formats: [],
 	runReport: async (localesDir, sourceLocale) => {
-		set({ phase: "running", error: null, redirectedFrom: null });
+		set({ phase: "running", error: null, redirectedFrom: null, formats: [] });
 		try {
 			const res = await globalThis.electronAPI.reportI18nFromDir(
 				localesDir,
@@ -411,6 +535,7 @@ export const useI18nScalerStore = create<I18nScalerState>((set) => ({
 				report: res.report,
 				scannedDir: res.locales_dir ?? null,
 				redirectedFrom: res.redirected_from ?? null,
+				formats: res.layout === "catalogs" ? (res.formats ?? []) : [],
 			});
 		} catch (e) {
 			set({ phase: "error", error: errorMessage(e) });
@@ -423,6 +548,7 @@ export const useI18nScalerStore = create<I18nScalerState>((set) => ({
 interface CogContextState extends BaseSlice {
 	context: OptimizedContext | null;
 	optimize: (
+		projectPath: string,
 		prompt: string,
 		candidateFiles: string[],
 		tokenBudget: number,
@@ -433,18 +559,21 @@ export const useCogContextStore = create<CogContextState>((set) => ({
 	phase: "idle",
 	error: null,
 	context: null,
-	optimize: async (prompt, candidateFiles, tokenBudget) => {
+	optimize: async (projectPath, prompt, candidateFiles, tokenBudget) => {
+		const live = stillOpen();
 		set({ phase: "running", error: null });
 		try {
 			const res = await globalThis.electronAPI.optimizeContext(
 				prompt,
 				candidateFiles,
 				tokenBudget,
+				{ projectDir: projectPath },
 			);
+			if (!live()) return;
 			if (!res.success) throw new Error(res.error ?? "Backend error");
 			set({ phase: "ok", context: res.context });
 		} catch (e) {
-			set({ phase: "error", error: errorMessage(e) });
+			if (live()) set({ phase: "error", error: errorMessage(e) });
 		}
 	},
 }));
@@ -467,19 +596,22 @@ export const useAuditTrailStore = create<AuditTrailState>((set) => ({
 	replayEvents: [],
 	integrity: null,
 	loadEvents: async (storageDir, trailName) => {
+		const live = stillOpen();
 		set({ phase: "running", error: null });
 		try {
 			const res = await globalThis.electronAPI.auditEvents({
 				storageDir,
 				trailName,
 			});
+			if (!live()) return;
 			if (!res.success) throw new Error(res.error ?? "Backend error");
 			set({ phase: "ok", events: res.events });
 		} catch (e) {
-			set({ phase: "error", error: errorMessage(e) });
+			if (live()) set({ phase: "error", error: errorMessage(e) });
 		}
 	},
 	replay: async (correlationId, storageDir, trailName) => {
+		const live = stillOpen();
 		set({ phase: "running", error: null });
 		try {
 			const res = await globalThis.electronAPI.auditReplay(
@@ -487,49 +619,88 @@ export const useAuditTrailStore = create<AuditTrailState>((set) => ({
 				storageDir,
 				trailName,
 			);
+			if (!live()) return;
 			if (!res.success) throw new Error(res.error ?? "Backend error");
 			set({ phase: "ok", replayEvents: res.bundle.events });
 		} catch (e) {
-			set({ phase: "error", error: errorMessage(e) });
+			if (live()) set({ phase: "error", error: errorMessage(e) });
 		}
 	},
 	verify: async (storageDir, trailName) => {
+		const live = stillOpen();
 		set({ phase: "running", error: null });
 		try {
 			const res = await globalThis.electronAPI.auditVerify(storageDir, trailName);
+			if (!live()) return;
 			if (!res.success) throw new Error(res.error ?? "Backend error");
 			set({ phase: "ok", integrity: res.integrity });
 		} catch (e) {
-			set({ phase: "error", error: errorMessage(e) });
+			if (live()) set({ phase: "error", error: errorMessage(e) });
 		}
 	},
 }));
 
+/**
+ * Called by the hub when the open project changes: the findings of the
+ * previous project are cleared, and answers still in flight for it dropped.
+ */
+export function bindPhase35Project(projectPath: string): void {
+	if (projectPath === boundProject) return;
+	boundProject = projectPath;
+	projectEpoch += 1;
+	const idle = { phase: "idle" as Phase, error: null };
+	useLongevityStore.setState({ ...idle, report: null });
+	useAgentHealthStore.setState({ ...idle, projectPath: null, health: null });
+	useDomainAgentsStore.setState({ bundle: null });
+	useLicenseStore.setState({ ...idle, report: null, online: null });
+	useArchDriftStore.setState({
+		...idle,
+		scanReport: null,
+		driftReport: null,
+		configSource: null,
+		baselineCount: null,
+	});
+	useCogContextStore.setState({ ...idle, context: null });
+	useAuditTrailStore.setState({ ...idle, events: [], replayEvents: [], integrity: null });
+}
+
 // ---------- #3.5 Pair Realtime ----------
+
+/** The AI participant's id in every room (`main/pair-ai-partner.ts`). */
+export const PAIR_AI_USER_ID = "workpilot-ai";
+
+export type PairAiError = "room" | "unavailable" | "empty" | "invalid";
 
 interface PairRealtimeState extends BaseSlice {
 	currentRoom: PairRoomSnapshot | null;
 	ops: PairOperation[];
 	subscriptionId: string | null;
 	isStreaming: boolean;
+	/** Who I am in the room, and the project the room works on. */
+	me: string | null;
+	projectPath: string | null;
+	aiThinking: boolean;
+	aiError: PairAiError | null;
 	createOrJoin: (
 		roomId: string,
 		userId: string,
 		displayName: string,
-		role?: "driver" | "navigator" | "ai",
+		role: "driver" | "navigator",
+		projectPath: string,
 	) => Promise<void>;
 	leave: () => Promise<void>;
 	sendChat: (text: string) => Promise<void>;
-	sendEdit: (
-		filePath: string,
-		startLine: number,
-		endLine: number,
-		newText: string,
-	) => Promise<void>;
+	inviteAi: (displayName: string) => Promise<void>;
+	askAi: () => Promise<void>;
+	focusFile: (filePath: string) => Promise<void>;
+	refreshRoom: () => Promise<void>;
 	subscribe: () => Promise<void>;
 	unsubscribe: () => Promise<void>;
 	_appendOp: (op: PairOperation) => void;
 }
+
+const aiInRoom = (room: PairRoomSnapshot | null): boolean =>
+	Boolean(room?.participants.some((p) => p.user_id === PAIR_AI_USER_ID));
 
 export const usePairRealtimeStore = create<PairRealtimeState>((set, get) => ({
 	phase: "idle",
@@ -538,10 +709,14 @@ export const usePairRealtimeStore = create<PairRealtimeState>((set, get) => ({
 	ops: [],
 	subscriptionId: null,
 	isStreaming: false,
-	createOrJoin: async (roomId, userId, displayName, role) => {
+	me: null,
+	projectPath: null,
+	aiThinking: false,
+	aiError: null,
+	createOrJoin: async (roomId, userId, displayName, role, projectPath) => {
 		set({ phase: "running", error: null });
 		try {
-			// Try create; if it already exists, just join.
+			// Create, or join the room that already exists under this name.
 			await globalThis.electronAPI.createPairRoom(roomId);
 			const joinRes = await globalThis.electronAPI.pairJoin(
 				roomId,
@@ -552,35 +727,73 @@ export const usePairRealtimeStore = create<PairRealtimeState>((set, get) => ({
 			if (!joinRes.success) throw new Error(joinRes.error ?? "join failed");
 			const snapRes = await globalThis.electronAPI.getPairRoom(roomId);
 			if (!snapRes.success) throw new Error(snapRes.error ?? "snapshot failed");
-			set({ phase: "ok", currentRoom: snapRes.room, ops: [] });
+			set({
+				phase: "ok",
+				currentRoom: snapRes.room,
+				ops: [],
+				me: userId,
+				projectPath,
+				aiError: null,
+			});
 		} catch (e) {
 			set({ phase: "error", error: errorMessage(e) });
 		}
 	},
 	leave: async () => {
-		const room = get().currentRoom;
+		const { currentRoom: room, me } = get();
 		if (!room) return;
 		await get().unsubscribe();
-		set({ currentRoom: null, ops: [] });
+		if (me) await globalThis.electronAPI.pairLeave(room.room_id, me);
+		set({ currentRoom: null, ops: [], me: null, aiThinking: false, aiError: null });
 	},
 	sendChat: async (text) => {
-		const room = get().currentRoom;
-		if (!room) return;
-		const me = room.participants[0]?.user_id ?? "anon";
-		await globalThis.electronAPI.pairChat(room.room_id, me, text);
+		const { currentRoom: room, me } = get();
+		if (!room || !me) return;
+		const res = await globalThis.electronAPI.pairChat(room.room_id, me, text);
+		if (!res.success) {
+			set({ error: res.error ?? "chat failed" });
+			return;
+		}
+		if (aiInRoom(get().currentRoom)) await get().askAi();
 	},
-	sendEdit: async (filePath, startLine, endLine, newText) => {
+	inviteAi: async (displayName) => {
+		const room = get().currentRoom;
+		if (!room || aiInRoom(room)) return;
+		const res = await globalThis.electronAPI.pairJoin(
+			room.room_id,
+			PAIR_AI_USER_ID,
+			displayName,
+			"ai",
+		);
+		if (!res.success) {
+			set({ error: res.error ?? "join failed" });
+			return;
+		}
+		await get().refreshRoom();
+	},
+	askAi: async () => {
+		const { currentRoom: room, projectPath } = get();
+		if (!room || !projectPath || get().aiThinking) return;
+		set({ aiThinking: true, aiError: null });
+		try {
+			const res = await globalThis.electronAPI.pairAskAi(room.room_id, projectPath);
+			set({ aiError: res.success ? null : res.error });
+		} catch {
+			set({ aiError: "unavailable" });
+		} finally {
+			set({ aiThinking: false });
+		}
+	},
+	focusFile: async (filePath) => {
+		const { currentRoom: room, me } = get();
+		if (!room || !me) return;
+		await globalThis.electronAPI.pairCursor(room.room_id, me, filePath, 0, 0);
+	},
+	refreshRoom: async () => {
 		const room = get().currentRoom;
 		if (!room) return;
-		const me = room.participants[0]?.user_id ?? "anon";
-		await globalThis.electronAPI.pairEdit(
-			room.room_id,
-			me,
-			filePath,
-			startLine,
-			endLine,
-			newText,
-		);
+		const res = await globalThis.electronAPI.getPairRoom(room.room_id);
+		if (res.success) set({ currentRoom: res.room });
 	},
 	subscribe: async () => {
 		const room = get().currentRoom;
@@ -604,7 +817,13 @@ export const usePairRealtimeStore = create<PairRealtimeState>((set, get) => ({
 		await globalThis.electronAPI.unsubscribePairRoom(sid);
 		set({ subscriptionId: null, isStreaming: false });
 	},
-	_appendOp: (op) => set((s) => ({ ops: [...s.ops, op] })),
+	_appendOp: (op) => {
+		set((s) => ({ ops: [...s.ops, op] }));
+		// Someone came or went: the participant list is the room's, reread it.
+		if (op.kind === "join" || op.kind === "leave" || op.kind === "role_change") {
+			void get().refreshRoom();
+		}
+	},
 }));
 
 // Listener helper to wire the SSE stream into the store.
@@ -624,6 +843,3 @@ export function setupPairRealtimeListeners(): () => void {
 		offError();
 	};
 }
-
-// Re-export the helpers some components might want.
-export { unwrap, errorMessage };

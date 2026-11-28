@@ -36,6 +36,11 @@ export function isShortcutKey(key: string): boolean {
 	);
 }
 
+/** F13 to F24: keys no keyboard layout types with, used alone by pedals and switches. */
+export function isPedalKey(key: string): boolean {
+	return /^F(1[3-9]|2[0-4])$/.test(key);
+}
+
 /** The accelerator's parts, or null when it is not one this module writes. */
 export function parseAccelerator(accelerator: unknown): ParsedShortcut | null {
 	if (typeof accelerator !== "string" || accelerator.length > 64) return null;
@@ -76,8 +81,10 @@ export function parseAccelerator(accelerator: unknown): ParsedShortcut | null {
 				return null;
 		}
 	}
-	// A bare letter or Shift+letter is typing, not a shortcut.
-	if (!parsed.mod && !parsed.ctrl && !parsed.alt && !parsed.meta) return null;
+	// A bare letter or Shift+letter is typing, not a shortcut. F13 to F24 type
+	// nothing and no app uses them: alone, they are what a foot pedal or an
+	// accessibility switch sends (USB HID keyboard).
+	if (!parsed.mod && !parsed.ctrl && !parsed.alt && !parsed.meta && !isPedalKey(key)) return null;
 	return parsed;
 }
 

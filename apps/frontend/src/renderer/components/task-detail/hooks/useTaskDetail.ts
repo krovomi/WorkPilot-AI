@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type {
 	GitConflictInfo,
 	ImageAttachment,
@@ -8,6 +9,7 @@ import type {
 	Task,
 	TaskLogPhase,
 	TaskLogs,
+	WorktreeCreatePROptions,
 	WorktreeDiff,
 	WorktreeMergeResult,
 	WorktreeStatus,
@@ -15,8 +17,10 @@ import type {
 import { getActiveLogPhase } from "../../../../shared/utils/task-logs";
 import { isTaskPaused } from "../../../../shared/utils/task-pause";
 import { consumePendingTaskDetailTab } from "../../../lib/task-detail-nav";
+import { retainTaskLogWatch } from "../../../lib/task-log-watch";
 import { useProjectStore } from "../../../stores/project-store";
 import { useSettingsStore } from "../../../stores/settings-store";
+import { createTaskPR } from "../create-task-pr";
 import {
 	checkTaskRunning,
 	getTaskProgress,
@@ -95,21 +99,39 @@ function processAPIResult<T>(
 	label: string,
 	onSuccess: (data: T) => void,
 	errors: string[],
+	t: (key: string, values: Record<string, string>) => string,
 ): void {
 	if (result.status === "fulfilled") {
 		const res = result.value;
 		if (res.success && res.data) {
 			onSuccess(res.data);
 		} else if (!res.success && res.error) {
-			errors.push(`${label}: ${res.error}`);
+			errors.push(t("workspace.loadError", { part: label, error: res.error }));
 		}
 	} else {
 		console.error(`[useTaskDetail] Failed to load ${label}:`, result.reason);
-		errors.push(`Failed to load ${label}`);
+		errors.push(t("workspace.loadFailed", { part: label }));
 	}
 }
 
+// The worktree status with its counts taken from the diff, which already
+// leaves out discarded files.
+function reconcileWorktree(
+	statusResult: IPCResult<WorktreeStatus>,
+	diffResult: IPCResult<WorktreeDiff>,
+): { status: WorktreeStatus | null; diff: WorktreeDiff | null } {
+	const status = statusResult.success ? (statusResult.data ?? null) : null;
+	const diff = diffResult.success ? (diffResult.data ?? null) : null;
+	if (status && diff) {
+		status.filesChanged = diff.files.length;
+		status.additions = diff.files.reduce((s, f) => s + f.additions, 0);
+		status.deletions = diff.files.reduce((s, f) => s + f.deletions, 0);
+	}
+	return { status, diff };
+}
+
 export function useTaskDetail({ task }: UseTaskDetailOptions) {
+	const { t } = useTranslation("taskReview");
 	const [feedback, setFeedback] = useState("");
 	const [feedbackImages, setFeedbackImages] = useState<ImageAttachment[]>([]);
 	const [isSubmitting, setIsSubmitting] = useState(false);
@@ -173,6 +195,11 @@ export function useTaskDetail({ task }: UseTaskDetailOptions) {
 	const [showConflictDialog, setShowConflictDialog] = useState(false);
 	const [showPRDialog, setShowPRDialog] = useState(false);
 	const [isCreatingPR, setIsCreatingPR] = useState(false);
+	// The review's "Create Pull Request" (the card keeps what main added meanwhile).
+	const handleCreatePR = useCallback(
+		(options: WorktreeCreatePROptions) => createTaskPR(task, options, setIsCreatingPR),
+		[task],
+	);
 	const [isCompleting, setIsCompleting] = useState(false);
 	const [showAbandonDialog, setShowAbandonDialog] = useState(false);
 	const [isAbandoning, setIsAbandoning] = useState(false);
@@ -320,10 +347,15 @@ export function useTaskDetail({ task }: UseTaskDetailOptions) {
 		}
 	}, [activeTab]);
 
-	// Reset feedback images when task changes to prevent image leakage between tasks
-	useEffect(() => {
+	// The panel stays mounted while the user steps to the previous or next
+	// task: feedback typed for one task must not be sent for the next. Reset
+	// during render, as React advises for state that follows a prop.
+	const [feedbackTaskId, setFeedbackTaskId] = useState(task.id);
+	if (feedbackTaskId !== task.id) {
+		setFeedbackTaskId(task.id);
+		setFeedback("");
 		setFeedbackImages([]);
-	}, []);
+	}
 
 	// Load worktree status when task is in human_review
 	useEffect(() => {
@@ -336,15 +368,7 @@ export function useTaskDetail({ task }: UseTaskDetailOptions) {
 				window.electronAPI.getWorktreeDiff(task.id),
 			])
 				.then(([statusResult, diffResult]) => {
-					const status = statusResult.success ? statusResult.data : null;
-					const diff = diffResult.success ? diffResult.data : null;
-					// Reconcile status stats with diff data: the diff already filters
-					// out discarded files, so derive accurate counts from it
-					if (status && diff) {
-						status.filesChanged = diff.files.length;
-						status.additions = diff.files.reduce((s, f) => s + f.additions, 0);
-						status.deletions = diff.files.reduce((s, f) => s + f.deletions, 0);
-					}
+					const { status, diff } = reconcileWorktree(statusResult, diffResult);
 					if (status) {
 						setWorktreeStatus(status);
 					}
@@ -417,8 +441,8 @@ export function useTaskDetail({ task }: UseTaskDetailOptions) {
 
 		loadLogs();
 
-		// Start watching for log changes
-		window.electronAPI.watchTaskLogs(selectedProject.id, task.specId);
+		// Start watching for log changes (shared with the Pixel Office bubble)
+		const releaseWatch = retainTaskLogWatch(selectedProject.id, task.specId);
 
 		// Listen for log changes
 		const unsubscribe = window.electronAPI.onTaskLogsChanged((specId, logs) => {
@@ -450,7 +474,7 @@ export function useTaskDetail({ task }: UseTaskDetailOptions) {
 
 		return () => {
 			unsubscribe();
-			window.electronAPI.unwatchTaskLogs(task.specId);
+			releaseWatch();
 		};
 	}, [selectedProject, task.specId]);
 
@@ -520,49 +544,30 @@ export function useTaskDetail({ task }: UseTaskDetailOptions) {
 
 			processAPIResult(
 				previewResult,
-				"Merge preview",
+				t("workspace.loadParts.mergePreview"),
 				(data: WorktreeMergeResult) => {
 					setMergePreview(data?.preview ?? null);
 				},
 				errors,
+				t,
 			);
-
-			// Collect errors for status/diff (side-effect only); the actual
-			// values are extracted directly from the settled results below so
-			// TS control-flow analysis can narrow them correctly.
-			const collectErrorsOnly = () => {
-				// The values are read from the settled results below; this call is
-				// only here to push any error message into `errors`.
+			const settled = <T,>(
+				result: PromiseSettledResult<IPCResult<T>>,
+				label: string,
+			): IPCResult<T> => {
+				processAPIResult(result, label, () => undefined, errors, t);
+				return result.status === "fulfilled"
+					? result.value
+					: { success: false };
 			};
-			processAPIResult(statusResult, "Worktree status", collectErrorsOnly, errors);
-			processAPIResult(diffResult, "Worktree diff", collectErrorsOnly, errors);
-
-			const latestStatus: WorktreeStatus | null =
-				statusResult.status === "fulfilled" &&
-				statusResult.value.success &&
-				statusResult.value.data
-					? statusResult.value.data
-					: null;
-			const latestDiff: WorktreeDiff | null =
-				diffResult.status === "fulfilled" &&
-				diffResult.value.success &&
-				diffResult.value.data
-					? diffResult.value.data
-					: null;
-
+			const { status: latestStatus, diff: latestDiff } = reconcileWorktree(
+				settled(statusResult, t("workspace.loadParts.status")),
+				settled(diffResult, t("workspace.loadParts.diff")),
+			);
 			if (latestDiff) {
 				setWorktreeDiff(latestDiff);
 			}
-
-			// Reconcile status stats with diff data: the diff already filters
-			// out discarded files, so derive accurate counts from it.
 			if (latestStatus) {
-				if (latestDiff) {
-					const files = latestDiff.files;
-					latestStatus.filesChanged = files.length;
-					latestStatus.additions = files.reduce((s, f) => s + f.additions, 0);
-					latestStatus.deletions = files.reduce((s, f) => s + f.deletions, 0);
-				}
 				setWorktreeStatus(latestStatus);
 			}
 
@@ -575,14 +580,12 @@ export function useTaskDetail({ task }: UseTaskDetailOptions) {
 				"[useTaskDetail] Unexpected error in loadMergePreview:",
 				err,
 			);
-			setWorkspaceError(
-				"An unexpected error occurred while loading workspace information",
-			);
+			setWorkspaceError(t("workspace.loadUnexpected"));
 		} finally {
 			hasLoadedPreviewRef.current = task.id;
 			setIsLoadingPreview(false);
 		}
-	}, [task.id]);
+	}, [task.id, t]);
 
 	// Handle "Review Again" - clears staged state and reloads worktree info
 	const handleReviewAgain = useCallback(async () => {
@@ -605,14 +608,7 @@ export function useTaskDetail({ task }: UseTaskDetailOptions) {
 				window.electronAPI.getWorktreeStatus(task.id),
 				window.electronAPI.getWorktreeDiff(task.id),
 			]);
-			const status = statusResult.success ? statusResult.data : null;
-			const diff = diffResult.success ? diffResult.data : null;
-			// Reconcile status stats with diff data (diff filters discarded files)
-			if (status && diff) {
-				status.filesChanged = diff.files.length;
-				status.additions = diff.files.reduce((s, f) => s + f.additions, 0);
-				status.deletions = diff.files.reduce((s, f) => s + f.deletions, 0);
-			}
+			const { status, diff } = reconcileWorktree(statusResult, diffResult);
 			if (status) {
 				setWorktreeStatus(status);
 			}
@@ -642,14 +638,7 @@ export function useTaskDetail({ task }: UseTaskDetailOptions) {
 				window.electronAPI.getWorktreeStatus(task.id),
 				window.electronAPI.getWorktreeDiff(task.id),
 			]);
-			const status = statusResult.success ? statusResult.data : null;
-			const diff = diffResult.success ? diffResult.data : null;
-			// Reconcile status stats with diff data (diff filters discarded files)
-			if (status && diff) {
-				status.filesChanged = diff.files.length;
-				status.additions = diff.files.reduce((s, f) => s + f.additions, 0);
-				status.deletions = diff.files.reduce((s, f) => s + f.deletions, 0);
-			}
+			const { status, diff } = reconcileWorktree(statusResult, diffResult);
 			if (status) {
 				setWorktreeStatus(status);
 			}
@@ -839,6 +828,7 @@ export function useTaskDetail({ task }: UseTaskDetailOptions) {
 		setShowConflictDialog,
 		setShowPRDialog,
 		setIsCreatingPR,
+		handleCreatePR,
 		setIsCompleting,
 		setShowAbandonDialog,
 		setIsAbandoning,

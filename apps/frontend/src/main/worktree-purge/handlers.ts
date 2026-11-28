@@ -8,6 +8,7 @@ import { ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants";
 import type { IPCResult } from "../../shared/types";
 import type { PurgeCandidate, PurgeOutcome } from "../../shared/types/worktree-purge";
+import { startAutoArchive } from "../kanban-auto-archive";
 import { projectStore } from "../project-store";
 import { startMergedWatch } from "./merged-watch";
 import { listPurgeCandidates, purgeWorktrees } from "./purge";
@@ -60,4 +61,5 @@ export function registerWorktreePurgeHandlers(getMainWindow: () => BrowserWindow
 
 	// A merged PR closes its card and frees its worktree without asking.
 	startMergedWatch(getMainWindow);
+	startAutoArchive(getMainWindow);
 }

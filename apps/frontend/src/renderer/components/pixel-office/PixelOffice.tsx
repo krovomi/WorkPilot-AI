@@ -10,6 +10,7 @@ import {
 	Building2,
 	Grid3X3,
 	Hourglass,
+	Tv,
 	Volume2,
 	VolumeX,
 	ZoomIn,
@@ -18,24 +19,43 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
+	type AgentSkin,
+	agentShirt,
+	shownDecor,
+	wornSkin,
+} from "../../lib/pixel-office-skins";
+import {
 	onOfficeSignal,
 	type PixelAgent,
 	usePixelOfficeStore,
 } from "../../stores/pixel-office-store";
+import { useProjectStore } from "../../stores/project-store";
 import { useSwarmStore } from "../../stores/swarm-store";
-import { useTaskStore } from "../../stores/task-store";
+import { loadTasks, useTaskStore } from "../../stores/task-store";
 import { useTerminalStore } from "../../stores/terminal-store";
 import { Button } from "../ui/button";
 import "../charter/charter.css";
 import { Chip, Chips } from "../charter";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
+import { AchievementsPanel } from "./AchievementsPanel";
+import { AchievementToast } from "./AchievementToast";
 import { AddAgentButton, AgentBubble } from "./AgentBubble";
+import { KioskOverlay } from "./KioskOverlay";
+import { NarrativeFeed } from "./NarrativeFeed";
+import { OfficeScenesMenu } from "./OfficeScenesMenu";
+import { ProviderLegend } from "./ProviderLegend";
+import { CosmeticsPanel } from "./CosmeticsPanel";
+import { SeasonPanel } from "./SeasonPanel";
+import { TeamBoardPanel } from "./TeamBoardPanel";
 import { closeChimes, playChime } from "./office-sounds";
+import { shippedToday } from "./office-stats";
 import { PixelOfficeCanvas } from "./PixelOfficeCanvas";
 import { getCharacterSprite } from "./pixel-sprites";
-
-/** Height of the toolbar, subtracted from the container to size the canvas. */
-const TOOLBAR_H = 52;
+import { useKioskMode } from "./use-kiosk-mode";
+import { useOfficeAchievements } from "./use-office-achievements";
+import { useOfficeCalm } from "./use-office-motion";
+import { useOfficeNarratives } from "./use-office-narratives";
+import { useOfficeSeason } from "./use-office-season";
 
 const MIN_ZOOM = 1;
 const MAX_ZOOM = 6;
@@ -47,25 +67,33 @@ const MINI_FRAME_MS = 700;
 
 function MiniPixelChar({
 	characterIndex,
+	calm,
+	shirt,
 }: {
 	readonly characterIndex: number;
+	readonly calm: boolean;
+	/** The provider family's colour, when the task names a provider. */
+	readonly shirt?: string;
 }) {
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 
 	useEffect(() => {
 		let frame = 0;
 
+		const ctx = canvasRef.current?.getContext("2d");
+		// No 2D context: the name under the character still says who it is.
+		if (!ctx) return;
+		const { width, height } = ctx.canvas;
+
 		const draw = () => {
-			const canvas = canvasRef.current;
-			const ctx = canvas?.getContext("2d");
-			if (!canvas || !ctx) return;
 			ctx.imageSmoothingEnabled = false;
-			ctx.clearRect(0, 0, canvas.width, canvas.height);
-			const sprite = getCharacterSprite(characterIndex, "down", frame);
-			ctx.drawImage(sprite, 0, 0, canvas.width, canvas.height);
+			ctx.clearRect(0, 0, width, height);
+			const sprite = getCharacterSprite(characterIndex, "down", frame, shirt);
+			ctx.drawImage(sprite, 0, 0, width, height);
 		};
 
 		draw();
+		if (calm) return;
 		// A two-frame idle bob does not need requestAnimationFrame. The old loop
 		// woke sixty times a second to decide, fifty-nine of those times, that
 		// 700ms had not elapsed yet — once per queued task.
@@ -75,7 +103,7 @@ function MiniPixelChar({
 		}, MINI_FRAME_MS);
 
 		return () => clearInterval(timer);
-	}, [characterIndex]);
+	}, [characterIndex, calm, shirt]);
 
 	return (
 		<canvas
@@ -92,9 +120,11 @@ function MiniPixelChar({
 interface WaitingQueueProps {
 	readonly agents: PixelAgent[];
 	readonly onAgentClick: (agentId: string, x: number) => void;
+	readonly calm: boolean;
+	readonly skin: AgentSkin;
 }
 
-function WaitingQueue({ agents, onAgentClick }: WaitingQueueProps) {
+function WaitingQueue({ agents, onAgentClick, calm, skin }: WaitingQueueProps) {
 	const { t } = useTranslation(["pixelOffice"]);
 	const stripRef = useRef<HTMLDivElement>(null);
 
@@ -122,7 +152,7 @@ function WaitingQueue({ agents, onAgentClick }: WaitingQueueProps) {
 						style={{
 							background: "#8B5CF6",
 							boxShadow: "0 0 6px #8B5CF6",
-							animation: "pulse 2s ease-in-out infinite",
+							animation: calm ? "none" : "pulse 2s ease-in-out infinite",
 						}}
 					/>
 					<Hourglass
@@ -155,7 +185,7 @@ function WaitingQueue({ agents, onAgentClick }: WaitingQueueProps) {
 					className="flex gap-3 px-4 pb-3 overflow-x-auto"
 					style={{ scrollbarWidth: "none" }}
 				>
-					{agents.map((agent) => (
+					{agents.map((agent, place) => (
 						<button
 							key={agent.id}
 							type="button"
@@ -166,9 +196,11 @@ function WaitingQueue({ agents, onAgentClick }: WaitingQueueProps) {
 								// the nearest positioned ancestor is a Tailwind class anyone
 								// could remove from a parent, and the bubble would then be
 								// anchored against the viewport.
+								// The button is rendered inside the strip, so the strip is
+								// mounted whenever it can be clicked.
+								const strip = stripRef.current as HTMLDivElement;
 								const rect = e.currentTarget.getBoundingClientRect();
-								const parentRect = stripRef.current?.getBoundingClientRect();
-								if (!parentRect) return;
+								const parentRect = strip.getBoundingClientRect();
 								onAgentClick(
 									agent.id,
 									rect.left - parentRect.left + rect.width / 2,
@@ -179,11 +211,16 @@ function WaitingQueue({ agents, onAgentClick }: WaitingQueueProps) {
 							{/* Slow-bob wrapper */}
 							<div
 								style={{
-									animation: "waitBob 2.5s ease-in-out infinite",
-									animationDelay: `${(agent.waitingIndex ?? 0) * 0.4}s`,
+									animation: calm ? "none" : "waitBob 2.5s ease-in-out infinite",
+									// Staggered by place in the queue, so the bench does not bob in step.
+									animationDelay: `${place * 0.4}s`,
 								}}
 							>
-								<MiniPixelChar characterIndex={agent.characterIndex} />
+								<MiniPixelChar
+									characterIndex={agent.characterIndex}
+									calm={calm}
+									shirt={agentShirt(agent.providerFamily, skin)}
+								/>
 							</div>
 							{/* Violet glow dot */}
 							<div
@@ -240,7 +277,7 @@ export function PixelOffice({
 	onNavigateToTerminals,
 	onNavigateToKanban,
 }: PixelOfficeProps) {
-	const { t } = useTranslation(["pixelOffice", "common", "navigation"]);
+	const { t, i18n } = useTranslation(["pixelOffice", "common", "navigation"]);
 	const containerRef = useRef<HTMLDivElement>(null);
 	const [dimensions, setDimensions] = useState({ width: 800, height: 500 });
 	const [bubblePos, setBubblePos] = useState<{ x: number; y: number } | null>(
@@ -254,8 +291,14 @@ export function PixelOffice({
 	const addTerminal = useTerminalStore((s) => s.addTerminal);
 	const removeTerminal = useTerminalStore((s) => s.removeTerminal);
 	const canAddTerminal = useTerminalStore((s) => s.canAddTerminal);
+	// A server project: its cards come from the server, its folder here is
+	// the app's mirror, so no terminal opens on it.
+	const remote = useProjectStore((s) =>
+		s.projects.some((p) => p.id === projectId && !!p.remote),
+	);
 
 	const tasks = useTaskStore((s) => s.tasks);
+	const tasksLoading = useTaskStore((s) => s.isLoading);
 	const selectTask = useTaskStore((s) => s.selectTask);
 	const jumpToTask = useTaskStore((s) => s.jumpToTask);
 
@@ -308,17 +351,62 @@ export function PixelOffice({
 		};
 	}, [soundEnabled]);
 
-	// ── Container resize ────────────────────────────────────────
+	// ── Achievements, TV mode, calm ─────────────────────────────
 
-	useEffect(() => {
-		const el = containerRef.current;
-		if (!el) return;
+	const achievements = useOfficeAchievements({
+		projectId,
+		projectPath,
+		tasks,
+		ready: !tasksLoading,
+		remote,
+	});
+	const refreshAchievements = achievements.refresh;
+	const kioskRefresh = useCallback(() => {
+		void loadTasks(projectId);
+		refreshAchievements();
+	}, [projectId, refreshAchievements]);
+	const kiosk = useKioskMode(containerRef, kioskRefresh);
+	const season = useOfficeSeason(
+		achievements.projectTasks,
+		achievements.incidents,
+		achievements.now,
+	);
+	// The cosmetics chosen: a locked skin is not worn, hidden decor not drawn.
+	const skin = wornSkin(settings.agentSkin, season.decorIds);
+	const decorShown = useMemo(
+		() => shownDecor(season.decorIds, settings.hiddenDecor),
+		[season.decorIds, settings.hiddenDecor],
+	);
+	const scenes = useOfficeNarratives({
+		projectId,
+		tasks: achievements.projectTasks,
+		ready: !tasksLoading,
+		enabled: settings.narratives,
+		ai: settings.narrativesAi,
+		language: i18n.language,
+	});
+	const calm = useOfficeCalm(settings.calmMode);
+	const toggleCalm = useCallback(
+		() =>
+			updateSettings({
+				calmMode: !usePixelOfficeStore.getState().settings.calmMode,
+			}),
+		[updateSettings],
+	);
+
+	// ── Canvas area resize ──────────────────────────────────────
+
+	// The canvas area itself is measured, not the whole view minus a toolbar
+	// height: TV mode's header is taller than the toolbar it replaces. A ref
+	// callback with a cleanup (React 19) observes the element it is given,
+	// instead of an effect reading a ref that may not be attached yet.
+	const observeArea = useCallback((el: HTMLDivElement) => {
 		const ro = new ResizeObserver((entries) => {
 			for (const entry of entries) {
 				const { width, height } = entry.contentRect;
 				setDimensions({
 					width: Math.max(0, Math.floor(width)),
-					height: Math.max(0, Math.floor(height) - TOOLBAR_H),
+					height: Math.max(0, Math.floor(height)),
 				});
 			}
 		});
@@ -347,70 +435,34 @@ export function PixelOffice({
 	}, [selectAgent]);
 
 	// ── Terminal agent actions ───────────────────────────────────
+	// The bubble only exists for a selected agent, and only a terminal's panel
+	// offers these, so each receives that terminal's id.
 
-	const handleGoToTerminal = useCallback(() => {
-		const agent = agents.find((a) => a.id === selectedAgentId);
-		if (agent?.type !== "terminal" || !selectedAgentId) return;
-		jumpToTerminal(selectedAgentId);
+	const handleGoToTerminal = (terminalId: string) => {
+		jumpToTerminal(terminalId);
 		onNavigateToTerminals?.();
 		closeBubble();
-	}, [
-		agents,
-		selectedAgentId,
-		jumpToTerminal,
-		onNavigateToTerminals,
-		closeBubble,
-	]);
+	};
 
-	const handleKill = useCallback(async () => {
-		if (!selectedAgentId) return;
+	const handleKill = async (terminalId: string) => {
 		closeBubble();
-		await globalThis.electronAPI.destroyTerminal(selectedAgentId);
-		removeTerminal(selectedAgentId);
-	}, [selectedAgentId, removeTerminal, closeBubble]);
-
-	const handleInterrupt = useCallback(() => {
-		if (!selectedAgentId) return;
-		globalThis.electronAPI.sendTerminalInput(selectedAgentId, "\x03");
-	}, [selectedAgentId]);
-
-	const handleResumeClaude = useCallback(() => {
-		if (!selectedAgentId) return;
-		globalThis.electronAPI.invokeClaudeInTerminal(selectedAgentId);
-	}, [selectedAgentId]);
-
-	const handleSendCommand = useCallback(
-		(cmd: string) => {
-			if (!selectedAgentId) return;
-			globalThis.electronAPI.sendTerminalInput(selectedAgentId, `${cmd}\n`);
-		},
-		[selectedAgentId],
-	);
+		await globalThis.electronAPI.destroyTerminal(terminalId);
+		removeTerminal(terminalId);
+	};
 
 	// ── Task agent actions ───────────────────────────────────────
 
-	const handleGoToTask = useCallback(() => {
-		const agent = agents.find((a) => a.id === selectedAgentId);
-		if (!agent?.taskId) return;
-		selectTask(agent.taskId);
-		jumpToTask(agent.taskId); // triggers scroll + spotlight in TaskCard
+	const handleGoToTask = (taskId: string) => {
+		selectTask(taskId);
+		jumpToTask(taskId); // triggers scroll + spotlight in TaskCard
 		onNavigateToKanban?.();
 		closeBubble();
-	}, [
-		agents,
-		selectedAgentId,
-		selectTask,
-		jumpToTask,
-		onNavigateToKanban,
-		closeBubble,
-	]);
+	};
 
-	const handleStopTask = useCallback(() => {
-		const agent = agents.find((a) => a.id === selectedAgentId);
-		if (!agent?.taskId) return;
-		globalThis.electronAPI.stopTask(agent.taskId);
+	const handleStopTask = (taskId: string) => {
+		globalThis.electronAPI.stopTask(taskId);
 		closeBubble();
-	}, [agents, selectedAgentId, closeBubble]);
+	};
 
 	// ── Pending agent click (from WaitingQueue strip) ────────────
 
@@ -534,6 +586,16 @@ export function PixelOffice({
 			? terminals.find((t) => t.id === selectedAgentId)
 			: undefined;
 
+	const earnedCount = Object.keys(achievements.unlocked).length;
+	const shippedTodayCount = useMemo(
+		() =>
+			shippedToday(
+				tasks.filter((t) => t.projectId === projectId),
+				new Date(),
+			),
+		[tasks, projectId],
+	);
+
 	const { pendingAgents, seatedAgents, counts } = useMemo(() => {
 		const pending = agents.filter((a) => a.activity === "pending");
 		const seated = agents.filter((a) => a.activity !== "pending");
@@ -547,14 +609,31 @@ export function PixelOffice({
 				active: seated.filter(
 					(a) => a.activity !== "idle" && a.activity !== "exited",
 				).length,
+				waiting: seated.filter((a) => a.activity === "waiting").length,
 			},
 		};
 	}, [agents]);
 
 	return (
 		<div ref={containerRef} className="wp-scope flex flex-col h-full overflow-hidden">
+			{kiosk.active && (
+				<KioskOverlay
+					stats={{
+						active: counts.active,
+						waiting: counts.waiting,
+						shippedToday: shippedTodayCount,
+						achievements: earnedCount,
+					}}
+					calm={calm}
+					calmLocked={calm && !settings.calmMode}
+					onToggleCalm={toggleCalm}
+					onExit={kiosk.exit}
+				/>
+			)}
 			{/* Toolbar */}
-			<div className="flex items-center justify-between gap-3 px-5 py-2.5 border-b border-dashed border-[var(--wp-border)] bg-background/80 backdrop-blur-sm shrink-0">
+			<div
+				className={`flex items-center justify-between gap-3 px-5 py-2.5 border-b border-dashed border-[var(--wp-border)] bg-background/80 backdrop-blur-sm shrink-0${kiosk.active ? " hidden" : ""}`}
+			>
 				<div className="flex min-w-0 items-center gap-3">
 					<span className="wp-empty-glyph h-8 w-8 shrink-0" aria-hidden="true">
 						<Building2 className="h-4 w-4" />
@@ -574,13 +653,47 @@ export function PixelOffice({
 							<Chip tone="pink">{t("pixelOffice:badges.pending", { count: pendingAgents.length })}</Chip>
 						)}
 					</Chips>
+					<ProviderLegend agents={seatedAgents} />
 				</div>
 
 				<div className="flex items-center gap-1">
 					<AddAgentButton
 						onClick={handleAddAgent}
-						disabled={!canAddTerminal(projectPath)}
+						disabled={remote || !canAddTerminal(projectPath)}
 					/>
+					<div className="w-px h-5 bg-border mx-1" />
+					{remote && <TeamBoardPanel projectId={projectId} />}
+					<AchievementsPanel unlocked={achievements.unlocked} />
+					<SeasonPanel
+						season={season.season}
+						progress={season.progress}
+						decor={season.decor}
+					/>
+					<CosmeticsPanel
+						earned={season.decorIds}
+						hidden={settings.hiddenDecor}
+						skin={settings.agentSkin}
+						onChange={updateSettings}
+					/>
+					<OfficeScenesMenu
+						enabled={settings.narratives}
+						ai={settings.narrativesAi}
+						onChange={updateSettings}
+					/>
+					<Tooltip>
+						<TooltipTrigger asChild>
+							<Button
+								variant="ghost"
+								size="icon"
+								className="h-8 w-8"
+								onClick={kiosk.enter}
+								aria-label={t("pixelOffice:kiosk.enter")}
+							>
+								<Tv className="h-4 w-4" />
+							</Button>
+						</TooltipTrigger>
+						<TooltipContent>{t("pixelOffice:kiosk.enter")}</TooltipContent>
+					</Tooltip>
 					<div className="w-px h-5 bg-border mx-1" />
 
 					<Tooltip>
@@ -671,8 +784,19 @@ export function PixelOffice({
 				</div>
 			</div>
 
+
 			{/* Canvas area */}
-			<div className="flex-1 bg-[#1A1A2E] overflow-hidden relative">
+			<div
+				ref={observeArea}
+				className="flex-1 bg-[#1A1A2E] overflow-hidden relative"
+				title={t("pixelOffice:toolbar.shortcuts")}
+			>
+				<AchievementToast
+					achievement={achievements.toast}
+					onDismiss={achievements.dismissToast}
+					calm={calm}
+				/>
+				<NarrativeFeed scenes={scenes} calm={calm} />
 				{agents.length === 0 ? (
 					<div className="flex flex-col items-center justify-center h-full text-center gap-4 px-8">
 						<Building2 className="h-16 w-16 text-white/25" aria-hidden />
@@ -684,7 +808,7 @@ export function PixelOffice({
 						</p>
 						<AddAgentButton
 							onClick={handleAddAgent}
-							disabled={!canAddTerminal(projectPath)}
+							disabled={remote || !canAddTerminal(projectPath)}
 						/>
 					</div>
 				) : (
@@ -694,6 +818,9 @@ export function PixelOffice({
 								width={dimensions.width}
 								height={dimensions.height}
 								emptyDeskLabel={t("pixelOffice:canvas.emptyDesk")}
+								calm={calm}
+								decor={decorShown}
+								skin={skin}
 								onAgentClick={handleAgentClick}
 							/>
 						)}
@@ -712,6 +839,8 @@ export function PixelOffice({
 						<WaitingQueue
 							agents={pendingAgents}
 							onAgentClick={handlePendingAgentClick}
+							calm={calm}
+							skin={skin}
 						/>
 
 						{/* Backdrop */}
@@ -733,12 +862,24 @@ export function PixelOffice({
 								anchorX={bubblePos.x}
 								anchorY={bubblePos.y}
 								onClose={closeBubble}
-								onGoToTerminal={handleGoToTerminal}
+								onGoToTerminal={() => handleGoToTerminal(selectedAgent.id)}
 								onGoToTask={handleGoToTask}
-								onKill={handleKill}
-								onInterrupt={handleInterrupt}
-								onResumeClaude={handleResumeClaude}
-								onSendCommand={handleSendCommand}
+								onKill={() => handleKill(selectedAgent.id)}
+								onInterrupt={() =>
+									globalThis.electronAPI.sendTerminalInput(
+										selectedAgent.id,
+										"\x03",
+									)
+								}
+								onResumeClaude={() =>
+									globalThis.electronAPI.invokeClaudeInTerminal(selectedAgent.id)
+								}
+								onSendCommand={(cmd) =>
+									globalThis.electronAPI.sendTerminalInput(
+										selectedAgent.id,
+										`${cmd}\n`,
+									)
+								}
 								onStopTask={handleStopTask}
 							/>
 						)}

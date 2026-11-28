@@ -1,7 +1,13 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { getSpecsDir } from "../../shared/constants";
-import type { TaskMetadata } from "../../shared/types";
+import type { ProjectSettings, TaskMetadata } from "../../shared/types";
+import type { AiAccountPins } from "../../shared/types/ai-accounts";
+import {
+	mergeAccountPins,
+	pinnedAccountOf,
+	pinnedLoginOf,
+} from "../../shared/utils/ai-account-pins";
 import {
 	defaultEngineProvider,
 	type EnginePhase,
@@ -13,6 +19,8 @@ import {
 	type EngineSeedSettings,
 	type TaskEngine,
 } from "../../shared/utils/task-engine";
+import { applyPinnedLogin } from "../ai-accounts/login-accounts";
+import { applyPinnedAccount } from "../ai-accounts/pinned-account-env";
 import { appLog } from "../app-logger";
 import { projectStore } from "../project-store";
 import { credentialManager } from "../services/credential-manager";
@@ -33,7 +41,13 @@ import { readSettingsFile } from "../settings-utils";
  * Claude is never re-stated here: its OAuth / API-profile chain is resolved by
  * the process manager (`getBestAvailableProfileEnv`, `getAPIProfileEnv`), and
  * layering a key on top could contradict the mode it chose — the rule
- * `buildContestantEnv` already follows for the Bounty Board.
+ * `buildContestantEnv` already follows for the Bounty Board. A Claude account
+ * pinned by the card or the project goes through that chain too
+ * (`pinnedClaudeProfileEnv`); the pin of an API-key provider is applied
+ * here, on top of what the credential manager chose (`applyPinnedAccount`),
+ * and so is the pin of a CLI sign-in (`applyPinnedLogin`: Copilot, Codex CLI
+ * for OpenAI, Gemini CLI), once every provider's environment is in, because
+ * each of them carries the CLIs' default folders.
  */
 
 export interface TaskProviderPlan {
@@ -43,6 +57,19 @@ export interface TaskProviderPlan {
 	startProvider: string;
 	/** Whether any phase needs Claude credentials. */
 	usesClaude: boolean;
+	/**
+	 * The account each provider runs on (card pin, else project pin); a
+	 * provider absent from it runs on its default account.
+	 */
+	accounts?: AiAccountPins;
+}
+
+/** The accounts a task pins: its card's, completed from its project's. */
+export function taskAccountPins(
+	metadata: Pick<TaskMetadata, "aiAccounts"> | undefined,
+	projectSettings: Pick<ProjectSettings, "aiAccounts"> | undefined,
+): AiAccountPins | undefined {
+	return mergeAccountPins(metadata?.aiAccounts, projectSettings?.aiAccounts);
 }
 
 /** The engine of a task read from its metadata, completed from Settings. */
@@ -83,10 +110,16 @@ export function buildTaskProviderEnv(
 		credentialManager.getEnvironmentVariables(provider),
 ): Record<string, string> {
 	const env: Record<string, string> = {};
+	const logins: Record<string, string> = {};
 	for (const provider of plan.providers) {
 		if (isClaudeProvider(provider)) continue;
 		try {
-			Object.assign(env, getEnv(provider));
+			const providerEnv = { ...getEnv(provider) };
+			// OpenAI's key pin wins over its Codex sign-in, which a merged file could still hold.
+			if (!applyPinnedAccount(providerEnv, provider, pinnedAccountOf(plan.accounts, provider))) {
+				applyPinnedLogin(logins, provider, pinnedLoginOf(plan.accounts, provider));
+			}
+			Object.assign(env, providerEnv);
 		} catch (err) {
 			appLog.warn(
 				`[TaskProviderEnv] no credentials for provider "${provider}":`,
@@ -94,6 +127,7 @@ export function buildTaskProviderEnv(
 			);
 		}
 	}
+	Object.assign(env, logins);
 	const start = plan.startProvider.trim().toLowerCase();
 	env.SELECTED_LLM_PROVIDER = isClaudeProvider(start) ? "claude" : start;
 	return env;

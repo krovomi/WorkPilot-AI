@@ -25,6 +25,10 @@ class ModelEntry:
     label: str
     tier: str  # "flagship" | "standard" | "fast" | "local"
     supports_thinking: bool = False
+    # Whether the model reads images: False for a text-only model, None when
+    # the catalogue has not recorded it (Import Design's render loop refuses
+    # only the first, `vision_support`).
+    supports_vision: bool | None = None
 
     # Routing helpers
     is_default: bool = False
@@ -341,6 +345,49 @@ _GROK_MODELS = [
 ]
 
 # =============================================================================
+# GATEWAYS — one key, many vendors' models (gateway_providers.py)
+# OpenRouter: https://openrouter.ai/api/v1/models, read 2026-11-21.
+# Hugging Face Inference Providers: https://router.huggingface.co/v1/models,
+# read 2026-11-21. Both lists are fetched live and keyless; these entries are
+# only the defaults an auto-configured provider runs and the offline fallback.
+# =============================================================================
+
+_OPENROUTER_MODELS = [
+    ModelEntry(
+        "openrouter",
+        "moonshotai/kimi-k3.1-pro",
+        "Kimi K3.1 Pro",
+        "standard",
+        supports_thinking=True,
+        is_default=True,
+    ),
+    ModelEntry(
+        "openrouter",
+        "anthropic/claude-fable-5.2",
+        "Claude Fable 5.2",
+        "flagship",
+        supports_thinking=True,
+        supports_vision=True,
+    ),
+]
+
+_HUGGINGFACE_MODELS = [
+    ModelEntry(
+        "huggingface",
+        "moonshotai/Kimi-K3.1-Pro",
+        "Kimi K3.1 Pro",
+        "standard",
+        is_default=True,
+    ),
+    ModelEntry(
+        "huggingface",
+        "zai-org/GLM-5.3-Flash",
+        "GLM 5.3 Flash",
+        "fast",
+    ),
+]
+
+# =============================================================================
 # META / LLAMA MODELS
 # =============================================================================
 
@@ -366,46 +413,139 @@ _META_MODELS = [
 # =============================================================================
 
 _OLLAMA_MODELS = [
-    ModelEntry("ollama", "qwen3-coder:30b", "Qwen3 Coder 30B", "local"),
-    ModelEntry("ollama", "qwen3-coder-next", "Qwen3 Coder Next 80B", "local"),
+    ModelEntry(
+        "ollama", "qwen3-coder:30b", "Qwen3 Coder 30B", "local", supports_vision=False
+    ),
+    ModelEntry(
+        "ollama",
+        "qwen3-coder-next",
+        "Qwen3 Coder Next 80B",
+        "local",
+        supports_vision=False,
+    ),
     ModelEntry("ollama", "devstral-small-2:24b", "Devstral Small 2 24B", "local"),
     ModelEntry("ollama", "devstral-2:123b", "Devstral 2 123B", "local"),
-    ModelEntry("ollama", "gpt-oss:20b", "GPT-OSS 20B", "local", supports_thinking=True),
     ModelEntry(
-        "ollama", "gpt-oss:120b", "GPT-OSS 120B", "local", supports_thinking=True
+        "ollama",
+        "gpt-oss:20b",
+        "GPT-OSS 20B",
+        "local",
+        supports_thinking=True,
+        supports_vision=False,
     ),
-    ModelEntry("ollama", "qwen3:8b", "Qwen3 8B", "local", supports_thinking=True),
-    ModelEntry("ollama", "qwen3:14b", "Qwen3 14B", "local", supports_thinking=True),
-    ModelEntry("ollama", "qwen3:30b", "Qwen3 30B", "local", supports_thinking=True),
-    ModelEntry("ollama", "qwen3:32b", "Qwen3 32B", "local", supports_thinking=True),
-    ModelEntry("ollama", "qwen2.5-coder:7b", "Qwen 2.5 Coder 7B", "local"),
-    ModelEntry("ollama", "qwen2.5-coder:14b", "Qwen 2.5 Coder 14B", "local"),
-    ModelEntry("ollama", "qwen2.5-coder:32b", "Qwen 2.5 Coder 32B", "local"),
-    ModelEntry("ollama", "llama3.3", "Llama 3.3", "local", is_default=True),
-    ModelEntry("ollama", "deepseek-coder-v2", "DeepSeek Coder V2", "local"),
-    ModelEntry("ollama", "llama3.2", "Llama 3.2", "local"),
-    ModelEntry("ollama", "llama3.1", "Llama 3.1", "local"),
+    ModelEntry(
+        "ollama",
+        "gpt-oss:120b",
+        "GPT-OSS 120B",
+        "local",
+        supports_thinking=True,
+        supports_vision=False,
+    ),
+    ModelEntry(
+        "ollama",
+        "qwen3:8b",
+        "Qwen3 8B",
+        "local",
+        supports_thinking=True,
+        supports_vision=False,
+    ),
+    ModelEntry(
+        "ollama",
+        "qwen3:14b",
+        "Qwen3 14B",
+        "local",
+        supports_thinking=True,
+        supports_vision=False,
+    ),
+    ModelEntry(
+        "ollama",
+        "qwen3:30b",
+        "Qwen3 30B",
+        "local",
+        supports_thinking=True,
+        supports_vision=False,
+    ),
+    ModelEntry(
+        "ollama",
+        "qwen3:32b",
+        "Qwen3 32B",
+        "local",
+        supports_thinking=True,
+        supports_vision=False,
+    ),
+    ModelEntry(
+        "ollama",
+        "qwen2.5-coder:7b",
+        "Qwen 2.5 Coder 7B",
+        "local",
+        supports_vision=False,
+    ),
+    ModelEntry(
+        "ollama",
+        "qwen2.5-coder:14b",
+        "Qwen 2.5 Coder 14B",
+        "local",
+        supports_vision=False,
+    ),
+    ModelEntry(
+        "ollama",
+        "qwen2.5-coder:32b",
+        "Qwen 2.5 Coder 32B",
+        "local",
+        supports_vision=False,
+    ),
+    ModelEntry(
+        "ollama",
+        "llama3.3",
+        "Llama 3.3",
+        "local",
+        is_default=True,
+        supports_vision=False,
+    ),
+    ModelEntry(
+        "ollama",
+        "deepseek-coder-v2",
+        "DeepSeek Coder V2",
+        "local",
+        supports_vision=False,
+    ),
+    ModelEntry("ollama", "llama3.2", "Llama 3.2", "local", supports_vision=False),
+    ModelEntry("ollama", "llama3.1", "Llama 3.1", "local", supports_vision=False),
     ModelEntry("ollama", "mistral-large-3", "Mistral Large 3", "local"),
-    ModelEntry("ollama", "mistral", "Mistral", "local"),
+    ModelEntry("ollama", "mistral", "Mistral", "local", supports_vision=False),
     ModelEntry("ollama", "mistral-large", "Mistral Large", "local"),
-    ModelEntry("ollama", "deepseek-v3.2", "DeepSeek V3.2", "local"),
     ModelEntry(
-        "ollama", "deepseek-r2", "DeepSeek R2", "flagship", supports_thinking=True
+        "ollama", "deepseek-v3.2", "DeepSeek V3.2", "local", supports_vision=False
     ),
     ModelEntry(
-        "ollama", "deepseek-r1", "DeepSeek R1", "standard", supports_thinking=True
+        "ollama",
+        "deepseek-r2",
+        "DeepSeek R2",
+        "flagship",
+        supports_thinking=True,
+        supports_vision=False,
     ),
-    ModelEntry("ollama", "qwen2.5-coder", "Qwen 2.5 Coder", "local"),
-    ModelEntry("ollama", "qwen2.5", "Qwen 2.5", "local"),
-    ModelEntry("ollama", "phi4", "Phi-4", "local"),
+    ModelEntry(
+        "ollama",
+        "deepseek-r1",
+        "DeepSeek R1",
+        "standard",
+        supports_thinking=True,
+        supports_vision=False,
+    ),
+    ModelEntry(
+        "ollama", "qwen2.5-coder", "Qwen 2.5 Coder", "local", supports_vision=False
+    ),
+    ModelEntry("ollama", "qwen2.5", "Qwen 2.5", "local", supports_vision=False),
+    ModelEntry("ollama", "phi4", "Phi-4", "local", supports_vision=False),
     ModelEntry("ollama", "gemma3", "Gemma 3", "local"),
-    ModelEntry("ollama", "gemma2", "Gemma 2", "local"),
-    ModelEntry("ollama", "codellama", "CodeLlama", "local"),
-    ModelEntry("ollama", "yi", "Yi", "local"),
-    ModelEntry("ollama", "mixtral", "Mixtral", "local"),
-    ModelEntry("ollama", "vicuna", "Vicuna", "local"),
-    ModelEntry("ollama", "wizardlm", "WizardLM", "local"),
-    ModelEntry("ollama", "solar", "Solar Pro", "local"),
+    ModelEntry("ollama", "gemma2", "Gemma 2", "local", supports_vision=False),
+    ModelEntry("ollama", "codellama", "CodeLlama", "local", supports_vision=False),
+    ModelEntry("ollama", "yi", "Yi", "local", supports_vision=False),
+    ModelEntry("ollama", "mixtral", "Mixtral", "local", supports_vision=False),
+    ModelEntry("ollama", "vicuna", "Vicuna", "local", supports_vision=False),
+    ModelEntry("ollama", "wizardlm", "WizardLM", "local", supports_vision=False),
+    ModelEntry("ollama", "solar", "Solar Pro", "local", supports_vision=False),
     ModelEntry("ollama", "custom", "Autre (saisie libre)", "local"),
 ]
 
@@ -701,6 +841,8 @@ REGISTRY: tuple[ModelEntry, ...] = tuple(
     + _MISTRAL_MODELS
     + _DEEPSEEK_MODELS
     + _GROK_MODELS
+    + _OPENROUTER_MODELS
+    + _HUGGINGFACE_MODELS
     + _META_MODELS
     + _OLLAMA_MODELS
     + _WINDSURF_MODELS
@@ -736,6 +878,19 @@ def list_provider(provider: str) -> list[ModelEntry]:
     return [e for e in REGISTRY if e.provider == provider]
 
 
+def vision_support(provider: str, model_id: str) -> bool | None:
+    """Whether ``model_id`` reads images: True, False, or None when not recorded.
+
+    An Ollama tag (``llama3.3:latest``) is the model without it. A model the
+    catalogue does not list, or lists without the fact, answers None.
+    """
+    wanted = (model_id or "").strip().lower().removesuffix(":latest")
+    for entry in REGISTRY:
+        if entry.provider == provider and entry.model_id.lower() == wanted:
+            return entry.supports_vision
+    return None
+
+
 def provider_catalog() -> dict[str, list[dict[str, object]]]:
     """Serializable catalogue shared by the API and generated frontend fallback."""
     result: dict[str, list[dict[str, object]]] = {}
@@ -760,3 +915,62 @@ def provider_catalog() -> dict[str, list[dict[str, object]]]:
     result.setdefault("llama-cpp", [])
     result.setdefault("custom", [])
     return result
+
+
+# =============================================================================
+# ROUTER PICKS
+# The model the Adaptive Model Router (model_router/) sends a task to, per
+# provider and tier: the current generation, as MODEL_ID_MAP's bare `opus` /
+# `sonnet` / `haiku` are for Claude. A provider or tier left out here falls
+# back to `tier_pick`'s rule. tests/model_router/test_router.py checks that
+# each pick is an entry of REGISTRY with that tier.
+# =============================================================================
+
+_TIER_PICKS: dict[str, dict[str, str]] = {
+    "anthropic": {
+        "fast": "claude-haiku-5-5",
+        "standard": "claude-sonnet-5-5",
+        "flagship": "claude-opus-5-5",
+    },
+    "openai": {
+        "fast": "gpt-6-luna",
+        "standard": "gpt-6.1-sol",
+        "flagship": "gpt-5.6-sol",
+    },
+    "google": {
+        "fast": "gemini-3.1-flash-lite",
+        "standard": "gemini-3.8-flash",
+        "flagship": "gemini-3.1-pro-preview",
+    },
+    "mistral": {
+        "fast": "ministral-3b-2512",
+        "standard": "codestral-2508",
+        "flagship": "mistral-large-2512",
+    },
+    "deepseek": {"standard": "deepseek-flash", "flagship": "deepseek-v4-pro"},
+    "grok": {"standard": "grok-build-0.1", "flagship": "grok-4.3"},
+    "copilot": {
+        "fast": "claude-haiku-4.5",
+        "standard": "claude-sonnet-4.6",
+        "flagship": "claude-opus-4.8",
+    },
+}
+
+
+def tier_pick(provider: str, tier: str) -> ModelEntry | None:
+    """The model a router sends ``provider``'s ``tier`` work to, or None.
+
+    `_TIER_PICKS` first; otherwise the provider's default when it is of that
+    tier, then the first entry of that tier.
+    """
+    entries = [e for e in REGISTRY if e.provider == provider and e.tier == tier]
+    if not entries:
+        return None
+    picked = _TIER_PICKS.get(provider, {}).get(tier)
+    for entry in entries:
+        if entry.model_id == picked:
+            return entry
+    for entry in entries:
+        if entry.is_default:
+            return entry
+    return entries[0]

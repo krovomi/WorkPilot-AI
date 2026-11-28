@@ -24,13 +24,14 @@
 	"retry": "Retry",
 	"dismiss": "Dismiss",
 	"viewPR": "View PR",
+	"fixCard": "Fix card on the board: {{card}}",
 
 	"cicdConfig": "CI/CD Configuration",
 	"cicdEnabled": "Enable CI/CD healing",
-	"autoFix": "Auto-fix regressions",
-	"autoCreatePR": "Auto-create PRs",
+	"autoFix": "File a fix card for each regression",
+	"autoBisect": "Bisect when the last commit is probably not the culprit",
 	"noIncidents": "No CI/CD incidents detected",
-	"cicdDescription": "When tests break after a push, an incident is opened with the commit's diff and the failing tests. Automatic fixing is not wired yet: the incident is escalated for review.",
+	"cicdDescription": "When tests break after a push, an incident is opened with the commit's diff and the failing tests. Its fix is a card on the board: the build codes it and runs QA in a worktree, then waits for your review before its pull request.",
 
 	"connectedSources": "Monitoring Sources",
 	"connected": "Connected",
@@ -38,7 +39,7 @@
 	"productionConfig": "Production Configuration",
 	"productionEnabled": "Enable production monitoring",
 	"autoAnalyze": "Auto-analyze incidents",
-	"autoFixProduction": "Auto-fix production issues",
+	"autoFixProduction": "File a fix card for each production issue",
 	"liveIncidents": "Live Incidents",
 	"noProductionIncidents": "No production incidents",
 	"productionDescription": "Connect to Sentry, Datadog, CloudWatch, New Relic, or PagerDuty via MCP servers to detect production errors in real-time.",
@@ -61,5 +62,76 @@
 	"risk": "Risk",
 	"complexity": "Complexity",
 	"churn": "Churn",
-	"coverage": "Coverage"
+	"coverage": "Coverage",
+
+	"trends": {
+		"title": "Risk trajectories",
+		"empty": "A trajectory needs at least 4 scans of a file. Scans recorded: {{count}}.",
+		"snapshots": "Scans recorded: {{count}} · files followed: {{files}}",
+		"class": {
+			"new": "New",
+			"stable": "Stable",
+			"slow_rise": "Slowly rising",
+			"fast_rise": "Fast rising",
+			"improving": "Improving"
+		},
+		"hotList": "Hot list: fast rising",
+		"rising": "Slowly rising",
+		"noHot": "No file is rising fast.",
+		"slope": "{{slope}} pts/week",
+		"riskFromTo": "Risk {{from}} → {{to}}",
+		"newlyHot": "Just entered",
+		"why": "Complexity {{pct}}%, churn {{from}} → {{to}}",
+		"reset": "Rewritten: history restarted",
+		"clusters": "Directories degrading together",
+		"clusterLine": "{{rising}} of {{total}} files rising, {{fast}} fast",
+		"chartLabel": "Risk of {{file}} over the last {{days}} days"
+	},
+	"groups": {
+		"reports": "Reports merged: {{count}}",
+		"seenBy": "Seen by",
+		"fingerprint": "Fingerprint",
+		"inherited": "Priority inherited from commit {{commit}} (was {{severity}})",
+		"suspects": "Suspect commits",
+		"clustersTitle": "Incidents with one root cause",
+		"clusterLine": "{{count}} incidents · {{occurrences}} occurrences · {{users}} users",
+		"oneFix": "One fix covers them all."
+	},
+	"bisect": {
+		"title": "First bad commit",
+		"triggers": "The last commit may not be the culprit",
+		"trigger": {
+			"trivial_diff": "the last change is tiny ({{lines}} lines)",
+			"old_test": "the failing test was not touched for 30 days",
+			"dependency_changed": "a dependency file changed since the last green commit"
+		},
+		"goodLabel": "Last green commit",
+		"goodPlaceholder": "e.g. a1b2c3d",
+		"start": "Bisect",
+		"running": "Bisecting…",
+		"tested": "Commits tested: {{count}}",
+		"role": {
+			"bad-check": "failing commit",
+			"flaky-check": "rerun (flakiness)",
+			"good-check": "green commit",
+			"search": "search"
+		},
+		"outcome": {
+			"good": "passes",
+			"bad": "fails",
+			"skip": "untestable"
+		},
+		"status": {
+			"found": "First bad commit",
+			"ambiguous": "The culprit is one of these commits",
+			"flaky": "The test is flaky: it passed on a rerun of the failing commit.",
+			"not_reproduced": "The test passes at the failing commit in a clean checkout.",
+			"good_fails": "The green commit fails in a clean checkout: the environment breaks the test.",
+			"budget": "The bisect budget ran out; the culprit is one of these commits",
+			"unavailable": "No bisect: {{reason}}"
+		},
+		"invalidSha": "A commit id is 7 to 40 hexadecimal characters.",
+		"cached": "From the cache",
+		"error": "The bisect could not run: {{error}}"
+	}
 }

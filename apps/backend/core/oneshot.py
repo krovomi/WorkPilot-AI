@@ -51,6 +51,8 @@ _DIRECT_PROVIDERS = frozenset(
         "mistral",
         "deepseek",
         "grok",
+        "openrouter",
+        "huggingface",
         "ollama",
         "local",
         "lmstudio",
@@ -63,6 +65,25 @@ _DIRECT_PROVIDERS = frozenset(
 def drives_itself(provider: str) -> bool:
     """True when `provider` runs its own models here rather than degrading."""
     return (provider or "").strip().lower() in _DIRECT_PROVIDERS
+
+
+def runs_own_agent(
+    provider: str, project_dir: str | None, spec_dir: str | None
+) -> bool:
+    """True when `provider` answers through its own agent client here.
+
+    The CLIs (pi, OpenCode, Antigravity, the ACP agents such as Gemini CLI)
+    have no context-free client: with a project and a spec directory,
+    ``_build_client`` hands them to ``create_agent_client``, which drives
+    each one with its own builder. That is still the named vendor answering,
+    so a caller that refuses substitutes may take it. A name with no builder
+    there (meta, aws, cursor, custom) would degrade to Claude: never this.
+    """
+    if not (project_dir and spec_dir):
+        return False
+    from core.client import _CLIENT_BUILDERS, _normalize_provider_name
+
+    return _normalize_provider_name(provider or "") in _CLIENT_BUILDERS
 
 
 # Cheap default model per provider for these tiny one-shot calls.
@@ -79,6 +100,19 @@ _DEFAULT_MODELS = {
     "grok": "grok-4-fast",
 }
 _FALLBACK_MODEL = "claude-haiku-4-5"
+
+# Providers answering through `CompatibleProviderAgentClient` (OpenAI format,
+# their own key): the base URLs live in `core.client._COMPATIBLE_PROVIDER_URLS`.
+_COMPATIBLE = frozenset({"mistral", "deepseek", "grok", "openrouter", "huggingface"})
+
+
+def _registry_default(provider: str) -> str | None:
+    """The provider's fast model in the shipped registry, else its default."""
+    from models_registry import get_default, get_tier
+
+    entry = get_tier(provider, "fast") or get_default(provider)
+    return entry.model_id if entry else None
+
 
 # When the provider has no known cheap default (exotic provider), fall back to a
 # model the task already uses (guaranteed valid for that provider).
@@ -112,9 +146,10 @@ def _model_from_task(spec_dir: Path | None) -> str | None:
 def _resolve_model(provider: str, explicit: str | None, spec_dir: Path | None) -> str:
     if explicit:
         return explicit
-    if provider in ("mistral", "deepseek", "grok"):
+    if provider in _COMPATIBLE:
         return (
             _DEFAULT_MODELS.get(provider)
+            or _registry_default(provider)
             or _model_from_task(spec_dir)
             or _FALLBACK_MODEL
         )
@@ -323,8 +358,9 @@ def _build_client(
             agent_type="commit_message",
         )
 
-    if provider in ("mistral", "deepseek", "grok"):
+    if provider in _COMPATIBLE:
         from core.agent_client import CompatibleProviderAgentClient
+        from core.client import _COMPATIBLE_PROVIDER_URLS
         from provider_models_catalog import _api_key_for
 
         from src.connectors.llm_config import load_provider_config
@@ -336,11 +372,7 @@ def _build_client(
         base_url = (
             os.environ.get(f"{provider.upper()}_BASE_URL")
             or config.get("base_url")
-            or {
-                "mistral": "https://api.mistral.ai",
-                "deepseek": "https://api.deepseek.com",
-                "grok": "https://api.x.ai",
-            }[provider]
+            or _COMPATIBLE_PROVIDER_URLS[provider]
         )
         return CompatibleProviderAgentClient(
             provider=provider,
@@ -503,7 +535,11 @@ async def oneshot_completion(
         "yes" if (project_dir and spec_dir) else "no",
     )
 
-    if require_provider and not drives_itself(resolved_provider):
+    if (
+        require_provider
+        and not drives_itself(resolved_provider)
+        and not runs_own_agent(resolved_provider, project_dir, spec_dir)
+    ):
         message = (
             f"Provider '{resolved_provider}' has no adapter of its own here: "
             "running it would answer from a different vendor's model."

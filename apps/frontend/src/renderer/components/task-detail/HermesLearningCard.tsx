@@ -116,9 +116,10 @@ export function HermesLearningCard({ task, projectPath }: HermesLearningCardProp
 	const { readiness, soul } = status;
 	const unmet = readiness.checks.filter((c) => !c.ok);
 	const blocking = unmet.filter((c) => c.required);
-	const soulMissing = soul.offered && !soul.installed;
-	const adopted = status.adopted ?? [];
-	const adoptedPack = status.adoptedPack || "hermes-learned";
+	// Offered here and not in place: none installed yet, or a different one
+	// ("diverged"), which the button replaces (the old one is backed up).
+	const soulOffer = soul.state === "not-installed" || soul.state === "diverged";
+	const { adopted, adoptedPack } = status;
 	const brain = status.brain;
 	const dropped = Object.entries(lastCycle?.ingest?.dropped ?? {}).sort(([a], [b]) =>
 		a.localeCompare(b),
@@ -126,7 +127,7 @@ export function HermesLearningCard({ task, projectPath }: HermesLearningCardProp
 	const droppedTotal =
 		(lastCycle?.ingest?.droppedTotal ?? 0) +
 		(lastCycle?.ingest?.pruned ?? 0) +
-		(status.stale ?? 0);
+		status.stale;
 
 	const taskContext = { projectDir: projectPath, specId: task?.specId };
 	const decide = (files: readonly string[], decision: "adopt" | "decline") =>
@@ -273,7 +274,9 @@ export function HermesLearningCard({ task, projectPath }: HermesLearningCardProp
 						: t("hermes:review.declined", { count: lastReview.declined.length })}
 				</p>
 			)}
-			{lastReview?.decision === "adopt" && <CuratorLockHint names={lastReview.adopted} />}
+			{lastReview?.decision === "adopt" && (
+				<CuratorLockHint names={lastReview.adopted} checks={readiness.checks} />
+			)}
 			{error && (
 				<p className="mx-4 mt-2 text-xs text-destructive" role="alert">
 					{error}
@@ -407,7 +410,7 @@ export function HermesLearningCard({ task, projectPath }: HermesLearningCardProp
 
 						<SoulInstallNote />
 
-						{soulMissing && (
+						{soulOffer && (
 							<section>
 								<h4 className="font-medium">{t("hermes:soul.title")}</h4>
 								<p className="mt-1 text-muted-foreground">
@@ -675,11 +678,16 @@ export function SoulInstallNote() {
  * hermes may keep improving a skill is their call, not the panel's. Hidden
  * when the doctor says hermes is older than the command.
  */
-export function CuratorLockHint({ names }: { readonly names: readonly string[] }) {
+export function CuratorLockHint({
+	names,
+	checks,
+}: {
+	readonly names: readonly string[];
+	/** The doctor's conditions, of the status the card shows. */
+	readonly checks: readonly { name: string; ok: boolean }[];
+}) {
 	const { t } = useTranslation(["hermes"]);
-	const tooOld = useHermesStore((s) =>
-		s.status?.readiness.checks.some((c) => c.name === "version" && !c.ok),
-	);
+	const tooOld = checks.some((c) => c.name === "version" && !c.ok);
 	if (names.length === 0 || tooOld) return null;
 	return (
 		<div className="mx-4 mt-1 text-xs text-muted-foreground">

@@ -35,6 +35,16 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
+from design_to_code.budget import read_usage
+from offline_policy import is_local_provider, local_endpoint
+from services import design_to_code_edit_calls as edit_calls
+from services.design_to_code_providers import (
+    cloud_refusal,
+    guard_cloud,
+    missing_credentials,
+    normalize_provider,
+    provider_key,
+)
 from services.design_to_code_stacks import (
     STACKS,
     build_visual_test,
@@ -49,6 +59,9 @@ logger = logging.getLogger(__name__)
 
 # Constants
 CONTENT_TYPE_JSON = "application/json"
+#: The models of the OpenAI and Gemini vision calls (Gemini's can be set).
+OPENAI_VISION_MODEL = "gpt-4o"
+GOOGLE_VISION_MODEL = "gemini-1.5-flash"
 DEFAULT_FONT_FAMILY = "Inter, sans-serif"
 
 
@@ -310,11 +323,11 @@ class DesignTokenExtractor:
                 self._parse_json_tokens(content)
             elif suffix in (".css", ".scss"):
                 self._parse_css_tokens(content)
-            elif suffix in (".js", ".ts"):
+            else:  # .js / .ts theme configs, the only other supported files
                 self._parse_js_tokens(content)
 
             logger.debug(f"Parsed tokens from {filepath}")
-        except Exception as e:
+        except (OSError, UnicodeDecodeError, RecursionError) as e:
             logger.warning(f"Could not parse token file {filepath}: {e}")
 
     def _parse_json_tokens(self, content: str) -> None:
@@ -546,6 +559,8 @@ class DesignToCodeService:
         self.progress_callbacks: list[Callable[..., None]] = []
         # Set when a canned example answered instead of a model.
         self._simulated = False
+        # The tokens the last vision call's provider reported (render loop budget).
+        self.last_usage: Any = None
 
         # Configuration (direct API calls only; the one-shot trunk and the
         # Claude subscription route use the user's own model choice).
@@ -574,8 +589,8 @@ class DesignToCodeService:
         for cb in self.phase_callbacks:
             try:
                 cb(phase, status)
-            except Exception:
-                pass
+            except (OSError, TypeError, ValueError):
+                logger.debug("design-to-code phase callback raised", exc_info=True)
         for cb in self.progress_callbacks:
             try:
                 cb(phase, status, detail or {})
@@ -701,7 +716,7 @@ class DesignToCodeService:
             if figma_file_key:
                 self._set_phase(PipelinePhase.FIGMA_SYNC, "Syncing with Figma...")
                 sync_status = await self._sync_figma(
-                    figma_file_key, figma_node_id, generated_files
+                    figma_file_key, figma_node_id, generated_files, fw
                 )
                 result.figma_sync_status = sync_status
 
@@ -805,72 +820,101 @@ Return ONLY the JSON, no additional text."""
         # Parse the JSON response
         return self._parse_design_analysis(raw_analysis)
 
-    def _resolve_active_provider(self) -> str:
-        """Resolve the user's selected provider (empty string if unknown)."""
-        try:
-            from core.client import _get_active_provider
+    def _selected_provider(self) -> tuple[str, bool]:
+        """The provider selected for this run, and whether anybody chose it.
 
-            return (_get_active_provider() or "").lower().strip()
-        except Exception:  # noqa: BLE001
-            return ""
+        ``chosen`` is False only for the fallback default nobody named
+        (``core.client._resolve_active_provider``).
+        """
+        from core.client import _resolve_active_provider
+
+        provider, chosen = _resolve_active_provider()
+        return normalize_provider(provider), chosen
+
+    def _guard_cloud(self) -> None:
+        """Refuse a cloud call when the project is under strict offline mode."""
+        guard_cloud(self.project_path)
 
     async def _call_vision_ai(self, image_data: str, prompt: str) -> str:
-        """Analyze the design image with the active provider's vision model.
+        """Analyze the design image with the provider the person chose, and only it.
 
-        Honors the user's selected provider when it is vision-capable (Claude,
-        OpenAI/Copilot, Google Gemini), then falls back to any available
-        vision-capable key. Provider-agnostic — not hard-wired to Claude.
+        Claude (API key, else the Claude Code sign-in), OpenAI, Google Gemini or
+        a model on this machine. A chosen provider that is not configured is an
+        error naming it: no other provider's key is tried in its place. Under
+        strict offline mode only a local model is called.
         """
-        provider = self._resolve_active_provider()
-        anthropic_key = os.getenv("ANTHROPIC_API_KEY")
-        openai_key = os.getenv("OPENAI_API_KEY")
-        google_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
-
-        # provider alias -> (api key, vision handler)
+        provider, chosen = self._selected_provider()
+        local = is_local_provider(provider)
+        if not local:
+            self._guard_cloud()
+        key = provider_key(provider)
         handlers = {
-            "claude": (anthropic_key, self._call_claude_vision),
-            "anthropic": (anthropic_key, self._call_claude_vision),
-            "openai": (openai_key, self._call_openai_vision),
-            "copilot": (openai_key, self._call_openai_vision),
-            "google": (google_key, self._call_gemini_vision),
-            "gemini": (google_key, self._call_gemini_vision),
+            "claude": self._call_claude_vision,
+            "openai": self._call_openai_vision,
+            "google": self._call_gemini_vision,
         }
+        handler = handlers.get(provider)
 
         try:
-            # 1) Honor the selected provider when it's vision-capable + keyed.
-            selected = handlers.get(provider)
-            if selected and selected[0]:
-                return await selected[1](selected[0], image_data, prompt)
-
-            # 2) Claude through the user's subscription (Claude Code sign-in):
-            #    no API key, the image goes to the CLI as a message block.
-            if provider in ("", "claude", "anthropic") and _claude_signed_in():
+            if local:
+                return await self._call_local_vision(provider, image_data, prompt)
+            if handler and key:
+                return await handler(key, image_data, prompt)
+            # Claude through the user's subscription (Claude Code sign-in):
+            # no API key, the image goes to the CLI as a message block.
+            if provider == "claude" and _claude_signed_in():
                 return await self._call_claude_subscription_vision(image_data, prompt)
-
-            # 3) Fall back to any available vision-capable provider.
-            if anthropic_key:
-                return await self._call_claude_vision(anthropic_key, image_data, prompt)
-            if openai_key:
-                return await self._call_openai_vision(openai_key, image_data, prompt)
-            if google_key:
-                return await self._call_gemini_vision(google_key, image_data, prompt)
-
-            logger.warning(
-                "No vision-capable provider configured (provider=%s). Using mock analysis.",
-                provider or "unknown",
-            )
-            self._simulated = True
-            return self._mock_vision_analysis()
-
         except Exception as e:
             logger.error(f"Vision AI call failed: {e}")
-            raise RuntimeError(f"Vision AI analysis failed: {e}")
+            raise RuntimeError(f"Vision AI analysis failed: {e}") from e
+
+        if chosen:
+            raise RuntimeError(missing_credentials(provider, "vision analysis"))
+        logger.warning("No vision model configured. Using mock analysis.")
+        self._simulated = True
+        return self._mock_vision_analysis()
+
+    async def _call_local_vision(
+        self, provider: str, image_data: str, prompt: str, *, forced: bool = False
+    ) -> str:
+        """Ask the model running on this machine (Ollama, LM Studio, llama.cpp).
+
+        All three serve the OpenAI-compatible chat route. The endpoint comes
+        from ``offline_policy.local_endpoint``, which only answers a loopback
+        address, and the request never goes through a proxy. ``forced``
+        constrains the answer to the render loop's edits schema.
+        """
+        import httpx
+        from core.oneshot import _resolve_model
+
+        base_url = local_endpoint(provider)
+        async with httpx.AsyncClient(timeout=300, trust_env=False) as client:
+            response = await client.post(
+                f"{base_url}/v1/chat/completions",
+                headers={"Content-Type": CONTENT_TYPE_JSON},
+                json={
+                    "model": _resolve_model(provider, None, None),
+                    "max_tokens": 4096,
+                    "messages": _openai_vision_messages(prompt, image_data),
+                    **(edit_calls.local_fields() if forced else {}),
+                },
+            )
+            response.raise_for_status()
+            data = response.json()
+            if forced:
+                return edit_calls.openai_answer(data)
+            return data["choices"][0]["message"]["content"]
 
     async def _call_claude_vision(
-        self, api_key: str, image_data: str, prompt: str
+        self, api_key: str, image_data: str, prompt: str, *, forced: bool = False
     ) -> str:
-        """Call Claude Vision API for image analysis."""
+        """Call Claude Vision API for image analysis.
+
+        ``forced``: the answer is the call of the edits' tool (``tool_choice``).
+        """
         import httpx
+
+        self._guard_cloud()
 
         # Extract base64 and media type from data URI
         if image_data.startswith("data:"):
@@ -908,10 +952,14 @@ Return ONLY the JSON, no additional text."""
                             ],
                         }
                     ],
+                    **(edit_calls.anthropic_fields() if forced else {}),
                 },
             )
             response.raise_for_status()
             data = response.json()
+            self.last_usage = read_usage(data)
+            if forced:
+                return edit_calls.anthropic_answer(data)
             return data["content"][0]["text"]
 
     async def _call_claude_subscription_vision(
@@ -963,6 +1011,8 @@ Return ONLY the JSON, no additional text."""
         async with client:
             await client.query(_message())
             async for msg in client.receive_response():
+                if hasattr(msg, "total_cost_usd"):  # the closing ResultMessage
+                    self.last_usage = read_usage(getattr(msg, "usage", None))
                 for block in getattr(msg, "content", None) or []:
                     text = getattr(block, "text", None)
                     if isinstance(text, str):
@@ -973,11 +1023,15 @@ Return ONLY the JSON, no additional text."""
         return answer
 
     async def _call_openai_vision(
-        self, api_key: str, image_data: str, prompt: str
+        self, api_key: str, image_data: str, prompt: str, *, forced: bool = False
     ) -> str:
-        """Call OpenAI GPT-4o Vision API for image analysis."""
+        """Call OpenAI GPT-4o Vision API for image analysis.
+
+        ``forced``: the answer is the call of the edits' function.
+        """
         import httpx
 
+        self._guard_cloud()
         async with httpx.AsyncClient(timeout=120) as client:
             response = await client.post(
                 "https://api.openai.com/v1/chat/completions",
@@ -986,31 +1040,29 @@ Return ONLY the JSON, no additional text."""
                     "Content-Type": CONTENT_TYPE_JSON,
                 },
                 json={
-                    "model": "gpt-4o",
+                    "model": OPENAI_VISION_MODEL,
                     "max_tokens": 4096,
-                    "messages": [
-                        {
-                            "role": "user",
-                            "content": [
-                                {"type": "text", "text": prompt},
-                                {
-                                    "type": "image_url",
-                                    "image_url": {"url": image_data, "detail": "high"},
-                                },
-                            ],
-                        }
-                    ],
+                    "messages": _openai_vision_messages(prompt, image_data),
+                    **(edit_calls.openai_fields() if forced else {}),
                 },
             )
             response.raise_for_status()
             data = response.json()
+            self.last_usage = read_usage(data)
+            if forced:
+                return edit_calls.openai_answer(data)
             return data["choices"][0]["message"]["content"]
 
     async def _call_gemini_vision(
-        self, api_key: str, image_data: str, prompt: str
+        self, api_key: str, image_data: str, prompt: str, *, forced: bool = False
     ) -> str:
-        """Call Google Gemini Vision for image analysis."""
+        """Call Google Gemini Vision for image analysis.
+
+        ``forced``: the answer is the call of the edits' function (mode ``ANY``).
+        """
         import httpx
+
+        self._guard_cloud()
 
         # Extract base64 + media type from a data URI (or assume PNG).
         if image_data.startswith("data:"):
@@ -1021,12 +1073,13 @@ Return ONLY the JSON, no additional text."""
             media_type = "image/png"
             b64_data = image_data
 
-        model = os.getenv("DESIGN_TO_CODE_VISION_MODEL_GOOGLE", "gemini-1.5-flash")
+        model = os.getenv("DESIGN_TO_CODE_VISION_MODEL_GOOGLE", GOOGLE_VISION_MODEL)
         async with httpx.AsyncClient(timeout=120) as client:
             response = await client.post(
                 f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
-                headers={"Content-Type": CONTENT_TYPE_JSON},
-                params={"key": api_key},
+                # The key goes in its header: a URL ends up in error messages
+                # and proxy logs.
+                headers={"Content-Type": CONTENT_TYPE_JSON, "x-goog-api-key": api_key},
                 json={
                     "contents": [
                         {
@@ -1040,11 +1093,15 @@ Return ONLY the JSON, no additional text."""
                                 },
                             ]
                         }
-                    ]
+                    ],
+                    **(edit_calls.gemini_fields() if forced else {}),
                 },
             )
             response.raise_for_status()
             data = response.json()
+            self.last_usage = read_usage(data)
+            if forced:
+                return edit_calls.gemini_answer(data)
             return data["candidates"][0]["content"]["parts"][0]["text"]
 
     def _mock_vision_analysis(self) -> str:
@@ -1174,10 +1231,13 @@ Return ONLY the JSON, no additional text."""
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse design analysis JSON: {e}")
             return DesignSpec(raw_analysis=raw_json)
+        if not isinstance(data, dict):
+            logger.error("Design analysis is not a JSON object")
+            return DesignSpec(raw_analysis=raw_json)
 
         # Parse components
         components = []
-        for comp_data in data.get("components", []):
+        for comp_data in _objects(data.get("components")):
             comp = ComponentSpec(
                 name=comp_data.get("name", "Unknown"),
                 type=comp_data.get("type", "div"),
@@ -1189,7 +1249,7 @@ Return ONLY the JSON, no additional text."""
                 bounds=_parse_bounds(comp_data.get("bounds")),
             )
             # Parse nested children
-            for child_data in comp_data.get("children", []):
+            for child_data in _objects(comp_data.get("children")):
                 child = ComponentSpec(
                     name=child_data.get("name", "Unknown"),
                     type=child_data.get("type", "div"),
@@ -1203,7 +1263,9 @@ Return ONLY the JSON, no additional text."""
             components.append(comp)
 
         # Parse layout
-        layout_data = data.get("layout", {})
+        layout_data = data.get("layout")
+        if not isinstance(layout_data, dict):
+            layout_data = {}
         layout = LayoutSpec(
             type=layout_data.get("type", "flex"),
             direction=layout_data.get("direction", "column"),
@@ -1366,8 +1428,10 @@ Return ONLY the JSON array."""
         """Generate code via the user's active provider (any LLM).
 
         Routes through the shared provider-agnostic one-shot trunk so the
-        selected provider (Claude, OpenAI, Copilot, Gemini, Ollama, …) is used;
-        falls back to a direct API call only if the trunk can't resolve.
+        selected provider (Claude, OpenAI, Copilot, Gemini, Ollama, …) is used,
+        under the project's offline policy. When the trunk gives nothing, a
+        direct API call is made to that same provider only (Claude, OpenAI):
+        never to another provider, and never to the cloud under strict offline.
         """
         try:
             from core.oneshot import oneshot_completion
@@ -1383,57 +1447,75 @@ Return ONLY the JSON array."""
                 f"One-shot code-gen failed ({e}); using direct-API fallback."
             )
 
-        # Legacy direct-API fallback (Anthropic → OpenAI → mock).
-        try:
-            import httpx
+        provider, chosen = self._selected_provider()
+        if is_local_provider(provider):
+            raise RuntimeError(
+                f"Code generation with {provider}, the local model selected, "
+                "returned nothing."
+            )
+        self._guard_cloud()
+        direct = {
+            "claude": self._generate_with_claude,
+            "openai": self._generate_with_openai,
+        }.get(provider)
+        key = provider_key(provider)
+        if direct and key:
+            try:
+                return await direct(key, prompt)
+            except Exception as e:
+                logger.error(f"Code generation AI call failed: {e}")
+                raise RuntimeError(f"Code generation failed: {e}") from e
 
-            anthropic_key = os.getenv("ANTHROPIC_API_KEY")
-            if anthropic_key:
-                async with httpx.AsyncClient(timeout=120) as client:
-                    response = await client.post(
-                        "https://api.anthropic.com/v1/messages",
-                        headers={
-                            "x-api-key": anthropic_key,
-                            "anthropic-version": "2023-06-01",
-                            "content-type": CONTENT_TYPE_JSON,
-                        },
-                        json={
-                            "model": self.code_model,
-                            "max_tokens": 8192,
-                            "messages": [{"role": "user", "content": prompt}],
-                        },
-                    )
-                    response.raise_for_status()
-                    data = response.json()
-                    return data["content"][0]["text"]
+        if chosen:
+            raise RuntimeError(missing_credentials(provider, "code generation"))
+        logger.warning("No model configured for code generation. Using mock response.")
+        self._simulated = True
+        return self._mock_code_generation()
 
-            openai_key = os.getenv("OPENAI_API_KEY")
-            if openai_key:
-                async with httpx.AsyncClient(timeout=120) as client:
-                    response = await client.post(
-                        "https://api.openai.com/v1/chat/completions",
-                        headers={
-                            "Authorization": f"Bearer {openai_key}",
-                            "Content-Type": CONTENT_TYPE_JSON,
-                        },
-                        json={
-                            "model": "gpt-4o",
-                            "max_tokens": 8192,
-                            "messages": [{"role": "user", "content": prompt}],
-                        },
-                    )
-                    response.raise_for_status()
-                    data = response.json()
-                    return data["choices"][0]["message"]["content"]
+    async def _generate_with_claude(self, api_key: str, prompt: str) -> str:
+        """Direct Anthropic API call, with the Anthropic key only."""
+        import httpx
 
-            # Mock response for development
-            logger.warning("No API key found for code generation. Using mock response.")
-            self._simulated = True
-            return self._mock_code_generation()
+        self._guard_cloud()
+        async with httpx.AsyncClient(timeout=120) as client:
+            response = await client.post(
+                "https://api.anthropic.com/v1/messages",
+                headers={
+                    "x-api-key": api_key,
+                    "anthropic-version": "2023-06-01",
+                    "content-type": CONTENT_TYPE_JSON,
+                },
+                json={
+                    "model": self.code_model,
+                    "max_tokens": 8192,
+                    "messages": [{"role": "user", "content": prompt}],
+                },
+            )
+            response.raise_for_status()
+            data = response.json()
+            return data["content"][0]["text"]
 
-        except Exception as e:
-            logger.error(f"Code generation AI call failed: {e}")
-            raise RuntimeError(f"Code generation failed: {e}")
+    async def _generate_with_openai(self, api_key: str, prompt: str) -> str:
+        """Direct OpenAI API call, with the OpenAI key only."""
+        import httpx
+
+        self._guard_cloud()
+        async with httpx.AsyncClient(timeout=120) as client:
+            response = await client.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": CONTENT_TYPE_JSON,
+                },
+                json={
+                    "model": "gpt-4o",
+                    "max_tokens": 8192,
+                    "messages": [{"role": "user", "content": prompt}],
+                },
+            )
+            response.raise_for_status()
+            data = response.json()
+            return data["choices"][0]["message"]["content"]
 
     def _mock_code_generation(self) -> str:
         """Return mock generated code for development/testing."""
@@ -1589,6 +1671,8 @@ export default DesignComponent;
             files_data = json.loads(cleaned)
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse generated files JSON: {e}")
+            files_data = None
+        if not isinstance(files_data, list):
             return [
                 GeneratedFile(
                     path="generated_output.txt",
@@ -1599,7 +1683,7 @@ export default DesignComponent;
             ]
 
         files = []
-        for fd in files_data:
+        for fd in _objects(files_data):
             files.append(
                 GeneratedFile(
                     path=fd.get("path", "unknown"),
@@ -1619,8 +1703,15 @@ export default DesignComponent;
         file_key: str,
         node_id: str | None,
         generated_files: list[GeneratedFile],
+        framework: FrameworkType = FrameworkType.REACT,
     ) -> dict[str, Any]:
-        """Sync generated code metadata back to Figma (bidirectional)."""
+        """Sync generated code metadata back to Figma (bidirectional).
+
+        Figma is a cloud service: under strict offline mode nothing is sent.
+        """
+        refusal = cloud_refusal(self.project_path)
+        if refusal:
+            return {"status": "skipped", "reason": refusal}
         try:
             from src.connectors.figma_connector import FigmaConnector
 
@@ -1630,13 +1721,18 @@ export default DesignComponent;
 
             connector = FigmaConnector(access_token=figma_token)
 
-            # Post a comment on the Figma node with the generated code info
-            component_names = []
+            # Post a comment on the Figma node with the generated code info:
+            # the components as the stack names them (Dart, Swift, XAML…).
+            stack = get_stack(framework.value)
+            component_names: list[str] = []
             for gf in generated_files:
-                if gf.language in ("tsx", "jsx", "vue", "svelte"):
-                    name = Path(gf.path).stem
-                    if name not in ("index", "styles", "types"):
-                        component_names.append(name)
+                name = (
+                    component_name(gf.path)
+                    if is_component_file(stack, gf.path, gf.language)
+                    else None
+                )
+                if name and name not in component_names:
+                    component_names.append(name)
 
             comment = (
                 f"🤖 Code generated by WorkPilot Design-to-Code Pipeline\n\n"
@@ -1665,6 +1761,13 @@ export default DesignComponent;
 # =============================================================================
 
 
+def _objects(raw: Any) -> list[dict[str, Any]]:
+    """The JSON objects of a list a model answered; anything else is dropped."""
+    if not isinstance(raw, list):
+        return []
+    return [item for item in raw if isinstance(item, dict)]
+
+
 def _parse_bounds(raw: Any) -> dict[str, float] | None:
     """``{"x","y","w","h"}`` clamped to the image, or ``None`` when unusable."""
     if not isinstance(raw, dict):
@@ -1679,6 +1782,22 @@ def _parse_bounds(raw: Any) -> dict[str, float] | None:
     box["w"] = min(box["w"], 1 - box["x"])
     box["h"] = min(box["h"], 1 - box["y"])
     return box
+
+
+def _openai_vision_messages(prompt: str, image_data: str) -> list[dict[str, Any]]:
+    """The prompt and the image in the OpenAI chat format (cloud and local servers)."""
+    return [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": prompt},
+                {
+                    "type": "image_url",
+                    "image_url": {"url": image_data, "detail": "high"},
+                },
+            ],
+        }
+    ]
 
 
 def _claude_signed_in() -> bool:

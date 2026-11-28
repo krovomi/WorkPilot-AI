@@ -46,15 +46,26 @@ import os
 import sys
 from pathlib import Path
 
-# Fix Windows console encoding for Unicode output (emojis, special chars)
-if sys.platform == "win32":
-    if hasattr(sys.stdout, "reconfigure"):
-        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-    if hasattr(sys.stderr, "reconfigure"):
-        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
-
 # Add backend to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
+from foundation.platform import is_windows
+
+
+def use_utf8_console() -> None:
+    """Write UTF-8 on a Windows console, whose code page cannot print every title.
+
+    Issue and PR titles carry emoji and accents; the legacy code page of a
+    Windows console raises on them. Other platforms already write UTF-8.
+    """
+    if not is_windows():
+        return
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
+
+
+use_utf8_console()
 
 # Validate platform-specific dependencies BEFORE any imports that might
 # trigger a pywintypes import (the MCP library imports win32api; ACS-253)
@@ -67,9 +78,8 @@ from cli.utils import import_dotenv
 
 load_dotenv = import_dotenv()
 
-env_file = Path(__file__).parent.parent.parent / ".env"
-if env_file.exists():
-    load_dotenv(env_file)
+# A missing file loads nothing.
+load_dotenv(Path(__file__).parent.parent.parent / ".env")
 
 # Initialize Sentry early to capture any startup errors
 from core.sentry import capture_exception, init_sentry, set_context
@@ -82,9 +92,9 @@ from foundation.debug import debug_error
 sys.path.insert(0, str(Path(__file__).parent))
 
 # Now import models and orchestrator directly (they use relative imports internally)
+from core.io_utils import safe_print
 from models import GitHubRunnerConfig
 from orchestrator import GitHubOrchestrator, ProgressCallback
-from services.io_utils import safe_print
 
 
 def print_progress(callback: ProgressCallback) -> None:
@@ -414,8 +424,10 @@ async def cmd_check_labels(args) -> int:
 
     if issues:
         safe_print(f"Found {len(issues)} issues with auto-fix labels:")
-        for num in issues:
-            safe_print(f"  #{num}")
+        for issue in issues:
+            safe_print(
+                f"  #{issue['issue_number']} ({issue['trigger_label']}) {issue['title']}"
+            )
     else:
         safe_print("No issues with auto-fix labels found.")
 
@@ -815,10 +827,8 @@ def main():
         "approve-batches": cmd_approve_batches,
     }
 
-    handler = commands.get(args.command)
-    if not handler:
-        safe_print(f"Unknown command: {args.command}")
-        sys.exit(1)
+    # argparse has already refused any other command.
+    handler = commands[args.command]
 
     try:
         # Set context for Sentry

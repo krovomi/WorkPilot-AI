@@ -25,6 +25,15 @@ import {
 import { Input } from "../ui/input";
 import { NativeSelect } from "../ui/native-select";
 import { Switch } from "../ui/switch";
+import { DeployAlertSettings } from "./DeployAlertSettings";
+import { DeployFlagSettings } from "./DeployFlagSettings";
+import { DeployLinkSettings } from "./DeployLinkSettings";
+import { DeployWatchFigures } from "./DeployWatchFigures";
+import { DeployMonitorSettings } from "./DeployMonitorSettings";
+import { DeployWatchPanel, isWatchRunning } from "./DeployWatchPanel";
+
+/** How often the page reads the runs again while a deployment is watched. */
+const WATCH_REFRESH_MS = 30_000;
 const PROVIDERS: Exclude<CICDProvider, "">[] = [
 	"github",
 	"gitlab",
@@ -55,8 +64,17 @@ export function CICDTriggersDashboard(): React.ReactElement {
 		setConfig,
 		loadRuns,
 		triggerPipeline,
+		rollback,
+		rollingBack,
 		clearError,
+		links,
+		loadLinks,
+		saveLinks,
+		figures,
+		loadFigures,
+		reviewVerdict,
 	} = useCICDTriggersStore();
+	const linkedNames = (links?.linked ?? []).map((p) => p.name);
 
 	const [branch, setBranch] = useState("");
 	const [prUrl, setPrUrl] = useState("");
@@ -65,9 +83,18 @@ export function CICDTriggersDashboard(): React.ReactElement {
 		if (!projectPath) return;
 		loadConfig(projectPath);
 		loadRuns(projectPath);
-	}, [projectPath, loadConfig, loadRuns]);
+		loadLinks(projectPath);
+		loadFigures(projectPath);
+	}, [projectPath, loadConfig, loadRuns, loadLinks, loadFigures]);
 
 	const provider = config?.provider ?? "";
+	const watching = runs.some((run) => isWatchRunning(run.watch));
+
+	useEffect(() => {
+		if (!projectPath || !watching) return;
+		const timer = setInterval(() => loadRuns(projectPath), WATCH_REFRESH_MS);
+		return () => clearInterval(timer);
+	}, [projectPath, watching, loadRuns]);
 
 	function handleTrigger() {
 		if (!projectPath || !provider) return;
@@ -159,7 +186,28 @@ export function CICDTriggersDashboard(): React.ReactElement {
 										/>
 									</label>
 								))}
+								<DeployMonitorSettings
+									config={config}
+									onSave={(update) => projectPath && setConfig(projectPath, update)}
+								/>
+								<DeployFlagSettings
+									config={config}
+									onSave={(update) => projectPath && setConfig(projectPath, update)}
+								/>
+								<DeployAlertSettings
+									config={config}
+									onSave={(update) => projectPath && setConfig(projectPath, update)}
+								/>
+								<DeployLinkSettings
+									links={links}
+									onSave={(ids) => projectPath && saveLinks(projectPath, ids)}
+								/>
 							</Panel>
+							{figures && figures.watches > 0 && (
+								<Panel>
+									<DeployWatchFigures figures={figures} />
+								</Panel>
+							)}
 						</Column>
 
 						<Column
@@ -214,6 +262,18 @@ export function CICDTriggersDashboard(): React.ReactElement {
 											)}
 											{run.error && (
 												<div className="mt-1 text-xs text-destructive">{run.error}</div>
+											)}
+											{run.watch && (
+												<DeployWatchPanel
+													watch={run.watch}
+													busy={rollingBack === run.id}
+													onRollback={() => projectPath && rollback(projectPath, run.id)}
+													linkedNames={linkedNames}
+													onReview={(review) =>
+														projectPath && reviewVerdict(projectPath, run.id, review)
+													}
+													taskId={run.task_id}
+												/>
 											)}
 										</Panel>
 									))}

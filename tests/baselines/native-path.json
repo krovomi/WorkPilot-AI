@@ -1,0 +1,17 @@
+{
+  "apps/backend/codex_models.py": 1,
+  "apps/backend/core/agent_clients/cli_subprocess.py": 1,
+  "apps/backend/core/codex_cli_client.py": 1,
+  "apps/backend/core/runtimes/tool_executor.py": 1,
+  "apps/backend/core/workspace/workspace_setup.py": 1,
+  "apps/backend/i18n_scaler/editor.py": 1,
+  "apps/backend/onboarding_agent/onboarding_engine.py": 1,
+  "apps/backend/qa/loop.py": 1,
+  "apps/backend/runners/api_watcher_runner.py": 1,
+  "apps/backend/runners/auto_refactor_runner.py": 1,
+  "apps/backend/runners/injection_guard_runner.py": 1,
+  "apps/backend/server/services/project_jobs.py": 1,
+  "apps/backend/tech_debt/scanner.py": 6,
+  "apps/backend/test_generation/api.py": 1,
+  "apps/backend/verify/window.py": 1
+}

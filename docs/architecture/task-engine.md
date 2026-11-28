@@ -1,3 +1,10 @@
+---
+feature: Moteur de tâche et LLM de page
+summary: >-
+  Une tâche possède son provider × LLM × effort par phase ; une page résout le sien par
+  `page-llm.ts`.
+---
+
 # Le moteur d'une tâche et le LLM d'une page
 
 > Design rationale moved verbatim out of [`docs/CLAUDE.md`](../CLAUDE.md),

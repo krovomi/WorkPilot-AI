@@ -20,6 +20,7 @@ import type {
 } from "../shared/types";
 import { CARD_EDIT_CONFLICT } from "../shared/types/team-room";
 import { getRemoteTasks, parseServerTaskId } from "./remote-board";
+import { approvalOutcome } from "./server-approval";
 import { serverImageUploads } from "./server-card-images";
 import { patchServerCardSettings, settingsFromMetadata } from "./server-card-settings";
 import { authedFetch } from "./server-connection";
@@ -224,7 +225,8 @@ export async function startRun(
  * Start a card's work on the server, as the app's Start does locally: a card
  * without a spec gets one (and its build when it asks for no review); a card
  * with a spec is built or resumed, and when it asks for a review, starting it
- * is this person approving the spec as it now stands (the server records who).
+ * is this person approving the spec as it now stands (the server records who);
+ * the build starts once the card has every approval its criticality needs.
  */
 export async function startServerCard(card: ServerCard): Promise<IPCResult> {
 	const current = await reread(card);
@@ -237,6 +239,9 @@ export async function startServerCard(card: ServerCard): Promise<IPCResult> {
 			"POST",
 		);
 		if (!approval.ok) return { success: false, error: approval.error };
+		// A card that needs more approvals than this one waits for them.
+		const outcome = approvalOutcome(approval.data);
+		if (!outcome.success) return outcome;
 	}
 	return startRun(card, "build");
 }

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useShallow } from "zustand/react/shallow";
 import type {
 	NewCommitsCheck,
 	PRData,
@@ -88,8 +89,9 @@ export function useGitHubPRs(
 
 	// Track previous isActive state to detect tab navigation
 	const wasActiveRef = useRef(isActive);
-	// Track if initial load has happened
-	const hasLoadedRef = useRef(false);
+	// The project whose PRs were loaded: a project switch loads the new one
+	// (the view stays mounted, hidden, across projects).
+	const loadedForRef = useRef<string | null>(null);
 	// Track the current PR being fetched (for race condition prevention)
 	const currentFetchPRNumberRef = useRef<number | null>(null);
 	// AbortController for cancelling pending checkNewCommits calls on rapid PR switching
@@ -100,20 +102,18 @@ export function useGitHubPRs(
 	const fetchGenerationRef = useRef(0);
 
 	// Get PR review state from the global store
-	const _prReviews = usePRReviewStore((state) => state.prReviews);
 	const getPRReviewState = usePRReviewStore((state) => state.getPRReviewState);
-	const getActivePRReviews = usePRReviewStore(
-		(state) => state.getActivePRReviews,
-	);
 	const setNewCommitsCheckAction = usePRReviewStore(
 		(state) => state.setNewCommitsCheck,
 	);
 
-	// Get review state for the selected PR from the store
-	const selectedPRReviewState = useMemo(() => {
-		if (!projectId || selectedPRNumber === null) return null;
-		return getPRReviewState(projectId, selectedPRNumber);
-	}, [projectId, selectedPRNumber, getPRReviewState]);
+	// Selected from the store, not memoised over its getters: the getters never
+	// change, so a memo over them froze the review panel on its first value.
+	const selectedPRReviewState = usePRReviewStore((state) =>
+		projectId && selectedPRNumber !== null
+			? state.getPRReviewState(projectId, selectedPRNumber)
+			: null,
+	);
 
 	// Derive values from store state - all from the same source to ensure consistency
 	const reviewResult = selectedPRReviewState?.result ?? null;
@@ -123,10 +123,13 @@ export function useGitHubPRs(
 	const startedAt = selectedPRReviewState?.startedAt ?? null;
 
 	// Get list of PR numbers currently being reviewed
-	const activePRReviews = useMemo(() => {
-		if (!projectId) return [];
-		return getActivePRReviews(projectId).map((review) => review.prNumber);
-	}, [projectId, getActivePRReviews]);
+	const activePRReviews = usePRReviewStore(
+		useShallow((state) =>
+			projectId
+				? state.getActivePRReviews(projectId).map((review) => review.prNumber)
+				: [],
+		),
+	);
 
 	// Helper to get review state for any PR
 	const getReviewStateForPR = useCallback(
@@ -173,6 +176,9 @@ export function useGitHubPRs(
 			// First check connection
 			const connectionResult =
 				await window.electronAPI.github.checkGitHubConnection(projectId);
+			// The project changed while GitHub answered: this answer is the
+			// previous project's repository and pull requests.
+			if (currentProjectIdRef.current !== projectId) return;
 			if (connectionResult.success && connectionResult.data) {
 				setIsConnected(connectionResult.data.connected);
 				setRepoFullName(connectionResult.data.repoFullName || null);
@@ -180,6 +186,7 @@ export function useGitHubPRs(
 				if (connectionResult.data.connected) {
 					// Fetch PRs (returns up to 100 open PRs at once - GitHub GraphQL limit)
 					const result = await window.electronAPI.github.listPRs(projectId);
+					if (currentProjectIdRef.current !== projectId) return;
 					if (result) {
 						// Use hasNextPage from API to determine if more PRs exist
 						setHasMore(result.hasNextPage);
@@ -224,17 +231,18 @@ export function useGitHubPRs(
 				setError(connectionResult.error || "Failed to check connection");
 			}
 		} catch (err) {
+			if (currentProjectIdRef.current !== projectId) return;
 			setError(err instanceof Error ? err.message : "Failed to fetch PRs");
 			setIsConnected(false);
 		} finally {
-			setIsLoading(false);
+			if (currentProjectIdRef.current === projectId) setIsLoading(false);
 		}
 	}, [projectId, getPRReviewState]);
 
 	// Initial load
 	useEffect(() => {
-		if (projectId && !hasLoadedRef.current) {
-			hasLoadedRef.current = true;
+		if (projectId && loadedForRef.current !== projectId) {
+			loadedForRef.current = projectId;
 			fetchPRs();
 		}
 	}, [projectId, fetchPRs]);
@@ -242,17 +250,19 @@ export function useGitHubPRs(
 	// Auto-refresh when tab becomes active (navigating to GitHub PRs tab)
 	useEffect(() => {
 		// Only refresh if transitioning from inactive to active AND we've loaded before
-		if (isActive && !wasActiveRef.current && hasLoadedRef.current) {
+		if (isActive && !wasActiveRef.current && loadedForRef.current === projectId) {
 			fetchPRs();
 		}
 		wasActiveRef.current = isActive;
-	}, [isActive, fetchPRs]);
+	}, [isActive, fetchPRs, projectId]);
 
 	// Reset state and selected PR when project changes
 	useEffect(() => {
 		currentProjectIdRef.current = projectId;
 		fetchGenerationRef.current += 1;
-		hasLoadedRef.current = false;
+		// The header names the repository: never the previous project's one.
+		setRepoFullName(null);
+		setError(null);
 		setHasMore(false);
 		setEndCursor(null);
 		setPrs([]);

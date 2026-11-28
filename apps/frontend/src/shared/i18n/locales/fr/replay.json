@@ -191,5 +191,166 @@
 	"viewerTabs": "Vues du replay",
 	"errors": {
 		"backendUnreachable": "Le backend local de WorkPilot n’a pas répondu. Démarrez-le (ou relancez l’application), puis actualisez."
+	},
+	"share": {
+		"button": "Partager",
+		"title": "Partager cette session",
+		"masked": "Les secrets, les jetons et vos dossiers locaux sont toujours masqués avant l'écriture du fichier.",
+		"options": {
+			"stripReasoning": "Retirer le raisonnement",
+			"stripReasoningHint": "Seules les actions sont partagées : les étapes de réflexion et le raisonnement sont retirés.",
+			"stripTokens": "Retirer les tokens et les coûts",
+			"stripTokensHint": "Le nombre de tokens et les coûts peuvent trahir le modèle utilisé.",
+			"includeFileContents": "Inclure le contenu des fichiers",
+			"includeFileContentsHint": "Les lignes de diff sont toujours gardées ; les fichiers entiers, avant et après, ne le sont que si vous les incluez."
+		},
+		"exportBundle": "Exporter en .wpreplay",
+		"exportPage": "Exporter une page (HTML)",
+		"import": "Importer un rejeu",
+		"exported": "Enregistré dans {{path}}",
+		"imported": "Session de {{name}} importée",
+		"dismiss": "Fermer",
+		"errors": {
+			"too_large": "Ce fichier est trop gros pour être un rejeu.",
+			"unreadable": "Ce fichier ne se lit pas comme un rejeu.",
+			"not_a_bundle": "Ce fichier n'est pas un rejeu WorkPilot.",
+			"unsupported_version": "Ce rejeu vient d'une version plus récente de WorkPilot.",
+			"not_a_file": "Choisissez un fichier, pas un dossier.",
+			"bad_export": "Le backend a produit un fichier inattendu : rien n'a été écrit.",
+			"generic": "Le rejeu n'a pas pu être partagé : {{error}}",
+			"bad_target": "Ce fichier ne peut pas être écrit à cet endroit : choisissez un autre nom ou un autre dossier.",
+			"video_busy": "Une vidéo est déjà en cours d'enregistrement. Attendez qu'elle se termine.",
+			"video_timeout": "L'enregistrement de la vidéo a pris trop de temps et a été arrêté.",
+			"video_too_large": "La vidéo est trop grosse pour être enregistrée.",
+			"video_failed": "Le navigateur n'a pas pu enregistrer la vidéo.",
+			"recording": "Cette session est encore en cours d'enregistrement.",
+			"has_thinking": "Cette session a son propre raisonnement : elle n'a pas besoin de résumé.",
+			"no_steps": "Cette session n'a aucune étape à résumer.",
+			"summary_failed": "Le modèle n'a pas pu être joint pour le résumé. Vérifiez la connexion au provider, puis réessayez.",
+			"summary_empty": "Le modèle a rendu un résumé vide. Réessayez.",
+			"not_a_link": "Ce n'est pas un lien de rejeu WorkPilot.",
+			"not_signed_in": "Connectez-vous à votre serveur WorkPilot pour ouvrir un lien d'équipe.",
+			"other_server": "Ce lien est pour un autre serveur WorkPilot que celui où vous êtes connecté.",
+			"not_a_server_project": "Ce projet n'est pas un projet de votre serveur WorkPilot.",
+			"too_large_to_share": "Cette session est trop lourde pour être laissée au serveur. Exportez-la en fichier, ou sans le contenu des fichiers.",
+			"bad_share": "Le serveur a répondu quelque chose d'inattendu : rien n'a été ouvert.",
+			"share_not_found": "Ce lien n'ouvre rien : il est peut-être mal copié, ou pour un autre projet.",
+			"share_expired": "Ce lien a expiré. Demandez-en un nouveau.",
+			"share_revoked": "Ce lien a été révoqué. Demandez-en un nouveau.",
+			"too_many_shares": "Ce projet a déjà autant de liens ouverts qu'il peut en garder. Révoquez-en un d'abord.",
+			"empty_reply": "Écrivez quelque chose avant d'envoyer une réponse.",
+			"too_many_replies": "Ce signet a déjà autant de réponses qu'il peut en garder.",
+			"bad_usage": "Les chiffres d'usage sont revenus sous une forme inattendue."
+		},
+		"video": {
+			"export": "Exporter une vidéo (WebM)",
+			"recording": "Enregistrement de la vidéo…",
+			"hint": "La vidéo est la même page masquée, jouée étape par étape dans un navigateur sans fenêtre sur cette machine. Elle dure deux minutes au plus.",
+			"saved": "Vidéo enregistrée dans {{path}}",
+			"savedPart": "Vidéo enregistrée dans {{path}} : elle joue {{played}} étapes sur {{total}}, la page les montre toutes.",
+			"refused": {
+				"no_playwright": "Une vidéo demande Playwright, que le backend de cette machine n'a pas. Installez-le avec les dépendances du backend, puis réessayez.",
+				"no_browser": "Une vidéo demande Chromium ou Chrome, et aucun n'a été trouvé sur cette machine. Installez-en un (par exemple avec « playwright install chromium »), puis réessayez.",
+				"no_encoder": "Une vidéo demande l'encodeur vidéo de Playwright, qui n'est pas installé. Lancez « playwright install ffmpeg », puis réessayez.",
+				"no_mp4_encoder": "Un MP4 demande ffmpeg sur cette machine, et aucun n'a été trouvé. Installez ffmpeg, ou exportez le WebM, qui n'en a pas besoin."
+			},
+			"exportMp4": "Exporter une vidéo (MP4)",
+			"exportCompare": "Vidéo côte à côte (WebM)",
+			"compareHint": "Les deux sessions, masquées, jouées étape par étape l'une à côté de l'autre.",
+			"exportCompareMp4": "Vidéo côte à côte (MP4)"
+		},
+		"team": {
+			"title": "Lien d'équipe",
+			"hint": "Laisse cette session masquée à un projet de votre serveur WorkPilot. Seuls les membres du projet peuvent ouvrir le lien, jusqu'à ce qu'il expire ou soit révoqué.",
+			"project": "Projet",
+			"ttl": "Durée",
+			"ttlOptions": {
+				"1": "1 jour",
+				"7": "7 jours",
+				"30": "30 jours"
+			},
+			"create": "Créer le lien",
+			"creating": "Création du lien…",
+			"link": "Lien à envoyer",
+			"linkOnce": "Le serveur ne montre ce lien qu'une fois : copiez-le maintenant.",
+			"copy": "Copier",
+			"copied": "Copié",
+			"listTitle": "Liens de ce projet",
+			"empty": "Aucun lien pour l'instant.",
+			"loading": "Chargement des liens…",
+			"byLine": "Par {{by}}, {{steps}} étapes",
+			"expires": "Fin le {{date}}",
+			"opened": "Ouvert {{count}} fois",
+			"revoke": "Révoquer",
+			"state": {
+				"active": "Ouvert",
+				"expired": "Expiré",
+				"revoked": "Révoqué"
+			}
+		},
+		"open": {
+			"button": "Ouvrir un lien d'équipe",
+			"title": "Ouvrir un lien d'équipe",
+			"description": "Collez un lien qu'un collègue vous a envoyé. La session vient du serveur WorkPilot où vous êtes connecté et s'ajoute à vos rejeux.",
+			"label": "Lien",
+			"submit": "Ouvrir",
+			"opening": "Ouverture…"
+		}
+	},
+	"bookmarks": {
+		"title": "Signets",
+		"note": "Note du signet",
+		"notePlaceholder": "Que doit regarder le lecteur ici ? (Markdown)",
+		"add": "Marquer l'étape {{step}}",
+		"step": "Étape {{step}}",
+		"remove": "Retirer le signet",
+		"empty": "Aucun signet pour l'instant.",
+		"recording": "Les signets s'ajoutent une fois l'enregistrement de la session terminé.",
+		"replies": "Réponses",
+		"reply": "Répondre",
+		"sendReply": "Envoyer",
+		"cancelReply": "Annuler",
+		"removeReply": "Retirer cette réponse",
+		"someone": "Quelqu'un"
+	},
+	"summary": {
+		"title": "Résumé des étapes",
+		"none": "Le modèle de cette session n'a laissé aucun raisonnement. Un modèle peut résumer les étapes en quelques lignes.",
+		"ask": "Résumer avec {{provider}}",
+		"again": "Résumer à nouveau avec {{provider}}",
+		"working": "Résumé en cours…",
+		"writtenBy": "Écrit par un modèle ({{model}}) à partir des étapes enregistrées, masquées comme pour un export.",
+		"recording": "Un résumé se demande une fois l'enregistrement de la session terminé.",
+		"noProvider": "Choisissez un provider par défaut dans les Réglages pour résumer les étapes."
+	},
+	"usage": {
+		"kicker": "Usage",
+		"title": "Comment vos rejeux sont partagés",
+		"none": "—",
+		"percent": "{{value}} %",
+		"weekOf": "Semaine du {{date}}",
+		"local": {
+			"perWeek": "Exports par semaine",
+			"exports": "Exports, {{weeks}} dernières semaines",
+			"annotated": "Sessions avec un signet",
+			"discussed": "Signets discutés",
+			"summarized": "Résumées par un modèle",
+			"imported": "Importées",
+			"weekCount_one": "{{count}} export",
+			"weekCount_other": "{{count}} exports",
+			"where": "Compté sur cet ordinateur, à partir de ses sessions et des fichiers, pages, vidéos et liens qu'il a produits. Rien n'est envoyé nulle part."
+		},
+		"team": {
+			"title": "Liens d'équipe de {{project}}",
+			"links": "Liens créés, {{days}} derniers jours",
+			"openRate": "Liens ouverts",
+			"opens": "Ouvertures",
+			"active": "Ouverts en ce moment",
+			"annotated": "Partagés avec un signet",
+			"sharers": "Personnes qui partagent",
+			"weekCount_one": "{{count}} lien",
+			"weekCount_other": "{{count}} liens",
+			"where": "Calculé par votre serveur WorkPilot pour ce projet seulement, en totaux : aucun titre, aucune personne, aucun lien. Rien n'est envoyé ailleurs."
+		}
 	}
 }

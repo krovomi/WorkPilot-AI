@@ -141,6 +141,18 @@ DEEPSEEK_MODEL = _DEEPSEEK_ENTRY.model_id if _DEEPSEEK_ENTRY else "deepseek-flas
 _GROK_ENTRY = get_default("grok")
 GROK_MODEL = _GROK_ENTRY.model_id if _GROK_ENTRY else "grok-4.3"
 
+# A gateway's default model: the one its provider page names (the frontend
+# injects it as OPENROUTER_MODEL / HUGGINGFACE_MODEL), else the registry's.
+_OPENROUTER_ENTRY = get_default("openrouter")
+OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "").strip() or (
+    _OPENROUTER_ENTRY.model_id if _OPENROUTER_ENTRY else "moonshotai/kimi-k3.1-pro"
+)
+
+_HUGGINGFACE_ENTRY = get_default("huggingface")
+HUGGINGFACE_MODEL = os.getenv("HUGGINGFACE_MODEL", "").strip() or (
+    _HUGGINGFACE_ENTRY.model_id if _HUGGINGFACE_ENTRY else "moonshotai/Kimi-K3.1-Pro"
+)
+
 #: The model id a CLI-backed provider (OpenCode, Antigravity) reads as "use
 #: the CLI's own default".
 CLI_DEFAULT_MODEL = "default"
@@ -200,6 +212,19 @@ PROVIDER_DEFAULT_MODELS: dict[str, dict[str, str]] = {
         "planning": GROK_MODEL,
         "coding": GROK_MODEL,
         "qa": GROK_MODEL,
+    },
+    # Gateways (gateway_providers.py)
+    "openrouter": {
+        "spec": OPENROUTER_MODEL,
+        "planning": OPENROUTER_MODEL,
+        "coding": OPENROUTER_MODEL,
+        "qa": OPENROUTER_MODEL,
+    },
+    "huggingface": {
+        "spec": HUGGINGFACE_MODEL,
+        "planning": HUGGINGFACE_MODEL,
+        "coding": HUGGINGFACE_MODEL,
+        "qa": HUGGINGFACE_MODEL,
     },
     # Meta (LLaMA)
     "meta": {
@@ -726,18 +751,28 @@ def get_phase_model(
     cli_model: str | None = None,
     cli_provider: str | None = None,
 ) -> str:
-    """The model of ``phase``, stepped down a tier when the carbon budget says so.
+    """The model of ``phase``, stepped down when a budget says so.
 
     A project whose monthly carbon budget is spent, with ``degrade`` on, runs
     its flagship models on the provider's standard one
-    (``carbon_profiler.budget``). Otherwise the model is the resolved one.
+    (``carbon_profiler.budget``). A task whose cost budget is past its warning
+    threshold, with ``degrade`` on, steps down one tier, two past the critical
+    one (``cost_budget``). Otherwise the model is the resolved one.
     """
     model = _resolve_phase_model(spec_dir, phase, cli_model, cli_provider)
     try:
         from carbon_profiler.budget import degraded_model
+        from cost_budget.degrade import budget_model
+        from cost_budget.guard import degrade_steps
     except ImportError:
         return model
-    return degraded_model(spec_dir, model, phase, _provider_standard_model)
+    model = degraded_model(spec_dir, model, phase, _provider_standard_model)
+    return budget_model(model, degrade_steps(spec_dir), phase, _provider_tier_model)
+
+
+def _provider_tier_model(provider: str, tier: str) -> str | None:
+    """The provider's own model for ``tier`` when its settings name one."""
+    return _provider_standard_model(provider) if tier == "standard" else None
 
 
 def _provider_standard_model(provider: str) -> str | None:

@@ -91,7 +91,12 @@ def _installed(root: str, model: str) -> str | None:
             f"{root}/api/tags", timeout=_PROBE_TIMEOUT_SECONDS
         ) as response:
             payload = json.loads(response.read().decode("utf-8", errors="replace"))
-        names = {str(m.get("name", "")) for m in payload.get("models") or []}
+        models = payload.get("models") if isinstance(payload, dict) else None
+        names = {
+            str(m.get("name", ""))
+            for m in (models if isinstance(models, list) else [])
+            if isinstance(m, dict)
+        }
         wanted = {model, f"{model}:latest"} if ":" not in model else {model}
         reason = None if names & wanted else "model-not-installed"
     except (OSError, ValueError, urllib.error.URLError):
@@ -121,13 +126,16 @@ class OllamaVisionEngine:
         return OcrOutcome(text=text, engine=self.name, described=True)
 
 
-def ask(image: Path, prompt: str, env: dict[str, str]) -> tuple[str, str]:
+def ask(
+    image: Path, prompt: str, env: dict[str, str], *, schema: dict | None = None
+) -> tuple[str, str]:
     """(answer, "") from the local vision model, or ("", reason). Never raises.
 
     The one request to the model, shared by the OCR chain and by anything else
     that needs a local reading of an image (`docintel/whiteboard.py`): the
     loopback rule, the proxy bypass and the refused redirects are decided here
-    once, not re-derived by each caller.
+    once, not re-derived by each caller. `schema`, a JSON schema, is sent as
+    Ollama's `format`: the answer is then JSON in that shape.
     """
     reason = OllamaVisionEngine().available(env)
     if reason:
@@ -136,15 +144,16 @@ def ask(image: Path, prompt: str, env: dict[str, str]) -> tuple[str, str]:
         encoded = base64.b64encode(image.read_bytes()).decode("ascii")
     except OSError:
         return "", "failed"
-    body = json.dumps(
-        {
-            "model": settings.vision_model(env),
-            "prompt": prompt,
-            "images": [encoded],
-            "stream": False,
-            "options": {"temperature": 0},
-        }
-    ).encode("utf-8")
+    fields: dict = {
+        "model": settings.vision_model(env),
+        "prompt": prompt,
+        "images": [encoded],
+        "stream": False,
+        "options": {"temperature": 0},
+    }
+    if schema is not None:
+        fields["format"] = schema
+    body = json.dumps(fields).encode("utf-8")
     request = urllib.request.Request(
         f"{ollama_root()}/api/generate",
         data=body,
@@ -159,5 +168,6 @@ def ask(image: Path, prompt: str, env: dict[str, str]) -> tuple[str, str]:
     except (OSError, ValueError, urllib.error.URLError):
         logger.debug("docintel: ollama vision failed on %s", image, exc_info=True)
         return "", "failed"
-    text = str(payload.get("response") or "").strip()
+    answer = payload.get("response") if isinstance(payload, dict) else None
+    text = str(answer or "").strip()
     return (text, "") if text else ("", "empty")

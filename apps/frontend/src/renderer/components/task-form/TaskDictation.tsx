@@ -8,9 +8,10 @@ import {
 	useState,
 } from "react";
 import { useTranslation } from "react-i18next";
+import { claimMicrophoneForForm } from "../../stores/voice-assistant-store";
 import { Button } from "../ui/button";
 import { Textarea } from "../ui/textarea";
-import { appendDictation, appendTranscript, undoDictation } from "./dictation";
+import { appendDictation, appendTranscript } from "./dictation";
 import { captureDictation } from "./dictation-audio";
 
 import { NativeSelect } from "../ui/native-select";
@@ -108,6 +109,12 @@ export function TaskDictation({
 	const stopAudio = useRef<((discard?: boolean) => void) | null>(null);
 	const queue = useRef<Promise<void>>(Promise.resolve());
 	const queued = useRef(0);
+	// The voice assistant's background microphone gives way while this dictation runs.
+	const voiceRelease = useRef<(() => void) | null>(null);
+	const giveMicrophoneBack = useCallback(() => {
+		voiceRelease.current?.();
+		voiceRelease.current = null;
+	}, []);
 	const phaseRef = useRef<Phase>("idle");
 	const transition = useCallback((next: Phase) => {
 		phaseRef.current = next;
@@ -122,9 +129,10 @@ export function TaskDictation({
 			void window.electronAPI.dictationCancel(current).catch(() => {
 				/* The renderer may be closing. */
 			});
+		giveMicrophoneBack();
 		transition("idle");
 		setLevel(0);
-	}, [transition]);
+	}, [giveMicrophoneBack, transition]);
 	const finish = () => {
 		if (phaseRef.current !== "recording") return;
 		transition("finishing");
@@ -145,8 +153,9 @@ export function TaskDictation({
 				void window.electronAPI.dictationCancel(current).catch(() => {
 					/* The renderer may be closing. */
 				});
+			giveMicrophoneBack();
 		},
-		[],
+		[giveMicrophoneBack],
 	);
 	useEffect(() => {
 		if (disabled) cancel();
@@ -156,8 +165,9 @@ export function TaskDictation({
 		const timer = setInterval(() => setSeconds((value) => value + 1), 1000);
 		return () => clearInterval(timer);
 	}, [phase]);
+	// Called only from buttons disabled while busy or disabled: React applies a
+	// click's state before the next click, so a second start cannot slip in.
 	const start = async (download = false) => {
-		if (phaseRef.current !== "idle" || disabled) return;
 		const current = crypto.randomUUID();
 		session.current = current;
 		setError("");
@@ -166,6 +176,8 @@ export function TaskDictation({
 		transition(download ? "downloading" : "preparing");
 		queue.current = Promise.resolve();
 		queued.current = 0;
+		giveMicrophoneBack();
+		voiceRelease.current = claimMicrophoneForForm();
 		try {
 			const result = await window.electronAPI.dictationStart(
 				current,
@@ -389,8 +401,8 @@ export function TaskDictation({
 					size="sm"
 					disabled={disabled || busy}
 					onClick={() => {
-						const previous = undoDictation(description, insertion);
-						if (previous !== null) onChange(previous);
+						// Shown only while the description is still the inserted text.
+						onChange(insertion.before);
 						setInsertion(null);
 					}}
 				>

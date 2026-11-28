@@ -99,7 +99,9 @@
 	"filePicker": {
 		"selectFile": "Parcourir et sélectionner un fichier source...",
 		"filter": "Filtrer les fichiers...",
-		"empty": "Aucun fichier trouvé"
+		"empty": "Aucun fichier trouvé",
+		"clear": "Retirer le fichier choisi",
+		"clearFilter": "Effacer le filtre"
 	},
 	"errors": {
 		"noFile": "Veuillez sélectionner un fichier à analyser",
@@ -186,6 +188,10 @@
 			"invalid_input": {
 				"title": "Il manque un élément à la requête",
 				"hint": "Complétez le champ concerné puis relancez la génération."
+			},
+			"unsupported_stack": {
+				"title": "Les tests de ce projet s'écrivent dans son éditeur",
+				"hint": "Les tests WinDev sont des scénarios de test que seul l'éditeur WinDev crée et exécute. Créez le scénario dans l'éditeur ; une tâche du Kanban peut ensuite écrire le code WLangage qu'il appelle."
 			},
 			"backend_missing": {
 				"title": "Le backend WorkPilot AI est introuvable",

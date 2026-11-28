@@ -42,6 +42,10 @@
 #                                          to the provider's SDK
 #                               bridged    WorkPilot connects to them and offers
 #                                          their tools in its own loop
+#                               handed     WorkPilot hands the CLI the project's
+#                                          approved custom servers in its own
+#                                          words (core/cli_mcp.py), on top of
+#                                          what its own config declares
 #                               own        WorkPilot hands none: the CLI loads
 #                                          what its own config declares
 #                               none       no MCP tool reaches the model
@@ -61,6 +65,12 @@
 #                          `127.0.0.1:port` a local endpoint
 #                 read_only files under `state` the agent may not change
 #                          (pi's trust.json), when they exist
+#                 microvm  how the CLI runs in the task's Docker Sandboxes
+#                          microVM when Settings > Sandbox allows it:
+#                          `command` (its name there), `install` (one line,
+#                          run once per VM), `secrets` (sbx service → the
+#                          CLI's key variables, set to sbx's placeholder;
+#                          the real key never leaves sbx)
 #               A CLI without this block is not sandboxed, and its card says so.
 #
 # Adding a real adapter for a provider is a strictly better outcome than
@@ -88,9 +98,11 @@ copilot:
     compact: emulated
     usage: reported
   standards:
-    mcp: none
+    mcp: bridged
     instructions: agents_md
-  note: Was declared native while nothing reached the model; see `emulated`.
+  note: >-
+    Was declared native while nothing reached the model; see `emulated`. The
+    project's MCP servers are bridged into the loop like OpenAI's.
 
 windsurf:
   adapter: WindsurfAgentClient
@@ -122,9 +134,11 @@ openai:
   note: >-
     With OPENAI_AUTH_MODE=codex-cli the task runs on CodexCliAgentClient, whose
     threads compact natively (model_auto_compact_token_limit); context_mgmt
-    resolves that from the client, not from this entry. The Codex CLI also loads the
-    MCP servers of its own config (.codex/config.toml) and reads AGENTS.md
-    itself, on top of the prompt WorkPilot injects.
+    resolves that from the client, not from this entry. The Codex CLI is handed
+    the project's approved custom MCP servers as `-c mcp_servers.<id>.…`
+    overrides (core/cli_mcp.py), also loads those of its own config
+    (.codex/config.toml), and reads AGENTS.md itself, on top of the prompt
+    WorkPilot injects.
 
 google:
   adapter: GoogleAgentClient
@@ -212,6 +226,34 @@ grok:
     mcp: bridged
     instructions: injected
 
+# Gateways to many vendors' models through one key (gateway_providers.py).
+# The effort reaches the gateway as OpenRouter's `reasoning.effort`, which it
+# maps onto each model's own setting, or drops for a model without one.
+
+openrouter:
+  adapter: CompatibleProviderAgentClient
+  subagents: emulated
+  effort: reasoning_effort
+  degrades_to: null
+  context:
+    compact: emulated
+    usage: reported
+  standards:
+    mcp: bridged
+    instructions: injected
+
+huggingface:
+  adapter: CompatibleProviderAgentClient
+  subagents: emulated
+  effort: reasoning_effort
+  degrades_to: null
+  context:
+    compact: emulated
+    usage: reported
+  standards:
+    mcp: bridged
+    instructions: injected
+
 # ---------------------------------------------------------------------------
 # Coding-agent CLIs driven as subprocesses (core/agent_clients/cli_subprocess.py).
 # They bring their own tools, sessions and login; WorkPilot hands the prompt
@@ -227,7 +269,7 @@ opencode:
     compact: emulated
     usage: reported
   standards:
-    mcp: own
+    mcp: handed
     instructions: agents_md
   note: >-
     `opencode run --format json`. A type declaring none of Write/Edit/Bash runs
@@ -240,6 +282,20 @@ opencode:
       - ~/.config/opencode
       - ~/.cache/opencode
       - ~/.local/state/opencode
+    # With Settings > Sandbox > microVM > agent CLIs on: OpenCode runs in the
+    # task's microVM, for the keys the person stored in sbx (never copied by
+    # WorkPilot; the VM's variables hold a placeholder the sbx proxy replaces).
+    microvm:
+      command: opencode
+      install: npm install -g opencode-ai@latest
+      secrets:
+        anthropic: [ANTHROPIC_API_KEY]
+        openai: [OPENAI_API_KEY]
+        google: [GOOGLE_GENERATIVE_AI_API_KEY, GEMINI_API_KEY]
+        mistral: [MISTRAL_API_KEY]
+        groq: [GROQ_API_KEY]
+        openrouter: [OPENROUTER_API_KEY]
+        xai: [XAI_API_KEY]
     network: &llm_hosts
       - api.anthropic.com
       - console.anthropic.com
@@ -346,7 +402,7 @@ gemini-cli:
     compact: emulated
     usage: exact
   standards:
-    mcp: own
+    mcp: handed
     instructions: unverified
   acp:
     label: Gemini CLI
@@ -360,13 +416,16 @@ gemini-cli:
       gemini-api-key: GEMINI_API_KEY
     login: Run `gemini` once in a terminal and sign in, or set GEMINI_API_KEY.
     docs: https://geminicli.com/docs/cli/acp-mode/
-  # Gemini CLI keeps its login and sessions in ~/.gemini and only talks to
-  # Google: the Gemini API with a key, Code Assist (cloudcode-pa) and Google's
-  # OAuth hosts with a Google sign-in. Vertex AI's regional hosts are not
-  # listed: a Vertex setup runs with the sandbox off or a host added here.
+  # Gemini CLI keeps its login and sessions in ~/.gemini (in
+  # $GEMINI_CLI_HOME/.gemini for an account of Settings → AI accounts) and
+  # only talks to Google: the Gemini API with a key, Code Assist
+  # (cloudcode-pa) and Google's OAuth hosts with a Google sign-in. Vertex AI's
+  # regional hosts are not listed: a Vertex setup runs with the sandbox off or
+  # a host added here.
   sandbox:
     state:
       - ~/.gemini
+      - $GEMINI_CLI_HOME/.gemini
     network:
       - generativelanguage.googleapis.com
       - cloudcode-pa.googleapis.com

@@ -22,7 +22,11 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { ScreenshotSource } from "../../shared/types/screenshot";
+import {
+	SCREENSHOT_ERROR_CODES,
+	type ScreenshotErrorCode,
+	type ScreenshotSource,
+} from "../../shared/types/screenshot";
 import { Button } from "./ui/button";
 import {
 	Dialog,
@@ -52,12 +56,32 @@ const getPasteShortcut = (): string => {
 	return /mac|iphone|ipad|ipod/i.test(navigator.userAgent) ? "Cmd+V" : "Ctrl+V";
 };
 
+/**
+ * Electron names a source `screen:<id>:0` or `window:<id>:0`. Its name is a
+ * window title, which may well contain « screen » or « display ».
+ */
+const isScreenSource = (source: ScreenshotSource): boolean =>
+	source.id.startsWith("screen:");
+
+/** The translated failure, then why, if anything says so. */
+const withDetail = (message: string, detail?: string): string =>
+	detail ? `${message}\n${detail}` : message;
+
+/** The main process answers a stable code; anything else is not shown. */
+const isErrorCode = (value: unknown): value is ScreenshotErrorCode =>
+	SCREENSHOT_ERROR_CODES.includes(value as ScreenshotErrorCode);
+
 export function ScreenshotCapture({
 	open,
 	onOpenChange,
 	onCapture,
 }: ScreenshotCaptureProps) {
 	const { t } = useTranslation(["tasks", "common"]);
+	const reason = useCallback(
+		(code: unknown) =>
+			isErrorCode(code) ? t(`tasks:screenshot.errors.codes.${code}`) : undefined,
+		[t],
+	);
 	const [sources, setSources] = useState<ScreenshotSource[]>([]);
 	const [selectedSource, setSelectedSource] = useState<string | null>(null);
 	const [isLoading, setIsLoading] = useState(false);
@@ -85,19 +109,20 @@ export function ScreenshotCapture({
 			if (result.success && result.data) {
 				setSources(result.data);
 			} else {
-				setError(result.error || t("tasks:screenshot.errors.getSources"));
+				setError(withDetail(t("tasks:screenshot.errors.getSources"), reason(result.error)));
 			}
 		} catch (err) {
 			console.error("Failed to fetch screenshot sources:", err);
 			setError(
-				err instanceof Error
-					? err.message
-					: t("tasks:screenshot.errors.fetchSources"),
+				withDetail(
+					t("tasks:screenshot.errors.fetchSources"),
+					err instanceof Error ? err.message : undefined,
+				),
 			);
 		} finally {
 			setIsLoading(false);
 		}
-	}, [t]);
+	}, [t, reason]);
 
 	// Fetch sources when dialog opens
 	useEffect(() => {
@@ -109,43 +134,29 @@ export function ScreenshotCapture({
 	/**
 	 * Handle capture button click
 	 */
-	const handleCapture = async () => {
-		if (!selectedSource) return;
-
+	const handleCapture = async (sourceId: string) => {
 		setIsCapturing(true);
 		setError(null);
 		try {
-			const result = await globalThis.electronAPI.capture({
-				sourceId: selectedSource,
-			});
+			const result = await globalThis.electronAPI.capture({ sourceId });
 			if (result.success && result.data) {
 				onCapture(result.data);
 				onOpenChange(false);
 				setSelectedSource(null);
 			} else {
-				setError(result.error || t("tasks:screenshot.errors.capture"));
+				setError(withDetail(t("tasks:screenshot.errors.capture"), reason(result.error)));
 			}
 		} catch (err) {
 			console.error("Failed to capture screenshot:", err);
 			setError(
-				err instanceof Error
-					? err.message
-					: t("tasks:screenshot.errors.captureFailed"),
+				withDetail(
+					t("tasks:screenshot.errors.captureFailed"),
+					err instanceof Error ? err.message : undefined,
+				),
 			);
 		} finally {
 			setIsCapturing(false);
 		}
-	};
-
-	/**
-	 * Determine if a source is a screen or window based on name
-	 */
-	const isScreenSource = (source: ScreenshotSource): boolean => {
-		return (
-			source.name.toLowerCase().includes("screen") ||
-			source.name.toLowerCase().includes("display") ||
-			/^\d+:/.exec(source.name) !== null
-		);
 	};
 
 	return (
@@ -184,19 +195,18 @@ export function ScreenshotCapture({
 						<div className="flex items-center gap-3 p-4 bg-destructive/10 border border-destructive/30 rounded-lg mb-4">
 							<AlertCircle className="h-5 w-5 text-destructive shrink-0" />
 							<div className="flex-1">
-								<p className="text-sm text-destructive">{error}</p>
+								<p role="alert" className="text-sm text-destructive whitespace-pre-wrap break-words">
+									{error}
+								</p>
 							</div>
+							{/* Shown once loading is over: a fetch clears the error first */}
 							<Button
 								variant="outline"
 								size="sm"
 								onClick={fetchSources}
-								disabled={isLoading}
+								aria-label={t("common:buttons.retry")}
 							>
-								{isLoading ? (
-									<Loader2 className="h-4 w-4 animate-spin" />
-								) : (
-									<RefreshCw className="h-4 w-4" />
-								)}
+								<RefreshCw className="h-4 w-4" />
 							</Button>
 						</div>
 					)}
@@ -219,6 +229,7 @@ export function ScreenshotCapture({
 									<button
 										key={source.id}
 										type="button"
+										aria-pressed={isSelected}
 										onClick={() => setSelectedSource(source.id)}
 										className={`
                       relative group rounded-lg border-2 overflow-hidden
@@ -235,7 +246,7 @@ export function ScreenshotCapture({
 											{source.thumbnail ? (
 												<img
 													src={source.thumbnail}
-													alt={source.name}
+													alt=""
 													className="w-full h-full object-cover"
 												/>
 											) : (
@@ -285,6 +296,11 @@ export function ScreenshotCapture({
 													) : (
 														<Frame className="h-4 w-4" />
 													)}
+													<span className="sr-only">
+														{isScreen
+															? t("tasks:screenshot.kind.screen")
+															: t("tasks:screenshot.kind.window")}
+													</span>
 												</div>
 											</div>
 										</div>
@@ -313,13 +329,8 @@ export function ScreenshotCapture({
 								size="sm"
 								onClick={fetchSources}
 								className="mt-4"
-								disabled={isLoading}
 							>
-								{isLoading ? (
-									<Loader2 className="h-4 w-4 animate-spin mr-2" />
-								) : (
-									<RefreshCw className="h-4 w-4 mr-2" />
-								)}
+								<RefreshCw className="h-4 w-4 mr-2" />
 								{t("common:buttons.retry")}
 							</Button>
 						</div>
@@ -350,7 +361,9 @@ export function ScreenshotCapture({
 							)}
 						</Button>
 						<Button
-							onClick={handleCapture}
+							onClick={
+								selectedSource ? () => void handleCapture(selectedSource) : undefined
+							}
 							disabled={!selectedSource || isCapturing || isDevMode}
 						>
 							{isCapturing ? (

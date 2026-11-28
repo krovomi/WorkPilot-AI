@@ -15,6 +15,7 @@ from __future__ import annotations
 import ast
 import json
 import logging
+import os
 import subprocess
 from pathlib import Path
 
@@ -30,6 +31,33 @@ WEIGHT_COVERAGE = 0.3
 # Normalization constants
 MAX_COMPLEXITY = 50  # Complexity above this maps to 100
 MAX_CHURN = 30  # Commits in 30 days above this maps to 100
+
+# Every language the heuristic complexity can read (Python gets its AST).
+SOURCE_EXTENSIONS = frozenset(
+    {
+        ".py", ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".vue", ".svelte",
+        ".java", ".kt", ".kts", ".scala", ".groovy", ".go", ".rs", ".rb", ".php",
+        ".cs", ".fs", ".vb", ".swift", ".m", ".mm", ".c", ".h", ".cc", ".cpp",
+        ".hpp", ".dart", ".ex", ".exs", ".erl", ".lua", ".pl", ".r", ".jl",
+    }
+)  # fmt: skip
+
+TEST_SUFFIXES = (
+    "_test.py",
+    ".test.ts",
+    ".test.tsx",
+    ".test.js",
+    ".test.jsx",
+    ".spec.ts",
+    ".spec.tsx",
+    ".spec.js",
+    ".spec.jsx",
+    "_test.go",
+    "_spec.rb",
+    "_test.rb",
+    "_test.dart",
+    "_test.exs",
+)
 
 # Default excluded directories
 DEFAULT_EXCLUDED = {
@@ -84,7 +112,9 @@ class FragilityAnalyzer:
 
         reports: list[FragilityReport] = []
         for file_path in source_files:
-            rel_path = str(file_path.relative_to(self.project_dir))
+            relative = file_path.relative_to(self.project_dir)
+            # git names files with "/" on every OS; the history keys on it too.
+            rel_path = relative.as_posix()
             complexity = self._compute_cyclomatic_complexity(file_path)
             churn = churn_map.get(rel_path, 0)
             coverage = coverage_map.get(rel_path, 0.0)
@@ -116,34 +146,33 @@ class FragilityAnalyzer:
         return reports
 
     def _find_source_files(self, max_files: int) -> list[Path]:
-        """Find analyzable source files in the project."""
-        extensions = {".py", ".js", ".ts", ".tsx", ".jsx", ".java", ".go", ".rs", ".rb"}
-        files: list[Path] = []
+        """Find analyzable source files in the project, in a stable order.
 
-        for ext in extensions:
-            for f in self.project_dir.rglob(f"*{ext}"):
-                if any(part in self.excluded_dirs for part in f.parts):
+        Sorted, so that two scans of the same tree measure the same files: the
+        risk history (#370) compares a file with itself from one scan to the
+        next, and a set's iteration order changes with every process.
+        """
+        files: list[Path] = []
+        # os.walk, pruned: a dependency folder is never walked at all.
+        for root, dirs, names in os.walk(self.project_dir):
+            dirs[:] = sorted(d for d in dirs if not self._excluded(d))
+            for name in sorted(names):
+                if Path(name).suffix.lower() not in SOURCE_EXTENSIONS:
                     continue
                 # Skip test files for fragility analysis
-                name_lower = f.name.lower()
-                if name_lower.startswith("test_") or name_lower.endswith(
-                    (
-                        "_test.py",
-                        ".test.ts",
-                        ".test.tsx",
-                        ".test.js",
-                        ".test.jsx",
-                        ".spec.ts",
-                        ".spec.tsx",
-                        ".spec.js",
-                    )
-                ):
+                name_lower = name.lower()
+                if name_lower.startswith("test_") or name_lower.endswith(TEST_SUFFIXES):
                     continue
-                files.append(f)
+                files.append(Path(root) / name)
                 if len(files) >= max_files:
                     return files
-
         return files
+
+    def _excluded(self, name: str) -> bool:
+        # A package's metadata folder is named after it: `mypkg.egg-info`.
+        return name in self.excluded_dirs or (
+            "egg-info" in self.excluded_dirs and name.endswith(".egg-info")
+        )
 
     def _compute_cyclomatic_complexity(self, file_path: Path) -> float:
         """Compute cyclomatic complexity for a Python file via AST.
@@ -159,7 +188,8 @@ class FragilityAnalyzer:
         try:
             source = file_path.read_text(encoding="utf-8", errors="replace")
             tree = ast.parse(source, filename=str(file_path))
-        except (SyntaxError, ValueError):
+        except (OSError, SyntaxError, ValueError):
+            # Unreadable (gone since the walk) or not Python this version parses.
             return 0.0
 
         complexity = 0
@@ -221,6 +251,9 @@ class FragilityAnalyzer:
                     "--format=",
                     "--name-only",
                     "--diff-filter=ACMR",
+                    # Paths relative to the project, which may be a folder of
+                    # a larger repository, and only the files under it.
+                    "--relative",
                 ],
                 cwd=str(self.project_dir),
                 capture_output=True,
@@ -228,83 +261,71 @@ class FragilityAnalyzer:
                 timeout=30,
             )
             if result.returncode == 0:
-                for line in result.stdout.splitlines():
-                    line = line.strip()
-                    if line:
-                        churn[line] = churn.get(line, 0) + 1
+                for name in filter(None, map(str.strip, result.stdout.splitlines())):
+                    churn[name] = churn.get(name, 0) + 1
         except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
             logger.warning(f"Git churn analysis failed: {e}")
 
         return churn
 
     def _load_coverage_data(self) -> dict[str, float]:
-        """Load test coverage data from common coverage report formats."""
+        """Line coverage per file, keyed by its path from the project with "/".
+
+        Read from coverage.py's ``coverage.json`` and Istanbul's
+        ``coverage/coverage-summary.json`` or ``coverage/coverage-final.json``
+        (Jest, Vitest, nyc, c8).
+        """
         coverage: dict[str, float] = {}
 
-        # Try coverage.json (Python coverage.py format)
-        coverage_json = self.project_dir / "coverage.json"
-        if coverage_json.exists():
-            try:
-                data = json.loads(coverage_json.read_text(encoding="utf-8"))
-                if "files" in data:
-                    for file_path, file_data in data["files"].items():
-                        if "summary" in file_data:
-                            coverage[file_path] = file_data["summary"].get(
-                                "percent_covered", 0.0
-                            )
-            except (json.JSONDecodeError, KeyError):
-                pass
+        data = self._read_json(self.project_dir / "coverage.json")
+        files = data.get("files") if isinstance(data, dict) else None
+        for file_path, file_data in (files or {}).items():
+            summary = file_data.get("summary") if isinstance(file_data, dict) else None
+            if isinstance(summary, dict):
+                coverage[self._coverage_key(file_path)] = float(
+                    summary.get("percent_covered", 0.0)
+                )
 
-        # Try lcov-style coverage-summary.json (Jest/Istanbul)
-        for summary_path in [
-            self.project_dir / "coverage" / "coverage-summary.json",
-            self.project_dir / "coverage" / "coverage-final.json",
-        ]:
-            if summary_path.exists():
-                try:
-                    data = json.loads(summary_path.read_text(encoding="utf-8"))
-                    for file_path, file_data in data.items():
-                        if file_path == "total":
-                            continue
-                        rel_path = file_path
-                        try:
-                            rel_path = str(
-                                Path(file_path).relative_to(self.project_dir)
-                            )
-                        except ValueError:
-                            pass
-                        if isinstance(file_data, dict) and "lines" in file_data:
-                            coverage[rel_path] = file_data["lines"].get("pct", 0.0)
-                except (json.JSONDecodeError, KeyError):
-                    pass
+        for name in ("coverage-summary.json", "coverage-final.json"):
+            data = self._read_json(self.project_dir / "coverage" / name)
+            for file_path, file_data in (data or {}).items():
+                percent = _istanbul_percent(file_data)
+                if file_path != "total" and percent is not None:
+                    coverage[self._coverage_key(file_path)] = percent
 
         return coverage
 
-    def _find_test_file(self, source_file: Path) -> Path | None:
-        """Find the corresponding test file for a source file."""
-        stem = source_file.stem
-        suffix = source_file.suffix
+    @staticmethod
+    def _read_json(path: Path) -> dict | None:
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return None
+        return data if isinstance(data, dict) else None
 
-        test_patterns = [
-            f"test_{stem}{suffix}",
-            f"{stem}_test{suffix}",
-            f"{stem}.test{suffix}",
-            f"{stem}.spec{suffix}",
-        ]
+    def _coverage_key(self, file_path: str) -> str:
+        """A report's path as the project-relative, "/" path the scan uses."""
+        path = Path(file_path)
+        if path.is_absolute():
+            for root in (self.project_dir, self.project_dir.resolve()):
+                try:
+                    return path.relative_to(root).as_posix()
+                except ValueError:
+                    continue
+        return file_path.replace("\\", "/")
 
-        # Search in common test directories
-        test_dirs = [
-            source_file.parent,
-            source_file.parent / "__tests__",
-            source_file.parent / "tests",
-            self.project_dir / "tests",
-            self.project_dir / "test",
-        ]
 
-        for test_dir in test_dirs:
-            for pattern in test_patterns:
-                test_file = test_dir / pattern
-                if test_file.exists():
-                    return test_file
-
+def _istanbul_percent(file_data: object) -> float | None:
+    """The line percentage of one Istanbul entry, summary or final format."""
+    if not isinstance(file_data, dict):
         return None
+    lines = file_data.get("lines")
+    if isinstance(lines, dict) and "pct" in lines:
+        pct = lines["pct"]
+        # Istanbul writes "Unknown" for a file without a line.
+        return float(pct) if isinstance(pct, (int, float)) else None
+    hits = file_data.get("s")
+    if isinstance(hits, dict) and hits:
+        covered = sum(1 for count in hits.values() if count)
+        return round(covered / len(hits) * 100, 1)
+    return None

@@ -2,17 +2,19 @@
  * #3.6 Domain-Specific Agent Factory panel.
  *
  * Pick a domain + an agent role, see the generated bundle (guardrails,
- * skills, prompt addendum). The output can be copied into a project's
- * config to inject domain awareness into every agent.
+ * skills, prompt addendum, libraries for the project's stacks). "Apply to
+ * this project" saves the domain in `.workpilot/domain.json`: every Kanban
+ * task of the project then receives the addendum (planner, coder, QA).
  */
 
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useShallow } from "zustand/react/shallow";
 import { useDomainAgentsStore } from "../../stores/phase35-stores";
 import { Button } from "../ui/button";
+import { NativeSelect } from "../ui/native-select";
 import { PanelShell } from "./_panel-shell";
 
-import { NativeSelect } from "../ui/native-select";
 const ROLES = [
 	{ value: "coder", labelKey: "domainAgents.roleCoder" },
 	{ value: "planner", labelKey: "domainAgents.rolePlanner" },
@@ -22,9 +24,40 @@ const ROLES = [
 
 type Role = (typeof ROLES)[number]["value"];
 
-export function DomainAgentsPanel() {
+/** One empty list, so the shallow selector sees the same value from render to render. */
+const NO_LANGUAGES: string[] = [];
+
+interface DomainAgentsPanelProps {
+	projectPath?: string;
+}
+
+export function DomainAgentsPanel({ projectPath = "" }: DomainAgentsPanelProps) {
 	const { t } = useTranslation("phase35");
-	const { phase, error, domains, bundle, loadDomains, build } = useDomainAgentsStore();
+	const {
+		phase,
+		error,
+		domains,
+		bundle,
+		projectDomain,
+		projectLanguages,
+		loadDomains,
+		loadProjectDomain,
+		applyProjectDomain,
+		build,
+	} = useDomainAgentsStore(
+		useShallow((s) => ({
+			phase: s.phase,
+			error: s.error,
+			domains: s.domains,
+			bundle: s.bundle,
+			projectDomain: s.projectPath === projectPath ? s.projectDomain : null,
+			projectLanguages: s.projectPath === projectPath ? s.projectLanguages : NO_LANGUAGES,
+			loadDomains: s.loadDomains,
+			loadProjectDomain: s.loadProjectDomain,
+			applyProjectDomain: s.applyProjectDomain,
+			build: s.build,
+		})),
+	);
 	const [selected, setSelected] = useState<string>("");
 	const [role, setRole] = useState<Role>("coder");
 
@@ -33,8 +66,24 @@ export function DomainAgentsPanel() {
 	}, [loadDomains]);
 
 	useEffect(() => {
-		if (!selected && domains.length > 0) setSelected(domains[0].tag);
-	}, [selected, domains]);
+		if (projectPath) loadProjectDomain(projectPath);
+	}, [projectPath, loadProjectDomain]);
+
+	// The project's saved domain preselects once it is read; the user may then pick another.
+	useEffect(() => {
+		if (projectDomain) setSelected(projectDomain);
+	}, [projectDomain]);
+
+	// Functional update: when the domains and the project's domain land in the same render,
+	// the preselection above must not be overwritten by the first domain of the list.
+	useEffect(() => {
+		if (domains.length > 0) setSelected((current) => current || domains[0].tag);
+	}, [domains]);
+
+	const domainLabel = (tag: string) => {
+		const known = domains.find((d) => d.tag === tag);
+		return t(`domainAgents.domains.${tag}.label` as never, { defaultValue: known?.label ?? tag });
+	};
 
 	const isRunning = phase === "running";
 
@@ -45,6 +94,7 @@ export function DomainAgentsPanel() {
 	}, [domains, selected, t]);
 
 	const noDomains = !isRunning && domains.length === 0;
+	const selectedDomain = domains.find((d) => d.tag === selected);
 
 	return (
 		<PanelShell
@@ -54,7 +104,7 @@ export function DomainAgentsPanel() {
 			actions={
 				<Button
 					size="sm"
-					onClick={() => build(selected, role)}
+					onClick={() => build(selected, role, projectPath || undefined)}
 					disabled={isRunning || Boolean(domainError) || noDomains}
 				>
 					{isRunning ? t("common.running") : t("domainAgents.build")}
@@ -62,6 +112,45 @@ export function DomainAgentsPanel() {
 			}
 		>
 			<div className="space-y-3">
+				{projectPath ? (
+					<div className="rounded border bg-muted/20 p-3 text-sm space-y-2">
+						<p>
+							{projectDomain
+								? t("domainAgents.project.current", { domain: domainLabel(projectDomain) })
+								: t("domainAgents.project.none")}
+						</p>
+						<p className="text-xs text-muted-foreground">
+							{projectLanguages.length > 0
+								? t("domainAgents.project.languages", { languages: projectLanguages.join(", ") })
+								: t("domainAgents.project.noLanguages")}
+						</p>
+						<p className="text-xs text-muted-foreground">{t("domainAgents.project.effect")}</p>
+						<div className="flex flex-wrap gap-2">
+							<Button
+								size="sm"
+								variant="outline"
+								onClick={() => applyProjectDomain(projectPath, selected)}
+								disabled={
+									isRunning || !selected || selected === "generic" || selected === projectDomain
+								}
+							>
+								{t("domainAgents.project.apply")}
+							</Button>
+							{projectDomain && (
+								<Button
+									size="sm"
+									variant="ghost"
+									onClick={() => applyProjectDomain(projectPath, null)}
+									disabled={isRunning}
+								>
+									{t("domainAgents.project.clear")}
+								</Button>
+							)}
+						</div>
+					</div>
+				) : (
+					<p className="text-sm text-muted-foreground">{t("domainAgents.project.noProject")}</p>
+				)}
 				{noDomains && (
 					<p className="text-sm text-muted-foreground">
 						{t("domainAgents.validation.noDomainsLoaded")}
@@ -84,13 +173,20 @@ export function DomainAgentsPanel() {
 							{domains.length === 0 && <option value="">—</option>}
 							{domains.map((d) => (
 								<option key={d.tag} value={d.tag}>
-									{d.label}
+									{t(`domainAgents.domains.${d.tag}.label` as never, { defaultValue: d.label })}
 								</option>
 							))}
 						</NativeSelect>
 						{domainError && (
 							<p id="domain-error" className="mt-1 text-xs text-destructive">
 								{domainError}
+							</p>
+						)}
+						{selectedDomain && (
+							<p className="mt-1 text-xs text-muted-foreground">
+								{t(`domainAgents.domains.${selectedDomain.tag}.description` as never, {
+									defaultValue: selectedDomain.description,
+								})}
 							</p>
 						)}
 					</div>
@@ -115,6 +211,7 @@ export function DomainAgentsPanel() {
 
 				{bundle && (
 					<div className="space-y-3 text-sm">
+						<p className="text-xs text-muted-foreground">{t("domainAgents.promptNote")}</p>
 						{bundle.guardrails.length > 0 && (
 							<details open>
 								<summary className="font-medium cursor-pointer">
@@ -150,6 +247,20 @@ export function DomainAgentsPanel() {
 									{bundle.forbidden_patterns.map((p) => (
 										<li key={p} className="font-mono text-xs">
 											{p}
+										</li>
+									))}
+								</ul>
+							</details>
+						)}
+						{Object.keys(bundle.suggested_libraries).length > 0 && (
+							<details open>
+								<summary className="font-medium cursor-pointer">
+									{t("domainAgents.libraries")}
+								</summary>
+								<ul className="ml-4 mt-1 list-disc space-y-1 text-muted-foreground">
+									{Object.entries(bundle.suggested_libraries).map(([lang, libs]) => (
+										<li key={lang}>
+											{t("domainAgents.librariesFor", { language: lang, libraries: libs.join(", ") })}
 										</li>
 									))}
 								</ul>

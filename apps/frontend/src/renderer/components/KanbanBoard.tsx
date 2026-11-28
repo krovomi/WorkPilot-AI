@@ -18,10 +18,7 @@ import {
 } from "@dnd-kit/sortable";
 import {
 	AlertTriangle,
-	Ban,
 	CheckCheck,
-	ChevronLeft,
-	ChevronRight,
 	ChevronsRight,
 	Coins,
 	GitPullRequest,
@@ -29,14 +26,10 @@ import {
 	RefreshCw,
 	Timer,
 	Trash2,
-	X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import {
-	TASK_STATUS_COLUMNS,
-	TASK_STATUS_LABELS,
-} from "../../shared/constants";
+import { isOutcomeColumn, TASK_STATUS_COLUMNS, TASK_STATUS_LABELS } from "../../shared/constants";
 import type {
 	IPCResult,
 	PlanConflictReport,
@@ -55,13 +48,17 @@ import { useViewState } from "../contexts/ViewStateContext";
 import { useKanbanAccessibility } from "../hooks/useKanbanAccessibility";
 import { useToast } from "../hooks/use-toast";
 import { useVisibleKanbanColumns } from "../hooks/useVisibleKanbanColumns";
+import { useBoardBulkEdits } from "../hooks/useBoardBulkEdits";
+import { useBoardSelection } from "../hooks/useBoardSelection";
+import { isLightCard, recordMoves } from "../lib/card-edits";
+import { usePendingDeleteStore } from "../stores/pending-delete-store";
 import { formatAgingDuration, listAgingTasks } from "../lib/kanban-aging";
-import {
-	canMoveTaskTo,
-	emptyColumnGroups,
-	getVisualColumn,
-	VALID_BULK_TRANSITIONS,
-} from "../lib/kanban-columns";
+import { canMoveTaskTo, emptyColumnGroups, getBoardColumn, getVisualColumn, isQuickAddColumn } from "../lib/kanban-columns";
+import { useOutcomeDrop } from "../hooks/useOutcomeDrop";
+import { useLaneDrag } from "../hooks/useLaneDrag";
+import { BoardDialogs } from "./kanban/BoardDialogs";
+import { groupMoveTargets } from "../lib/group-move";
+import { DragOverlayCard } from "./kanban/DragOverlayCard";
 import { computeBoardCostForecast } from "../lib/kanban-cost";
 import {
 	indexTasksById,
@@ -81,7 +78,7 @@ import {
 	MIN_COLUMN_WIDTH,
 	useKanbanSettingsStore,
 } from "../stores/kanban-settings-store";
-import { useKanbanFilterStore } from "../stores/kanban-filter-store";
+import { useBoardFilters, useKanbanFilterStore } from "../stores/kanban-filter-store";
 import {
 	useProjectEnvStore,
 } from "../stores/project-env-store";
@@ -114,10 +111,12 @@ import { BulkPRDialog } from "./BulkPRDialog";
 import { formatCost } from "./formula-lab/formula-utils";
 import { JiraSidePanel } from "./jira-import/JiraSidePanel";
 import { KanbanToolbar } from "./kanban/KanbanToolbar";
+import { BoardKeyboard } from "./kanban/BoardKeyboard";
+import { BoardSelectionContext } from "./kanban/board-selection-context";
+import { BulkActionBar } from "./kanban/BulkActionBar";
+import { deleteCardsLater } from "./kanban/deleteCardsLater";
 import { PRFilesModal } from "./PRFilesModal";
 import { QueueSettingsModal } from "./QueueSettingsModal";
-import { AppSettingsDialog } from "./settings/AppSettings";
-import { TaskCard } from "./TaskCard";
 import { TaskEditDialog } from "./TaskEditDialog";
 import {
 	AlertDialog,
@@ -137,6 +136,7 @@ import { ScrollArea } from "./ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import { WorktreeCleanupDialog } from "./WorktreeCleanupDialog";
 import { SortableColumnWrapper } from "./kanban/KanbanColumn";
+import { BoardLanes } from "./kanban/BoardLanes";
 
 // Type guard for valid drop column targets - preserves literal type from TASK_STATUS_COLUMNS
 const VALID_DROP_COLUMNS = new Set<string>(TASK_STATUS_COLUMNS);
@@ -194,8 +194,7 @@ export function KanbanBoard({
 	const { announcement, announce } = useKanbanAccessibility();
 	const [activeTask, setActiveTask] = useState<Task | null>(null);
 	const [overColumnId, setOverColumnId] = useState<string | null>(null);
-	const { showArchived, toggleShowArchived, hideAbandoned, toggleHideAbandoned } =
-		useViewState();
+	const { showArchived, toggleShowArchived } = useViewState();
 
 	// --- Accessibility helpers (screen-reader drag-and-drop announcements) ---
 	const getColumnLabel = useCallback(
@@ -267,7 +266,7 @@ export function KanbanBoard({
 
 	// Kanban filter/sort state (search, source/category/priority filters, sort).
 	// Persisted per project in the kanban-filter-store.
-	const kanbanFilters = useKanbanFilterStore((state) => state.filters);
+	const kanbanFilters = useBoardFilters();
 	const kanbanSort = useKanbanFilterStore((state) => state.sort);
 	const loadKanbanFilters = useKanbanFilterStore(
 		(state) => state.loadForProject,
@@ -292,15 +291,12 @@ export function KanbanBoard({
 					setAzureDevOpsConnected(
 						result.success && result.data?.connected === true,
 					);
-					setAzureDevOpsProjectName(result.data?.projectName || null);
 				})
 				.catch(() => {
 					setAzureDevOpsConnected(null);
-					setAzureDevOpsProjectName(null);
 				});
 		} else {
 			setAzureDevOpsConnected(null);
-			setAzureDevOpsProjectName(null);
 		}
 	}, [activeProjectId, envConfig?.azureDevOpsEnabled]);
 
@@ -334,11 +330,6 @@ export function KanbanBoard({
 	// Track tasks manually moved to queue to prevent auto-promotion back
 	const manuallyQueuedTaskIdsRef = useRef<Set<string>>(new Set());
 
-	// Selection state for bulk actions (Human Review column)
-	const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(
-		new Set(),
-	);
-
 	// True when the currently dragged task is part of a multi-selection
 	const [isDraggingBulkSelected, setIsDraggingBulkSelected] = useState(false);
 
@@ -366,11 +357,6 @@ export function KanbanBoard({
 	// Source task for the "duplicate" dialog (edit fields before creating the copy)
 	const [duplicateSource, setDuplicateSource] = useState<Task | null>(null);
 
-	// Store recently deleted tasks for undo functionality
-	const [_recentlyDeletedTasks, setRecentlyDeletedTasks] = useState<
-		Map<string, Task>
-	>(new Map());
-
 	// Worktree cleanup dialog state
 	const [worktreeCleanupDialog, setWorktreeCleanupDialog] = useState<{
 		open: boolean;
@@ -393,9 +379,6 @@ export function KanbanBoard({
 	const [azureDevOpsConnected, setAzureDevOpsConnected] = useState<
 		boolean | null
 	>(null);
-	const [_azureDevOpsProjectName, setAzureDevOpsProjectName] = useState<
-		string | null
-	>(null);
 
 	// Jira import panel state
 	const [jiraPanelOpen, setJiraPanelOpen] = useState(false);
@@ -403,9 +386,6 @@ export function KanbanBoard({
 
 	// Azure DevOps drag state
 	const [isDraggingAzureDevOps, setIsDraggingAzureDevOps] = useState(false);
-	const [_draggedAzureDevOpsItems, setDraggedAzureDevOpsItems] = useState<
-		AzureDevOpsWorkItem[]
-	>([]);
 
 	// Import confirm dialog state (shown after dropping work items from Azure DevOps / Jira)
 	const [importConfirmDialog, setImportConfirmDialog] = useState<{
@@ -436,27 +416,17 @@ export function KanbanBoard({
 	}, [columnPreferences]);
 
 	// Filter tasks based on archive status
+	// Cards deleted but still in their undo delay (kanban/deleteCardsLater.tsx).
+	const pendingDeletes = usePendingDeleteStore((s) => s.ids);
 	const filteredTasks = useMemo(() => {
-		// Archive gate first, then (optionally) the abandoned gate, then the
-		// user-selected search/source/category/priority filters from the filter bar.
-		// Abandoned tasks are shown greyed by default; hideAbandoned removes them.
-		let base = showArchived
-			? tasks
-			: tasks.filter((t) => !t.metadata?.archivedAt);
-		if (hideAbandoned) {
-			base = base.filter((t) => t.metadata?.abandoned !== true);
-		}
-		return base.filter((t) => taskMatchesFilters(t, kanbanFilters));
-	}, [tasks, showArchived, hideAbandoned, kanbanFilters]);
+		// Archive gate first, then the search/source/category/priority filters of
+		// the filter bar. Abandoned tasks have their own column (« Abandonnée »).
+		const base = showArchived ? tasks : tasks.filter((t) => !t.metadata?.archivedAt);
+		return base.filter(
+			(t) => !pendingDeletes.has(t.id) && taskMatchesFilters(t, kanbanFilters),
+		);
+	}, [tasks, showArchived, kanbanFilters, pendingDeletes]);
 
-	// Count of abandoned tasks currently on the board (drives the filter toggle).
-	const abandonedCount = useMemo(
-		() =>
-			tasks.filter(
-				(t) => t.metadata?.abandoned === true && !t.metadata?.archivedAt,
-			).length,
-		[tasks],
-	);
 
 	// Calculate archived count for Done column button
 	const archivedCount = useMemo(
@@ -574,11 +544,11 @@ export function KanbanBoard({
 	const taskOrder = useTaskStore((state) => state.taskOrder);
 
 	const tasksByStatus = useMemo(() => {
-		// error tasks are shown in the 'human_review' column (see getVisualColumn)
+		// Each task in its board column: failed runs and abandoned tasks have their own (getBoardColumn)
 		const grouped = emptyColumnGroups();
 
 		filteredTasks.forEach((task) => {
-			const targetColumn = getVisualColumn(task.status);
+			const targetColumn = getBoardColumn(task);
 			if (grouped[targetColumn]) {
 				grouped[targetColumn].push(task);
 			}
@@ -640,60 +610,36 @@ export function KanbanBoard({
 		return grouped;
 	}, [filteredTasks, taskOrder, kanbanSort]);
 
-	// Prune stale IDs when tasks are deleted or filtered out
-	useEffect(() => {
-		const allTaskIds = new Set(filteredTasks.map((t) => t.id));
-		setSelectedTaskIds((prev) => {
-			const filtered = new Set([...prev].filter((id) => allTaskIds.has(id)));
-			return filtered.size === prev.size ? prev : filtered;
-		});
-	}, [filteredTasks]);
-
-	// Selection callbacks for bulk actions (all columns)
-	const toggleTaskSelection = useCallback((taskId: string) => {
-		setSelectedTaskIds((prev) => {
-			const next = new Set(prev);
-			if (next.has(taskId)) {
-				next.delete(taskId);
-			} else {
-				next.add(taskId);
-			}
-			return next;
-		});
-	}, []);
-
+	const {
+		selectedTaskIds,
+		setSelectedTaskIds,
+		toggleTaskSelection,
+		selectGesture,
+		selectTasks,
+		deselectAllTasks,
+	} = useBoardSelection(filteredTasks);
+	// Select every card of one column (header checkbox, menu, Ctrl+A).
 	const selectAllTasks = useCallback(
-		(columnStatus?: (typeof TASK_STATUS_COLUMNS)[number]) => {
-			if (columnStatus) {
-				// Select all in specific column
-				const columnTasks = tasksByStatus[columnStatus] || [];
-				const columnIds = new Set(columnTasks.map((t: Task) => t.id));
-				setSelectedTaskIds((prev) => new Set<string>([...prev, ...columnIds]));
-			} else {
-				// Select all across all columns
-				const allIds = new Set(filteredTasks.map((t) => t.id));
-				setSelectedTaskIds(allIds);
-			}
-		},
-		[tasksByStatus, filteredTasks],
+		(columnStatus: string) =>
+			selectTasks(tasksByStatus[columnStatus as (typeof TASK_STATUS_COLUMNS)[number]].map((t) => t.id)),
+		[tasksByStatus, selectTasks],
 	);
-
-	const deselectAllTasks = useCallback(() => {
-		setSelectedTaskIds(new Set());
-	}, []);
 
 	// Get selected task objects for bulk actions
 	const selectedTasks = useMemo(() => {
 		return filteredTasks.filter((task) => selectedTaskIds.has(task.id));
 	}, [filteredTasks, selectedTaskIds]);
 
+	// The columns a dragged selection may land in (drop highlight).
+	const groupTargets = useMemo(() => groupMoveTargets(selectedTasks), [selectedTasks]);
+	const outcomeDrop = useOutcomeDrop(selectedTasks);
 	// Determine which visual column all selected tasks belong to (null = mixed selection)
 	const selectedColumnStatus = useMemo<
 		(typeof TASK_STATUS_COLUMNS)[number] | null
 	>(() => {
 		if (selectedTaskIds.size === 0) return null;
 		const columns = new Set(
-			selectedTasks.map((t) => getVisualColumn(t.status)),
+			selectedTasks.map((t) => getBoardColumn(t)),
 		);
 		return columns.size === 1 ? [...columns][0] : null;
 	}, [selectedTasks, selectedTaskIds.size]);
@@ -716,11 +662,6 @@ export function KanbanBoard({
 				const result = await restoreTask(id);
 				if (result.success) restored++;
 			}
-			setRecentlyDeletedTasks((prev) => {
-				const next = new Map(prev);
-				for (const id of taskIds) next.delete(id);
-				return next;
-			});
 			if (restored > 0) {
 				toast({
 					title: t("kanban.bulkRestoreSuccess", { count: restored }),
@@ -748,11 +689,6 @@ export function KanbanBoard({
 		setDeleteConfirmOpen(false);
 
 		if (result.success) {
-			setRecentlyDeletedTasks((prev) => {
-				const next = new Map(prev);
-				for (const task of deletedTasks) next.set(task.id, task);
-				return next;
-			});
 			const deletedIds = deletedTasks.map((task) => task.id);
 			toast({
 				title: t("kanban.deleteSuccess", { count: taskIdsToDelete.length }),
@@ -780,35 +716,7 @@ export function KanbanBoard({
 				setSelectedTaskIds(remainingIds);
 			}
 		}
-	}, [selectedTaskIds, deselectAllTasks, handleUndoBulkDelete, toast, t]);
-
-	// Handle bulk move of all selected tasks to a target status
-	const handleBulkMove = useCallback(
-		async (targetStatus: TaskStatus) => {
-			if (selectedTaskIds.size === 0) return;
-			const taskIds = Array.from(selectedTaskIds);
-			let failedCount = 0;
-			for (const taskId of taskIds) {
-				const result = await persistTaskStatus(taskId, targetStatus);
-				if (!result.success) failedCount++;
-			}
-			if (failedCount === 0) {
-				toast({
-					title: t("kanban.bulkMoveSuccess", { count: taskIds.length }),
-				});
-				deselectAllTasks();
-			} else {
-				toast({
-					title: t("kanban.bulkMoveError", {
-						failed: failedCount,
-						total: taskIds.length,
-					}),
-					variant: "destructive",
-				});
-			}
-		},
-		[selectedTaskIds, deselectAllTasks, toast, t],
-	);
+	}, [selectedTaskIds, deselectAllTasks, handleUndoBulkDelete, toast, t, setSelectedTaskIds]);
 
 	// Open BulkPRDialog after user confirms "mark as done" for human_review tasks
 	const handleBulkMarkDoneConfirm = useCallback(() => {
@@ -849,9 +757,11 @@ export function KanbanBoard({
 		}
 	}, [tasksByStatus.done, projectId]);
 
-	const handleDeleteTask = useCallback(async (taskId: string) => {
+	const handleDeleteTask = useCallback((taskId: string) => {
 		// Get the task information for the confirmation dialog
 		const task = useTaskStore.getState().tasks.find((t) => t.id === taskId);
+		// A card nothing has worked on goes after a few seconds, with an undo.
+		if (task && isLightCard(task)) return deleteCardsLater([task], t);
 		const taskTitle = task?.title || "Untitled";
 
 		// Open confirmation dialog instead of deleting directly
@@ -860,7 +770,7 @@ export function KanbanBoard({
 			taskId,
 			taskTitle,
 		});
-	}, []);
+	}, [t]);
 
 	// Open the duplicate dialog pre-filled with the source task so the user can
 	// edit the fields before the copy is actually created.
@@ -884,13 +794,6 @@ export function KanbanBoard({
 				const result = await restoreTask(taskId);
 
 				if (result.success) {
-					// Remove from recently deleted tasks (for UI state consistency)
-					setRecentlyDeletedTasks((prev) => {
-						const newMap = new Map(prev);
-						newMap.delete(taskId);
-						return newMap;
-					});
-
 					toast({
 						title: t("kanban.restoreSuccess"),
 						variant: "default",
@@ -933,11 +836,6 @@ export function KanbanBoard({
 		});
 
 		if (result.success && taskToDelete) {
-			// Store the deleted task for undo functionality
-			setRecentlyDeletedTasks((prev) =>
-				new Map(prev).set(deletedTaskId, taskToDelete),
-			);
-
 			toast({
 				title: t("kanban.deleteSuccessSingle", {
 					title: singleDeleteConfirm.taskTitle,
@@ -972,6 +870,7 @@ export function KanbanBoard({
 		toast,
 		t,
 		handleUndoDelete,
+		setSelectedTaskIds,
 	]);
 
 	/**
@@ -1252,8 +1151,8 @@ export function KanbanBoard({
 					.getState()
 					.tasks.find((t) => t.id === overId);
 				if (overTask) {
-					setOverColumnId(overTask.status);
-					announceColumn = getVisualColumn(overTask.status);
+					announceColumn = getBoardColumn(overTask);
+					setOverColumnId(announceColumn);
 				}
 			}
 
@@ -1281,6 +1180,9 @@ export function KanbanBoard({
 				providedTask ||
 				useTaskStore.getState().tasks.find((t) => t.id === taskId);
 			const result = await persistTaskStatus(taskId, newStatus);
+			if (result.success && task) {
+				recordMoves([{ id: taskId, from: task.status, to: newStatus }], t("tasks:kanban.undoLabels.move", { count: 1 }));
+			}
 
 			if (!result.success) {
 				if (result.worktreeExists) {
@@ -1293,8 +1195,8 @@ export function KanbanBoard({
 						isProcessing: false,
 						error: undefined,
 					});
-				} else {
-					// Show error toast for other failures
+				} else if (!result.held) {
+					// Show error toast for other failures (a held card has its own dialog)
 					toast({
 						title: t("common:errors.operationFailed"),
 						description: result.error || t("common:errors.unknownError"),
@@ -1417,6 +1319,26 @@ export function KanbanBoard({
 		}
 	}, [maxParallelTasks]);
 
+	const bulkEdits = useBoardBulkEdits({
+		projectId,
+		maxParallelTasks,
+		heldInQueue: manuallyQueuedTaskIdsRef.current,
+		processQueue,
+		selectedTasks,
+		deselectAllTasks,
+		openDeleteConfirm: handleOpenDeleteConfirm,
+	});
+	const boardSelection = useMemo(
+		() => ({
+			selectedTaskIds,
+			onSetType: bulkEdits.setType,
+			onSetPriority: bulkEdits.setPriority,
+			onDelete: bulkEdits.deleteSelection,
+			onClear: deselectAllTasks,
+		}),
+		[selectedTaskIds, bulkEdits, deselectAllTasks],
+	);
+
 	/**
 	 * Move all backlog tasks to queue
 	 */
@@ -1492,7 +1414,6 @@ export function KanbanBoard({
 						parsed.type === "jira-workitems"
 					) {
 						setIsDraggingAzureDevOps(true);
-						setDraggedAzureDevOpsItems(parsed.workItems || []);
 
 						// Auto-scroll functionality
 						const kanbanContainer = document.querySelector(
@@ -1575,18 +1496,9 @@ export function KanbanBoard({
 			}
 
 			// Method 2: Fallback to DOM traversal
-			const fromClosest = target.closest("[data-column-status]");
-			if (fromClosest) return fromClosest as HTMLElement;
-
-			let currentElement = target.parentElement;
-			while (currentElement) {
-				if (currentElement.dataset.columnStatus !== undefined) {
-					return currentElement;
-				}
-				currentElement = currentElement.parentElement;
-			}
-
-			return null;
+			// (closest() already walks every ancestor: nothing above it carries
+			// the attribute when it finds none.)
+			return target.closest<HTMLElement>("[data-column-status]");
 		};
 
 		const handleDrop = async (event: DragEvent) => {
@@ -1620,7 +1532,7 @@ export function KanbanBoard({
 							setImportConfirmDialog({
 								open: true,
 								workItems: parsed.workItems,
-								targetColumn: columnStatus,
+								targetColumn: columnStatus as TaskStatus, // IMPORT_ALLOWED_COLUMNS: statuses only
 								isImporting: false,
 								source: isJira ? "jira" : "azure-devops",
 							});
@@ -1639,14 +1551,12 @@ export function KanbanBoard({
 				});
 			} finally {
 				setIsDraggingAzureDevOps(false);
-				setDraggedAzureDevOpsItems([]);
 				setOverColumnId(null);
 			}
 		};
 
 		const handleDragEnd = () => {
 			setIsDraggingAzureDevOps(false);
-			setDraggedAzureDevOpsItems([]);
 			setOverColumnId(null);
 		};
 
@@ -1666,11 +1576,9 @@ export function KanbanBoard({
 	useEffect(() => {
 		let isExternalDragging = false;
 
-		const handleExternalDragStart = (event: Event) => {
-			const customEvent = event as CustomEvent;
+		const handleExternalDragStart = () => {
 			isExternalDragging = true;
 			setIsDraggingAzureDevOps(true);
-			setDraggedAzureDevOpsItems(customEvent.detail.workItems || []);
 		};
 
 		const handleDragOver = (event: DragEvent) => {
@@ -1741,7 +1649,6 @@ export function KanbanBoard({
 		const handleExternalDragEnd = () => {
 			isExternalDragging = false;
 			setIsDraggingAzureDevOps(false);
-			setDraggedAzureDevOpsItems([]);
 			setOverColumnId(null);
 		};
 
@@ -2070,9 +1977,10 @@ export function KanbanBoard({
 				.tasks.find((t) => t.id === activeTaskId);
 			if (!task) return;
 			oldStatus = task.status;
+			if (await outcomeDrop(task, overId)) return;
 
 			// Check if dropped on a column
-			if (isValidDropColumn(overId)) {
+			if (isValidDropColumn(overId) && !isOutcomeColumn(overId)) {
 				newStatus = overId;
 			} else {
 				// Check if dropped on another task - move to that task's column
@@ -2086,8 +1994,8 @@ export function KanbanBoard({
 					if (!task) return;
 
 					// Compare visual columns
-					const taskVisualColumn = getVisualColumn(task.status);
-					const overTaskVisualColumn = getVisualColumn(overTask.status);
+					const taskVisualColumn = getBoardColumn(task);
+					const overTaskVisualColumn = getBoardColumn(overTask);
 
 					// Same visual column: reorder within column
 					if (taskVisualColumn === overTaskVisualColumn) {
@@ -2147,52 +2055,16 @@ export function KanbanBoard({
 			}
 
 			if (!newStatus || newStatus === oldStatus) return;
-			if (newStatus === "pr_created" && !canMoveTaskTo(task, newStatus)) {
-				toast({ title: t("kanban.prOpenNeedsPr"), variant: "destructive" });
+			// A selection moves as one: each card by the single-drop rules (lib/group-move.ts).
+			if (selectedTaskIds.has(activeTaskId) && selectedTaskIds.size > 1) {
+				const target = getVisualColumn(newStatus);
+				// human_review → done goes through the PR flow, after a confirmation.
+				if (selectedColumnStatus === "human_review" && target === "done") setBulkMarkDoneConfirmOpen(true);
+				else await bulkEdits.moveSelection(target);
 				return;
 			}
-
-			// ============================================
-			// BULK DRAG: Move all selected tasks together
-			// ============================================
-			const isDraggedTaskInSelection =
-				selectedTaskIds.has(activeTaskId) && selectedTaskIds.size > 1;
-			if (isDraggedTaskInSelection) {
-				const targetVisualColumn = getVisualColumn(newStatus);
-
-				// Mixed selection: abort with warning
-				if (selectedColumnStatus === null) {
-					toast({
-						title: t("kanban.mixedColumnWarning"),
-						variant: "destructive",
-					});
-					return;
-				}
-
-				// Invalid transition: abort with toast
-				if (
-					!VALID_BULK_TRANSITIONS[selectedColumnStatus].includes(
-						targetVisualColumn,
-					)
-				) {
-					toast({
-						title: t("kanban.invalidBulkTransition"),
-						variant: "destructive",
-					});
-					return;
-				}
-
-				// human_review → done requires confirmation before opening BulkPRDialog
-				if (
-					selectedColumnStatus === "human_review" &&
-					targetVisualColumn === "done"
-				) {
-					setBulkMarkDoneConfirmOpen(true);
-					return;
-				}
-
-				// Valid transition: move all selected tasks
-				await handleBulkMove(newStatus);
+			if (newStatus === "pr_created" && !canMoveTaskTo(task, newStatus)) {
+				toast({ title: t("kanban.prOpenNeedsPr"), variant: "destructive" });
 				return;
 			}
 
@@ -2264,7 +2136,7 @@ export function KanbanBoard({
 			}
 
 			// Update task order for the new column - add task to top of new column
-			const oldVisualColumn = getVisualColumn(oldStatus);
+			const oldVisualColumn = getBoardColumn(task);
 			const newVisualColumn = getVisualColumn(newStatus);
 
 			if (oldVisualColumn !== newVisualColumn) {
@@ -2299,26 +2171,18 @@ export function KanbanBoard({
 			processQueue,
 			selectedTaskIds,
 			selectedColumnStatus,
-			handleBulkMove,
+			bulkEdits,
 			toast,
 			t,
 			setColumnOrder,
 			announce,
 			getColumnLabel,
-			kanbanSort,
+			kanbanSort, outcomeDrop,
 		],
 	);
-
-	// Ajout ou correction de la déclaration de l'état pour la boîte de dialogue de paramètres projet
-	// Ajout d'un compteur pour forcer le remount d'AppSettingsDialog
-	const [settingsDialogKey, _setSettingsDialogKey] = useState(0);
-	const [isProjectSettingsOpen, setIsProjectSettingsOpen] = useState(false);
-	const [settingsDialogProjectId, _setSettingsDialogProjectId] = useState<
-		string | undefined
-	>(undefined);
-
+	const laneDrag = useLaneDrag(handleDragOver, handleDragEnd, selectedTasks);
 	return (
-		<div className="flex h-full flex-col">
+		<div className="flex h-full flex-col" data-board-selecting={selectedTaskIds.size > 0 ? "" : undefined} data-board-group-drag={isDraggingBulkSelected ? "" : undefined}>
 			{/* Screen-reader live region for drag-and-drop announcements */}
 			<div
 				aria-live="polite"
@@ -2360,7 +2224,7 @@ export function KanbanBoard({
 						</Button>
 					)}
 					{/* Unified toolbar: search, filters, sort, and quick commands */}
-					<KanbanToolbar projectPath={project?.path} />
+					<KanbanToolbar projectPath={project?.path} onOpenTask={onTaskClick} />
 					{/* Flow signal: a clickable list of cards that have idled too long.
 					    Plain label + concrete task list so the value is obvious. */}
 					{agingList.length > 0 && (
@@ -2428,9 +2292,9 @@ export function KanbanBoard({
 													<span className="block text-xs text-muted-foreground">
 														{t("kanban.stale.rowMeta", {
 															column:
-																getColumnLabel(getVisualColumn(task.status)) ??
+																getColumnLabel(getBoardColumn(task)) ??
 																"",
-															duration: formatAgingDuration(hours),
+															duration: formatAgingDuration(hours, t),
 														})}
 													</span>
 												</span>
@@ -2440,29 +2304,6 @@ export function KanbanBoard({
 								</ScrollArea>
 							</PopoverContent>
 						</Popover>
-					)}
-					{/* Abandoned filter: shown greyed on the board by default; this chip
-					    toggles hiding them. Only appears when there are abandoned tasks. */}
-					{abandonedCount > 0 && (
-						<button
-							type="button"
-							onClick={toggleHideAbandoned}
-							aria-pressed={hideAbandoned}
-							className={cn(
-								"flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium tabular-nums transition-colors",
-								hideAbandoned
-									? "border-warning/50 bg-warning/20 text-warning hover:bg-warning/25"
-									: "border-border/60 bg-muted/30 text-muted-foreground hover:bg-muted/50",
-							)}
-							title={
-								hideAbandoned
-									? t("kanban.abandoned.showChip")
-									: t("kanban.abandoned.hideChip")
-							}
-						>
-							<Ban className="h-3.5 w-3.5" />
-							{t("kanban.abandoned.chip", { count: abandonedCount })}
-						</button>
 					)}
 					{/* Cost forecast: sum of applied Formula Lab estimates */}
 					{costForecast.totalUsd > 0 && (
@@ -2578,25 +2419,25 @@ export function KanbanBoard({
 					)}
 				</div>
 			</div>
-			{/* Kanban columns */}
 			<DndContext
 				sensors={sensors}
 				collisionDetection={closestCorners}
 				onDragStart={handleDragStart}
-				onDragOver={handleDragOver}
-				onDragEnd={handleDragEnd}
+				onDragOver={laneDrag.onDragOver}
+				onDragEnd={laneDrag.onDragEnd}
 			>
+				<BoardSelectionContext.Provider value={boardSelection}>
 				<SortableContext
 					items={columnOrder.map((s) => `col-${s}`)}
 					strategy={horizontalListSortingStrategy}
 				>
-					<div className="flex flex-1 gap-3 overflow-x-auto overflow-y-hidden min-h-0 p-2">
-						{columnOrder.map((status) => (
+					<BoardLanes projectId={projectId} columnOrder={columnOrder} tasksByStatus={tasksByStatus} onOpenTask={onTaskClick} renderColumn={(status, columnTasks, droppableId) => (
 							<SortableColumnWrapper
-								key={status}
+								key={droppableId ?? status}
 								sortableId={`col-${status}`}
+								droppableId={droppableId}
 								status={status}
-								tasks={tasksByStatus[status]}
+								tasks={columnTasks}
 								onTaskClick={onTaskClick}
 								onStatusChange={handleStatusChange}
 								isOver={
@@ -2604,25 +2445,16 @@ export function KanbanBoard({
 									overColumnId === status &&
 									(!isDraggingAzureDevOps ||
 										IMPORT_ALLOWED_COLUMNS.has(status)) &&
-									(!isDraggingBulkSelected ||
-										selectedColumnStatus === null ||
-										VALID_BULK_TRANSITIONS[selectedColumnStatus].includes(
-											status,
-										))
+									(!isDraggingBulkSelected || groupTargets.has(status))
 								}
 								isImportForbidden={
 									!isDraggingColumn &&
 									((isDraggingAzureDevOps &&
 										overColumnId === status &&
 										!IMPORT_ALLOWED_COLUMNS.has(status)) ||
-										(isDraggingBulkSelected &&
-											overColumnId === status &&
-											selectedColumnStatus !== null &&
-											!VALID_BULK_TRANSITIONS[selectedColumnStatus].includes(
-												status,
-											)))
+										(isDraggingBulkSelected && overColumnId === status && !groupTargets.has(status)))
 								}
-								onAddClick={status === "backlog" ? onNewTaskClick : undefined}
+								onAddClick={isQuickAddColumn(status) ? onNewTaskClick : undefined}
 								onQueueAll={status === "backlog" ? handleQueueAll : undefined}
 								onQueueSettings={
 									status === "queue"
@@ -2656,6 +2488,7 @@ export function KanbanBoard({
 								onSelectAll={() => selectAllTasks(status)}
 								onDeselectAll={deselectAllTasks}
 								onToggleSelect={toggleTaskSelection}
+								onCardSelectGesture={selectGesture}
 								onDeleteTask={handleDeleteTask}
 								onDuplicateTask={handleDuplicateTask}
 								onViewPRFiles={handleViewPRFiles}
@@ -2669,183 +2502,39 @@ export function KanbanBoard({
 								isLocked={columnPreferences?.[status]?.isLocked}
 								onToggleLocked={() => handleToggleColumnLocked(status)}
 							/>
-						))}
-					</div>
+						)} />
 				</SortableContext>
+				</BoardSelectionContext.Provider>
 
 				{/* Drag overlay - enhanced visual feedback */}
 				<DragOverlay>
 					{activeTask ? (
-						<div className="drag-overlay-card relative">
-							<TaskCard
-								task={activeTask}
-								onClick={() => {
-									/* noop */
-								}}
-							/>
-							{isDraggingBulkSelected && (
-								<div className="absolute -top-2 -right-2 flex items-center justify-center h-6 min-w-6 px-1.5 rounded-full bg-primary text-primary-foreground text-xs font-bold shadow-lg border-2 border-background">
-									{selectedTaskIds.size}
-								</div>
-							)}
-						</div>
+						<DragOverlayCard task={activeTask} count={isDraggingBulkSelected ? selectedTaskIds.size : 1} />
 					) : null}
 				</DragOverlay>
 			</DndContext>
-
+			<BoardKeyboard
+				onSelectColumn={selectAllTasks}
+				hasSelection={selectedTaskIds.size > 0}
+				onClearSelection={deselectAllTasks}
+				onDeleteSelection={bulkEdits.deleteSelection}
+				onUndo={bulkEdits.undo}
+				announce={announce}
+			/>
 			{selectedTaskIds.size > 0 && (
-				<div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
-					<div className="flex items-center gap-3 px-4 py-3 rounded-2xl border border-border bg-card shadow-lg backdrop-blur-sm">
-						<span className="text-sm font-medium text-foreground">
-							{t("kanban.selectedCountOther", { count: selectedTaskIds.size })}
-						</span>
-						<div className="w-px h-5 bg-border" />
-
-						{/* Context-sensitive move actions based on selected column */}
-						{selectedColumnStatus === null ? (
-							<span className="text-xs text-muted-foreground flex items-center gap-1.5">
-								<Ban className="h-3.5 w-3.5" />
-								{t("kanban.mixedColumnWarning")}
-							</span>
-						) : selectedColumnStatus === "backlog" ? (
-							<>
-								<Button
-									variant="outline"
-									size="sm"
-									className="gap-2"
-									onClick={() => handleBulkMove("queue")}
-								>
-									<ChevronRight className="h-4 w-4" />
-									{t("columns.queue")}
-								</Button>
-								<Button
-									variant="default"
-									size="sm"
-									className="gap-2"
-									onClick={() => handleBulkMove("in_progress")}
-								>
-									<ChevronsRight className="h-4 w-4" />
-									{t("columns.in_progress")}
-								</Button>
-							</>
-						) : selectedColumnStatus === "queue" ? (
-							<>
-								<Button
-									variant="outline"
-									size="sm"
-									className="gap-2"
-									onClick={() => handleBulkMove("backlog")}
-								>
-									<ChevronLeft className="h-4 w-4" />
-									{t("columns.backlog")}
-								</Button>
-								<Button
-									variant="default"
-									size="sm"
-									className="gap-2"
-									onClick={() => handleBulkMove("in_progress")}
-								>
-									<ChevronsRight className="h-4 w-4" />
-									{t("columns.in_progress")}
-								</Button>
-							</>
-						) : selectedColumnStatus === "in_progress" ? (
-							<>
-								<Button
-									variant="outline"
-									size="sm"
-									className="gap-2"
-									onClick={() => handleBulkMove("queue")}
-								>
-									<ChevronLeft className="h-4 w-4" />
-									{t("columns.queue")}
-								</Button>
-								<Button
-									variant="default"
-									size="sm"
-									className="gap-2"
-									onClick={() => handleBulkMove("ai_review")}
-								>
-									<ChevronsRight className="h-4 w-4" />
-									{t("columns.ai_review")}
-								</Button>
-							</>
-						) : selectedColumnStatus === "ai_review" ? (
-							<>
-								<Button
-									variant="outline"
-									size="sm"
-									className="gap-2"
-									onClick={() => handleBulkMove("in_progress")}
-								>
-									<ChevronLeft className="h-4 w-4" />
-									{t("columns.in_progress")}
-								</Button>
-								<Button
-									variant="default"
-									size="sm"
-									className="gap-2"
-									onClick={() => handleBulkMove("human_review")}
-								>
-									<ChevronsRight className="h-4 w-4" />
-									{t("columns.human_review")}
-								</Button>
-							</>
-						) : selectedColumnStatus === "human_review" ? (
-							<>
-								<Button
-									variant="outline"
-									size="sm"
-									className="gap-2"
-									onClick={() => handleBulkMove("ai_review")}
-								>
-									<ChevronLeft className="h-4 w-4" />
-									{t("columns.ai_review")}
-								</Button>
-								<Button
-									variant="default"
-									size="sm"
-									className="gap-2"
-									onClick={() => setBulkMarkDoneConfirmOpen(true)}
-								>
-									<CheckCheck className="h-4 w-4" />
-									{t("kanban.markAsDone")}
-								</Button>
-							</>
-						) : selectedColumnStatus === "done" ? (
-							<Button
-								variant="default"
-								size="sm"
-								className="gap-2"
-								onClick={handleOpenBulkPRDialog}
-							>
-								<GitPullRequest className="h-4 w-4" />
-								{t("kanban.createPRs")}
-							</Button>
-						) : null}
-
-						<div className="w-px h-5 bg-border" />
-						<Button
-							variant="ghost"
-							size="sm"
-							className="gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
-							onClick={handleOpenDeleteConfirm}
-						>
-							<Trash2 className="h-4 w-4" />
-							{t("kanban.deleteSelected")}
-						</Button>
-						<Button
-							variant="ghost"
-							size="sm"
-							className="gap-2 text-muted-foreground hover:text-foreground"
-							onClick={deselectAllTasks}
-						>
-							<X className="h-4 w-4" />
-							{t("kanban.clearSelection")}
-						</Button>
-					</div>
-				</div>
+				<BulkActionBar
+					count={selectedTaskIds.size}
+					column={selectedColumnStatus}
+					onMove={bulkEdits.moveSelection}
+					onMarkDone={() => setBulkMarkDoneConfirmOpen(true)}
+					onCreatePRs={handleOpenBulkPRDialog}
+					onSetType={bulkEdits.setType}
+					onSetPriority={bulkEdits.setPriority}
+					onDelete={bulkEdits.deleteSelection}
+					onClear={deselectAllTasks}
+				/>
 			)}
+			<BoardDialogs />
 
 			{/* Bulk "mark as done" confirmation dialog (human_review → done + PR creation) */}
 			<AlertDialog
@@ -3129,17 +2818,6 @@ export function KanbanBoard({
 				onComplete={handleBulkPRComplete}
 			/>
 
-			{/* Boîte de dialogue paramètres projet (AppSettingsDialog) */}
-			{project && settingsDialogProjectId && (
-				<AppSettingsDialog
-					key={settingsDialogKey + settingsDialogProjectId}
-					open={!!isProjectSettingsOpen}
-					onOpenChange={setIsProjectSettingsOpen}
-					initialProjectSection="general"
-					initialProjectId={settingsDialogProjectId}
-				/>
-			)}
-
 			{/* Azure DevOps Import Panel */}
 			{projectId && (
 				<AzureDevOpsSidePanel
@@ -3147,16 +2825,6 @@ export function KanbanBoard({
 					onOpenChange={setAzureDevOpsPanelOpen}
 					projectId={projectId}
 					onOpenSettings={onOpenAzureDevOpsSettings}
-					onWorkItemsImported={async (workItems, targetStatus) => {
-						// Show the import confirmation dialog
-						setImportConfirmDialog({
-							open: true,
-							workItems,
-							targetColumn: targetStatus,
-							isImporting: false,
-							source: "azure-devops",
-						});
-					}}
 				/>
 			)}
 
@@ -3167,16 +2835,6 @@ export function KanbanBoard({
 					onOpenChange={setJiraPanelOpen}
 					projectId={projectId}
 					onOpenSettings={onOpenJiraSettings}
-					onWorkItemsImported={async (workItems, targetStatus) => {
-						// Show the import confirmation dialog
-						setImportConfirmDialog({
-							open: true,
-							workItems,
-							targetColumn: targetStatus,
-							isImporting: false,
-							source: "jira",
-						});
-					}}
 				/>
 			)}
 
@@ -3198,6 +2856,7 @@ export function KanbanBoard({
 				targetColumn={importConfirmDialog.targetColumn}
 				isImporting={importConfirmDialog.isImporting}
 				onConfirm={handleImportConfirm}
+				source={importConfirmDialog.source}
 				onCancel={() => {
 					// Close the side panel when user cancels the import dialog
 					setAzureDevOpsPanelOpen(false);

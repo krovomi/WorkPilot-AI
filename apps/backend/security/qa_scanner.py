@@ -16,11 +16,19 @@ The QA fixer can auto-resolve critical issues.
 
 from __future__ import annotations
 
+import os
 import re
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from .finding_priority import (
+    SECTION_TITLES,
+    EvidenceProvider,
+    PriorityContext,
+    RankedFinding,
+    rank,
+)
 from .vulnerability_scanner import (
     ScanResult,
     Severity,
@@ -162,6 +170,14 @@ class SecurityScanSummary:
     passed: bool = True  # True if no critical/high issues
     blocking: bool = False  # True if build should be blocked (critical issues)
     duration_seconds: float = 0.0
+    #: The findings ranked by reach and production use (#364), when known.
+    ranking: list[RankedFinding] | None = None
+    priority_notes: list[str] = field(default_factory=list)
+
+    def apply_priorities(self, context: PriorityContext) -> None:
+        """Rank the findings; what blocks and what passes does not change."""
+        self.ranking = rank(self.all_vulnerabilities, context)
+        self.priority_notes = list(context.notes)
 
     @property
     def all_vulnerabilities(self) -> list[Vulnerability]:
@@ -215,7 +231,66 @@ class SecurityScanSummary:
         )
         lines.append(f"Scan duration: {self.duration_seconds:.1f}s\n")
 
-        # Detail sections by severity
+        if self.ranking is not None:
+            lines.extend(self._priority_sections(self.ranking))
+        else:
+            lines.extend(self._severity_sections(all_vulns))
+
+        if self.scan_result.scan_errors:
+            lines.append("\n### Scan Errors\n")
+            for err in self.scan_result.scan_errors:
+                lines.append(f"- {err}")
+
+        return "\n".join(lines)
+
+    @staticmethod
+    def _finding_lines(v: Vulnerability) -> list[str]:
+        location = (
+            f"`{v.file}:{v.line}`"
+            if v.file and v.line
+            else (f"`{v.file}`" if v.file else "")
+        )
+        lines = [f"- **[{v.id}] {v.title}**"]
+        if location:
+            lines.append(f"  - Location: {location}")
+        if v.dependency:
+            lines.append(f"  - Dependency: `{v.dependency}`")
+        if v.cwe:
+            lines.append(f"  - CWE: {v.cwe}")
+        lines.append(f"  - {v.description}")
+        if v.remediation:
+            lines.append(f"  - 💡 Fix: {v.remediation}")
+        return lines
+
+    def _priority_sections(self, ranking: list[RankedFinding]) -> list[str]:
+        counts = dict.fromkeys(SECTION_TITLES, 0)
+        for ranked in ranking:
+            counts[ranked.section] += 1
+        lines = [
+            "**Priority:** "
+            + " | ".join(f"{title}: {counts[s]}" for s, title in SECTION_TITLES.items())
+            + "\n",
+            "Priority = base CVSS × reach × production use. It orders the "
+            "findings; what blocks the build still follows severity.\n",
+        ]
+        lines.extend(f"> ℹ️ {note}\n" for note in self.priority_notes)
+        for section, title in SECTION_TITLES.items():
+            group = [r for r in ranking if r.section == section]
+            if not group:
+                continue
+            lines.append(f"\n### {title} ({len(group)})\n")
+            for ranked in group:
+                finding = self._finding_lines(ranked.vulnerability)
+                finding.insert(
+                    1,
+                    f"  - Priority {ranked.priority:g} · "
+                    f"{ranked.vulnerability.severity.value} · {', '.join(ranked.tags)}",
+                )
+                lines.extend(finding)
+        return lines
+
+    def _severity_sections(self, all_vulns: list[Vulnerability]) -> list[str]:
+        lines: list[str] = []
         for severity in (
             Severity.CRITICAL,
             Severity.HIGH,
@@ -227,45 +302,35 @@ class SecurityScanSummary:
                 continue
             lines.append(f"\n### {severity.value.upper()} ({len(group)})\n")
             for v in group:
-                location = (
-                    f"`{v.file}:{v.line}`"
-                    if v.file and v.line
-                    else (f"`{v.file}`" if v.file else "")
-                )
-                lines.append(f"- **[{v.id}] {v.title}**")
-                if location:
-                    lines.append(f"  - Location: {location}")
-                if v.cwe:
-                    lines.append(f"  - CWE: {v.cwe}")
-                lines.append(f"  - {v.description}")
-                if v.remediation:
-                    lines.append(f"  - 💡 Fix: {v.remediation}")
-
-        if self.scan_result.scan_errors:
-            lines.append("\n### Scan Errors\n")
-            for err in self.scan_result.scan_errors:
-                lines.append(f"- {err}")
-
-        return "\n".join(lines)
+                lines.extend(self._finding_lines(v))
+        return lines
 
     def to_qa_issues(self) -> list[dict]:
         """Convert high+ vulnerabilities to QA issue format for implementation_plan.json."""
+        # Ranked, the fixer meets the exposed findings first; every critical
+        # and high one stays in the list, whatever its rank.
+        ranked: list[tuple[Vulnerability, RankedFinding | None]] = (
+            [(r.vulnerability, r) for r in self.ranking]
+            if self.ranking is not None
+            else [(v, None) for v in self.all_vulnerabilities]
+        )
         issues = []
-        for v in self.all_vulnerabilities:
+        for v, rank_of in ranked:
             if v.severity in (Severity.CRITICAL, Severity.HIGH):
-                issues.append(
-                    {
-                        "type": v.severity.value,
-                        "title": f"Security: {v.title}",
-                        "location": f"{v.file}:{v.line}"
-                        if v.file and v.line
-                        else v.file or "",
-                        "fix_required": v.remediation
-                        or "Fix this security vulnerability",
-                        "source": v.source.value,
-                        "cwe": v.cwe,
-                    }
-                )
+                issue = {
+                    "type": v.severity.value,
+                    "title": f"Security: {v.title}",
+                    "location": f"{v.file}:{v.line}"
+                    if v.file and v.line
+                    else v.file or "",
+                    "fix_required": v.remediation or "Fix this security vulnerability",
+                    "source": v.source.value,
+                    "cwe": v.cwe,
+                }
+                if rank_of is not None:
+                    issue["priority"] = rank_of.priority
+                    issue["section"] = rank_of.section.value
+                issues.append(issue)
         return issues
 
 
@@ -338,8 +403,8 @@ class QASecurityScanner:
         findings: list[Vulnerability] = []
 
         for source_file in self._iter_source_files():
-            rel_path = str(source_file.relative_to(self.project_dir)).replace("\\", "/")
-            ext = source_file.suffix.lower()
+            rel_path = source_file.relative_to(self.project_dir).as_posix()
+            ext = _scan_extension(source_file)
 
             try:
                 lines = source_file.read_text(
@@ -400,13 +465,22 @@ class QASecurityScanner:
     }
 
     def _iter_source_files(self):
-        for path in self.project_dir.rglob("*"):
-            if not path.is_file():
-                continue
-            if any(part in self._SKIP_DIRS for part in path.parts):
-                continue
-            if path.suffix.lower() in self._SCAN_EXTENSIONS:
-                yield path
+        # Only the folders *inside* the project are skipped: a task's worktree
+        # lives under `.workpilot/worktrees/`, which must not hide all of it.
+        for root, dirs, files in os.walk(self.project_dir):
+            dirs[:] = sorted(d for d in dirs if d not in self._SKIP_DIRS)
+            for name in sorted(files):
+                path = Path(root) / name
+                if _scan_extension(path) in self._SCAN_EXTENSIONS:
+                    yield path
+
+
+def _scan_extension(path: Path) -> str:
+    """`.env` and `.env.local` have no suffix worth the name: both are `.env`."""
+    name = path.name.lower()
+    if name == ".env" or name.startswith(".env."):
+        return ".env"
+    return path.suffix.lower()
 
 
 # =============================================================================
@@ -417,6 +491,7 @@ class QASecurityScanner:
 async def run_qa_security_scan(
     project_dir: Path,
     spec_dir: Path,
+    evidence: EvidenceProvider | None = None,
 ) -> tuple[bool, str, list[dict]]:
     """
     Run a security scan and append the findings to the QA report.
@@ -430,9 +505,14 @@ async def run_qa_security_scan(
         - passed: True if no critical/high issues
         - markdown_section: Markdown to append to qa_report.md
         - qa_issues: List of issue dicts for implementation_plan.json
+
+    ``evidence``, when given, ranks the findings by reach and production use
+    (``security_reach.evidence_for``); it never changes ``passed``.
     """
     scanner = QASecurityScanner(project_dir)
     summary = scanner.scan()
+    if evidence is not None and summary.all_vulnerabilities:
+        summary.apply_priorities(evidence(project_dir, summary.all_vulnerabilities))
 
     # Append to qa_report.md
     qa_report = spec_dir / "qa_report.md"

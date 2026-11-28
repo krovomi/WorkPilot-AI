@@ -23,12 +23,15 @@ import os
 import sys
 import tempfile
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+from server.authz.groups import project_group_names
 from server.config import get_settings
 from server.db.engine import get_session_factory
 from server.db.models import AgentRun, SpecIndex, User
+from server.services import ai_accounts
 from server.services.events import emit_board_event
 from server.services.needs_you import notify_needs_you
 from server.services.push import notify_run_finished
@@ -39,10 +42,18 @@ from server.services.run_isolation import (
     prepare_run,
     project_brain_env,
 )
-from server.services.secrets import get_user_secret
+from server.services.secrets import SecretsVaultError, get_user_secret
+from server.services.status_history import follow_status, stop_following
+from server.services.usage_records import finish_collecting, usage_channel
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
+
+#: The groups of the person who started a run, a JSON list of names: the run
+#: recalls the ``team:`` memories of those groups, and of no other
+#: (``brain.lifecycle.scopes.TEAMS_ENV``).
+RECALL_TEAMS_ENV = "WORKPILOT_RECALL_TEAMS"
 
 #: Error of a run the server was running when it stopped.
 INTERRUPTED = "Interrupted: the server stopped while the run was queued or running"
@@ -127,8 +138,14 @@ def build_command(
     model: str | None,
     scratch: Path,
     pr: dict | None = None,
+    may_skip_review: bool = False,
 ) -> list[str]:
-    """The argv of one run. `scratch` is a private directory the run may use."""
+    """The argv of one run. `scratch` is a private directory the run may use.
+
+    ``may_skip_review`` is whether the person who starts the run holds the
+    approval right (``review.approve``): only then does a card that asks for
+    no review go on to its build.
+    """
     if phase == SPEC_PHASE:
         spec_dir = Path(server_path) / ".workpilot" / "specs" / spec_name
         requirements = _json_file(spec_dir / "requirements.json")
@@ -154,10 +171,18 @@ def build_command(
             str(spec_dir),
         ]
         # As in the app: a card that asks for no review goes on to its build
-        # once its spec is written; one that does waits for a member's approval.
-        if metadata.get("requireReviewBeforeCoding", True) is False:
+        # once its spec is written, when the person starting it may approve;
+        # otherwise it waits for a member's approval.
+        skip_review = metadata.get("requireReviewBeforeCoding", True) is False
+        if skip_review and may_skip_review:
             cmd.append("--auto-approve")
         else:
+            target = spec_dir / "task_metadata.json"
+            if skip_review and not target.is_symlink():
+                # The card now waits for a review: say so where the board and
+                # the notifications read it (never through a link).
+                metadata["requireReviewBeforeCoding"] = True
+                target.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
             cmd.append("--no-build")
     else:
         cmd = [
@@ -188,6 +213,79 @@ USER_SECRET_ENV: dict[str, str] = {
 
 class RunManagerError(RuntimeError):
     pass
+
+
+async def _account_keys(db: AsyncSession, user_id: str) -> dict[str, str]:
+    """The keys of the starter's default AI accounts (``services/ai_accounts``).
+
+    They replace what the deployment set for the same provider: the run is
+    the starter's, so it spends on their account. A key the vault cannot
+    decrypt leaves every provider on the deployment's credentials, logged
+    without the key.
+    """
+    try:
+        return await ai_accounts.run_env(db, user_id)
+    except SecretsVaultError as e:
+        logger.warning("Could not read the AI accounts of a run: %s", type(e).__name__)
+        return {}
+
+
+#: How to read and keep a spec's approval around a build: installed by the
+#: board (``shared_board.review``), since the server imports no feature unit
+#: (``tests/test_import_contracts.py``) and the approval lives in ``review``.
+_approval_holds: Callable[[Path], bool] | None = None
+_carry_approval: Callable[[Path], None] | None = None
+
+
+def set_approval_carry(
+    holds: Callable[[Path], bool] | None, carry: Callable[[Path], None] | None
+) -> None:
+    """Install the approval check a build starts with, and the carry-over
+    that keeps that approval over the plan the build wrote.
+
+    Without the carry-over every build left the approval stale (it covers the
+    plan, and a build writes its progress there), so a retry, a resume or the
+    build a request for changes starts stopped at "review required"."""
+    global _approval_holds, _carry_approval
+    _approval_holds, _carry_approval = holds, carry
+
+
+@dataclass(frozen=True)
+class RunEnded:
+    """A run the manager let go of: its project, card, phase and outcome."""
+
+    project_id: str
+    spec_name: str
+    phase: str
+    status: str
+
+
+#: Told of every run that ended, once the manager let go of it: installed by
+#: the execution waves (``shared_features.waves.driver``), which then take
+#: their next step and time merge conflicts, for the same reason as the
+#: approval carry.
+_run_ended: Callable[[RunEnded], None] | None = None
+
+
+def set_run_ended_listener(listener: Callable[[RunEnded], None] | None) -> None:
+    """Install what hears that a run of a project ended (or nothing)."""
+    global _run_ended
+    _run_ended = listener
+
+
+def _approved_before_build(phase: str, spec_dir: Path) -> bool:
+    return (
+        phase == "build" and _approval_holds is not None and _approval_holds(spec_dir)
+    )
+
+
+def _keep_approval(spec_dir: Path) -> None:
+    if _carry_approval is None:
+        return
+    try:
+        _carry_approval(spec_dir)
+    except OSError as exc:
+        logger.warning("Approval of %s not carried over: %s", spec_dir.name, exc)
 
 
 def _mint_ws_token(run_id: str, hours: int = 12) -> str:
@@ -281,6 +379,8 @@ class RunManager:
         self._tracked: set[str] = set()
         # run_id -> project_id of the runs above: what a project delete stops.
         self._projects: dict[str, str] = {}
+        # run_id -> who started it: what "stop my agents" stops.
+        self._starters: dict[str, str] = {}
 
     def _get_semaphore(self) -> asyncio.Semaphore:
         if self._semaphore is None:
@@ -292,9 +392,11 @@ class RunManager:
         jobs (``server.services.project_jobs``) included."""
         return self._get_semaphore()
 
-    async def run_env(self, user_id: str, run_id: str) -> dict[str, str]:
+    async def run_env(
+        self, user_id: str, run_id: str, project_id: str | None = None
+    ) -> dict[str, str]:
         """The environment of one agent process, as :meth:`_build_env`."""
-        return await self._build_env(user_id, run_id)
+        return await self._build_env(user_id, run_id, project_id)
 
     async def start_run(
         self,
@@ -306,6 +408,7 @@ class RunManager:
         model: str | None = None,
         org_id: str | None = None,
         pr: dict | None = None,
+        may_skip_review: bool = False,
     ) -> AgentRun:
         """Queue a run and return its DB row immediately (status=queued).
 
@@ -325,7 +428,7 @@ class RunManager:
             async with get_session_factory()() as quota_db:
                 # Raises HTTPException(429/402) — checked before the spec is
                 # reserved, so a refused run leaves no reservation behind.
-                await enforce_run_quota(quota_db, org_id)
+                await enforce_run_quota(quota_db, org_id, user_id, project_id)
 
         # Reserve the spec BEFORE the first await. The reservation used to
         # happen after the DB round-trip below, so two concurrent requests
@@ -349,6 +452,7 @@ class RunManager:
             raise
         self._tracked.add(run_id)
         self._projects[run_id] = project_id
+        self._starters[run_id] = user_id
 
         asyncio.get_running_loop().create_task(
             self._execute(
@@ -361,6 +465,7 @@ class RunManager:
                 user_id=user_id,
                 model=model,
                 pr=pr,
+                may_skip_review=may_skip_review,
             )
         )
         return run
@@ -382,7 +487,12 @@ class RunManager:
         self._cancelled.add(run_id)
         proc = self._active.get(run_id)
         if proc is not None:
-            proc.terminate()
+            try:
+                proc.terminate()
+            except ProcessLookupError:
+                # It ended on its own and is not reaped yet: nothing to stop.
+                # Windows reports it here; elsewhere asyncio ignores it.
+                pass
         return True
 
     async def stop_project(
@@ -395,13 +505,40 @@ class RunManager:
         longer exists, then record its end on a row that is gone. Returns how
         many runs were stopped; gives up waiting after ``timeout`` seconds.
         """
-        runs = [run for run, owner in self._projects.items() if owner == project_id]
-        for run_id in runs:
-            await self.cancel_run(run_id)
+        held = self.active_runs(project_id)
+        runs = await self.stop_runs(project_id)
         await wait_until_ended(
-            lambda: any(run in self._tracked for run in runs), timeout
+            lambda: any(run in self._tracked for run in held), timeout
         )
         return len(runs)
+
+    def active_runs(self, project_id: str, started_by: str | None = None) -> list[str]:
+        """The runs of a project this process holds, only ``started_by``'s when given."""
+        return [
+            run
+            for run, owner in self._projects.items()
+            if owner == project_id
+            and (started_by is None or self._starters.get(run) == started_by)
+        ]
+
+    async def stop_runs(
+        self, project_id: str, started_by: str | None = None
+    ) -> list[str]:
+        """Stop the project's runs (only those ``started_by`` started, when
+        given) without waiting for them to end; the ids stopped.
+
+        A run already stopped and still winding down is not stopped again,
+        nor counted: a second Stop right after the first one names only the
+        runs it stopped itself.
+        """
+        runs = [
+            run
+            for run in self.active_runs(project_id, started_by)
+            if run not in self._cancelled
+        ]
+        for run_id in runs:
+            await self.cancel_run(run_id)
+        return runs
 
     async def settle_orphans(self) -> int:
         """Mark failed the runs left queued or running by a server that stopped.
@@ -428,9 +565,12 @@ class RunManager:
             logger.info("Settled %d run(s) interrupted by a server stop", settled)
         return settled
 
-    async def _build_env(self, user_id: str, run_id: str) -> dict[str, str]:
+    async def _build_env(
+        self, user_id: str, run_id: str, project_id: str | None = None
+    ) -> dict[str, str]:
         """Run env: the server env without its own secrets, the run's WS token,
-        and the launcher's integration secrets (``server.services.run_env``)."""
+        the launcher's integration secrets (``server.services.run_env``) and
+        their groups in the project's organization (`RECALL_TEAMS_ENV`)."""
 
         env = run_environment(
             os.environ,
@@ -440,6 +580,10 @@ class RunManager:
             },
         )
         async with get_session_factory()() as db:
+            teams = (
+                await project_group_names(db, user_id, project_id) if project_id else []
+            )
+            env[RECALL_TEAMS_ENV] = json.dumps(teams, ensure_ascii=False)
             for kind, env_name in USER_SECRET_ENV.items():
                 try:
                     value = await get_user_secret(db, user_id, kind)
@@ -460,6 +604,7 @@ class RunManager:
                     continue
                 if value:
                     env[env_name] = value
+            env.update(await _account_keys(db, user_id))
         return env
 
     async def _execute(
@@ -473,11 +618,15 @@ class RunManager:
         user_id: str,
         model: str | None,
         pr: dict | None = None,
+        may_skip_review: bool = False,
     ) -> None:
+        status = "failed"
+        follower: asyncio.Task[None] | None = None
         try:
             async with self._get_semaphore():
                 if run_id in self._cancelled:
                     # Stopped while it waited for a slot: never start the agent.
+                    status = "cancelled"
                     await self._set_run_status(run_id, "cancelled")
                     await self._notify(
                         project_id,
@@ -493,31 +642,59 @@ class RunManager:
                 await self._notify(
                     project_id, spec_id, spec_name, run_id, phase, user_id, "running"
                 )
+                # Each status the run's agents give the card, in its history.
+                follower = asyncio.create_task(
+                    follow_status(Path(server_path), spec_name, user_id)
+                )
 
+                spec_dir = Path(server_path) / ".workpilot" / "specs" / spec_name
+                approved = _approved_before_build(phase, spec_dir)
                 with tempfile.TemporaryDirectory(prefix="workpilot-run-") as scratch:
                     cmd = build_command(
-                        phase, spec_name, server_path, model, Path(scratch), pr
+                        phase,
+                        spec_name,
+                        server_path,
+                        model,
+                        Path(scratch),
+                        pr,
+                        may_skip_review,
                     )
-                    env = await self._build_env(user_id, run_id)
+                    env = await self._build_env(user_id, run_id, project_id)
                     # Always set, empty for "every platform": the server's own
                     # environment must not choose for a card.
                     env.update(card_environment(server_path, spec_name))
                     cmd = confine(cmd, project_id, server_path, Path(scratch), env)
+                    channel = await usage_channel(project_id, user_id, run_id=run_id)
+                    env.update(channel.env)
                     logger.info("Run %s starting: %s", run_id, " ".join(cmd[:6]))
-                    proc = await asyncio.create_subprocess_exec(
-                        *cmd,
-                        cwd=str(BACKEND_DIR),
-                        env=env,
-                        # Never interactive: a prompt would wait forever.
-                        stdin=asyncio.subprocess.DEVNULL,
-                        stdout=asyncio.subprocess.DEVNULL,  # agents log to task_logs/WS
-                        stderr=asyncio.subprocess.PIPE,
-                    )
+                    spawned = False
+                    try:
+                        proc = await asyncio.create_subprocess_exec(
+                            *cmd,
+                            cwd=str(BACKEND_DIR),
+                            env=env,
+                            # Never interactive: a prompt would wait forever.
+                            stdin=asyncio.subprocess.DEVNULL,
+                            stdout=asyncio.subprocess.DEVNULL,  # agents log to task_logs/WS
+                            stderr=asyncio.subprocess.PIPE,
+                            pass_fds=channel.pass_fds,
+                        )
+                        spawned = True
+                    finally:
+                        if not spawned:
+                            # No process holds the pipe: release both ends.
+                            channel.close()
+                    channel.started()
+                    counting = asyncio.create_task(channel.collect())
                     self._active[run_id] = proc
                     if run_id in self._cancelled:
                         # Stop arrived while the environment was being built.
                         proc.terminate()
                     _, stderr = await proc.communicate()
+                    await finish_collecting(counting)
+                await stop_following(follower)
+                if approved:
+                    _keep_approval(spec_dir)
 
                 if run_id in self._cancelled:
                     # terminate() makes the process exit non-zero; that is a
@@ -538,11 +715,15 @@ class RunManager:
             logger.exception("Run %s crashed in the manager", run_id)
             await self._set_run_status(run_id, "failed", error=str(e)[:2000])
         finally:
+            await stop_following(follower)
             self._active.pop(run_id, None)
             self._running_specs.discard(spec_id)
             self._cancelled.discard(run_id)
             self._tracked.discard(run_id)
             self._projects.pop(run_id, None)
+            self._starters.pop(run_id, None)
+            if _run_ended is not None:
+                _run_ended(RunEnded(project_id, spec_name, phase, status))
 
     async def _set_run_status(
         self, run_id: str, status: str, error: str | None = None

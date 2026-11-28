@@ -18,7 +18,9 @@
 	"header": {
 		"title": "Ideation",
 		"subtitle": "AI-generated feature ideas for your project",
+		"ideasCount_one": "{{count}} idea",
 		"ideasCount": "{{count}} ideas",
+		"selectedCount_one": "{{count}} selected",
 		"selectedCount": "{{count}} selected",
 		"selectAll": "Select all",
 		"importAll": "Import all",
@@ -47,7 +49,38 @@
 		"useRegenerate": "Use \"Regenerate\" to refresh existing ideas.",
 		"cancel": "Cancel",
 		"generate": "Generate",
+		"generateTypes_one": "Generate {{count}} Type",
 		"generateTypes": "Generate {{count}} Types"
+	},
+	"progress": {
+		"logStarting": "Starting ideation generation in parallel…",
+		"generating_one": "Generating {{count}} ideation type in parallel…",
+		"generating_other": "Generating {{count}} ideation types in parallel…",
+		"timedOut": "Generation timed out. Some ideas may have been generated: check the results.",
+		"logTimedOut": "⚠ Generation timed out",
+		"logStopping": "Stopping ideation generation…",
+		"stopped": "Generation stopped",
+		"logAlreadyStopped": "Process already stopped",
+		"logStopped": "Ideation generation stopped",
+		"logRefreshing": "Refreshing ideation in parallel…",
+		"refreshing_one": "Refreshing {{count}} ideation type in parallel…",
+		"refreshing_other": "Refreshing {{count}} ideation types in parallel…",
+		"logAllDismissed": "All ideas dismissed",
+		"logArchived": "Idea archived",
+		"logDeleted": "Idea deleted",
+		"logManyDeleted_one": "{{count}} idea deleted",
+		"logManyDeleted_other": "{{count}} ideas deleted",
+		"logAdding_one": "Adding {{count}} new ideation type…",
+		"logAdding_other": "Adding {{count}} new ideation types…",
+		"generatingMore_one": "Generating {{count}} additional ideation type…",
+		"generatingMore_other": "Generating {{count}} additional ideation types…",
+		"logTypeComplete_one": "✓ {{type}} completed with {{count}} idea",
+		"logTypeComplete_other": "✓ {{type}} completed with {{count}} ideas",
+		"typesComplete": "{{completed}}/{{total}} ideation types complete",
+		"logTypeFailed": "✗ {{type}} failed",
+		"complete": "Ideation complete",
+		"logComplete": "Ideation generation complete!",
+		"logError": "Error: {{error}}"
 	},
 	"generation": {
 		"title": "Generating Ideas",
@@ -57,9 +90,11 @@
 		"stopping": "Stopping...",
 		"stop": "Stop",
 		"stopTooltip": "Stop generation",
+		"stopFailed": "Could not stop the generation",
 		"waitingToStart": "Waiting to start...",
 		"failedCategory": "Failed to generate ideas for this category",
 		"noIdeasCategory": "No ideas generated for this category",
+		"ideasCount_one": "{{count}} idea",
 		"ideasCount": "{{count}} ideas"
 	},
 	"auth": {
@@ -78,7 +113,7 @@
 		"tradeoffs": "Tradeoffs"
 	},
 	"details": {
-		"impactLevel": "{{level}} impact",
+		"impactLevel": "Impact: {{level}}",
 		"files": "Files",
 		"buildsUpon": "Builds Upon",
 		"implementationApproach": "Implementation Approach",
@@ -114,5 +149,80 @@
 		"security_hardening": "Security vulnerabilities and hardening opportunities",
 		"performance_optimizations": "Performance bottlenecks and optimization opportunities",
 		"code_quality": "Refactoring opportunities, large files, code smells, and best practice violations"
+	},
+	"status": {
+		"draft": "Draft",
+		"selected": "Selected",
+		"converted": "Converted",
+		"dismissed": "Dismissed",
+		"archived": "Archived"
+	},
+	"levels": {
+		"trivial": "Trivial",
+		"small": "Small",
+		"medium": "Medium",
+		"large": "Large",
+		"complex": "Complex",
+		"low": "Low",
+		"high": "High",
+		"critical": "Critical",
+		"suggestion": "Suggestion",
+		"minor": "Minor",
+		"major": "Major"
+	},
+	"audiences": {
+		"developers": "Developers",
+		"users": "Users",
+		"contributors": "Contributors",
+		"maintainers": "Maintainers"
+	},
+	"categories": {
+		"ui_ux_improvements": {
+			"usability": "Usability",
+			"accessibility": "Accessibility",
+			"performance": "Performance",
+			"visual": "Visual Design",
+			"interaction": "Interaction"
+		},
+		"documentation_gaps": {
+			"readme": "README",
+			"api_docs": "API Documentation",
+			"inline_comments": "Inline Comments",
+			"examples": "Examples & Tutorials",
+			"architecture": "Architecture Docs",
+			"troubleshooting": "Troubleshooting Guide"
+		},
+		"security_hardening": {
+			"authentication": "Authentication",
+			"authorization": "Authorization",
+			"input_validation": "Input Validation",
+			"data_protection": "Data Protection",
+			"dependencies": "Dependencies",
+			"configuration": "Configuration",
+			"secrets_management": "Secrets Management"
+		},
+		"performance_optimizations": {
+			"bundle_size": "Bundle Size",
+			"runtime": "Runtime Performance",
+			"memory": "Memory Usage",
+			"database": "Database Queries",
+			"network": "Network Requests",
+			"rendering": "Rendering",
+			"caching": "Caching"
+		},
+		"code_quality": {
+			"large_files": "Large Files",
+			"code_smells": "Code Smells",
+			"complexity": "High Complexity",
+			"duplication": "Code Duplication",
+			"naming": "Naming Conventions",
+			"structure": "File Structure",
+			"linting": "Linting Issues",
+			"testing": "Test Coverage",
+			"types": "Type Safety",
+			"dependencies": "Dependency Issues",
+			"dead_code": "Dead Code",
+			"git_hygiene": "Git Hygiene"
+		}
 	}
 }

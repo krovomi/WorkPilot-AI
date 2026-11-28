@@ -41,6 +41,7 @@ import {
 	TERMINAL_DOM_UPDATE_DELAY_MS,
 } from "../../shared/constants";
 import type { SessionDateInfo } from "../../shared/types";
+import { escapeShellArg } from "../../shared/utils/shell-escape";
 import { cn } from "../lib/utils";
 import { useFileExplorerStore } from "../stores/file-explorer-store";
 import { useTaskStore } from "../stores/task-store";
@@ -205,11 +206,14 @@ export function TerminalGrid({
 	}, [jumpToTerminalId, clearTerminalJump]);
 
 	// Reset expanded terminal and clear pending cleanup when project changes
+	const shownProjectRef = useRef(projectPath);
 	useEffect(() => {
+		if (shownProjectRef.current === projectPath) return;
+		shownProjectRef.current = projectPath;
 		setExpandedTerminalId(null);
 		setPendingCleanup(new Map());
 		clearAllCleanupTimers();
-	}, [clearAllCleanupTimers]);
+	}, [projectPath, clearAllCleanupTimers]);
 
 	// Fetch available session dates when project changes
 	useEffect(() => {
@@ -533,12 +537,12 @@ export function TerminalGrid({
 			}
 
 			if (terminalId && activeData?.path) {
-				// Quote the path if it contains spaces
-				const quotedPath = activeData.path.includes(" ")
-					? `"${activeData.path}"`
-					: activeData.path;
-				// Insert the file path into the terminal with a trailing space
-				globalThis.electronAPI.sendTerminalInput(terminalId, `${quotedPath} `);
+				// Quoted like a file dropped on the terminal itself
+				// (useTerminalFileDrop), then a trailing space
+				globalThis.electronAPI.sendTerminalInput(
+					terminalId,
+					`${escapeShellArg(activeData.path)} `,
+				);
 			}
 		},
 		[reorderTerminals, terminals, projectPath],

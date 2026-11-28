@@ -10,13 +10,15 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from server.auth.deps import (
     CurrentUser,
-    get_project_role,
+    effective_project_role,
     require_project_role,
 )
+from server.authz.approvals import may_approve_alone
 from server.authz.principal import get_principal
 from server.db.engine import get_db
 from server.db.models import (
@@ -120,7 +122,7 @@ async def claim_spec(
     spec = await _get_spec_or_404(db, project_id, spec_id)
 
     if spec.claimed_by and spec.claimed_by != user.id:
-        role = await get_project_role(db, user, project_id)
+        role = effective_project_role(request)
         if not (body.force and role == ProjectRole.OWNER.value):
             holder = await db.scalar(
                 select(User.display_name).where(User.id == spec.claimed_by)
@@ -173,7 +175,7 @@ async def release_spec(
     _require(request, "task.claim")
     spec = await _get_spec_or_404(db, project_id, spec_id)
     if spec.claimed_by and spec.claimed_by != user.id:
-        role = await get_project_role(db, user, project_id)
+        role = effective_project_role(request)
         if role != ProjectRole.OWNER.value:
             raise HTTPException(
                 status_code=403, detail="Only the claim holder or an owner can release"
@@ -228,6 +230,19 @@ async def start_run(
     spec = await _get_spec_or_404(db, project_id, spec_id)
     ensure_can_act_on_spec(spec, user, None)
 
+    # A card without a review approves its own plan: only for someone whose
+    # approval alone is enough for the card, within the deployment's rule on
+    # approving one's own card. Read before the claim below is written, which
+    # holds the database until committed.
+    may_skip_review = await may_approve_alone(
+        db,
+        principal=principal,
+        project_id=project_id,
+        org_id=project.org_id,
+        author_id=spec.created_by,
+        spec_name=spec.spec_name,
+        card_dir=Path(project.server_path) / ".workpilot" / "specs" / spec.spec_name,
+    )
     if spec.claimed_by is None:
         spec.claimed_by = user.id
         spec.claimed_at = datetime.now(UTC)
@@ -242,6 +257,7 @@ async def start_run(
             model=body.model,
             org_id=project.org_id,
             pr=body.pr.model_dump() if body.pr else None,
+            may_skip_review=may_skip_review,
         )
     except RunManagerError as e:
         raise HTTPException(status_code=409, detail=str(e))

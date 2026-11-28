@@ -37,7 +37,15 @@
 			"placeholder": "For example: write the test before the code it checks.",
 			"tooManyEngines": "With a rule, each engine is replayed twice: keep at most {{max}} engines."
 		},
-		"summaryRule": "{{cards}} card(s) × {{engines}} engine(s) × 2 (without and with the rule) = {{builds}} full build(s)"
+		"summaryRule": "{{cards}} card(s) × {{engines}} engine(s) × 2 (without and with the rule) = {{builds}} full build(s)",
+		"codeMode": {
+			"title": "Code mode (optional)",
+			"label": "Measure code mode: replay each engine without it and with it",
+			"help": "Each engine is replayed twice, once without code mode and once with it on every phase, so the run says what it changes in cards resolved, cost and duration. No default changes from the score.",
+			"switchOff": "Turn code mode on in Settings, Code mode, to measure it.",
+			"notWithRule": "Measure a rule or code mode, not both in the same run."
+		},
+		"summaryCodeMode": "{{cards}} card(s) × {{engines}} engine(s) × 2 (without and with code mode) = {{builds}} full build(s)"
 	},
 	"source": {
 		"merge": "its merge",
@@ -99,6 +107,17 @@
 			"summary": "Without the rule: {{without}}/{{pairs}} resolved. With it: {{with}}/{{pairs}}. Regressions: {{regressions}}.",
 			"better": "Better on these cards, with no regression. Adopting it stays your call, in the Learning Loop.",
 			"worse": "It breaks a card the engine resolved without it: do not adopt it as it is.",
+			"same": "No difference measured on these cards.",
+			"unmeasured": "Not measured yet: no card was judged in both arms."
+		},
+		"withCodeMode": "code mode",
+		"codeMode": {
+			"title": "Code mode",
+			"summary": "Without code mode: {{without}}/{{pairs}} resolved. With it: {{with}}/{{pairs}}. Regressions: {{regressions}}.",
+			"cost": "Mean cost per build: {{without}} without, {{with}} with.",
+			"duration": "Mean duration per build: {{without}} without, {{with}} with.",
+			"better": "Better on these cards: as many resolved or more, no regression, and cheaper or more resolved.",
+			"worse": "It resolves fewer of these cards than without it: keep it off for this engine.",
 			"same": "No difference measured on these cards.",
 			"unmeasured": "Not measured yet: no card was judged in both arms."
 		}

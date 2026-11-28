@@ -3,6 +3,7 @@
  */
 
 import type { BlockedKind, HumanResolution } from "../utils/subtask-unblock";
+import type { BudgetPauseDetail } from "./cost-budget";
 import type { GeneratedReviewSource } from "./generated-review";
 import type {
 	CompletablePhase,
@@ -14,9 +15,45 @@ import type {
 	PhaseThinkingConfig,
 	ThinkingLevel,
 } from "./settings";
+import type { AnomalyPauseDetail, SandboxPauseDetail } from "./agent-safety";
+import type { PolicyPauseDetail } from "./governance";
 import type { TaskGoalSummary } from "./goal";
 import type { MobileBootstrapMark, MobilePlatform } from "./mobile";
 import type { TaskSmartEstimate } from "./smart-estimation";
+import type {
+	CiSuiteRecord,
+	SuitePlacement,
+	TestPlacementMode,
+} from "./suite-placement";
+
+/** What the circuit breaker saw when it paused a task (`agents/tool_breaker.py`). */
+export interface BreakerPauseDetail {
+	tool: string;
+	repeats: number;
+	limit: number;
+}
+
+/** What "Stop all agents" stopped (`main/ipc-handlers/task/stop-all-handlers.ts`). */
+export interface StopAllResult {
+	/** Tasks paused, to resume one by one. */
+	pausedTasks: string[];
+	/** Other agent processes (ideation, roadmap, insights…) stopped outright. */
+	stoppedProcesses: number;
+	/** Tasks whose pause could not be written: stopped all the same. */
+	failedTasks: string[];
+	/** Runs and jobs of server projects, started by this person, stopped there. */
+	serverAgents?: number;
+	/** Server projects that could not be asked to stop (offline, refused). */
+	serverFailed?: number;
+}
+
+/** The voice assistant's spoken « stop » (`AGENTS_STOP_AFTER_STEP`). */
+export interface StopAfterStepResult {
+	/** Tasks that stop after the tool call in flight, then wait to be resumed. */
+	stoppingTasks: string[];
+	/** Tasks whose pause could not be written: they keep running. */
+	failedTasks: string[];
+}
 
 /** One phase's engine: provider × model × effort (see shared/utils/task-engine.ts). */
 export interface EngineTrio {
@@ -39,8 +76,15 @@ export type TaskStatus =
 	| "pr_created"
 	| "error";
 
+/**
+ * A list of the Kanban's manual order: one per status, plus the two outcome
+ * columns (« Échec », « Abandonnée », renderer/lib/kanban-columns.ts).
+ */
+export type TaskOrderColumn = TaskStatus | "failed" | "abandoned";
+
 // Maps task status columns to ordered task IDs for kanban board reordering
-export type TaskOrderState = Record<TaskStatus, string[]>;
+export type TaskOrderState = Record<TaskStatus, string[]> &
+	Partial<Record<Exclude<TaskOrderColumn, TaskStatus>, string[]>>;
 
 // Reason why a task is in human_review status
 // - 'completed': All subtasks done and QA passed, ready for final approval/merge
@@ -124,6 +168,22 @@ export interface Subtask {
 	origin?: "change_request";
 	/** ISO timestamp recorded when a change_request subtask was created. */
 	requestedAt?: string;
+}
+
+/** A check of the machine that a start would fail (pre-analysis before « En cours »). */
+export type TaskReadinessProblem = "no_git" | "no_commit" | "no_auth";
+
+/**
+ * The pre-analysis of a card about to start (docs/architecture/task-readiness.md):
+ * quick checks always, an AI review only for a short card.
+ */
+export interface TaskReadiness {
+	/** False when the card should not start as it is. */
+	ready: boolean;
+	/** The machine check that failed: starting now would fail. */
+	problem?: TaskReadinessProblem;
+	/** The review of a short card: what to answer before it starts. */
+	questions?: SpecInterviewQuestion[];
 }
 
 /**
@@ -270,6 +330,8 @@ export interface TaskDraft {
 	requireReviewBeforeCoding?: boolean;
 	tddMode?: boolean;
 	verifyLoop?: boolean;
+	/** Where the long suites run (absent = the project's choice). */
+	testPlacement?: TestPlacementMode;
 	/** The automatic split as set in the wizard (absent = project defaults). */
 	autoSplit?: { noSplit: boolean; maxLines: string };
 	/** Part of the title of the one window a Windows app is verified in. */
@@ -420,6 +482,21 @@ export interface TaskSplitCheck {
 	checkedAt?: string;
 }
 
+/**
+ * Why a task was set aside (« Abandonnée » column), like Jira's resolution or
+ * Linear's Canceled / Duplicate. `pr_closed` is written when the task's pull
+ * request was closed without a merge.
+ */
+export const ABANDON_RESOLUTIONS = [
+	"wont_do",
+	"duplicate",
+	"obsolete",
+	"replaced",
+	"pr_closed",
+	"other",
+] as const;
+export type AbandonResolution = (typeof ABANDON_RESOLUTIONS)[number];
+
 export interface TaskMetadata {
 	// Origin tracking
 	sourceType?:
@@ -431,11 +508,13 @@ export interface TaskMetadata {
 		| "linear"
 		| "github"
 		| "gitlab"
+		| "bitbucket"
 		| "visual-canvas"
 		| "tech-debt"
 		| "flaky-tests"
 		| "automation"
-		| "generated";
+		| "generated"
+		| "self-healing";
 	/**
 	 * The page whose generated code this card holds for review
 	 * (`sourceType: "generated"`, main/generated-review/).
@@ -455,6 +534,8 @@ export interface TaskMetadata {
 	githubBatchTheme?: string; // Theme/title of the GitHub issue batch
 	gitlabIssueIid?: number; // Reference to GitLab issue IID if from GitLab
 	gitlabUrl?: string; // GitLab issue URL
+	bitbucketIssueId?: number; // Bitbucket Cloud issue id if from Bitbucket
+	bitbucketUrl?: string; // Bitbucket issue URL
 	azureDevOpsIdentifier?: string; // Azure DevOps work item identifier (e.g., '12345')
 	azureDevOpsUrl?: string; // Azure DevOps work item URL
 	azureDevOpsState?: string; // Azure DevOps work item state
@@ -597,6 +678,21 @@ export interface TaskMetadata {
 	appliedFormula?: AppliedFormula;
 
 	// Git/Worktree configuration
+	/**
+	 * Where this card's long suites run, over the project's `testPlacement`
+	 * (read by the backend from task_metadata.json). Absent: the project's.
+	 */
+	testPlacement?: TestPlacementMode;
+	/**
+	 * This task's code mode per phase, over Settings' (read by the backend from
+	 * task_metadata.json, `code_mode/settings.py`). A phase left out follows Settings.
+	 */
+	phaseCodeMode?: import("../utils/code-mode").PhaseCodeMode;
+	/**
+	 * The AI account this card runs on, per provider (`ai-account-pins.ts`):
+	 * it wins over the project's pin and the provider's default account.
+	 */
+	aiAccounts?: import("./ai-accounts").AiAccountPins;
 	baseBranch?: string; // Override base branch for this task's worktree
 	prUrl?: string; // GitHub PR URL if task has been submitted as a PR
 	/**
@@ -648,9 +744,24 @@ export interface TaskMetadata {
 		/**
 		 * Why the build is paused. Absent for the Pause button; "app_shutdown"
 		 * when WorkPilot was closed while it ran — the next launch resumes those
-		 * on its own, and only those.
+		 * on its own, and only those. "budget" / "budget_stall" when the
+		 * backend paused it for its cost budget (`cost_budget`), with `budget`.
+		 * "tool_loop" when the circuit breaker stopped an agent repeating the
+		 * same call (`agents/tool_breaker.py`), with `breaker`. "kill_switch"
+		 * when the person stopped every agent at once, "voice_stop" when they
+		 * said « stop » to the voice assistant (after the current step).
+		 * "anomaly" / "sandbox" when the session watch stopped an agent
+		 * (`agents/safety_watch.py`), with `anomaly` / `sandbox`.
+		 * "policy_hours" / "policy_budget" / "policy_invalid" when
+		 * workpilot.policy.yaml said agents must stop (`agents/policy_watch.py`),
+		 * with `policy`.
 		 */
 		reason?: string | null;
+		budget?: BudgetPauseDetail;
+		breaker?: BreakerPauseDetail;
+		anomaly?: AnomalyPauseDetail;
+		sandbox?: SandboxPauseDetail;
+		policy?: PolicyPauseDetail;
 	};
 
 	// Abandon status — the task was set aside (e.g. the product owner no longer
@@ -660,6 +771,23 @@ export interface TaskMetadata {
 	abandoned?: boolean; // True while the task is abandoned
 	abandonedAt?: string; // ISO date when the task was abandoned
 	abandonedReason?: string; // Optional free-text reason (e.g. "PO deprioritized")
+	/** Why it was set aside, as a closed list (Jira's resolution). Absent on older tasks. */
+	abandonedResolution?: AbandonResolution;
+	/** The task this one duplicates or is replaced by (`duplicate`, `replaced`). */
+	abandonedLink?: string;
+	/** When the watch set it aside because its PR was closed without a merge (`merged-watch.ts`). */
+	prClosedAt?: string;
+
+	// « Bloquée » (Jira's flag): an impediment a person raised, with why.
+	flagged?: boolean;
+	flaggedReason?: string;
+	flaggedAt?: string;
+	/** The sub-project the card belongs to (Kanban lanes, `renderer/lib/kanban-lanes.ts`). */
+	area?: string;
+	/** The sprint the card is planned in (`shared/types/sprint.ts`). */
+	sprintId?: string;
+	/** Labels a person put on the card (`shared/utils/task-labels.ts`). */
+	labels?: string[];
 
 	// Archive status
 	archivedAt?: string; // ISO date when task was archived
@@ -691,6 +819,14 @@ export interface Task {
 	goal?: TaskGoalSummary;
 	/** The second engine's verdict (`apps/backend/cross_review/`), from the plan. */
 	crossReview?: TaskCrossReviewSummary;
+	/** The approval tier of the green PR (`apps/backend/pr_followup/approval.py`). */
+	approval?: TaskApprovalSummary;
+	/** Where the backend decided the full suite runs (`test_placement.json`). */
+	suitePlacement?: SuitePlacement;
+	/** The full suite sent to the forge's CI from the pushed branch (`plan.ciSuite`). */
+	ciSuite?: CiSuiteRecord;
+	/** The QA reviewer's last sign-off and the QA session it came from. */
+	qaSignoff?: TaskQaSignoff;
 	subtasks: Subtask[];
 	qaReport?: QAReport;
 	logs: string[];
@@ -702,8 +838,75 @@ export interface Task {
 	location?: "main" | "worktree"; // Where task was loaded from (main project or worktree)
 	specsPath?: string; // Full path to specs directory for this task
 	prUrl?: string; // URL of the PR created automatically when task is completed
+	/**
+	 * Every status the task went through, oldest first
+	 * (`<spec>/status_history.json`, `main/task-status-history.ts`). Read by
+	 * the board's reports (cycle time, flow); bounded, never a person's name.
+	 */
+	statusHistory?: TaskStatusTransition[];
+	/**
+	 * Who created and who launched the task, and what its agents spent
+	 * (`main/task-run-facts.ts`). The board shows them once the task is done;
+	 * a missing part is unknown, never zero.
+	 */
+	runFacts?: TaskRunFacts;
 	createdAt: Date;
 	updatedAt: Date;
+}
+
+/** Who did something to a task: a person by their display name, or an automation. */
+export interface TaskPerson {
+	kind: "person" | "automation";
+	/** The person's name (local git identity, or a server account's display name). */
+	name?: string;
+	/** ISO 8601 date, for a launch. */
+	at?: string;
+}
+
+/**
+ * What every agent session of a task used, added up across providers
+ * (`core/usage_tracker.py` on this computer, `usage_records` on a server).
+ */
+export interface TaskUsageTotals {
+	inputTokens: number;
+	outputTokens: number;
+	cacheReadTokens: number;
+	cacheWriteTokens: number;
+	/** US dollars: the provider's price, or the catalog's; 0 when nobody priced it. */
+	costUsd: number;
+	sessions: number;
+	/** Sessions whose provider reported no count, counted from the text instead. */
+	estimatedSessions: number;
+	/** The models used, most used first (a handful at most). */
+	models: string[];
+}
+
+export interface TaskRunFacts {
+	createdBy?: TaskPerson;
+	/** The person who launched its last run. */
+	startedBy?: TaskPerson;
+	/** Absent when no session reported anything: the cost is unknown. */
+	usage?: TaskUsageTotals;
+}
+
+/** Who moved a task: its agents, a person, or the app on its own (a watcher). */
+export type TaskStatusActor = "agent" | "user" | "system";
+
+/** One status change of a task, as `status_history.json` keeps it. */
+export interface TaskStatusTransition {
+	/** The status it left; null for its creation or a history begun mid-way. */
+	from: TaskStatus | null;
+	to: TaskStatus;
+	/** The review reason that came with `to`, when it has one. */
+	reason?: ReviewReason;
+	/** ISO 8601 date of the change. */
+	at: string;
+	actor: TaskStatusActor;
+	/**
+	 * Server mode only: the account that made the change, or that started the
+	 * run whose agent made it. An opaque id, never a name or an e-mail.
+	 */
+	accountId?: string;
 }
 
 /**
@@ -711,6 +914,22 @@ export interface Task {
  * `disagree` names at least one blocking problem and holds the pull request
  * back; `inconclusive` is everything unclear and never reads as `agree`.
  */
+/**
+ * The approval tier of the task's green pull request
+ * (`pr_followup/approval.py::plan_summary`): read from the plan, never trusted
+ * as typed (the badge shows only a known tier).
+ */
+export interface TaskApprovalSummary {
+	tier?: string;
+	action?: string;
+	mode?: string;
+	merged?: boolean;
+	mergeError?: string;
+	reasons?: { code: string; tier: string }[];
+	error?: string;
+	at?: string;
+}
+
 export interface TaskCrossReviewSummary {
 	verdict: "agree" | "disagree" | "inconclusive";
 	provider: string;
@@ -718,6 +937,16 @@ export interface TaskCrossReviewSummary {
 	blockers: number;
 	summary?: string;
 	at?: string;
+}
+
+/**
+ * The QA reviewer's last sign-off (`qa_signoff` in the plan). `session` is the
+ * QA session that wrote it, counted from 1: an approval on session 1 passed QA
+ * on its first try.
+ */
+export interface TaskQaSignoff {
+	status: "approved" | "rejected";
+	session: number;
 }
 
 /** What the card needs to know about the task's last verification. */
@@ -751,6 +980,10 @@ export interface ImplementationPlan {
 	goal?: TaskGoalSummary;
 	/** Written by the cross review (`cross_review/review.py::write_verdict`). */
 	crossReview?: TaskCrossReviewSummary;
+	/** Written by the PR follow-through (`pr_followup/approval.py`). */
+	approval?: TaskApprovalSummary;
+	/** Written by the QA reviewer (`qa/reviewer.py`); read, never trusted as typed. */
+	qa_signoff?: { status?: unknown; qa_session?: unknown };
 	xstateState?: string; // Persisted XState machine state for restoration (e.g., 'planning', 'coding')
 	lastEvent?: {
 		eventId: string;
@@ -782,9 +1015,24 @@ export interface ImplementationPlan {
 		/**
 		 * Why the build is paused. Absent for the Pause button; "app_shutdown"
 		 * when WorkPilot was closed while it ran — the next launch resumes those
-		 * on its own, and only those.
+		 * on its own, and only those. "budget" / "budget_stall" when the
+		 * backend paused it for its cost budget (`cost_budget`), with `budget`.
+		 * "tool_loop" when the circuit breaker stopped an agent repeating the
+		 * same call (`agents/tool_breaker.py`), with `breaker`. "kill_switch"
+		 * when the person stopped every agent at once, "voice_stop" when they
+		 * said « stop » to the voice assistant (after the current step).
+		 * "anomaly" / "sandbox" when the session watch stopped an agent
+		 * (`agents/safety_watch.py`), with `anomaly` / `sandbox`.
+		 * "policy_hours" / "policy_budget" / "policy_invalid" when
+		 * workpilot.policy.yaml said agents must stop (`agents/policy_watch.py`),
+		 * with `policy`.
 		 */
 		reason?: string | null;
+		budget?: BudgetPauseDetail;
+		breaker?: BreakerPauseDetail;
+		anomaly?: AnomalyPauseDetail;
+		sandbox?: SandboxPauseDetail;
+		policy?: PolicyPauseDetail;
 	};
 }
 
@@ -880,6 +1128,7 @@ export type PipelineProviderId =
 	| "azure-devops"
 	| "github-actions"
 	| "gitlab-ci"
+	| "bitbucket-pipelines"
 	| "jenkins";
 
 /** Normalized state of the latest pipeline run on a task's branch. */

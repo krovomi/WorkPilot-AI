@@ -27,6 +27,8 @@
 		"githubPRs": "PRs GitHub",
 		"gitlabIssues": "Issues GitLab",
 		"gitlabMRs": "MRs GitLab",
+		"bitbucketIssues": "Issues Bitbucket",
+		"bitbucketPRs": "PRs Bitbucket",
 		"worktrees": "Arbres de travail",
 		"agentTools": "Aperçu MCP",
 		"migration": "Migration de code",
@@ -194,7 +196,6 @@
 		"notInstalledShort": "Non installé",
 		"checkingShort": "Vérification...",
 		"version": "Version",
-		"notInstalledDescription": "{{name}} n'est pas dans votre PATH. Installez-le, connectez-vous une fois dans un terminal, puis actualisez.",
 		"signInHint": "WorkPilot utilise la connexion propre à la CLI et ne lit jamais ses identifiants.",
 		"viewDocs": "Voir la documentation de {{name}}",
 		"install": {
@@ -262,6 +263,7 @@
 		"latest": "Dernière",
 		"lastChecked": "Dernière vérification",
 		"notInstalledDescription": "Codex CLI n'est pas installé. Cliquez sur « Installer » pour l'installer en arrière-plan :",
+		"updateFailed": "La mise à jour de Codex CLI a échoué.",
 		"installing": "Installation en cours, merci de patienter...",
 		"viewDocs": "Voir la documentation Codex CLI"
 	},
@@ -379,6 +381,8 @@
 		"githubPRs": "github pull requests pr revue",
 		"gitlabIssues": "gitlab issues tickets bugs",
 		"gitlabMRs": "gitlab merge requests mr revue",
+		"bitbucketIssues": "bitbucket issues tickets bugs",
+		"bitbucketPRs": "bitbucket pull requests pr pipelines",
 		"roadmap": "feuille de route roadmap planning",
 		"analytics": "statistiques graphiques métriques",
 		"costEstimator": "coûts tokens budget prix",
@@ -416,7 +420,10 @@
 		"chip": "CLI {{installed}}/{{total}}",
 		"chipTooltip": "Outils CLI : {{installed}} installés sur {{total}}",
 		"checking": "Outils CLI : vérification…",
-		"title": "Outils CLI"
+		"title": "Outils CLI",
+		"updateAll": "Tout mettre à jour ({{count}})",
+		"updateAllTooltip": "Mettre à jour {{names}}, l'un après l'autre",
+		"updatingAll": "Mise à jour {{current}}/{{total}}…"
 	},
 	"rail": {
 		"label": "Espaces du menu"
@@ -466,5 +473,78 @@
 		"hideAll_other": "Masquer les {{count}}",
 		"count": "Pages masquées ({{count}})",
 		"show": "Réafficher"
+	},
+	"rea": {
+		"description": "Lit ce que révèle un build livré (fusibles Electron, durcissement des binaires, API publique .NET), sans le lancer. WorkPilot n'exécute que la version {{version}}.",
+		"state": {
+			"ready": "Version {{version}} installée",
+			"other_version": "Une autre version est installée",
+			"absent": "Non installé",
+			"node_missing": "Node.js introuvable",
+			"node_too_old": "Node.js trop ancien"
+		},
+		"otherVersion": "Le rea de votre PATH est en {{installed}} ; WorkPilot n'exécute que la {{version}}. Installer le remplace par la {{version}}.",
+		"otherVersionUnknown": "Le rea de votre PATH n'est pas la version de rea-agents qu'exécute WorkPilot ({{version}}). Installer met la {{version}} à sa place.",
+		"absentHint": "Sans lui, WorkPilot récupère la version {{version}} avec npx à chaque besoin (refusé en mode hors-ligne strict).",
+		"nodeTooOld": "REA {{version}} demande Node.js {{ranges}} ; celui du PATH est en {{node}}, et nvm, fnm, Volta, mise et asdf n'en ont pas qui convienne.",
+		"nodeFromManager": "Node.js {{node}} de {{manager}} : celui du PATH est trop ancien ou absent.",
+		"nodeMissing": "REA demande Node.js {{ranges}}. Installez Node.js (nodejs.org), puis actualisez.",
+		"installButton": "Installer REA {{version}}",
+		"error": {
+			"node_required": "REA ne peut pas être installé ici : il faut npm et Node.js {{ranges}}.",
+			"failed": "L'installation de REA {{version}} a échoué.",
+			"not_on_path": "REA a été installé mais le rea de votre PATH ne mène toujours pas à la {{version}}. Redémarrez WorkPilot, puis actualisez.",
+			"busy": "REA est déjà en cours d'installation."
+		},
+		"noCredentials": "REA tourne sans vos identifiants, depuis un dossier à lui, et ne fait que lire des fichiers.",
+		"docsFailed": "Le lien ne s'est pas ouvert : {{error}}",
+		"checkFailed": "La vérification n'a pas abouti : {{error}}"
+	},
+	"cliStatus": {
+		"installFailed": "Échec de l'installation",
+		"terminalUnavailable": "Impossible d'ouvrir un terminal.",
+		"pathSwitchUnavailable": "Le changement d'installation du CLI n'est pas disponible.",
+		"pathSwitchFailed": "Impossible de changer d'installation du CLI."
+	},
+	"stopAll": {
+		"label": "Arrêter tous les agents",
+		"tooltip": "Arrêter tous les agents (Ctrl+Maj+.) : chaque tâche en cours est mise en pause, à reprendre depuis sa carte",
+		"done_one": "{{count}} tâche en pause",
+		"done_other": "{{count}} tâches en pause",
+		"resumeHint": "Tous les agents sont arrêtés. Reprenez chaque tâche depuis sa carte quand vous voulez.",
+		"nothing": "Aucun agent ne tournait",
+		"failed": "Les agents n'ont pas pu être arrêtés",
+		"serverDone_one": "{{count}} de vos agents arrêté sur le serveur.",
+		"serverDone_other": "{{count}} de vos agents arrêtés sur le serveur.",
+		"serverFailed_one": "{{count}} projet du serveur injoignable : arrêtez ses agents depuis sa page Garde-fous.",
+		"serverFailed_other": "{{count}} projets du serveur injoignables : arrêtez leurs agents depuis leur page Garde-fous."
+	},
+	"resize": {
+		"label": "Redimensionner le menu",
+		"hint": "Glissez pour redimensionner le menu, double-cliquez pour retrouver sa largeur par défaut",
+		"width": "{{width}} pixels de large",
+		"folded": "Replié"
+	},
+	"customize": {
+		"start": "Personnaliser le menu",
+		"done": "Terminé",
+		"title": "Personnalisez votre menu",
+		"hint": "Glissez une page par sa poignée jusqu'à sa nouvelle place, ou sur un espace du rail pour l'y déplacer. Les flèches font de même au clavier. Seul votre menu change.",
+		"spacePlace": "Sa place dans le rail",
+		"spaceUp": "Monter l'espace {{name}}",
+		"spaceDown": "Descendre l'espace {{name}}",
+		"resetOrder": "Rétablir l'ordre d'origine",
+		"up": "Monter {{name}}",
+		"down": "Descendre {{name}}",
+		"moveTo": "Déplacer {{name}} vers un autre espace",
+		"moveToTitle": "Déplacer {{name}} vers",
+		"announce": {
+			"instructions": "Pour prendre une entrée du menu, appuyez sur Espace ou Entrée. Déplacez-la avec les flèches, appuyez de nouveau sur Espace ou Entrée pour la déposer, ou sur Échap pour annuler.",
+			"start": "{{name}} est prise.",
+			"over": "{{name}} est au-dessus de {{target}}.",
+			"outside": "{{name}} n'est plus au-dessus d'une place possible.",
+			"drop": "{{name}} a été déposée sur {{target}}.",
+			"cancel": "Le déplacement de {{name}} est annulé."
+		}
 	}
 }

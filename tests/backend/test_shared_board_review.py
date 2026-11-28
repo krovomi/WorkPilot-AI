@@ -101,6 +101,10 @@ def _scope(project_id, org_id, clone, role):
     return ProjectScope(project_id, org_id, clone, role)
 
 
+#: What the route's permission (``review.approve``) lets through.
+APPROVER = frozenset({"review.approve"})
+
+
 def _request(**principal):
     from server.authz.principal import Principal
     from starlette.requests import Request
@@ -238,11 +242,13 @@ async def test_a_request_for_changes_is_written_where_the_build_reads_it(
         result = await request_changes(
             card_id,
             ChangeRequest(feedback=feedback),
-            _request(),
+            _request(permissions=APPROVER),
             _scope(pid, oid, clone, "member"),
             db,
         )
-    assert result == {"requested": True}
+    # The author, alone on the project, asks for the changes: the build they
+    # start is approved.
+    assert result == {"requested": True, "approved": True}
 
     spec = workspace / ".workpilot/specs" / card_id
     request = (spec / "QA_FIX_REQUEST.md").read_text(encoding="utf-8")
@@ -256,6 +262,40 @@ async def test_a_request_for_changes_is_written_where_the_build_reads_it(
         assert subtasks[-1]["origin"] == "change_request"
         assert subtasks[-1]["title"] == "Keep the session for 30 days."
     assert _events == [(pid, "spec_created"), (pid, "spec_updated")]
+
+
+@pytest.mark.asyncio
+async def test_the_build_a_request_for_changes_starts_is_approved_by_its_author(
+    tmp_path,
+):
+    """The approval taken before the first build covered the plan as it was:
+    the build moved it on, and the request adds a subtask. Without a new
+    approval, the build the request starts stopped at "review required"."""
+    from review.state import ReviewState
+    from shared_board.review import ChangeRequest, request_changes
+
+    pid, oid, clone = await _project(tmp_path)
+    card_id = await _card(pid, oid, clone)
+    spec = clone / ".workpilot/specs" / card_id
+    spec.mkdir(parents=True, exist_ok=True)
+    (spec / "spec.md").write_text("# Login\n", encoding="utf-8")
+    (spec / "implementation_plan.json").write_text("{}", encoding="utf-8")
+    ReviewState().approve(spec, approved_by="a@x")
+    _build(clone, card_id)
+    assert not ReviewState.load(spec).is_approval_valid(spec)
+
+    async with await _db() as db:
+        await request_changes(
+            card_id,
+            ChangeRequest(feedback="Keep the session for 30 days."),
+            _request(permissions=APPROVER),
+            _scope(pid, oid, clone, "member"),
+            db,
+        )
+
+    state = ReviewState.load(spec)
+    assert state.is_approval_valid(spec)
+    assert state.approved_by == "U"
 
 
 @pytest.mark.asyncio

@@ -34,6 +34,7 @@ __all__ = [
     "body_tags",
     "now_iso",
     "inside",
+    "listed",
 ]
 
 _WIKILINK = re.compile(r"\[\[([^\]\|#]+)(?:#[^\]\|]*)?(?:\|[^\]]*)?\]\]")
@@ -43,6 +44,18 @@ _FENCE = re.compile(r"```.*?```", re.DOTALL)
 # Never part of the brain's content: Obsidian's own state, git, and the
 # generated graph.
 _SKIP_DIRS = {".git", ".obsidian", ".trash", "graphify-out", ".brain"}
+
+
+def listed(value: Any) -> list[Any]:
+    """A frontmatter list field as a list.
+
+    A person editing a note in Obsidian writes ``agents: coder`` as readily as
+    ``agents: [coder]``. Read as ``list(value)``, the first is five letters —
+    and written back, it stays five letters.
+    """
+    if isinstance(value, list):
+        return list(value)
+    return [value] if value not in (None, "") else []
 
 
 def now_iso() -> str:
@@ -148,13 +161,21 @@ def inside(root: Path | str, rel: Path | str) -> Path:
     paths arrive from MCP tool calls, the HTTP API and agents that have read
     untrusted content, so ``../`` and absolute paths are not hypothetical.
     Written as normalise-then-prefix-check, the shape path-injection analysis
-    (CodeQL ``py/path-injection``) recognises as a sanitiser.
+    (CodeQL ``py/path-injection``) recognises as a sanitiser. The vault also
+    receives teammates' files through git, so the check holds for the path
+    its links lead to as well.
     """
     base = os.path.normpath(os.path.abspath(os.fspath(root)))
     full = os.path.normpath(os.path.join(base, os.fspath(rel)))
-    if not full.startswith(base + os.sep):
+    if not full.startswith(base + os.sep) or not _stays_in(base, full):
         raise ValueError(f"refusing a path outside the brain: {rel}")
     return Path(full)
+
+
+def _stays_in(base: str, full: str) -> bool:
+    """Whether *full*, its links followed, is still under *base*."""
+    real_base = os.path.realpath(base)
+    return os.path.realpath(full).startswith(real_base + os.sep)
 
 
 def read_note(root: Path, rel: Path | str) -> Note:
@@ -183,10 +204,15 @@ def iter_notes(root: Path):
     """Every Markdown note of the vault, relative paths, in a stable order."""
     if not root.is_dir():
         return
+    base = os.path.normpath(os.path.abspath(os.fspath(root)))
     for dirpath, dirnames, filenames in os.walk(root):
         dirnames[:] = sorted(
             d for d in dirnames if d not in _SKIP_DIRS and not d.startswith(".")
         )
         for name in sorted(filenames):
-            if name.endswith(".md") and not name.startswith("."):
-                yield (Path(dirpath) / name).relative_to(root)
+            if not name.endswith(".md") or name.startswith("."):
+                continue
+            path = Path(dirpath) / name
+            if path.is_symlink() and not _stays_in(base, os.path.abspath(path)):
+                continue
+            yield path.relative_to(root)

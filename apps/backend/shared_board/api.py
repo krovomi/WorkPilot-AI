@@ -1,4 +1,4 @@
-"""Cards of a shared board, in server mode: create, read, edit, delete, approve.
+"""Cards of a shared board, in server mode: create, read, edit, delete.
 
 A server-mode project is a clone on the server, and its board is that clone's
 ``.workpilot/specs/``, the same files the desktop app and the agents read. The
@@ -15,6 +15,8 @@ caller's tenant's, and the caller one of its members. On top of the
 permission the mount derives (``task.read`` / ``task.write``, ``task.delete``
 and ``review.approve`` for the two routes raised in ``ROUTE_OVERRIDES``),
 changing a card needs a project role of ``member`` or more; a ``viewer`` reads.
+Approving a card, by as many people as its criticality asks, and lending
+one's approval are ``shared_board/approvals.py``.
 
 A card's text is what a person wrote. It is stored and shown as such; the
 agents that later read it get it through the pipeline's own handling of the
@@ -31,6 +33,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
+from server.authz.approvals import may_approve_alone
 from server.authz.principal import get_principal
 from server.authz.scope import ProjectScope, resolve_project_scope
 from server.db.engine import get_db
@@ -38,6 +41,7 @@ from server.db.models import ProjectRole
 from server.services import push
 from server.services.events import emit_board_event
 from server.services.needs_you import set_approval_check
+from server.services.status_history import plan_status, record_status_change
 from shared_board import attachments as card_images
 from shared_board import listing, review, steering, unblock
 from shared_board import settings as card_settings
@@ -59,6 +63,8 @@ SNAPSHOT_FILES: dict[str, int] = {
     "requirements.json": 200_000,
     "pause_state.json": 50_000,
     "review_state.json": 50_000,
+    # Every status the card went through (server/services/status_history.py).
+    "status_history.json": 100_000,
     "spec.md": 300_000,
     "qa_report.md": 300_000,
 }
@@ -71,6 +77,7 @@ class CardCreate(BaseModel):
     kind: str | None = None
     # As on the desktop card: when true, the build waits for someone to
     # approve the spec and plan; when false, spec creation approves them.
+    # False is kept only for a person who may approve (``review.approve``).
     require_review: bool = True
     # Engine, priority, category, goal, phone targets and blockers, as the
     # desktop card carries them.
@@ -127,14 +134,18 @@ async def board_stream() -> dict[str, str | None]:
 @router.get("/snapshot")
 async def board_snapshot(
     scope: ProjectScope = Depends(resolve_project_scope),
+    db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """The board's cards as files, for the app to draw them as it draws its own.
 
     ``cards`` are the project's specs; ``worktrees`` the same cards as their
     build workspace has them, which the app prefers while a build runs. Only
     :data:`SNAPSHOT_FILES`, each under its size limit; a symlink is skipped.
+    Each card also gets who created and launched it and what it spent,
+    computed from the database (``run_facts``), never read from the clone.
     """
     from board_mcp.server import CARD_ID, SPECS
+    from shared_board.run_facts import card_fact_files
 
     root = scope.path.resolve()
 
@@ -154,6 +165,9 @@ async def board_snapshot(
         return out
 
     cards = collect(scope.path / SPECS)
+    facts = await card_fact_files(db, scope.project_id, cards)
+    for card_id, files in cards.items():
+        files.update(facts.get(card_id, {}))
     worktrees: dict[str, dict[str, str]] = {}
     tasks_dir = scope.path / ".workpilot" / "worktrees" / "tasks"
     for card_id in cards:
@@ -195,10 +209,19 @@ async def create_card(
         raise HTTPException(status_code=422, detail=f"kind must be one of {KINDS}")
 
     title = " ".join(body.title.split())
+    # Going without a review is approving: only for someone whose approval
+    # alone is enough, within the deployment's rule on one's own card.
+    may_skip_review = await may_approve_alone(
+        db,
+        principal=principal,
+        project_id=scope.project_id,
+        org_id=scope.org_id,
+        author_id=principal.id,
+    )
     metadata: dict[str, Any] = {
         "sourceType": "server",
         "createdBy": principal.id,
-        "requireReviewBeforeCoding": body.require_review,
+        "requireReviewBeforeCoding": body.require_review or not may_skip_review,
     }
     if body.kind:
         metadata.update(kind=body.kind, kindSource="user", kindConfidence=1)
@@ -216,6 +239,15 @@ async def create_card(
         card_settings.apply_settings(scope.path.resolve(), directory, body.settings)
     if images:
         _attach(directory, card_images.store_images(directory / "attachments", images))
+    # The first entry of the card's history: where its lead time starts.
+    status, reason = plan_status(directory)
+    record_status_change(
+        directory,
+        status or "backlog",
+        actor="user",
+        reason=reason,
+        account_id=principal.id,
+    )
     row = await _index_row(db, scope, directory.name)
     if row is not None and row.created_by is None:
         row.created_by = principal.id
@@ -326,7 +358,8 @@ async def update_card_settings(
     """Change the card's engine, priority, category or goal.
 
     Unlike its text, these may change once work has started, as on the
-    desktop; not while a run reads them.
+    desktop; not while a run reads them. The fields only the board reads
+    (sub-project, flag, sprint: ``BOARD_ONLY_KEYS``) change even then.
     """
     from server.services.run_manager import get_run_manager
 
@@ -334,7 +367,8 @@ async def update_card_settings(
     _require_writer(scope, principal)
     directory = _card_or_404(scope, card_id)
     row = await _index_row(db, scope, card_id)
-    if row is not None and get_run_manager().is_running(row.id):
+    board_only = body.model_fields_set <= card_settings.BOARD_ONLY_KEYS
+    if not board_only and row is not None and get_run_manager().is_running(row.id):
         raise HTTPException(status_code=409, detail="A run is active on this card")
     root = scope.path.resolve()
     card_settings.apply_settings(root, directory, body)
@@ -379,33 +413,6 @@ async def delete_card(
         scope.project_id, "spec_deleted", {"spec": card_id, "by": principal.id}
     )
     return {"deleted": card_id}
-
-
-@router.post("/cards/{card_id}/approve")
-async def approve_card(
-    card_id: str,
-    request: Request,
-    scope: ProjectScope = Depends(resolve_project_scope),
-) -> dict[str, Any]:
-    """Approve the card's spec and plan, so a build may start on them.
-
-    The approval is the one the build checks (``review_state.json``, with the
-    hash of ``spec.md`` and the plan): editing either afterwards voids it.
-    """
-    from review.state import ReviewState
-
-    principal = get_principal(request)
-    _require_writer(scope, principal)
-    directory = _card_or_404(scope, card_id)
-    if not (directory / "spec.md").is_file():
-        raise HTTPException(status_code=409, detail="No spec to approve yet")
-
-    review = ReviewState.load(directory)
-    review.approve(directory, approved_by=principal.email or principal.id)
-    emit_board_event(
-        scope.project_id, "spec_approved", {"spec": card_id, "by": principal.id}
-    )
-    return {"approved": True, "approvedBy": review.approved_by}
 
 
 def _approval_pending(directory: Path) -> bool:

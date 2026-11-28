@@ -69,7 +69,9 @@
 		"hideTokenEntryAriaLabel": "Masquer la saisie du jeton",
 		"enterTokenManuallyAriaLabel": "Saisir le jeton manuellement",
 		"renameProfileAriaLabel": "Renommer le profil",
-		"deleteProfileAriaLabel": "Supprimer le profil"
+		"deleteProfileAriaLabel": "Supprimer le profil",
+		"showSecretAriaLabel": "Afficher la valeur",
+		"hideSecretAriaLabel": "Masquer la valeur"
 	},
 	"diffViewer": {
 		"noContent": "Aucun contenu de diff disponible pour ce fichier",
@@ -238,7 +240,9 @@
 			"checkTerminal": "Vérifiez la section Terminaux d'agent dans la barre latérale pour compléter la connexion OAuth.",
 			"authStartFailed": "Échec du démarrage de l'authentification",
 			"addProfileFailed": "Échec de l'ajout du profil",
-			"tryAgain": "Veuillez réessayer."
+			"tryAgain": "Veuillez réessayer.",
+			"autoSwitchFailed": "Échec de l'enregistrement du basculement automatique",
+			"switchFailed": "Échec du changement de compte"
 		},
 		"sdk": {
 			"title": "Limite de taux IA",
@@ -271,7 +275,9 @@
 			"addClaudeSubscription": "Ajoutez un autre abonnement Claude pour basculer automatiquement quand vous atteignez la limite.",
 			"willOpenClaudeLogin": "La connexion Claude va s'ouvrir pour authentifier le nouveau compte.",
 			"switchClaudeRetry": "Passez à un autre compte Claude et relancez l'opération :",
-			"connectClaude": "Connectez un compte Claude :"
+			"connectClaude": "Connectez un compte Claude :",
+			"yourAccount": "votre compte",
+			"defaultAccount": "Par défaut"
 		},
 		"recommendedAria": "Recommandé"
 	},
@@ -306,7 +312,8 @@
 			"largest": "Plus grand"
 		},
 		"pullRequests": "Pull Requests",
-		"open": "ouvert",
+		"openCount_one": "{{count}} ouverte",
+		"openCount_other": "{{count}} ouvertes",
 		"selectPRToView": "Sélectionner une pull request pour voir les détails",
 		"loadingPRs": "Chargement des pull requests...",
 		"noOpenPRs": "Aucune pull request ouverte",
@@ -326,6 +333,17 @@
 		"reviewComplete": "Révision terminée",
 		"reviewStatus": "Statut de la révision",
 		"files": "fichiers",
+		"files_one": "fichier",
+		"files_other": "fichiers",
+		"fileStatus": {
+			"added": "ajouté",
+			"removed": "supprimé",
+			"modified": "modifié",
+			"renamed": "renommé",
+			"copied": "copié",
+			"changed": "changé",
+			"unchanged": "inchangé"
+		},
 		"filesChanged": "{{count}} fichiers modifiés",
 		"clickToViewFiles": "Cliquer pour voir les fichiers modifiés",
 		"loadingFiles": "Chargement des fichiers...",
@@ -338,7 +356,8 @@
 		"merge": "Fusionner",
 		"mergeViaGitHub": "Fusionner via GitHub CLI. Peut échouer si les règles de protection de branche nécessitent des révisions ou vérifications supplémentaires.",
 		"autoApprovePR": "Approuver la PR",
-		"suggestions": "avec {{count}} suggestions",
+		"suggestions_one": "avec {{count}} suggestion",
+		"suggestions_other": "avec {{count}} suggestions",
 		"postedFindings_one": "{{count}} résultat publié",
 		"postedFindings_other": "{{count}} résultats publiés",
 		"resolved_one": "{{count}} résolu",
@@ -368,13 +387,14 @@
 		},
 		"category": {
 			"security": "Sécurité",
-			"logic": "Logique",
 			"quality": "Qualité",
-			"performance": "Performance",
 			"style": "Style",
-			"documentation": "Documentation",
-			"testing": "Tests",
-			"other": "Autre"
+			"test": "Tests",
+			"docs": "Documentation",
+			"pattern": "Motif",
+			"performance": "Performance",
+			"verification_failed": "Non vérifié",
+			"redundancy": "Redondance"
 		},
 		"state": {
 			"open": "Ouvert",
@@ -383,6 +403,7 @@
 		},
 		"selectCriticalHigh": "Sélectionner Bloquant/Obligatoire ({{count}})",
 		"selectAll": "Tout sélectionner",
+		"selectSeverityGroup": "Sélectionner tous les résultats : {{severity}}",
 		"clear": "Effacer",
 		"noIssuesFound": "Aucun problème trouvé ! Le code semble bon.",
 		"allFindingsPosted": "Tous les résultats publiés sur GitHub",
@@ -390,28 +411,8 @@
 		"findingsPostedCount_other": "{{count}} résultats publiés sur GitHub",
 		"selectedOfTotal": "{{selected}}/{{total}} sélectionné(s)",
 		"suggestedFix": "Correction suggérée :",
-		"runAIReviewDesc": "Lancer une révision IA pour analyser cette PR",
-		"newCommitsSinceFollowup_one": "{{count}} nouveau commit depuis le suivi. Lancer une autre révision de suivi.",
-		"newCommitsSinceFollowup_other": "{{count}} nouveaux commits depuis le suivi. Lancer une autre révision de suivi.",
-		"allIssuesResolved_one": "Tous les {{count}} problèmes résolus. Cette PR peut être fusionnée.",
-		"allIssuesResolved_other": "Tous les {{count}} problèmes résolus. Cette PR peut être fusionnée.",
-		"nonBlockingSuggestions_one": "{{resolved}} résolu(s). {{count}} suggestion non bloquante restante.",
-		"nonBlockingSuggestions_other": "{{resolved}} résolu(s). {{count}} suggestions non bloquantes restantes.",
 		"blockingIssues": "Problèmes bloquants",
-		"blockingIssuesDesc_one": "{{resolved}} résolu(s), {{count}} problème bloquant encore ouvert.",
-		"blockingIssuesDesc_other": "{{resolved}} résolu(s), {{count}} problèmes bloquants encore ouverts.",
-		"newCommitsSinceReview_one": "{{count}} nouveau commit depuis la révision. Lancer un suivi pour vérifier si les problèmes sont résolus.",
-		"newCommitsSinceReview_other": "{{count}} nouveaux commits depuis la révision. Lancer un suivi pour vérifier si les problèmes sont résolus.",
-		"noBlockingIssues": "Aucun problème bloquant trouvé. Cette PR peut être fusionnée.",
-		"findingsPostedWaiting_one": "{{count}} résultat publié. En attente que le contributeur traite les problèmes.",
-		"findingsPostedWaiting_other": "{{count}} résultats publiés. En attente que les contributeurs traitent les problèmes.",
-		"findingsPostedNoBlockers_one": "{{count}} résultat publié. Aucun problème bloquant restant.",
-		"findingsPostedNoBlockers_other": "{{count}} résultats publiés. Aucun problème bloquant restant.",
 		"needsAttention": "Nécessite une attention",
-		"findingsNeedPosting_one": "{{count}} résultat à publier sur GitHub.",
-		"findingsNeedPosting_other": "{{count}} résultats à publier sur GitHub.",
-		"findingsFoundSelectPost_one": "{{count}} résultat trouvé. Sélectionner et publier sur GitHub.",
-		"findingsFoundSelectPost_other": "{{count}} résultats trouvés. Sélectionner et publier sur GitHub.",
 		"reviewLogs": "Journaux de révision",
 		"followup": "Suivi",
 		"initial": "Initial",
@@ -439,8 +440,6 @@
 		"cleanReviewMessageStatus": "**Statut :** Tout le code est bon",
 		"cleanReviewMessageFooter": "*Cette révision automatisée n'a trouvé aucun problème. Généré par WorkPilot AI.*",
 		"failedPostCleanReview": "Échec de la publication de la révision propre",
-		"viewErrorDetails": "Voir les détails",
-		"hideErrorDetails": "Masquer les détails",
 		"postBlockedStatus": "Publier le statut",
 		"postingBlockedStatus": "Publication...",
 		"blockedStatusPosted": "Statut publié sur la PR",
@@ -474,13 +473,52 @@
 			"pastBugs": "Bugs passés dans cette zone",
 			"regressionRisks": "Risques de régression",
 			"gatheringTime": "Contexte collecté en {{ms}}ms",
-			"noContext": "Pas de contexte profond disponible",
-			"canImportFrom": "Peut importer depuis : {{imports}}"
+			"canImportFrom": "Peut importer depuis : {{imports}}",
+			"violationSeverity": {
+				"error": "Erreur",
+				"warning": "Avertissement"
+			}
 		},
 		"deepContextSections_one": "{{count}} section",
 		"deepContextSections_other": "{{count}} sections",
 		"verdictOutdated": "Le verdict de l'IA est peut-être dépassé",
-		"rerunReviewSuggestion": "Pensez à relancer la revue une fois ces problèmes corrigés."
+		"rerunReviewSuggestion": "Pensez à relancer la revue une fois ces problèmes corrigés.",
+		"feedback": {
+			"groupLabel": "Avis sur ce résultat",
+			"accept": "Accepter",
+			"reject": "Rejeter",
+			"notApplicable": "Non applicable",
+			"reasonLabel": "Raison (facultatif)",
+			"noReason": "Sans raison",
+			"reasons": {
+				"too_pedantic": "Trop pointilleux",
+				"project_convention": "La convention du projet diffère",
+				"false_positive": "Faux positif",
+				"legacy_exception": "Exception de code hérité",
+				"other": "Autre"
+			},
+			"noteLabel": "Précisions (facultatif)",
+			"notePlaceholder": "Pourquoi cela ne s'applique pas ici",
+			"save": "Enregistrer",
+			"cancel": "Annuler",
+			"held": "En attente d'un mainteneur : le relecteur apprendra de ce rejet une fois approuvé par un propriétaire du projet.",
+			"show": "Afficher",
+			"hide": "Masquer",
+			"learnedBadge_one": "Rejeté {{count}} fois sur ce projet",
+			"learnedBadge_other": "Rejeté {{count}} fois sur ce projet",
+			"learnedHint": "Ce type de résultat a souvent été rejeté sur ce projet : sa gravité a été abaissée.",
+			"suppressed_one": "{{count}} résultat masqué d'après ce que ce projet a rejeté",
+			"suppressed_other": "{{count}} résultats masqués d'après ce que ce projet a rejeté",
+			"suppressedHint": "Les types de résultat rejetés assez souvent ne sont plus remontés. Les résultats de sécurité et critiques ne sont jamais masqués.",
+			"rejectedCount_one": "(rejeté {{count}} fois)",
+			"rejectedCount_other": "(rejeté {{count}} fois)",
+			"errors": {
+				"invalid": "Cet avis n'a pas pu être lu.",
+				"not_found": "Ce résultat n'est plus dans la revue enregistrée.",
+				"server_project": "L'avis sur les résultats n'est pas encore disponible pour les projets du serveur.",
+				"write_failed": "L'avis n'a pas pu être enregistré."
+			}
+		}
 	},
 	"downloads": {
 		"toggleExpand": "Basculer les détails de téléchargement",
@@ -497,7 +535,10 @@
 		"cancel": "Annuler ce téléchargement",
 		"retry": "Réessayer",
 		"cancelledLabel": "Annulé",
-		"hint": "Les téléchargements continuent en arrière-plan, même si vous fermez cette tâche."
+		"hint": "Les téléchargements continuent en arrière-plan, même si vous fermez cette tâche.",
+		"hoursRemaining": "encore {{count}} h",
+		"minutesRemaining": "encore {{count}} min",
+		"secondsRemaining": "encore {{count}} s"
 	},
 	"ideation": {
 		"converting": "Conversion...",
@@ -518,13 +559,15 @@
 	},
 	"usage": {
 		"claudeCodeSubscription": "Claude Code",
-		"claudeCodeSubscriptionPro": "Claude Code Pro",
-		"claudeCodeSubscriptionMax": "Claude Code Max",
 		"claudeCodeSubscriptionUnknown": "Claude Code",
 		"dataUnavailable": "Données d'utilisation indisponibles",
 		"dataUnavailableDescription": "Le point de terminaison de surveillance d'utilisation pour ce fournisseur n'est pas disponible ou n'est pas pris en charge.",
 		"dataUnavailableAnthropic": "Les données d'usage Anthropic ne sont pas disponibles. Vous pouvez vérifier votre consommation directement sur claude.ai/settings.",
 		"activeAccount": "Compte actif",
+		"planApiKey": "Clé API · à l'usage",
+		"planApiKeyHint": "Facturé à l'usage par une clé API : aucune fenêtre de forfait ne s'applique.",
+		"planSubscription": "Abonnement",
+		"planSubscriptionHint": "Forfait de ce compte, tel que le fournisseur l'indique.",
 		"usageAlert": "Alerte d'utilisation",
 		"accountExceedsThreshold": "L'utilisation du compte dépasse le seuil de 90%",
 		"authentication": "Authentification",
@@ -631,10 +674,6 @@
 			"text": "Vérifiez que votre clé API OpenAI est liée à une organisation activée pour la facturation.",
 			"link": "Afficher le tableau de bord OpenAI"
 		},
-		"debugProfiles": "Profils détectés par débogage :",
-		"noProfileDetected": "Aucun profil détecté",
-		"selectedProvider": "Fournisseur sélectionné : {{provider}}",
-		"openaiError": "Erreur OpenAI :",
 		"openaiDetailTitle": "Détail OpenAI",
 		"completionsLabel": "Complétions (tokens par modèle) :",
 		"costByModelLabel": "Coût par modèle :",
@@ -671,11 +710,12 @@
 		"lensAutoWith": "Automatique ({{provider}})",
 		"lensRunning": "{{provider}} — en cours",
 		"lensTooltip": "La consommation de quel fournisseur les badges affichent. Automatique suit les tâches en cours. Cela ne change rien au moteur d'une tâche.",
-		"debugProvider": "fournisseur :",
 		"needsReauthTitle": "Nouvelle authentification nécessaire",
 		"sessionUsage": "Utilisation de la session",
 		"weeklyUsage": "Utilisation hebdomadaire",
-		"inOut": "{{model}} : {{input}} en entrée, {{output}} en sortie"
+		"inOut": "{{model}} : {{input}} en entrée, {{output}} en sortie",
+		"providerAccounts": "Comptes de ce provider",
+		"accountSwitchFailed": "Bascule impossible : {{error}}"
 	},
 	"oauth": {
 		"enterCode": "Saisie de code manuelle (Fallback)",
@@ -720,6 +760,9 @@
 		"hasAuthenticatedAccount": "Vous avez au moins un compte Claude authentifié. Vous pouvez passer à l'étape suivante.",
 		"authNotDetected": "L'authentification n'a pas été détectée. Veuillez compléter /login dans le terminal en premier.",
 		"noProfileSelected": "Aucun profil sélectionné pour la vérification",
+		"profilesLoadFailed": "Impossible de lire les profils Claude",
+		"terminalOpenFailed": "Impossible d'ouvrir le terminal de connexion",
+		"verifyFailed": "Impossible de vérifier la connexion",
 		"alerts": {
 			"profileCreatedAuthFailed": "Profil créé, mais échec du démarrage de l'authentification : {{error}}",
 			"authPrepareFailed": "Échec de la préparation de l'authentification : {{error}}",
@@ -880,7 +923,14 @@
 		"stopping": "Arrêt...",
 		"progress": "Progrès",
 		"lastActivityPrefix": "dernière activité",
-		"lastProgressUpdateTooltip": "Dernière mise à jour de progression reçue"
+		"lastProgressUpdateTooltip": "Dernière mise à jour de progression reçue",
+		"timeAgo": {
+			"justNow": "à l'instant",
+			"seconds": "il y a {{count}} s",
+			"minutes": "il y a {{count}} min",
+			"hours": "il y a {{count}} h",
+			"days": "il y a {{count}} j"
+		}
 	},
 	"time": {
 		"justNow": "à l'instant",
@@ -893,6 +943,8 @@
 		"daysAgo": "il y a {{count}} j",
 		"daysAgo_one": "il y a {{count}} j",
 		"daysAgo_other": "il y a {{count}} j",
+		"weeksAgo_one": "il y a {{count}} sem.",
+		"weeksAgo_other": "il y a {{count}} sem.",
 		"today": "Aujourd'hui",
 		"yesterday": "Hier"
 	},
@@ -966,7 +1018,10 @@
 			"optional": "Facultatif",
 			"agents": "Agents qui l'utilisent",
 			"agentsHint": "Modifiable plus tard dans Outils des agents.",
-			"noAgent": "Choisissez au moins un agent."
+			"noAgent": "Choisissez au moins un agent.",
+			"showValue": "Afficher la valeur",
+			"hideValue": "Masquer la valeur",
+			"openHelp": "Où obtenir {{name}}"
 		},
 		"installedTab": {
 			"empty": "Aucun serveur MCP dans ce projet",
@@ -1007,12 +1062,59 @@
 			"httpConfiguration": "Configuration HTTP",
 			"transformTemplate": "Modèle de transformation",
 			"transformPlaceholder": "Modèle de transformation des données d'entrée...",
-			"paramDescriptionPlaceholder": "Description"
+			"paramDescriptionPlaceholder": "Description",
+			"addTool": "Ajouter un outil",
+			"removeParam": "Supprimer le paramètre",
+			"paramName": "Nom du paramètre",
+			"paramType": "Type du paramètre",
+			"paramDescription": "Description du paramètre",
+			"colorCode": "Code couleur",
+			"httpMethod": "Méthode HTTP",
+			"httpPath": "Chemin",
+			"chain": "Enchaînement",
+			"paramTypes": {
+				"string": "Texte",
+				"number": "Nombre",
+				"boolean": "Oui / non",
+				"array": "Liste",
+				"object": "Objet"
+			}
 		},
 		"officialOnly": "Officiels",
 		"official": "Officiel",
 		"community": "Communauté",
 		"noProject": "Sélectionnez un projet : les serveurs s'installent par projet.",
+		"failures": {
+			"builderSaveFailed": "Le fichier du constructeur n'a pas pu être écrit.",
+			"builderDeleteFailed": "Le fichier du constructeur n'a pas pu être écrit.",
+			"invalidBuilderRequest": "La demande envoyée à l'application n'était pas valide.",
+			"securityServerRequired": "Aucun serveur du catalogue n'a été indiqué.",
+			"securityInvalidProject": "Le projet indiqué n'est pas valide.",
+			"securityUnknownServer": "Ce serveur n'est pas dans le catalogue.",
+			"securityFailed": "Le score de sécurité n'a pas pu être calculé.",
+			"tooManyBuilderProjects": "Le constructeur contient déjà autant de serveurs qu'il peut en garder.",
+			"watchProjectRequired": "Aucun projet n'a été indiqué.",
+			"watchServerRequired": "Aucun serveur du catalogue n'a été indiqué.",
+			"watchUnknownProject": "Ce projet n'est pas enregistré dans l'application.",
+			"policyReadFailed": "La politique MCP du projet n'a pas pu être lue.",
+			"watchReadFailed": "Les alertes des serveurs installés n'ont pas pu être lues.",
+			"acknowledgeFailed": "Les alertes n'ont pas pu être marquées comme vues."
+		},
+		"errors": {
+			"loadCatalog": "Le catalogue n'a pas pu être chargé.",
+			"loadBuilder": "Vos serveurs du constructeur n'ont pas pu être chargés.",
+			"unknownServer": "{{name}} n'est pas dans le catalogue.",
+			"missingValues": "À remplir : {{name}}.",
+			"alreadyInstalled": "{{name}} est déjà installé dans ce projet.",
+			"readSettings": "Les réglages du projet n'ont pas pu être lus : rien n'a été modifié.",
+			"saveSettings": "Les réglages du projet n'ont pas pu être enregistrés.",
+			"install": "Le serveur n'a pas pu être installé.",
+			"uninstall": "Le serveur n'a pas pu être retiré.",
+			"saveBuilder": "Le serveur n'a pas pu être enregistré.",
+			"deleteBuilder": "Le serveur n'a pas pu être supprimé.",
+			"policyRefused": "La politique MCP du projet a refusé {{name}}.",
+			"acknowledge": "Les alertes n'ont pas pu être acquittées."
+		},
 		"requires": {
 			"uv": "Nécessite uv (uvx) sur cette machine.",
 			"az": "Nécessite Azure CLI, connecté avec az login."
@@ -1020,7 +1122,187 @@
 		"agents": {
 			"planner": "Planificateur",
 			"coder": "Codeur",
-			"qa_reviewer": "Relecteur QA"
+			"qa_reviewer": "Relecteur QA",
+			"analyzer": "Enquêteur"
+		},
+		"security": {
+			"badge": "Sécurité {{score}}",
+			"badgeTitle": "Score de sécurité {{score}}/100 : {{level}}",
+			"level": {
+				"high": "élevé",
+				"medium": "moyen",
+				"low": "faible"
+			},
+			"title": "Sécurité",
+			"checking": "Lecture du registre et des vulnérabilités connues…",
+			"recheck": "Vérifier à nouveau",
+			"readFailed": "Le registre n'a pas pu être lu.",
+			"checkedAt": "Registre lu le {{date}}",
+			"unchecked": {
+				"remote": "Tourne sur les serveurs de son éditeur : rien ne tourne sur cette machine, et il n'y a pas de paquet à vérifier.",
+				"offline": "Ce projet est en mode hors-ligne strict : le score n'utilise que le catalogue et la dernière lecture du registre.",
+				"unreachable": "Le registre n'a pas répondu : le score n'utilise que le catalogue et la dernière lecture du registre.",
+				"notYet": "D'après le catalogue seulement ; ouvrez les détails pour lire le registre et les vulnérabilités connues."
+			},
+			"lowScore": "Score faible : ne l'installez que sur des projets de confiance, et relisez ses outils avant de les approuver.",
+			"dimensions": {
+				"publisher": "Éditeur",
+				"permissions": "Permissions",
+				"execution": "Où il tourne",
+				"freshness": "Fraîcheur",
+				"supplyChain": "Vulnérabilités connues",
+				"maintainers": "Mainteneurs",
+				"code": "Code source"
+			},
+			"reasons": {
+				"official": "Maintenu par {{author}}, l'éditeur du produit.",
+				"community": "Serveur communautaire ({{author}}), pas l'éditeur du produit.",
+				"readsOnly": "Ses outils ne font que lire.",
+				"writes": "Certains de ses outils modifient des données.",
+				"executes": "Des outils lancent des commandes : {{tools}}.",
+				"readOnlyFlag": "Lancé en mode lecture seule.",
+				"remote": "Tourne à distance, pas sur cette machine.",
+				"localPinned": "Tourne sur cette machine avec vos droits, à une version figée.",
+				"localUnpinned": "Tourne sur cette machine avec vos droits ; sa dernière version est téléchargée à chaque démarrage.",
+				"unknown": "Pas encore vérifié.",
+				"recent": "Dernière version il y a {{days}} jours.",
+				"stale": "Aucune version depuis {{days}} jours : peut-être abandonné.",
+				"deprecated": "Déprécié par son éditeur.",
+				"vulnerable": "{{count}} vulnérabilités connues pour cette version.",
+				"noKnownVulnerability": "Aucune vulnérabilité connue pour la version {{version}}.",
+				"changed": "Nouveaux mainteneurs depuis la première vérification : {{names}}.",
+				"noSource": "Le paquet ne nomme aucun dépôt source.",
+				"stable": "Les mêmes {{count}} mainteneurs qu'à la première vérification.",
+				"codeUnknown": "Son code n'a pas encore été lu.",
+				"codeClean": "Rien de risqué dans les {{files}} fichiers source de la version {{version}}.",
+				"undeclaredCommands": "Son code lance d'autres programmes, alors qu'aucun de ses outils ne dit lancer de commandes.",
+				"dynamicCode": "Son code exécute du code qu'il construit ou charge à l'exécution.",
+				"hardcodedSecret": "Son code contient une chaîne qui a la forme d'un identifiant.",
+				"undeclaredWrites": "Son code écrit des fichiers, alors que tous ses outils ne font que lire.",
+				"sourceUnavailable": {
+					"missing": "L'archive de la version {{version}} n'est plus sur le registre : son code ne peut pas être audité.",
+					"noArchive": "Le registre ne publie aucune archive pour la version {{version}} : son code ne peut pas être audité.",
+					"unsupported": "L'archive de la version {{version}} n'a pas pu être lue : son code ne peut pas être audité.",
+					"tooLarge": "L'archive de la version {{version}} est trop grande pour être lue : son code ne peut pas être audité.",
+					"integrity": "L'archive de la version {{version}} ne correspond pas à l'empreinte du registre : son code ne peut pas être audité."
+				}
+			},
+			"alerts": {
+				"maintainerChanged": "Mainteneurs changés : {{names}}. Un nouveau mainteneur peut publier n'importe quoi sous ce nom ; vérifiez avant de mettre à jour.",
+				"vulnerability": "{{id}} : {{summary}}",
+				"abandoned": "Aucune version depuis {{days}} jours : il est peut-être abandonné.",
+				"deprecated": "L'éditeur a déprécié ce paquet.",
+				"noSource": "Code source indisponible : impossible de l'auditer.",
+				"unpinned": "Version non figée : chaque démarrage lance la dernière version, quoi qu'elle contienne.",
+				"executesCommands": "Il peut lancer des commandes ({{tools}}) : ne le donnez qu'aux agents qui en ont besoin.",
+				"sourceUnavailable": "Le code de la version {{version}} n'a pas pu être lu : il ne peut pas être audité.",
+				"undeclaredCommands": "Lance d'autres programmes sans outil qui le dise ({{files}}) : à examiner avant de l'installer.",
+				"dynamicCode": "Exécute du code construit ou chargé à l'exécution ({{files}}) : ce qu'il lance ne se lit pas à l'avance.",
+				"hardcodedSecret": "Une chaîne qui a la forme d'un identifiant est dans son code ({{files}})."
+			},
+			"code": {
+				"title": "Analyse du code de la version {{version}} : {{files}} fichiers source",
+				"partial_one": "{{count}} fichier trop grand ou au-delà de la limite n'a pas été lu.",
+				"partial_other": "{{count}} fichiers trop grands ou au-delà de la limite n'ont pas été lus.",
+				"none": "Aucun motif trouvé.",
+				"more_one": "et {{count}} autre occurrence",
+				"more_other": "et {{count}} autres occurrences",
+				"accepted": "accepté par la politique MCP du projet : {{reason}}",
+				"rules": {
+					"shellExec": "Lance des programmes",
+					"dynamicCode": "Code dynamique",
+					"hardcodedSecret": "Chaîne en forme d'identifiant",
+					"fileWrite": "Écrit des fichiers",
+					"network": "Accès réseau"
+				}
+			}
+		},
+		"policy": {
+			"active": "Ce projet a une politique MCP (.workpilot/mcp-policy.json) : seul ce qu'elle autorise peut être installé.",
+			"allowed": "Serveurs du catalogue autorisés : {{ids}}.",
+			"allowedNone": "Aucun serveur du catalogue n'est autorisé.",
+			"minScore": "Score de sécurité minimum : {{min}}.",
+			"confineBelow": "Les serveurs dont le score de sécurité est sous {{min}}, et ceux hors catalogue, tournent confinés (bac à sable de l'OS, réseau limité aux hôtes qu'ils listent).",
+			"customBlocked": "Les serveurs hors catalogue sont refusés.",
+			"invalidTitle": "La politique MCP du projet (.workpilot/mcp-policy.json) est invalide : aucun serveur ne peut être installé tant qu'elle n'est pas corrigée.",
+			"invalid": {
+				"unreadable": "Le fichier n'a pas pu être lu.",
+				"notJson": "Le fichier n'est pas du JSON valide.",
+				"schema": "Un champ est inconnu ou a une valeur incorrecte.",
+				"schemaField": "Champ inconnu ou incorrect : {{field}}.",
+				"outsideProject": "Le fichier, ou son dossier, pointe hors du projet.",
+				"notAFile": "Ce n'est pas un fichier ordinaire.",
+				"tooLarge": "Le fichier dépasse 64 Ko."
+			},
+			"refusals": {
+				"policyInvalid": "{{name}} ne peut pas être installé : la politique MCP du projet est invalide.",
+				"notAllowed": "La politique MCP du projet n'autorise pas {{name}}.",
+				"scoreTooLow": "{{name}} a un score de sécurité de {{score}} ; la politique MCP du projet exige {{minScore}} ou plus.",
+				"customBlocked": "La politique MCP du projet refuse les serveurs hors catalogue ({{name}})."
+			},
+			"acceptedFindings_one": "{{count}} constat de l'analyse du code accepté, avec sa raison.",
+			"acceptedFindings_other": "{{count}} constats de l'analyse du code acceptés, chacun avec sa raison."
+		},
+		"watch": {
+			"title": "Alertes de sécurité",
+			"alertCount_one": "{{count}} alerte",
+			"alertCount_other": "{{count}} alertes",
+			"unverifiable": "Non vérifiable",
+			"unverifiableHint": "Ce n'est pas un serveur du catalogue : il n'est jamais vérifié sur le réseau.",
+			"status": {
+				"watched": "Vérifié chaque jour ; dernière lecture {{date}}.",
+				"pending": "Sera lu par la prochaine vérification quotidienne.",
+				"remote": "Tourne chez son éditeur : aucun paquet à vérifier.",
+				"offline": "Hors-ligne strict : les serveurs de ce projet ne sont pas vérifiés."
+			},
+			"acknowledge": "Acquitter",
+			"detectedAt": "Détectée {{date}}",
+			"alerts": {
+				"newVulnerability": "Nouvel avis pour la version {{version}} : {{id}}, {{summary}}",
+				"maintainerAdded": "Nouveau mainteneur : {{names}}. Un nouveau mainteneur peut publier n'importe quoi sous ce nom ; vérifiez sa dernière version.",
+				"deprecated": "L'éditeur a déprécié ou retiré ce paquet.",
+				"lowScore": "Le score de sécurité est tombé à {{score}} (il était de {{previous}}).",
+				"newCodeFinding": "La version {{version}} apporte du code que la précédente n'avait pas : {{rule}} ({{file}}).",
+				"sourceUnavailable": "Le code de la version {{version}} ne peut plus être lu : il ne peut pas être audité."
+			}
+		},
+		"reviews": {
+			"title": "Avis de l'équipe",
+			"hint": "Ce que votre organisation a constaté en utilisant ce serveur, partagé par tous ses projets. Seuls les membres de cette organisation les lisent ; mainteneurs et administrateurs les écrivent.",
+			"loading": "Chargement des avis",
+			"none": "Personne dans l'organisation n'a encore donné son avis sur ce serveur.",
+			"by": "par {{author}}",
+			"unknownAuthor": "un ancien membre",
+			"delete": "Supprimer cet avis",
+			"write": "Votre avis",
+			"yours": "Votre avis (l'enregistrer le remplace)",
+			"comment": "Commentaire",
+			"commentPlaceholder": "Qu'avez-vous constaté ? Hôtes appelés, fichiers lus, tout ce que la doc ne dit pas.",
+			"save": "Publier l'avis",
+			"update": "Mettre à jour l'avis",
+			"verdicts": {
+				"safe": "Sûr",
+				"caution": "À utiliser avec prudence",
+				"unsafe": "Dangereux"
+			},
+			"errors": {
+				"too_many_reviews": "Cette organisation contient déjà le nombre maximal d'avis.",
+				"review_not_found": "Cet avis n'existe plus.",
+				"failed": "Le serveur a refusé ou est injoignable."
+			}
+		},
+		"sandbox": {
+			"refused": "Non lancé sur cette machine : ce serveur doit tourner confiné, dans le bac à sable de l'OS, et il n'y en a pas ici. Il n'est jamais lancé sans.",
+			"policyRefused": "Sur cette machine, les serveurs que cette politique confine ne se lancent pas : il n'y a pas de bac à sable de l'OS ici.",
+			"why": "Pourquoi ?",
+			"recheck": "Vérifier à nouveau",
+			"kinds": {
+				"off": "Le bac à sable de l'OS est désactivé (WORKPILOT_SANDBOX=off).",
+				"unsupported": "Ce système n'a pas encore de bac à sable de l'OS que WorkPilot sache utiliser (Windows, pour l'instant).",
+				"missing": "Le programme du bac à sable ({{backend}}) n'est pas installé sur cette machine.",
+				"refused": "Le programme du bac à sable ({{backend}}) est installé, mais le système a refusé de le lancer.",
+				"unknown": "WorkPilot n'a pas pu vérifier le bac à sable de l'OS de cette machine."
+			}
 		}
 	},
 	"terminalGrid": {
@@ -1075,7 +1357,8 @@
 			"installing": "Installation...",
 			"uninstall": "Désinstaller",
 			"enable": "Activer",
-			"disable": "Désactiver"
+			"disable": "Désactiver",
+			"uninstallNamed": "Désinstaller {{name}}"
 		},
 		"sdk": {
 			"title": "SDK de Plugins",
@@ -1146,19 +1429,34 @@
 			"openFolderFailed": "Impossible d’ouvrir le dossier du plugin",
 			"done": "Terminé",
 			"namePlaceholder": "Mon super plugin",
-			"untitled": "Sans titre"
+			"createFailed": "Impossible de créer le plugin",
+			"copyFailed": "Impossible de copier la configuration",
+			"fieldIdInvalid": "Lettres minuscules, chiffres et tirets simples (mon-plugin)",
+			"fieldTemplateContentPlaceholder": "# Modèle de spec\n\n## Exigences\n...",
+			"configFile": "Écrit dans plugin.config.json, dans le dossier du plugin"
 		},
 		"byAuthor": "par {{author}}",
 		"noProject": "Sélectionnez un projet : les plugins s'installent dans les skills d'un projet.",
 		"installedIn": "Dans {{paths}}",
 		"howToUse": "Lancez-le avec /{{id}} dans la barre de commandes du Kanban, ou laissez l'agent s'en servir.",
 		"showSkill": "Voir le skill",
-		"hideSkill": "Masquer le skill"
+		"hideSkill": "Masquer le skill",
+		"sortBy": "Trier les plugins",
+		"loading": "Chargement des plugins",
+		"errors": {
+			"loadCatalog": "Impossible de charger le catalogue",
+			"loadInstalled": "Impossible de lire les plugins installés dans ce projet",
+			"install": "Échec de l’installation",
+			"uninstall": "Échec de la désinstallation"
+		}
 	},
 	"chatHistory": {
 		"title": "Historique des conversations",
 		"byTeammate": "Par {{name}}, en lecture seule",
 		"noConversations": "Aucune conversation pour le moment",
+		"titleInputLabel": "Titre de la conversation",
+		"renameFailed": "La conversation n'a pas pu être renommée.",
+		"deleteFailed": "La conversation n'a pas pu être supprimée.",
 		"today": "Aujourd'hui",
 		"yesterday": "Hier",
 		"daysAgo": "Il y a {{count}} jours",
@@ -1207,6 +1505,7 @@
 		}
 	},
 	"modelCatalog": {
+		"freeText": "Autre (saisie libre)",
 		"live": "À jour (fournisseur)",
 		"registry": "À jour (registre public)",
 		"cache": "En cache · {{when}}",
@@ -1295,11 +1594,31 @@
 		"description": "Connectez-vous à un serveur partagé, ou continuez en mode local.",
 		"serverUrl": "URL du serveur",
 		"entraButton": "Se connecter avec Microsoft",
+		"ssoButton": "Se connecter avec {{name}}",
 		"email": "Email",
 		"password": "Mot de passe",
 		"localAccountButton": "Connexion",
 		"localModeButton": "Mode local",
-		"haveInvite": "J'ai une invitation"
+		"haveInvite": "J'ai une invitation",
+		"forgotPassword": "Mot de passe oublié ?",
+		"failed": "Connexion impossible"
+	},
+	"passwordReset": {
+		"title": "Réinitialiser votre mot de passe",
+		"askDescription": "Saisissez l'e-mail de votre compte : si le serveur le connaît, il vous envoie un lien pour choisir un nouveau mot de passe.",
+		"setDescription": "Collez le lien reçu, puis choisissez votre nouveau mot de passe. Vos autres sessions seront fermées.",
+		"noEmail": "Ce serveur ne peut pas envoyer d'e-mail. Demandez un lien de réinitialisation à un administrateur du serveur (Administration, Membres), puis choisissez « J'ai un lien ».",
+		"send": "Envoyer le lien",
+		"sent": "Si un compte utilise cette adresse, un lien est en route. Il sert une fois et expire bientôt.",
+		"haveLink": "J'ai un lien",
+		"needLink": "Il me faut un lien",
+		"link": "Lien ou code de réinitialisation",
+		"forAccount": "Pour le compte {{email}}",
+		"newPassword": "Nouveau mot de passe",
+		"save": "Enregistrer mon mot de passe",
+		"invalidLink": "Ce lien de réinitialisation est invalide ou a expiré",
+		"failed": "Le mot de passe n'a pas pu être réinitialisé",
+		"done": "Votre mot de passe a été changé. Connectez-vous avec le nouveau."
 	},
 	"acceptInvite": {
 		"title": "Créer votre compte",
@@ -1326,20 +1645,36 @@
 		"parent": "⬆ Dossier parent",
 		"noFolders": "Aucun dossier trouvé.",
 		"checkPath": "Vérifiez le chemin ou vos droits d'accès.",
-		"dragReferences": "Glissez des fichiers pour les ajouter en référence"
-	},
-	"imageUpload": {
-		"largeFile": "Fichier volumineux : pensez à le compresser",
-		"limits": "{{types}}, 10 Mo max. chacune ({{count}}/{{max}})",
-		"maxImages": "{{max}} images au maximum",
-		"dropOrBrowse": "Déposez des images ici ou cliquez pour parcourir",
-		"maxReached": "Nombre maximal d'images atteint"
+		"dragReferences": "Glissez des fichiers pour les ajouter en référence",
+		"loadFailed": "Impossible d'ouvrir ce dossier."
 	},
 	"shortcutsOverlay": {
 		"title": "Raccourcis clavier",
 		"pressBefore": "Appuyez sur",
 		"escapeKey": "Échap",
-		"pressAfter": "pour fermer · Les raccourcis à une touche marchent hors d'un champ de saisie"
+		"pressAfter": "pour fermer · Les raccourcis du menu (deux lettres, tapées l'une après l'autre) marchent quand un projet est ouvert, hors d'un champ de saisie",
+		"groups": {
+			"navigation": "Navigation",
+			"general": "Général",
+			"terminal": "Terminaux",
+			"menu": "Menu"
+		},
+		"items": {
+			"goKanban": "Aller au Kanban",
+			"goTerminals": "Aller aux terminaux",
+			"goInsights": "Aller à Insights",
+			"goRoadmap": "Aller à la roadmap",
+			"openSettings": "Ouvrir les paramètres",
+			"commandPalette": "Palette de commandes",
+			"shortcuts": "Raccourcis clavier",
+			"newTask": "Nouvelle tâche",
+			"addProject": "Ajouter un projet (hors terminaux)",
+			"voiceAssistant": "Assistant vocal",
+			"stopAgents": "Arrêter tous les agents",
+			"closeDialog": "Fermer une boîte de dialogue ou un panneau",
+			"newTerminal": "Nouveau terminal (dans Terminaux)",
+			"closeTerminal": "Fermer le terminal (dans Terminaux)"
+		}
 	},
 	"learningMode": {
 		"level": "Niveau : {{level}}",
@@ -1363,8 +1698,6 @@
 			"specCreated": "Spec créée à partir de l'issue",
 			"retry": "Relancer la correction auto",
 			"button": "Correction auto",
-			"processing_one": "Traitement de {{count}} issue...",
-			"processing_other": "Traitement de {{count}} issues...",
 			"newIssues": "Corriger auto. les nouvelles",
 			"newIssuesDescription": "Corriger automatiquement les nouvelles issues dès leur arrivée.",
 			"failed": "La correction auto a échoué",
@@ -1377,8 +1710,8 @@
 			"selectedBatches_other": "{{count}} lots sélectionnés ({{issues}} issues)",
 			"plusSingle_one": "+ {{count}} issue isolée",
 			"plusSingle_other": "+ {{count}} issues isolées",
-			"approveCreate": "Approuver et créer ({{count}})",
-			"issueCount": "{{count}} issues",
+			"issueCount_one": "{{count}} issue",
+			"issueCount_other": "{{count}} issues",
 			"similar": "{{percent}} % similaire",
 			"title": "Analyser et regrouper les issues",
 			"intro": "Jusqu'à 200 issues ouvertes seront analysées et les similaires regroupées ; vous relirez les lots proposés avant toute création de tâche.",
@@ -1397,6 +1730,7 @@
 			"approveCreateCount_one": "Approuver et créer ({{count}} lot)",
 			"approveCreateCount_other": "Approuver et créer ({{count}} lots)",
 			"defaultName": "Lot {{number}}",
+			"approveFailed": "Impossible de créer les tâches de ces lots",
 			"computing": "Calcul des similarités et validation des lots...",
 			"stepIntro": "Analyser les issues ouvertes et regrouper les similaires pour un traitement par lots.",
 			"stepAnalyzing": "Analyse de la similarité sémantique des issues...",
@@ -1420,13 +1754,32 @@
 		},
 		"createTask": "Créer la tâche",
 		"done": "Terminé",
-		"commentsCount": "{{count}} commentaires",
+		"commentsCount_one": "{{count}} commentaire",
+		"commentsCount_other": "{{count}} commentaires",
+		"state": {
+			"open": "Ouverte",
+			"closed": "Fermée"
+		},
+		"complexity": {
+			"simple": "Simple",
+			"standard": "Standard",
+			"complex": "Complexe"
+		},
 		"taskId": "ID de tâche : {{id}}",
 		"viewTask": "Voir la tâche",
 		"taskLinked": "Tâche liée",
 		"assignees": "Assignés",
 		"milestone": "Jalon",
-		"openCount": "{{count}} ouvertes",
+		"openCount_one": "{{count}} ouverte",
+		"openCount_other": "{{count}} ouvertes",
+		"noIssues": "Aucune issue trouvée",
+		"loadFailed": "Impossible de charger les issues",
+		"loadMoreFailed": "Impossible de charger plus d'issues",
+		"importFailed": "Impossible de créer les tâches depuis les issues",
+		"createCardFailed": "Impossible de créer la carte",
+		"unknownError": "Erreur inconnue",
+		"selectIssue": "Choisissez une issue pour voir son détail",
+		"filterLabel": "Issues affichées",
 		"searchPlaceholder": "Rechercher des issues...",
 		"filters": {
 			"open": "Ouvertes",
@@ -1446,7 +1799,21 @@
 		"less": "Moins",
 		"more": "Plus",
 		"streaming": "Diffusion",
-		"running": "En cours"
+		"running": "En cours",
+		"phase": {
+			"context": "Collecte du contexte",
+			"analysis": "Analyse IA",
+			"synthesis": "Synthèse"
+		},
+		"activity": {
+			"read_one": "{{count}} fichier lu",
+			"read_other": "{{count}} fichiers lus",
+			"search_one": "{{count}} recherche",
+			"search_other": "{{count}} recherches",
+			"other_one": "{{count}} autre",
+			"other_other": "{{count}} autres"
+		},
+		"showDetail": "Afficher le détail"
 	},
 	"githubCopilot": {
 		"authTerminal": {

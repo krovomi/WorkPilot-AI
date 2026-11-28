@@ -9,10 +9,15 @@ import { type ChildProcess, spawn } from "node:child_process";
 import { ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants";
 import type { IPCResult, PRDetailsResult, Project } from "../../shared/types";
-import { readProjectEnv } from "../project-env-file";
+import { readProjectForgeEnv } from "../forge/forge-credentials";
 import { getGitHubConfig, githubFetch } from "./github/utils";
 import { findTaskAndProject } from "./task/shared";
 import { envWithoutCredentials } from "../utils/child-env";
+
+/** A pull request number as both forges write it: a positive whole number. */
+export function isPRNumber(value: unknown): value is number {
+	return typeof value === "number" && Number.isSafeInteger(value) && value > 0;
+}
 
 /**
  * Register universal PR details handler
@@ -22,9 +27,12 @@ export function registerPRDetailsHandlers(): void {
 		IPC_CHANNELS.PR_DETAILS,
 		async (
 			_,
-			prNumber: number,
-			taskId?: string,
+			prNumber: unknown,
+			taskId?: unknown,
 		): Promise<IPCResult<PRDetailsResult>> => {
+			if (!isPRNumber(prNumber) || (taskId !== undefined && typeof taskId !== "string")) {
+				return { success: false, error: "Invalid pull request" };
+			}
 			try {
 				// If taskId is provided, get the task and project to detect PR URL
 				let prUrl: string | null = null;
@@ -451,7 +459,7 @@ async function callAzureDevOpsPythonWithExistingConfig(
 	if (!args) {
 		throw new Error("Invalid Azure DevOps PR URL format");
 	}
-	const projectEnv = readProjectEnv(project);
+	const projectEnv = readProjectForgeEnv(project);
 	return new Promise((resolve, reject) => {
 		const pythonProcess = spawn("python", args, {
 			cwd: project.path,
@@ -803,14 +811,14 @@ function transformAzureDevOpsData(
 
 function mapAzureDevOpsChangeType(
 	changeType: string,
-): "added" | "modified" | "renamed" {
+): "added" | "removed" | "modified" | "renamed" {
 	switch (changeType) {
 		case "add":
 			return "added";
 		case "edit":
 			return "modified";
 		case "delete":
-			return "renamed"; // Map Azure DevOps 'delete' to 'renamed' for compatibility
+			return "removed";
 		case "rename":
 			return "renamed";
 		default:

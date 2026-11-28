@@ -9,10 +9,16 @@ import {
 import type {
 	AppSettings,
 	ClaudeAuthResult,
+	CustomMcpServer,
 	IPCResult,
 	ProjectEnvConfig,
 } from "../../shared/types";
 import { debugError } from "../../shared/utils/debug-logger";
+import {
+	maskCustomMcpServers,
+	parseCustomMcpServers,
+	unmaskCustomMcpServers,
+} from "../custom-mcp-secrets";
 import { unmaskSecret } from "../utils/masked-secret";
 import {
 	getClaudeCliInvocation,
@@ -26,6 +32,16 @@ import {
 	writeProjectEnvFile,
 } from "../project-env-file";
 import { ensureProjectEnvIgnored } from "../project-initializer";
+import { installGuardDeps } from "../mcp-security/runtime";
+import { withMcpConfinement } from "../mcp-security/confine-guard";
+import { mcpInstallRefusal, refusalMessage } from "../mcp-security/install-guard";
+import { withGhCliToken } from "./github/oauth-token";
+import { withGlabCliToken } from "./gitlab/oauth-token";
+import {
+	applyBitbucketEnvUpdate,
+	bitbucketEnvSection,
+	readBitbucketEnvConfig,
+} from "./bitbucket/env-config";
 import { projectStore } from "../project-store";
 import {
 	envTemplateKeys,
@@ -33,6 +49,11 @@ import {
 	parseEnvFile,
 	unownedEnvLines,
 } from "./utils";
+import {
+	applyForgeAccountIds,
+	forgeAccountIdRefusal,
+	readForgeAccountIds,
+} from "../forge/forge-account-env";
 import { readSettingsFile } from "../settings-utils";
 import { backendFetch } from "./_backend-fetch";
 
@@ -95,6 +116,9 @@ const NOTIFY_WEBHOOK_ENV_KEYS = {
 	WEBHOOK_URL: "NOTIFY_WEBHOOK_URL",
 } as const;
 
+/** A memory conflict a teammate's sync queued, on the same channels (opt-in, #352). */
+const MEMORY_CONFLICT_NOTIFY_KEY = "WORKPILOT_MEMORY_CONFLICT_NOTIFY";
+
 // CI/CD pipeline loop environment variable keys (« Build rouge »)
 // Read by ci-pipeline-service.ts / ci-pipeline-providers.ts. Azure DevOps,
 // GitHub and GitLab credentials are reused from their own sections above.
@@ -117,6 +141,7 @@ export const PROJECT_ENV_SECRET_FIELDS = [
 	"linearApiKey",
 	"githubToken",
 	"gitlabToken",
+	"bitbucketToken",
 	"azureDevOpsPat",
 	"jiraApiToken",
 	"cicdJenkinsToken",
@@ -142,12 +167,21 @@ export function maskProjectEnvSecrets(
 			context7ApiKey: MASKED_SECRET,
 		};
 	}
+	if (masked.customMcpServers) {
+		masked.customMcpServers = maskCustomMcpServers(masked.customMcpServers);
+	}
 	return masked;
 }
 
-/** `config` from the renderer with masked secrets dropped, so they keep their stored value. */
+/**
+ * `config` from the renderer with masked secrets dropped, so they keep their
+ * stored value. The header and environment values of custom MCP servers come
+ * back whole, so a masked one is taken from `storedServers` (the servers the
+ * file holds now).
+ */
 export function unmaskProjectEnvUpdate(
 	config: Partial<ProjectEnvConfig>,
+	storedServers: CustomMcpServer[] = [],
 ): Partial<ProjectEnvConfig> {
 	const result: Partial<ProjectEnvConfig> = { ...config };
 	for (const field of PROJECT_ENV_SECRET_FIELDS) {
@@ -162,6 +196,12 @@ export function unmaskProjectEnvUpdate(
 		if (value === undefined) delete mcpServers.context7ApiKey;
 		else mcpServers.context7ApiKey = value;
 		result.mcpServers = mcpServers;
+	}
+	if (result.customMcpServers) {
+		result.customMcpServers = unmaskCustomMcpServers(
+			result.customMcpServers,
+			storedServers,
+		);
 	}
 	return result;
 }
@@ -287,6 +327,8 @@ export function registerEnvHandlers(
 				? "true"
 				: "false";
 		}
+		// The saved forge account each forge uses (forge/forge-account-env.ts)
+		applyForgeAccountIds(config, existingVars);
 		// GitHub Integration
 		if (config.githubEnabled !== undefined) {
 			existingVars.GITHUB_ENABLED = config.githubEnabled ? "true" : "false";
@@ -337,6 +379,8 @@ export function registerEnvHandlers(
 				? "true"
 				: "false";
 		}
+
+		applyBitbucketEnvUpdate(existingVars, config);
 
 		// Azure DevOps Integration
 		// Guard: don't overwrite existing non-empty values with empty strings.
@@ -517,6 +561,11 @@ export function registerEnvHandlers(
 		) {
 			existingVars[NOTIFY_WEBHOOK_ENV_KEYS.WEBHOOK_URL] = config.notifyWebhookUrl;
 		}
+		if (config.memoryConflictNotify !== undefined) {
+			existingVars[MEMORY_CONFLICT_NOTIFY_KEY] = config.memoryConflictNotify
+				? "true"
+				: "false";
+		}
 		// Git/Worktree Settings
 		if (config.defaultBranch !== undefined) {
 			existingVars.DEFAULT_BRANCH = config.defaultBranch;
@@ -649,6 +698,7 @@ ${existingVars.LINEAR_REALTIME_SYNC ? `LINEAR_REALTIME_SYNC=${existingVars.LINEA
 ${existingVars.GITHUB_ENABLED ? `GITHUB_ENABLED=${existingVars.GITHUB_ENABLED}` : "# GITHUB_ENABLED=false"}
 ${existingVars.GITHUB_TOKEN ? `GITHUB_TOKEN=${existingVars.GITHUB_TOKEN}` : "# GITHUB_TOKEN="}
 ${existingVars.GITHUB_REPO ? `GITHUB_REPO=${existingVars.GITHUB_REPO}` : "# GITHUB_REPO=owner/repo"}
+${envLine(existingVars, "GITHUB_ACCOUNT_ID")}
 ${existingVars.GITHUB_AUTO_SYNC ? `GITHUB_AUTO_SYNC=${existingVars.GITHUB_AUTO_SYNC}` : "# GITHUB_AUTO_SYNC=false"}
 
 # =============================================================================
@@ -657,9 +707,11 @@ ${existingVars.GITHUB_AUTO_SYNC ? `GITHUB_AUTO_SYNC=${existingVars.GITHUB_AUTO_S
 ${existingVars[GITLAB_ENV_KEYS.ENABLED] ? `${GITLAB_ENV_KEYS.ENABLED}=${existingVars[GITLAB_ENV_KEYS.ENABLED]}` : `# ${GITLAB_ENV_KEYS.ENABLED}=true`}
 ${envLine(existingVars, GITLAB_ENV_KEYS.INSTANCE_URL, "https://gitlab.com")}
 ${envLine(existingVars, GITLAB_ENV_KEYS.TOKEN)}
+${envLine(existingVars, "GITLAB_ACCOUNT_ID")}
 ${envLine(existingVars, GITLAB_ENV_KEYS.PROJECT, "group/project")}
 ${envLine(existingVars, GITLAB_ENV_KEYS.AUTO_SYNC, "false")}
 
+${bitbucketEnvSection(existingVars)}
 
 # =============================================================================
 # AZURE DEVOPS INTEGRATION (OPTIONAL)
@@ -667,6 +719,7 @@ ${envLine(existingVars, GITLAB_ENV_KEYS.AUTO_SYNC, "false")}
 ${existingVars[AZURE_DEVOPS_ENV_KEYS.ENABLED] ? `${AZURE_DEVOPS_ENV_KEYS.ENABLED}=${existingVars[AZURE_DEVOPS_ENV_KEYS.ENABLED]}` : `# ${AZURE_DEVOPS_ENV_KEYS.ENABLED}=true`}
 ${envLine(existingVars, AZURE_DEVOPS_ENV_KEYS.ORG_URL, "https://dev.azure.com/your-org")}
 ${envLine(existingVars, AZURE_DEVOPS_ENV_KEYS.PAT)}
+${envLine(existingVars, "AZURE_DEVOPS_ACCOUNT_ID")}
 ${existingVars[AZURE_DEVOPS_ENV_KEYS.ENABLED] === "true" ? `${AZURE_DEVOPS_ENV_KEYS.PROJECT}=${existingVars[AZURE_DEVOPS_ENV_KEYS.PROJECT] || ""}` : envLine(existingVars, AZURE_DEVOPS_ENV_KEYS.PROJECT, "MyProject")}
 ${existingVars[AZURE_DEVOPS_ENV_KEYS.ENABLED] === "true" ? `${AZURE_DEVOPS_ENV_KEYS.REPOSITORY}=${existingVars[AZURE_DEVOPS_ENV_KEYS.REPOSITORY] || ""}` : envLine(existingVars, AZURE_DEVOPS_ENV_KEYS.REPOSITORY, "MyRepository")}
 ${existingVars[AZURE_DEVOPS_ENV_KEYS.AUTO_SYNC] ? `${AZURE_DEVOPS_ENV_KEYS.AUTO_SYNC}=${existingVars[AZURE_DEVOPS_ENV_KEYS.AUTO_SYNC]}` : `# ${AZURE_DEVOPS_ENV_KEYS.AUTO_SYNC}=false`}
@@ -714,6 +767,8 @@ ${envLine(existingVars, GOOGLE_CHAT_ENV_KEYS.WEBHOOK_URL, "https://chat.googleap
 # Generic webhook (flat JSON POST)
 ${existingVars[NOTIFY_WEBHOOK_ENV_KEYS.ENABLED] ? `${NOTIFY_WEBHOOK_ENV_KEYS.ENABLED}=${existingVars[NOTIFY_WEBHOOK_ENV_KEYS.ENABLED]}` : `# ${NOTIFY_WEBHOOK_ENV_KEYS.ENABLED}=false`}
 ${envLine(existingVars, NOTIFY_WEBHOOK_ENV_KEYS.WEBHOOK_URL, "https://example.com/webhook")}
+# Also announce a memory conflict a teammate's sync brought (titles, a short preview, authors' names)
+${existingVars[MEMORY_CONFLICT_NOTIFY_KEY] ? `${MEMORY_CONFLICT_NOTIFY_KEY}=${existingVars[MEMORY_CONFLICT_NOTIFY_KEY]}` : `# ${MEMORY_CONFLICT_NOTIFY_KEY}=false`}
 
 # =============================================================================
 # GIT/WORKTREE SETTINGS (OPTIONAL)
@@ -903,6 +958,8 @@ ${otherLines.join("\n")}
 				config.githubAutoSync = true;
 			}
 
+			readForgeAccountIds(vars, config);
+
 			// GitLab config
 			if (vars[GITLAB_ENV_KEYS.TOKEN]) {
 				config.gitlabToken = vars[GITLAB_ENV_KEYS.TOKEN];
@@ -919,6 +976,8 @@ ${otherLines.join("\n")}
 			if (vars[GITLAB_ENV_KEYS.AUTO_SYNC]?.toLowerCase() === "true") {
 				config.gitlabAutoSync = true;
 			}
+
+			Object.assign(config, readBitbucketEnvConfig(vars));
 
 			// Azure DevOps config
 			if (vars[AZURE_DEVOPS_ENV_KEYS.PAT]) {
@@ -1033,6 +1092,9 @@ ${otherLines.join("\n")}
 			if (vars[NOTIFY_WEBHOOK_ENV_KEYS.WEBHOOK_URL]) {
 				config.notifyWebhookUrl = vars[NOTIFY_WEBHOOK_ENV_KEYS.WEBHOOK_URL];
 			}
+			if (vars[MEMORY_CONFLICT_NOTIFY_KEY]?.toLowerCase() === "true") {
+				config.memoryConflictNotify = true;
+			}
 
 			// Git/Worktree config
 			if (vars.DEFAULT_BRANCH) {
@@ -1108,12 +1170,7 @@ ${otherLines.join("\n")}
 
 			// Parse custom MCP servers (user-defined)
 			if (vars.CUSTOM_MCP_SERVERS) {
-				try {
-					config.customMcpServers = JSON.parse(vars.CUSTOM_MCP_SERVERS);
-				} catch {
-					// Invalid JSON, ignore
-					config.customMcpServers = [];
-				}
+				config.customMcpServers = parseCustomMcpServers(vars.CUSTOM_MCP_SERVERS);
 			}
 
 			// Secrets stay in the main process: the renderer learns which are set.
@@ -1137,6 +1194,8 @@ ${otherLines.join("\n")}
 					error: `Line breaks are not allowed in project settings (${lineBreakAt})`,
 				};
 			}
+			const accountRefusal = forgeAccountIdRefusal(config);
+			if (accountRefusal) return { success: false, error: accountRefusal };
 
 			const project = projectStore.getProject(projectId);
 			if (!project) {
@@ -1167,9 +1226,37 @@ ${otherLines.join("\n")}
 				}
 
 				// Generate new content
-				// A secret sent back as the mask ENV_GET showed keeps its stored value.
+				// A secret sent back as the mask ENV_GET showed keeps its stored value;
+				// the mask of a gh or glab sign-in stands for the token it holds now.
+				const storedServers = parseCustomMcpServers(
+					existingContent ? parseEnvFile(existingContent).CUSTOM_MCP_SERVERS : undefined,
+				);
+				const unmasked = unmaskProjectEnvUpdate(config, storedServers);
+				// The project's MCP install policy (#369): a server added or changed
+				// is checked here, whatever the renderer showed.
+				const refusal = await mcpInstallRefusal(
+					project.path,
+					storedServers,
+					unmasked.customMcpServers,
+					installGuardDeps(),
+				);
+				if (refusal) {
+					return {
+						success: false,
+						error: refusalMessage(refusal),
+						data: { mcpPolicyRefusal: refusal },
+					};
+				}
+				// A low-score server is written confined (`confineBelow`, #369 lot 5).
+				if (unmasked.customMcpServers) {
+					unmasked.customMcpServers = await withMcpConfinement(
+						project.path,
+						unmasked.customMcpServers,
+						installGuardDeps(),
+					);
+				}
 				const newContent = generateEnvContent(
-					unmaskProjectEnvUpdate(config),
+					await withGlabCliToken(config, await withGhCliToken(config, unmasked)),
 					existingContent,
 				);
 

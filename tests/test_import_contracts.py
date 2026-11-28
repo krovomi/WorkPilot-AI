@@ -50,6 +50,12 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # registries and its record; git through foundation. The QA gate that
     # calls it, and offline_policy, live in qa. A leaf.
     "dependency_guard": {"foundation"},
+    # The watch after a deployment (docs/architecture/deploy-watch.md): git and
+    # atomic writes through foundation, the strict offline policy. A leaf the
+    # deploy watch runner calls. Its incident report asks the project's model
+    # through the agent_runtime port, with the metrics fenced by
+    # security.untrusted; the revert PR's forge is handed in by the runner.
+    "deploy_watch": {"agent_runtime", "foundation", "offline_policy", "security"},
     # The API contract watcher (docs/architecture/api-contract-watcher.md):
     # git through foundation; the consumer registry is read in the main
     # checkout (security.guardrail_policy.main_project). Its QA gate is in qa,
@@ -62,7 +68,7 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # The mutation gate (docs/architecture/mutation-gate.md): git, the test
     # conventions and the platform through foundation; the child environment
     # without credentials from security. The QA gate that calls it is in qa.
-    "mutation_gate": {"foundation", "security"},
+    "mutation_gate": {"foundation", "security", "suite_runner"},
     # The schema guard (docs/architecture/schema-guard.md): migration rules
     # over text, git through foundation. The QA gate that calls it is in qa.
     "schema_guard": {"foundation"},
@@ -75,6 +81,10 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # A suite run with its machine report, for the flaky detective and the
     # red team: the platform's command splitting, the child environment.
     "suite_runner": {"foundation", "security"},
+    # The generational test archive: the suite runner's report converters and
+    # TRX reader, so a generation reads every stack's report like the flaky
+    # detective; the route's API helpers in foundation.
+    "generational_tests": {"foundation", "suite_runner"},
     # Requirement -> subtask -> files -> tests (docs/architecture/requirement-links.md):
     # the plan's references, the Agent Trace records and the test conventions.
     # The build and the traceability route read it.
@@ -98,17 +108,30 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # MCP 2026-07-28 and its Tasks extension, for WorkPilot's own servers:
     # the standard library only (docs/architecture/mcp-2026.md).
     "mcp_tasks": set(),
+    # « Interroger le tableau », ranking by meaning (docs/architecture/board-ask.md):
+    # the brain's local embeddings model, secret masking and atomic writes
+    # through foundation, the strict offline policy; and, for a server
+    # project's question (lot 4c), the quoting of ticket text as data
+    # (security.untrusted, S2). Its model is handed in by the runner. A leaf.
+    "board_ask": {"brain", "foundation", "offline_policy", "security"},
     # The board as an MCP server: the spec numbering lock and the MCP layer,
     # nothing that runs an agent (docs/architecture/board-mcp.md).
     "board_mcp": {"core", "mcp_tasks"},
+    # Import Design's render loop (docs/architecture/design-render-loop.md):
+    # the model catalogue (does this model read images?), nothing else. Its
+    # model call and its browser binary are handed in by the runner's glue
+    # (services), so it stays out of the agents' cycle. A leaf.
+    "design_to_code": {"models_registry"},
     # The changelog's prompts, git history and done cards, shared by its
     # runner and the server's routes: the board, git and the untrusted-content
     # fence, nothing that runs an agent (its model call is the runner's,
     # through core.oneshot).
     "changelog_generator": {"board_mcp", "foundation", "security"},
-    # Stack detection, including the UI and test stacks moved here in M10.
-    "project": {"mobile"},
-    "mobile": {"foundation"},
+    # Stack detection, including the UI and test stacks moved here in M10,
+    # and the WinDev-family project (a leaf).
+    "project": {"mobile", "windev"},
+    # The WinDev Mobile app of a WinDev project (`windev` is a leaf).
+    "mobile": {"foundation", "windev"},
     "rtk": {"foundation"},
     # Read by the scheduler and the phase config: its LLM refine takes the
     # client factory from its runner instead of importing core. Formula Lab
@@ -117,17 +140,28 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # The repo bench: git, files and test runners, read by Formula Lab and
     # the model router. A leaf, or the router's cycle reaches it.
     "bench": {"foundation"},
+    # Git snapshots of a task's worktree before each agent session, and the
+    # rollback (docs/architecture/agent-safety.md): git through foundation only.
+    "agent_snapshots": {"foundation"},
     # The security layer reads the project's stack (allowlist per stack), the
     # injection scanner, and rtk to see the command behind the proxy
     # (docs/architecture/rtk.md).
     "security": {"injection_guard", "project", "rtk"},
-    # Server mode is mounted by provider_api; it reaches nothing back.
-    "server": set(),
+    # The evidence that ranks a security scan (docs/architecture/
+    # security-priority.md): the scanner's types, and the APM inbox parser of
+    # Regression Guardian. The QA loop hands it to the scanner, which never
+    # imports it back.
+    "security_reach": {"regression_guardian", "security"},
+    # Server mode is mounted by provider_api; it reaches nothing back, but
+    # the GenAI spans' tracer, a leaf, so its request spans share the
+    # agents' exporter (server/telemetry.py).
+    "server": {"genai_trace"},
     # Model and provider per phase: the catalogue, the provider chosen in the
-    # UI, the complexity router, and the carbon budget's degraded mode
-    # (carbon_profiler.budget steps a flagship down).
+    # UI, the complexity router, and the carbon and cost budgets' degraded
+    # modes (carbon_profiler.budget, cost_budget step a flagship down).
     "phase_config": {
         "carbon_profiler",
+        "cost_budget",
         "models_registry",
         "provider_selection",
         "scheduling",
@@ -135,6 +169,10 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # The carbon profiler: the ledger, its estimates and the budget; model tiers
     # from the registry. phase_config calls it, so it never imports it back.
     "carbon_profiler": {"foundation", "models_registry"},
+    # The cost budgets (docs/architecture/cost-budgets.md): the ledger, the
+    # pause store, model tiers. phase_config steps a model down through it and
+    # the coder and QA loops read it before each session: a leaf.
+    "cost_budget": {"foundation", "models_registry"},
     "harness": {
         "agents",
         "context_mgmt",
@@ -153,17 +191,32 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     "provider_selection": set(),
     # The OS sandbox is read by core (client factory, tool executor, CLI
     # clients) and by the provider registry: a leaf, or it joins the cycle.
-    # The card and the feed are written by core (`_report_sandbox`).
-    "os_sandbox": {"foundation", "security"},
+    # The card and the feed are written by core (`_report_sandbox`). A task's
+    # microVM is sized by the suite placement's machine sampler, itself a
+    # leaf on foundation (`os_sandbox.microvm.vm_resources`).
+    "os_sandbox": {"foundation", "security", "test_placement"},
+    # Code mode's tool: Node behind the session's executor, which it receives
+    # (`code_mode.runner.Executor`) rather than imports; a leaf on foundation.
+    "code_mode": {"foundation"},
+    # Approval tiers (docs/architecture/approval-tiers.md): pure facts and
+    # decision; git and the text-only list through foundation, path globs and
+    # the main checkout's policy file through security, the Clean Architecture
+    # layers of the project through architecture. No model, no forge.
+    "approvals": {"architecture", "foundation", "security"},
     # The cross review's verdict, read by the pull request step in core: a
     # leaf, or it joins the cycle. Its session is `workflows/cross_review_phase.py`.
     "cross_review": {"foundation"},
+    # REA's runner (rea-agents CLI, static readers): PATH lookup, the strict
+    # offline policy and the credential-free child env; nothing above them.
+    "rea": {"foundation", "offline_policy", "security"},
     # The agent runtime as a port (docs/architecture/agent-runtime.md): core
     # installs it, the units below reach a session through it. A leaf.
     "agent_runtime": set(),
+    # The merge preview reads git and asks no model; the AI merge of a file
+    # lives in core.workspace.
+    "merge": {"foundation"},
     # Taken out of the agents' cycle by the port (plan of 29 October, A1):
     # each starts its session through agent_runtime, never core or agents.
-    "merge": {"agent_runtime", "foundation"},
     "integrations": {
         "agent_runtime",
         "foundation",
@@ -171,18 +224,26 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
         "phase_config",
         "server",
     },
-    "analysis": {"agent_runtime", "foundation", "project", "security"},
+    "analysis": {"agent_runtime", "foundation"},
     # The subagent registry, out of agents (it never imported it): read by
     # core, the skills emitter and the learning loop.
     "subagents": {"mobile", "project", "skills_registry"},
     # Test generation, the generator included; its model call goes through
     # the agent_runtime port.
     "test_generation": {"agent_runtime", "foundation", "project"},
-    # The QA loop's architecture gate; its reviewer's prompt is built here.
-    "architecture": {"agent_runtime", "foundation", "phase_config", "task_logger"},
+    # The QA loop's architecture gate; its reviewer's prompt is built here,
+    # with the project's rules quoted as data (security.untrusted, rule S2).
+    "architecture": {
+        "agent_runtime",
+        "foundation",
+        "phase_config",
+        "security",
+        "task_logger",
+    },
     # Out of the agents' cycle since A1's third step. The archify map builds its
-    # own prompts; its workflow phase lives in workflows/architecture_map_phase.py.
-    "architecture_visualizer": {"foundation"},
+    # own prompts, the task's text quoted as data (security.untrusted, rule S2);
+    # its workflow phase lives in workflows/architecture_map_phase.py.
+    "architecture_visualizer": {"foundation", "security"},
     # Attachments and diagnostics: the CI parsers and the traceability record
     # are read from foundation, not from self_healing or spec.
     "docintel": {
@@ -199,7 +260,23 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # The shared brain and what sits on it: with docintel, a cycle of five of
     # their own below the agents' one; none of them imports core, agents or a
     # phase.
-    "brain": {"docintel", "foundation", "learning_loop", "skills_registry"},
+    # agent_runtime (a leaf) and security (clean_untrusted): the model's
+    # opinion on a queued memory conflict, asked by a person
+    # (brain/lifecycle/advisor.py); neither reaches back to brain.
+    # offline_policy (local_endpoint, loopback only) and ollama_model_detector
+    # (is_embedding_model), two leaves docintel already reads: a local
+    # embeddings model finds memory conflicts in other words
+    # (brain/lifecycle/embeddings.py).
+    "brain": {
+        "agent_runtime",
+        "docintel",
+        "foundation",
+        "learning_loop",
+        "offline_policy",
+        "ollama_model_detector",
+        "security",
+        "skills_registry",
+    },
     # The model analysis (F178) asks the agent_runtime port, never core.
     "learning_loop": {
         "agent_runtime",
@@ -218,6 +295,33 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # and the bundled skill through skills_registry, nothing that runs an agent
     # (docs/architecture/dotnet-upgrade.md). A leaf the CLI and the prompts read.
     "dotnet_upgrade": {"skills_registry"},
+    # WinDev, WebDev and WinDev Mobile: the file formats, the integrity check,
+    # the prompt section and its staged skills, nothing that runs an agent
+    # (docs/architecture/windev.md). A leaf: the stack detection imports it.
+    "windev": set(),
+    # Mission Control's composition (docs/architecture/mission-control-composition.md):
+    # the model registry, the price catalog, the context windows, the provider
+    # matrix, the stack and the card's kind, the untrusted-content fence, the
+    # API's path checks and the local Ollama's own word on tools (offline_policy,
+    # a leaf of the toolbox). It runs no agent (the main process calls the model),
+    # so nothing that reaches core or agents.
+    "mission_control": {
+        "context_mgmt",
+        "cost_intelligence",
+        "foundation",
+        "models_registry",
+        "offline_policy",
+        "phase_config",
+        "project",
+        "public_model_registry",
+        "security",
+        "skills_registry",
+        "tasks",
+    },
+    # Smart Estimation's calibration loop (docs/architecture/smart-estimation.md):
+    # its ledger through foundation's JSON lock, the merge diff through
+    # foundation's git. A leaf the estimation runner and the merge event read.
+    "estimation_calibration": {"foundation"},
 }
 
 # The largest set of units that all import one another, directly or not. It

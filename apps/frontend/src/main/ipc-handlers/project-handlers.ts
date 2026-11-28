@@ -22,6 +22,7 @@ import {
 import type { AgentManager } from "../agent";
 import { appEmulatorService } from "../app-emulator-service";
 import { changelogService } from "../changelog-service";
+import { forgetGitRemotes } from "../forge/project-forge-binding";
 import { getToolPath } from "../cli-tool-manager";
 import { parseGitIdentity } from "../git-identity";
 import { insightsService } from "../insights-service";
@@ -322,7 +323,7 @@ function createProviderResult(
 	remoteUrl?: string,
 ): RepoProviderDetectionResult {
 	return {
-		provider: provider as "github" | "azure_devops" | "unknown",
+		provider: provider as RemoteProvider,
 		remoteName,
 		remoteUrl,
 	};
@@ -527,6 +528,11 @@ function setGitRemote(
 	}
 
 	const exists = remoteExists(name);
+	// The forge views read the repository from the remotes: drop what they cached.
+	const changed = (): RepoProviderDetectionResult => {
+		forgetGitRemotes(projectPath);
+		return detectRepoProvider(projectPath);
+	};
 
 	if (!url) {
 		if (exists) {
@@ -536,7 +542,7 @@ function setGitRemote(
 				stdio: "pipe",
 			});
 		}
-		return detectRepoProvider(projectPath);
+		return changed();
 	}
 
 	execFileSync(
@@ -547,7 +553,7 @@ function setGitRemote(
 		{ cwd: projectPath, encoding: "utf-8", stdio: "pipe" },
 	);
 
-	return detectRepoProvider(projectPath);
+	return changed();
 }
 
 /**

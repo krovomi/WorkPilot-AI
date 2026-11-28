@@ -2,6 +2,7 @@ import { ArrowLeft, ArrowRight, Camera, ExternalLink, type Globe, MonitorPlay, R
 import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useBrowserAgentStore } from "@/stores/browser-agent-store";
+import { toArtifactName } from "@shared/utils/browser-agent-inputs";
 
 import { CharterButton, Chip, EmptyStage, Panel, ScanLine } from "../charter";
 import { Input } from "../ui/input";
@@ -47,7 +48,7 @@ export function BrowserTab({ projectPath }: BrowserTabProps) {
 
 	const handleCapture = useCallback(() => {
 		if (!currentUrl) return;
-		const name = screenshotName.trim() || `capture_${Date.now()}`;
+		const name = toArtifactName(screenshotName) || `capture_${Date.now()}`;
 		captureScreenshot(projectPath, name, currentUrl);
 		setScreenshotName("");
 		setShowCaptureBar(false);

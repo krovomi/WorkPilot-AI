@@ -14,8 +14,10 @@ This eliminates the risk of indefinite hangs in GitHub automation workflows.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
+import os
 from dataclasses import dataclass
 from datetime import UTC
 from pathlib import Path
@@ -60,6 +62,19 @@ class GHCommandResult:
     command: list[str]
     attempts: int
     total_time: float
+
+
+def _get_args(endpoint: str, **params: object) -> list[str]:
+    """`gh api` arguments for a GET with query parameters.
+
+    The parameters go as `-f` fields: with `--method GET`, gh puts them in the
+    query string (without it, gh would send a POST). No argument carries `&`,
+    which a Windows `.cmd` shim of gh would read as a command separator.
+    """
+    args = ["api", "--method", "GET", endpoint]
+    for key, value in params.items():
+        args.extend(["-f", f"{key}={value}"])
+    return args
 
 
 class GHClient:
@@ -115,6 +130,7 @@ class GHClient:
         args: list[str],
         timeout: float | None = None,
         raise_on_error: bool = True,
+        input_text: str | None = None,
     ) -> GHCommandResult:
         """
         Execute a gh CLI command with timeout and retry logic.
@@ -123,6 +139,7 @@ class GHClient:
             args: Command arguments (e.g., ["pr", "list"])
             timeout: Timeout in seconds (uses default if None)
             raise_on_error: Raise GHCommandError on non-zero exit
+            input_text: Written to gh's stdin (UTF-8), for `--body-file -`
 
         Returns:
             GHCommandResult with command output and metadata
@@ -138,6 +155,9 @@ class GHClient:
                 "GitHub CLI (gh) not found. Install from https://cli.github.com/"
             )
         cmd = [gh_exec] + args
+        # `-R` only reaches the subcommands that take it: `gh api` resolves its
+        # `{owner}/{repo}` placeholders from GH_REPO, or else from the cwd's remote.
+        env = {**os.environ, "GH_REPO": self.repo} if self.repo else None
         start_time = asyncio.get_event_loop().time()
 
         # Pre-flight rate limit check
@@ -162,22 +182,25 @@ class GHClient:
                 proc = await asyncio.create_subprocess_exec(
                     *cmd,
                     cwd=self.project_dir,
+                    env=env,
+                    stdin=asyncio.subprocess.PIPE if input_text is not None else None,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
+                )
+                stdin_bytes = (
+                    input_text.encode("utf-8") if input_text is not None else None
                 )
 
                 # Wait for completion with timeout
                 try:
                     stdout, stderr = await asyncio.wait_for(
-                        proc.communicate(), timeout=timeout
+                        proc.communicate(stdin_bytes), timeout=timeout
                     )
                 except TimeoutError:
-                    # Kill the hung process
-                    try:
+                    # Kill the hung process (it may have exited in the meantime)
+                    with contextlib.suppress(ProcessLookupError):
                         proc.kill()
-                        await proc.wait()
-                    except Exception as e:
-                        logger.warning(f"Failed to kill hung process: {e}")
+                    await proc.wait()
 
                     # Calculate backoff delay
                     backoff_delay = 2 ** (attempt - 1)
@@ -255,7 +278,11 @@ class GHClient:
                 # Unexpected error
                 logger.error(f"Unexpected error in gh command: {e}")
                 if attempt == self.max_retries:
-                    raise GHCommandError(f"gh {args[0]} failed: {str(e)}")
+                    # Name the folder: on Windows a deleted cwd only says
+                    # "The directory name is invalid", without the path.
+                    raise GHCommandError(
+                        f"gh {args[0]} failed in {self.project_dir}: {str(e)}"
+                    )
                 else:
                     # Retry on unexpected errors too
                     backoff_delay = 2 ** (attempt - 1)
@@ -269,6 +296,16 @@ class GHClient:
     # =========================================================================
     # Helper methods
     # =========================================================================
+
+    @staticmethod
+    def _body_on_stdin(args: list[str]) -> list[str]:
+        """Ask gh to read the body from stdin, passed as `run(input_text=...)`.
+
+        A body never goes on the command line: a newline does not survive a
+        `.cmd` launcher on Windows (cmd.exe ends the command there), and a long
+        review can pass the 32 767 characters Windows allows for one.
+        """
+        return [*args, "--body-file", "-"]
 
     def _add_repo_flag(self, args: list[str]) -> list[str]:
         """
@@ -432,10 +469,9 @@ class GHClient:
         else:
             args.append("--comment")
 
-        args.extend(["--body", body])
-        args = self._add_repo_flag(args)
+        args = self._add_repo_flag(self._body_on_stdin(args))
 
-        await self.run(args)
+        await self.run(args, input_text=body)
         return 0  # gh CLI doesn't return review ID
 
     async def issue_list(
@@ -477,6 +513,7 @@ class GHClient:
             "--json",
             ",".join(json_fields),
         ]
+        args = self._add_repo_flag(args)
 
         result = await self.run(args)
         return json.loads(result.stdout)
@@ -514,6 +551,7 @@ class GHClient:
             "--json",
             ",".join(json_fields),
         ]
+        args = self._add_repo_flag(args)
 
         result = await self.run(args)
         return json.loads(result.stdout)
@@ -526,8 +564,8 @@ class GHClient:
             issue_number: Issue number
             body: Comment body
         """
-        args = ["issue", "comment", str(issue_number), "--body", body]
-        await self.run(args)
+        args = self._body_on_stdin(["issue", "comment", str(issue_number)])
+        await self.run(self._add_repo_flag(args), input_text=body)
 
     async def issue_add_labels(self, issue_number: int, labels: list[str]) -> None:
         """
@@ -547,7 +585,7 @@ class GHClient:
             "--add-label",
             ",".join(labels),
         ]
-        await self.run(args)
+        await self.run(self._add_repo_flag(args))
 
     async def issue_remove_labels(self, issue_number: int, labels: list[str]) -> None:
         """
@@ -568,7 +606,7 @@ class GHClient:
             ",".join(labels),
         ]
         # Don't raise on error - labels might not exist
-        await self.run(args, raise_on_error=False)
+        await self.run(self._add_repo_flag(args), raise_on_error=False)
 
     async def api_get(self, endpoint: str, params: dict[str, str] | None = None) -> Any:
         """
@@ -581,13 +619,7 @@ class GHClient:
         Returns:
             JSON response
         """
-        args = ["api", endpoint]
-
-        if params:
-            for key, value in params.items():
-                args.extend(["-f", f"{key}={value}"])
-
-        result = await self.run(args)
+        result = await self.run(_get_args(endpoint, **(params or {})))
         return json.loads(result.stdout)
 
     async def pr_merge(
@@ -611,10 +643,10 @@ class GHClient:
         if commit_title:
             args.extend(["--subject", commit_title])
         if commit_message:
-            args.extend(["--body", commit_message])
+            args = self._body_on_stdin(args)
         args = self._add_repo_flag(args)
 
-        await self.run(args)
+        await self.run(args, input_text=commit_message or None)
 
     async def pr_comment(self, pr_number: int, body: str) -> None:
         """
@@ -624,9 +656,9 @@ class GHClient:
             pr_number: PR number
             body: Comment body
         """
-        args = ["pr", "comment", str(pr_number), "--body", body]
+        args = self._body_on_stdin(["pr", "comment", str(pr_number)])
         args = self._add_repo_flag(args)
-        await self.run(args)
+        await self.run(args, input_text=body)
 
     async def pr_get_assignees(self, pr_number: int) -> list[str]:
         """
@@ -655,14 +687,10 @@ class GHClient:
 
         # Use gh api to add assignees
         endpoint = f"/repos/{{owner}}/{{repo}}/issues/{pr_number}/assignees"
-        args = [
-            "api",
-            endpoint,
-            "-X",
-            "POST",
-            "-f",
-            f"assignees={','.join(assignees)}",
-        ]
+        # The API takes an array: one `assignees[]` field per login.
+        args = ["api", endpoint, "-X", "POST"]
+        for login in assignees:
+            args.extend(["-f", f"assignees[]={login}"])
         await self.run(args)
 
     async def compare_commits(self, base_sha: str, head_sha: str) -> dict[str, Any]:
@@ -916,10 +944,11 @@ class GHClient:
 
             # Query workflow runs with action_required status
             # Note: We need to use the API endpoint as gh CLI doesn't have direct support
-            endpoint = (
-                "repos/{owner}/{repo}/actions/runs?status=action_required&per_page=100"
+            args = _get_args(
+                "repos/{owner}/{repo}/actions/runs",
+                status="action_required",
+                per_page=100,
             )
-            args = ["api", "--method", "GET", endpoint]
 
             result = await self.run(args, timeout=30.0)
             data = json.loads(result.stdout) if result.stdout.strip() else {}
@@ -1032,8 +1061,11 @@ class GHClient:
         per_page = 100
 
         while True:
-            endpoint = f"repos/{{owner}}/{{repo}}/pulls/{pr_number}/files?page={page}&per_page={per_page}"
-            args = ["api", "--method", "GET", endpoint]
+            args = _get_args(
+                f"repos/{{owner}}/{{repo}}/pulls/{pr_number}/files",
+                page=page,
+                per_page=per_page,
+            )
 
             result = await self.run(args, timeout=60.0)
             page_files = json.loads(result.stdout) if result.stdout.strip() else []
@@ -1084,8 +1116,11 @@ class GHClient:
         per_page = 100
 
         while True:
-            endpoint = f"repos/{{owner}}/{{repo}}/pulls/{pr_number}/commits?page={page}&per_page={per_page}"
-            args = ["api", "--method", "GET", endpoint]
+            args = _get_args(
+                f"repos/{{owner}}/{{repo}}/pulls/{pr_number}/commits",
+                page=page,
+                per_page=per_page,
+            )
 
             result = await self.run(args, timeout=60.0)
             page_commits = json.loads(result.stdout) if result.stdout.strip() else []

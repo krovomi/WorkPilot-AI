@@ -1,3 +1,10 @@
+---
+feature: Pause et reprise
+summary: >-
+  `foundation/pause_state.py`, `BuildPaused` / `BuildHalted`, reprendre une phase sans la payer
+  deux fois.
+---
+
 # Pause, resume, and how a phase reports failure
 
 > Design rationale moved verbatim out of [`docs/CLAUDE.md`](../CLAUDE.md),
@@ -92,7 +99,9 @@ and the window has loaded, `resumeTasksInterruptedByAppExit` resumes those — a
 the tasks persisted `in_progress`/`ai_review` with no process behind them, which
 is what a crash, a forced kill or an OS shutdown that never delivered
 `before-quit` leaves. A pause the **user** asked for has no reason and stays a
-pause. Both go through `resumePausedTask` (`resume-task.ts`), the Reprendre
+pause, as do the pauses the backend takes itself (`budget`, `budget_stall`,
+`tool_loop`) and those of "Stop all agents" (`kill_switch`,
+[agent-kill-switch.md](agent-kill-switch.md)). Both go through `resumePausedTask` (`resume-task.ts`), the Reprendre
 button's path, which sends a task with no `spec.md` back to the spec pipeline
 (it skips every artefact it already wrote) — `run.py` refuses that directory.
 

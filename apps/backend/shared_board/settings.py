@@ -15,6 +15,12 @@ setup card the form created for a project with no phone app, see
 ``mobile.bootstrap``) are plain ``task_metadata.json`` fields, as on the
 desktop; the run reads the targets (``run_manager``), the board the rest.
 
+``abandoned`` and its companions (when, why, the resolution and the task it
+duplicates or that replaces it) set a card aside in the « Abandonnée » column
+of every member's board; nothing is deleted and resuming clears them
+(``shared/utils/task-lifecycle.ts`` on the desktop). ``flagged`` and its
+reason and date are the « Bloquée » flag (``shared/utils/task-flag.ts``).
+
 The engine names a provider of the capability matrix
 (``capabilities/providers.yaml``); its credentials are the deployment's, as
 for every run on the server. The goal is validated by ``goal.spec`` and its
@@ -122,8 +128,43 @@ class CardEngine(BaseModel):
 MobileTarget = Literal["android", "ios"]
 #: A task id as the app names a card: ``server:<project>:<card>`` or a spec id.
 TaskRef = Annotated[str, Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9:._-]{0,199}$")]
+#: Why a card was set aside, as the desktop's ``ABANDON_RESOLUTIONS`` lists them.
+AbandonResolution = Literal[
+    "wont_do", "duplicate", "obsolete", "replaced", "pr_closed", "other"
+]
+#: An ISO 8601 instant as ``Date.toISOString`` writes it.
+INSTANT_PATTERN = (
+    r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?(Z|[+-]\d{2}:\d{2})$"
+)
+#: A sub-project name (Kanban lanes): one line of text, no control character.
+AREA_PATTERN = r"^[^\x00-\x1f\x7f]{1,80}$"
+#: A card's label (`shared/utils/task-labels.ts`): 30 characters, no control character.
+Label = Annotated[
+    str, Field(min_length=1, max_length=30, pattern=r"^[^\x00-\x1f\x7f]+$")
+]
 #: Metadata keys this module writes as they are given (``None`` removes them).
-PLAIN_KEYS = ("priority", "category", "mobileTargets", "blockedBy", "mobileBootstrap")
+PLAIN_KEYS = (
+    "priority",
+    "category",
+    "mobileTargets",
+    "blockedBy",
+    "mobileBootstrap",
+    "abandoned",
+    "abandonedAt",
+    "abandonedReason",
+    "abandonedResolution",
+    "abandonedLink",
+    "flagged",
+    "flaggedReason",
+    "flaggedAt",
+    "area",
+    "sprintId",
+    "labels",
+)
+#: Keys only the board reads (lanes, flag, sprint): a run does not, so they may change during one.
+BOARD_ONLY_KEYS = frozenset(
+    {"area", "sprintId", "labels", "flagged", "flaggedReason", "flaggedAt"}
+)
 
 
 class MobileBootstrap(BaseModel):
@@ -153,6 +194,27 @@ class CardSettings(BaseModel):
     mobileTargets: list[MobileTarget] | None = Field(default=None, max_length=2)
     blockedBy: list[TaskRef] | None = Field(default=None, max_length=50)
     mobileBootstrap: MobileBootstrap | None = None
+    abandoned: bool | None = None
+    abandonedAt: str | None = Field(default=None, pattern=INSTANT_PATTERN)
+    abandonedReason: str | None = Field(default=None, max_length=2000)
+    abandonedResolution: AbandonResolution | None = None
+    abandonedLink: TaskRef | None = None
+    flagged: bool | None = None
+    flaggedReason: str | None = Field(default=None, max_length=500)
+    flaggedAt: str | None = Field(default=None, pattern=INSTANT_PATTERN)
+    area: str | None = Field(default=None, max_length=80, pattern=AREA_PATTERN)
+    sprintId: str | None = Field(default=None, pattern=r"^sp-[0-9a-f]{8}$")
+    labels: list[Label] | None = Field(default=None, max_length=10)
+
+    @field_validator("labels")
+    @classmethod
+    def _labels(cls, value: list[str] | None) -> list[str] | None:
+        if value is None:
+            return None
+        labels = [" ".join(label.split()) for label in value]
+        if any(not label for label in labels):
+            raise ValueError("a label cannot be blank")
+        return labels
 
     def plain_value(self, key: str) -> Any:
         """The value written to ``task_metadata.json``; ``None`` removes the key."""
@@ -267,6 +329,12 @@ def read_settings(root: Path, directory: Path) -> dict[str, Any]:
         "mobileTargets": metadata.get("mobileTargets"),
         "blockedBy": metadata.get("blockedBy"),
         "mobileBootstrap": metadata.get("mobileBootstrap"),
+        **{
+            key: metadata.get(key)
+            for key in PLAIN_KEYS
+            if key.startswith(("abandoned", "flagged"))
+            or key in ("area", "sprintId", "labels")
+        },
         "goal": None,
         "goalError": None,
     }

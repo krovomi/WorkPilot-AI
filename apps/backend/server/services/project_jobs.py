@@ -34,6 +34,7 @@ from pathlib import Path
 
 from server.db.engine import get_session_factory
 from server.db.models import ProjectJob
+from server.services import audit
 from server.services.events import emit_board_event
 from server.services.run_manager import (
     BACKEND_DIR,
@@ -43,8 +44,11 @@ from server.services.run_manager import (
     get_run_manager,
     wait_until_ended,
 )
+from server.services.usage_records import finish_collecting, usage_channel
 from sqlalchemy import select
 
+#: A job started, in the audit log: its feature and its id.
+JOB_STARTED = "project.job.started"
 FEATURE_KEY = re.compile(r"^[a-z][a-z0-9_-]{0,39}$")
 #: A file of ``runners/``, or of one of its packages (``github/runner.py``):
 #: never a ``..`` or an absolute path.
@@ -91,6 +95,7 @@ class ProjectJobs:
         self._running: dict[tuple[str, str], str] = {}  # (project, slot) -> job
         self._active: dict[str, asyncio.subprocess.Process] = {}
         self._cancelled: set[str] = set()
+        self._starters: dict[str, str] = {}  # job -> who started it
         self._output: OrderedDict[str, _Output] = OrderedDict()
 
     def running_job(self, project_id: str, slot: str) -> str | None:
@@ -156,7 +161,7 @@ class ProjectJobs:
             from server.services.quotas import enforce_run_quota
 
             async with get_session_factory()() as db:
-                await enforce_run_quota(db, org_id)
+                await enforce_run_quota(db, org_id, user_id, project_id)
         if key in self._running:
             raise RunManagerError("A job is already running for this feature")
 
@@ -164,6 +169,7 @@ class ProjectJobs:
         # both pass the check and start two writers of the same files.
         job_id = str(uuid.uuid4())
         self._running[key] = job_id
+        self._starters[job_id] = user_id
         recorded = False
         try:
             async with get_session_factory()() as db:
@@ -175,12 +181,22 @@ class ProjectJobs:
                     status="queued",
                 )
                 db.add(job)
+                # In the organization's history with the job it names.
+                await audit.record(
+                    db,
+                    action=JOB_STARTED,
+                    actor_id=user_id,
+                    org_id=org_id,
+                    project_id=project_id,
+                    payload={"feature": feature, "job_id": job_id},
+                )
                 await db.commit()
                 await db.refresh(job)
             recorded = True
         finally:
             if not recorded:
                 self._running.pop(key, None)
+                self._starters.pop(job_id, None)
         self._keep(job.id)
         # Announced while it waits for a slot, not only once it runs: a
         # teammate's open view follows it from the start.
@@ -216,13 +232,30 @@ class ProjectJobs:
     ) -> int:
         """Stop every job of a project and wait until they have ended, before
         the project and its clone are deleted (as ``RunManager.stop_project``)."""
-        jobs = [job for (owner, _), job in self._running.items() if owner == project_id]
-        for job_id in jobs:
-            await self.cancel(job_id)
+        jobs = await self.stop_jobs(project_id)
         await wait_until_ended(
             lambda: any(self.is_tracked(job) for job in jobs), timeout
         )
         return len(jobs)
+
+    def active_jobs(self, project_id: str, started_by: str | None = None) -> list[str]:
+        """The jobs of a project this process holds, only ``started_by``'s when given."""
+        return [
+            job
+            for (owner, _), job in self._running.items()
+            if owner == project_id
+            and (started_by is None or self._starters.get(job) == started_by)
+        ]
+
+    async def stop_jobs(
+        self, project_id: str, started_by: str | None = None
+    ) -> list[str]:
+        """Stop the project's jobs (only ``started_by``'s when given) without
+        waiting for them to end; the ids stopped."""
+        jobs = self.active_jobs(project_id, started_by)
+        for job_id in jobs:
+            await self.cancel(job_id)
+        return jobs
 
     def _keep(self, job_id: str) -> None:
         self._output[job_id] = _Output()
@@ -261,7 +294,7 @@ class ProjectJobs:
                 await _set_status(job_id, "running")
                 _notify(project_id, feature, job_id, "running", user_id)
                 with tempfile.TemporaryDirectory(prefix="workpilot-job-") as scratch:
-                    env = await manager.run_env(user_id, job_id)
+                    env = await manager.run_env(user_id, job_id, project_id)
                     for name, content in inputs.items():
                         Path(scratch, name).write_text(content, encoding="utf-8")
                     resolved = [
@@ -273,21 +306,33 @@ class ProjectJobs:
                     argv = confine(
                         resolved, project_id, server_path, Path(scratch), env
                     )
+                    channel = await usage_channel(project_id, user_id, job_id=job_id)
+                    env.update(channel.env)
                     # A job that hands its output to ``on_finish`` keeps its
                     # stderr (logs, tracebacks) out of it: only the reason
                     # when it fails.
-                    proc = await asyncio.create_subprocess_exec(
-                        *argv,
-                        cwd=str(BACKEND_DIR),
-                        env=env,
-                        stdin=asyncio.subprocess.DEVNULL,
-                        stdout=asyncio.subprocess.PIPE,
-                        stderr=(
-                            asyncio.subprocess.PIPE
-                            if on_finish
-                            else asyncio.subprocess.STDOUT
-                        ),
-                    )
+                    spawned = False
+                    try:
+                        proc = await asyncio.create_subprocess_exec(
+                            *argv,
+                            cwd=str(BACKEND_DIR),
+                            env=env,
+                            stdin=asyncio.subprocess.DEVNULL,
+                            stdout=asyncio.subprocess.PIPE,
+                            stderr=(
+                                asyncio.subprocess.PIPE
+                                if on_finish
+                                else asyncio.subprocess.STDOUT
+                            ),
+                            pass_fds=channel.pass_fds,
+                        )
+                        spawned = True
+                    finally:
+                        if not spawned:
+                            # No process holds the pipe: release both ends.
+                            channel.close()
+                    channel.started()
+                    counting = asyncio.create_task(channel.collect())
                     self._active[job_id] = proc
                     # Cancelled while the process was being set up: ``cancel``
                     # found nothing to stop yet.
@@ -316,6 +361,7 @@ class ProjectJobs:
 
                     await asyncio.gather(read_stdout(), read_stderr())
                     await proc.wait()
+                    await finish_collecting(counting)
                 if job_id in self._cancelled:
                     status, error = "cancelled", None
                 elif proc.returncode == 0:
@@ -334,9 +380,15 @@ class ProjectJobs:
                 if on_finish is not None:
                     await on_finish(status, collected)
             finally:
-                self._running.pop(key, None)
-                await _set_status(job_id, status, error)
-                _notify(project_id, feature, job_id, status, user_id)
+                # Stored before the job stops being tracked: a request that
+                # settles orphans in between would otherwise read it still
+                # running, untracked, and record it failed over its result.
+                try:
+                    await _set_status(job_id, status, error)
+                    _notify(project_id, feature, job_id, status, user_id)
+                finally:
+                    self._running.pop(key, None)
+                    self._starters.pop(job_id, None)
 
 
 async def _set_status(job_id: str, status: str, error: str | None = None) -> None:

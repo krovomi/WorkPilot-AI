@@ -59,8 +59,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from .lifecycle import announce, provenance, scopes
+from .lifecycle import journal as lifecycle_journal
+from .lifecycle import store as lifecycle_store
 from .memories import redact
-from .notes import inside, read_note, slugify
+from .notes import Note, inside, read_note, slugify
 from .runtime import enabled as brain_enabled
 from .tasks import project_name, project_name_from, project_rel
 from .vault import Brain
@@ -77,6 +80,7 @@ __all__ = [
     "get_graph_hints",
     "import_legacy_spec_memory",
     "is_memory_enabled",
+    "agent_memory",
     "list_memories",
     "open_project_memory",
     "search_memories",
@@ -175,6 +179,21 @@ def _title(text: str) -> str:
     return line if len(line) <= _MAX_TITLE else line[: _MAX_TITLE - 1].rstrip() + "…"
 
 
+def _items(value: Any) -> list[Any]:
+    """The entries of a list a model wrote, which it sometimes writes as one.
+
+    A text read with ``for item in value`` is a list of letters: a session's
+    ``"patterns_found": "Use the repository"`` became one note per letter.
+    """
+    if isinstance(value, (list, tuple)):
+        return list(value)
+    return [value] if value else []
+
+
+def _mapping(value: Any) -> dict[str, Any]:
+    return value if isinstance(value, dict) else {}
+
+
 def _as_list(value: Any) -> list[str]:
     if value is None:
         return []
@@ -184,9 +203,10 @@ def _as_list(value: Any) -> list[str]:
 
 
 def _open_brain(*, create: bool) -> Brain | None:
-    """The brain, or ``None`` when memory is off — or absent and not asked to create."""
-    if not is_memory_enabled():
-        return None
+    """The brain, or ``None`` when it is absent and not asked to create.
+
+    Whether memory is on is the caller's question (`ProjectMemory.is_enabled`).
+    """
     brain = Brain()
     if brain.exists:
         return brain
@@ -217,7 +237,25 @@ class ProjectMemory:
         *,
         brain: Brain | None = None,
         project: str | None = None,
+        actor: str = "agent",
+        audience: scopes.Audience | None = None,
+        show_unverified: bool = False,
+        signatures: bool = True,
     ) -> None:
+        self.actor = actor
+        """Who the journal says acted (`lifecycle.journal.ACTORS`)."""
+        self.audience = audience
+        """Whom the reads recall for (`lifecycle.scopes.recalled`): an agent's
+        build. ``None`` for a person's surfaces, which show every note."""
+        self.show_unverified = show_unverified
+        """A person reading: the notes no trusted key signed are kept, marked
+        (``verified: False``). Agents never get them (`lifecycle.provenance`)."""
+        self.signatures = signatures
+        """``False`` for a server project's brain, read by a route: no git
+        command runs in a brain that a project's runs write to, and it is
+        never synced, so nothing in it came from a teammate."""
+        self._unverified: frozenset[str] | None = None
+        self._explained: dict[str, tuple[str, str, str, list[str]]] = {}
         self.spec_dir = Path(spec_dir) if spec_dir else None
         self.project_dir = Path(project_dir) if project_dir else None
         if project:
@@ -237,6 +275,23 @@ class ProjectMemory:
         self._pending = 0
         self._pulled = False
         self._imported = False
+
+    def unverified_notes(self) -> frozenset[str]:
+        """This project's notes whose last change no trusted key signed.
+
+        Empty when the project lists no trusted signer. Read once per
+        memory, after its pull, like the notes themselves.
+        """
+        if not self.signatures:
+            return frozenset()
+        if self._unverified is None:
+            brain = self._reader()
+            self._unverified = (
+                provenance.unverified(brain.root, self.base)
+                if brain is not None
+                else frozenset()
+            )
+        return self._unverified
 
     # -- plumbing -----------------------------------------------------------
 
@@ -277,6 +332,10 @@ class ProjectMemory:
             return None
         if not self._pulled:
             self._pulled = True
+            if self.project_dir is not None:
+                # Which folder this memory is for: a sync of the whole vault
+                # finds the project's channels by it (`lifecycle.announce`).
+                announce.register_project(brain.root, self.project_dir)
             try:
                 brain.before_read()
             except Exception as exc:  # noqa: BLE001 - a failed pull still reads the disk
@@ -314,6 +373,7 @@ class ProjectMemory:
 
         project_link = _ensure_project(brain.root, self.project)
         rel = self.base / (folder or KINDS[kind]) / f"{slug or slugify(title)}.md"
+        before = self._own_text_at(brain, rel)
         fields: dict[str, Any] = {
             "memory": kind,
             "project": self.project,
@@ -334,7 +394,112 @@ class ProjectMemory:
             sync=False,
         )
         self._pending += 1
+        self._journal_write(brain, result.rel, title, body, before)
         return result.rel
+
+    @staticmethod
+    def _own_text_at(brain: Brain, rel: Path) -> str | None:
+        try:
+            return _own_text(read_note(brain.root, rel).body)
+        except (OSError, ValueError):
+            return None
+
+    def explain_next(
+        self,
+        kind: str,
+        slug: str,
+        *,
+        action: str,
+        reason_code: str,
+        reason: str = "",
+        related: list[str] | None = None,
+    ) -> None:
+        """How the journal should word the next write of this note (a merge),
+        and the notes it names (the folds a merge kept, `lifecycle.folds`)."""
+        self._explained[f"{KINDS[kind]}/{slugify(slug)}"] = (
+            action,
+            reason_code,
+            reason,
+            list(related or []),
+        )
+
+    def keep_folded(
+        self,
+        into: str,
+        pattern: dict[str, Any],
+        *,
+        title: str,
+        body: str,
+        share: dict[str, Any],
+    ) -> str | None:
+        """Keep a learning-loop pattern folded into the pattern *into*, so that
+        a person can separate them (`lifecycle.folds`). Its kept path, or
+        ``None`` when there is no brain or the ids are not patterns."""
+        from .lifecycle import folds
+
+        brain = self._get_brain(create=False)
+        pattern_id = str(pattern.get("pattern_id") or "").strip()
+        if brain is None or not pattern_id:
+            return None
+        kind = KINDS["pattern"]
+        evidence = {
+            k: (redact(v) if isinstance(v, str) else v)
+            for k, v in pattern.items()
+            if k != "effectiveness_rate"
+        }
+        stamp = datetime.now(UTC).isoformat(timespec="seconds")
+        note = Note(
+            path=self.base / kind / f"{slugify(pattern_id)}.md",
+            meta={
+                "title": redact(title)[:80],
+                "kind": "knowledge",
+                "memory": "pattern",
+                "project": self.project,
+                "tags": ["memory", "pattern", slugify(self.project), "learning-loop"],
+                "created": stamp,
+                "updated": stamp,
+                LEARNED: evidence,
+            },
+            body=redact(body),
+        )
+        canonical = (self.base / kind / f"{slugify(into)}.md").as_posix()
+        try:
+            kept = folds.keep(brain.root, self.base, canonical, note, share=share)
+        except (OSError, ValueError) as exc:
+            logger.warning("brain: folded pattern not kept: %s", exc)
+            return None
+        if kept:
+            self._pending += 1
+        return kept
+
+    def _journal_write(
+        self, brain: Brain, rel: str, title: str, body: str, before: str | None
+    ) -> None:
+        """A creation, or an update whose text changed: counters alone are not news."""
+        now = _own_text(body)
+        if before is not None and before == now:
+            return
+        key = rel.split("/memory/", 1)[-1].removesuffix(".md")
+        action, code, reason, related = self._explained.pop(
+            key,
+            ("create", "recorded", "", [])
+            if before is None
+            else ("update", "edited", "", []),
+        )
+        lifecycle_journal.append(
+            brain.root,
+            self.base,
+            lifecycle_journal.JournalEntry(
+                action=action,
+                actor=self.actor,
+                note=rel,
+                title=title,
+                preview=lifecycle_journal.preview_of(now),
+                reason_code=code,
+                reason=reason,
+                related=related,
+            ),
+        )
 
     def flush(self) -> bool:
         """Commit, pull and push what this instance wrote. Idempotent."""
@@ -350,21 +515,33 @@ class ProjectMemory:
             return False
 
     def _notes(
-        self, kind: str, *, learned: bool | None = None
+        self, kind: str, *, learned: bool | None = None, everything: bool = False
     ) -> list[tuple[str, dict[str, Any], str]]:
         """The notes of *kind*. ``learned`` keeps only the learning loop's
-        patterns (``True``) or only the others (``False``); ``None`` keeps all."""
+        patterns (``True``) or only the others (``False``); ``None`` keeps all.
+
+        A note no trusted key signed is left out unless a person reads
+        (``show_unverified``) or the caller keeps the store whole
+        (``everything``: the learning loop rewrites what it read).
+        """
         brain = self._reader()
         if brain is None:
             return []
         folder = inside(brain.root, self.base / KINDS[kind])
         if not folder.is_dir():
             return []
+        hidden = (
+            frozenset()
+            if everything or self.show_unverified
+            else self.unverified_notes()
+        )
         out = []
         for path in sorted(folder.rglob("*.md")):
             if path.name.startswith(".") or ".conflict-" in path.name:
                 continue
             rel = path.relative_to(brain.root).as_posix()
+            if rel in hidden:
+                continue
             try:
                 note = read_note(brain.root, rel)
             except (OSError, ValueError):
@@ -374,6 +551,18 @@ class ProjectMemory:
                 continue
             out.append((rel, meta, _own_text(note.body)))
         return out
+
+    def _recall(
+        self, kind: str, *, learned: bool | None = None
+    ) -> list[tuple[str, dict[str, Any], str]]:
+        """`_notes`, less what `audience` does not recall. The reads go
+        through it; a write reads every note (`_notes`), recalled or not."""
+        notes = self._notes(kind, learned=learned)
+        if self.audience is None:
+            return notes
+        return [
+            n for n in notes if scopes.recalled(n[1].get("applies_to"), self.audience)
+        ]
 
     # -- write (synchronous core) -------------------------------------------
 
@@ -441,21 +630,61 @@ class ProjectMemory:
         """The learning loop's patterns, oldest first, as their dicts."""
         return [
             dict(meta[LEARNED])
-            for _, meta, _ in self._by_date(self._notes("pattern", learned=True))
+            for _, meta, _ in self._by_date(
+                self._notes("pattern", learned=True, everything=True)
+            )
         ]
 
-    def forget(self, kind: str, slug: str) -> bool:
-        """Remove one note of this project's memory. ``False`` when absent."""
+    def unrecalled_pattern_ids(self) -> set[str]:
+        """The learning loop's patterns this memory's agents do not get: the
+        notes no trusted key signed (`lifecycle.provenance`) and those its
+        `audience` does not recall (another branch, another team:
+        `lifecycle.scopes.recalled`). Kept by the store, which rewrites them
+        all; never put in a prompt nor answered by ``mem_search``."""
+        hidden = self.unverified_notes()
+        if not hidden and self.audience is None:
+            return set()
+        return {
+            str(meta[LEARNED].get("pattern_id") or "")
+            for rel, meta, _ in self._notes("pattern", learned=True, everything=True)
+            if rel in hidden
+            or (
+                self.audience is not None
+                and not scopes.recalled(meta.get("applies_to"), self.audience)
+            )
+        }
+
+    def forget(
+        self, kind: str, slug: str, *, reason_code: str = "", reason: str = ""
+    ) -> bool:
+        """Move one note of this project's memory to the trash (`lifecycle.store`).
+
+        Restorable for ``BRAIN_MEMORY_RETENTION_DAYS``, and journalled. A pinned
+        note refuses every actor but the person (``False``). ``False`` when absent.
+        """
         brain = self._get_brain(create=False)
-        if brain is None:
+        if brain is None or kind not in KINDS:
             return False
+        rel = (self.base / KINDS[kind] / f"{slugify(slug)}.md").as_posix()
+        code = reason_code or (
+            "user-request" if self.actor == "user" else "pattern-retired"
+        )
         try:
-            path = inside(brain.root, self.base / KINDS[kind] / f"{slugify(slug)}.md")
-        except ValueError:
+            outcome = lifecycle_store.forget(
+                brain.root,
+                self.base,
+                rel,
+                actor=self.actor,
+                reason_code=code,
+                reason=reason,
+            )
+        except (OSError, ValueError) as exc:
+            logger.warning("brain: memory note not forgotten: %s", exc)
             return False
-        if not path.is_file():
+        if outcome.get("code") == "pinned":
+            self._pending += 1  # the refusal is journalled, and syncs
+        if not outcome.get("ok"):
             return False
-        path.unlink()
         self._pending += 1
         return True
 
@@ -522,8 +751,8 @@ class ProjectMemory:
     ) -> bool:
         """One session's insights, and its discoveries filed as their own notes."""
         insights = dict(insights or {})
-        discoveries = insights.get("discoveries") or {}
-        for path, purpose in (discoveries.get("files_understood") or {}).items():
+        discoveries = _mapping(insights.get("discoveries"))
+        for path, purpose in _mapping(discoveries.get("files_understood")).items():
             desc = purpose.get("description") if isinstance(purpose, dict) else purpose
             self.record_discovery(str(path), str(desc or ""))
         for pattern in _as_list(discoveries.get("patterns_found")):
@@ -574,14 +803,14 @@ class ProjectMemory:
         """The insight extractor's output, one note per fact."""
         insights = dict(insights or {})
         wrote = False
-        for item in insights.get("file_insights") or []:
+        for item in _items(insights.get("file_insights")):
             if isinstance(item, dict):
                 wrote |= self.record_discovery(
                     str(item.get("path") or ""),
                     str(item.get("purpose") or ""),
                     changes=str(item.get("changes_made") or ""),
                 )
-        for item in insights.get("patterns_discovered") or []:
+        for item in _items(insights.get("patterns_discovered")):
             if isinstance(item, dict):
                 wrote |= self.record_pattern(
                     str(item.get("pattern") or ""),
@@ -590,7 +819,7 @@ class ProjectMemory:
                 )
             else:
                 wrote |= self.record_pattern(str(item))
-        for item in insights.get("gotchas_discovered") or []:
+        for item in _items(insights.get("gotchas_discovered")):
             if isinstance(item, dict):
                 wrote |= self.record_gotcha(
                     str(item.get("gotcha") or ""),
@@ -617,17 +846,17 @@ class ProjectMemory:
     # -- read (synchronous core) --------------------------------------------
 
     def load_gotchas(self) -> list[str]:
-        return [body.strip() for _, _, body in self._by_date(self._notes("gotcha"))]
+        return [body.strip() for _, _, body in self._by_date(self._recall("gotcha"))]
 
     def load_patterns(self) -> list[str]:
         return [
             body.strip()
-            for _, _, body in self._by_date(self._notes("pattern", learned=False))
+            for _, _, body in self._by_date(self._recall("pattern", learned=False))
         ]
 
     def load_codebase_map(self) -> dict[str, str]:
         out: dict[str, str] = {}
-        for _, meta, body in self._notes("codebase"):
+        for _, meta, body in self._recall("codebase"):
             path = str(meta.get("file") or "")
             if path:
                 first = body.strip().splitlines()[0] if body.strip() else ""
@@ -636,7 +865,7 @@ class ProjectMemory:
 
     def load_sessions(self, *, spec_only: bool = True) -> list[dict[str, Any]]:
         sessions = []
-        for rel, meta, _ in self._notes("session"):
+        for rel, meta, _ in self._recall("session"):
             if spec_only and self.spec_id and meta.get("spec") != self.spec_id:
                 continue
             item = {
@@ -675,11 +904,12 @@ class ProjectMemory:
     ) -> list[dict[str, Any]]:
         """Notes of this project's memory ranked by overlap with *query*."""
         terms = _terms(query)
+        marked = self.unverified_notes() if self.show_unverified else frozenset()
         hits = []
         for kind in kinds:
-            for rel, meta, body in self._notes(kind, learned=learned):
+            for rel, meta, body in self._recall(kind, learned=learned):
                 title = str(meta.get("title") or "")
-                score = _score(terms, f"{title}\n{body}") if terms else 0.0
+                score = _score(terms, f"{title}\n{body}")
                 if terms and score <= 0:
                     continue
                 if score < min_score:
@@ -694,6 +924,7 @@ class ProjectMemory:
                         "updated": str(
                             meta.get("updated") or meta.get("created") or ""
                         ),
+                        "verified": rel not in marked,
                     }
                 )
         # Newest first, then (stable) best score first: equal scores keep recency.
@@ -704,7 +935,11 @@ class ProjectMemory:
 
     def status(self) -> dict[str, Any]:
         brain = self._get_brain(create=False)
-        counts = {kind: len(self._notes(kind)) for kind in KINDS} if brain else {}
+        counts = (
+            {kind: len(self._notes(kind, everything=True)) for kind in KINDS}
+            if brain
+            else {}
+        )
         return {
             "enabled": self.is_enabled,
             "initialized": brain is not None,
@@ -846,9 +1081,17 @@ def _body_text(hit: dict[str, Any]) -> str:
 def open_project_memory(
     spec_dir: Path | str | None = None, project_dir: Path | str | None = None
 ) -> ProjectMemory | None:
-    """The memory of *spec_dir*'s project, or ``None`` when memory is off."""
+    """The memory of *spec_dir*'s project as a build's agents recall it
+    (`agent_memory`), or ``None`` when memory is off."""
     memory = ProjectMemory(spec_dir, project_dir)
-    return memory if memory.is_enabled else None
+    return agent_memory(memory, project_dir or spec_dir) if memory.is_enabled else None
+
+
+def agent_memory(memory: ProjectMemory, workdir: Path | str | None) -> ProjectMemory:
+    """*memory*, recalling for the build working in *workdir* (its worktree):
+    its branch, and on a server the groups of the run's starter."""
+    memory.audience = scopes.audience(workdir)
+    return memory
 
 
 # ---------------------------------------------------------------------------
@@ -884,7 +1127,7 @@ def _graph_hints(
     if not is_memory_enabled() or not Brain().exists:
         return []
     project_dir = Path(project_id) if project_id else None
-    memory = ProjectMemory(spec_dir, project_dir)
+    memory = agent_memory(ProjectMemory(spec_dir, project_dir), project_dir or spec_dir)
     hints = (
         [
             {
@@ -903,7 +1146,9 @@ def _graph_hints(
     brain = memory._brain or Brain()
     seen = {h["path"] for h in hints}
     try:
-        recalled = brain.recall(query, limit=max_results)["hits"]
+        recalled = brain.recall(query, limit=max_results, audience=memory.audience)[
+            "hits"
+        ]
     except Exception:  # noqa: BLE001 - a recall that fails leaves the memory hits
         recalled = []
     for hit in recalled:
@@ -937,16 +1182,24 @@ def list_memories(
     From ``brain`` when given (a server project's own, read by
     ``shared_features.context``), else the person's brain.
     """
-    memory = ProjectMemory(project=project, brain=brain)
+    memory = _for_person(project, brain)
     return (
         [_episode(h) for h in memory.search("", limit=limit)] if memory.project else []
+    )
+
+
+def _for_person(project: str, brain: Brain | None) -> ProjectMemory:
+    """The memory a person reads: every note, the unverified ones marked —
+    except in a server project's brain (``brain`` given), never synced."""
+    return ProjectMemory(
+        project=project, brain=brain, show_unverified=True, signatures=brain is None
     )
 
 
 def search_memories(
     project: str, query: str, *, limit: int = 20, brain: Brain | None = None
 ) -> list[dict[str, Any]]:
-    memory = ProjectMemory(project=project, brain=brain)
+    memory = _for_person(project, brain)
     if not memory.project:
         return []
     return [
@@ -955,6 +1208,7 @@ def search_memories(
             "score": h["score"],
             "type": h["type"],
             "path": h["path"],
+            "verified": h["verified"],
         }
         for h in memory.search(query, limit=limit)
     ]
@@ -978,6 +1232,9 @@ def _episode(hit: dict[str, Any]) -> dict[str, Any]:
         "content": hit["content"],
         "session_number": meta.get("session_number"),
         "path": hit["path"],
+        "pinned": meta.get("pinned") is True,
+        "applies_to": str(meta.get("applies_to") or ""),
+        "verified": hit.get("verified", True),
     }
 
 
@@ -1044,6 +1301,8 @@ def import_legacy_spec_memory(
         try:
             insight = json.loads(file.read_text(encoding="utf-8"))
         except (OSError, ValueError):
+            continue
+        if not isinstance(insight, dict):
             continue
         number = insight.get("session_number") or int(re.sub(r"\D", "", file.stem) or 0)
         count += memory.record_session(int(number), insight)

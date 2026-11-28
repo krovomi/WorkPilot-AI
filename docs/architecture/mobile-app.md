@@ -1,3 +1,11 @@
+---
+feature: App mobile (iOS, Android)
+summary: >-
+  Client Expo du mode serveur : Kanban en direct (`GET /api/board/cards`, `project:<id>`), actions
+  d'une carte ; refresh dans le Keychain ou le Keystore, un à la fois, HTTPS sauf réseau local ;
+  APK et simulateur iOS en artefacts de `mobile.yml`.
+---
+
 # L'app mobile (iOS et Android)
 
 L'app mobile est un client du [mode serveur](server-mode.md). Les agents ont besoin d'une machine
@@ -26,22 +34,33 @@ applications mobiles pour un projet.
 | Tableau de bord | `src/app/(app)/projects/[projectId]/dashboard.tsx` | `GET /api/features/workspace/dashboard` et `.../costs` |
 | Sessions | `src/app/(app)/projects/[projectId]/sessions.tsx` | `GET /api/features/workspace/sessions` (les 100 dernières) |
 | Analyses | `src/app/(app)/projects/[projectId]/analyses/` | `GET /api/features/analyses/<analyse>/report`, `POST .../jobs` pour la lancer, suivie comme un job |
-| Réglages | `src/app/(app)/settings.tsx` | `POST /auth/switch-org`, `POST /auth/logout`, `PUT /users/me/preferences` (le thème, `src/ui/ThemeSection.tsx`) |
+| Gouvernance | `src/app/(app)/projects/[projectId]/governance.tsx` | `GET /api/features/governance`, `POST .../approvals/{id}` pour approuver ou refuser un appel, `POST .../stop` pour l'arrêt d'urgence (voir « La gouvernance ») |
+| Réglages | `src/app/(app)/settings.tsx` | `GET /auth/me/session` (« Ma session », `src/auth/SessionSection.tsx`), `POST /auth/switch-org`, `POST /auth/logout`, `PUT /users/me/preferences` (le thème, `src/ui/ThemeSection.tsx`) |
 | Administration | `src/app/(app)/admin/` | `/admin/members`, `/auth/invitations`, `/admin/groups` (membres et projets), `/admin/roles` et `/admin/permissions` (`src/admin/api.ts`) |
 | Mes jetons sur le serveur | `src/app/(app)/tokens.tsx` | `GET`, `PUT /users/me/secrets`, `DELETE /users/me/secrets/{kind}` |
+| Mes comptes IA | `src/app/(app)/ai-accounts.tsx` | `GET`, `POST /users/me/ai-accounts`, `PATCH`/`DELETE .../{id}`, `PUT .../defaults/{provider}` (voir « Contexte, jetons personnels… ») |
 
 Les actions d'une carte sont celles de l'app de bureau sur une carte du serveur
 (`main/server-board-actions.ts`), avec la même correspondance (`src/board/actions.ts`) :
 
 | Action | Au serveur |
 |---|---|
-| Démarrer | sans spec : phase `spec` ; avec : phase `build`, précédée de l'approbation si la carte demande une revue |
+| Démarrer | sans spec : phase `spec` ; avec : phase `build`, précédée de l'approbation si la carte demande une revue ; si le serveur répond que la carte attend d'autres approbateurs (`approved: false`), rien ne démarre et l'app dit combien d'approbations la carte a (`ApprovalWaiting`) |
 | Approuver la spec | `POST /api/board/cards/{id}/approve` |
 | Arrêter | annule le run en file ou en cours de la carte |
 | Demander des changements | `POST .../request-changes`, puis phase `build` |
 | Fusionner, créer la PR, relancer le build | phases `merge`, `pr`, `build` |
 | Supprimer | `DELETE /api/board/cards/{id}`, après confirmation |
 | Modifier le titre et la description | `PATCH /api/board/cards/{id}`, tant qu'aucune spec n'est écrite (le serveur refuse ensuite, 409) |
+
+L'écran d'une carte montre son approbation telle que le serveur la tient (`GET .../approvals`,
+`src/card/ApprovalSection.tsx`) : sa criticité, que règle une personne qui a `review.approve`
+(`PUT .../criticality`), le compte d'approbations sur le quorum, qui les a données (et pour qui) et
+les rôles qui manquent ; un serveur plus ancien sans cette route garde la ligne de la carte. La page
+« Approbations prêtées » du tableau (`review.approve`, `src/app/(app)/projects/[projectId]/delegations.tsx`)
+liste les délégations du projet, en termine une et prête la sienne à un autre membre du projet qui
+écrit, pour 1 à 90 jours ; le serveur revérifie le collègue, la période et qui peut terminer
+(voir [spec-approval-sso.md](spec-approval-sso.md#prêter-son-approbation-lot-3)).
 
 L'écran d'une carte montre aussi avec quoi elle tourne (moteur, priorité, objectif, `src/card/SettingsSection.tsx`), en lecture seule : l'app de bureau les règle.
 
@@ -125,7 +144,11 @@ sortirait du clone n'est pas suivi.
   reste stockée et l'app propose de réessayer ; seul un refus du serveur (401, 403) l'efface.
 - **HTTPS obligatoire** (`src/api/server-url.ts`) : l'app envoie un mot de passe puis des jetons à
   l'adresse saisie. Le http simple n'est accepté que vers la machine ou le réseau local (littéral IPv4
-  privé, `localhost`, `*.local`), où il n'y a pas de certificat à obtenir.
+  privé, `localhost`, `*.local`, nom de machine sans domaine comme `build-box`, qu'aucun DNS public
+  ne résout), où il n'y a pas de certificat à obtenir. C'est l'ensemble qu'iOS laisse joindre en
+  clair (`NSAllowsLocalNetworking`, `app.json`) ; Android ne sait pas le décrire dans sa
+  configuration réseau, donc l'app y autorise le clair (`plugins/with-local-network-http.js`) et
+  `server-url.ts` reste le seul contrôle. Un nom avec domaine (`srv.entreprise.lan`) demande HTTPS.
 - **L'organisation** part dans `X-WorkPilot-Org`, comme depuis l'app de bureau : l'en-tête choisit
   parmi les organisations de la personne, le serveur vérifie l'appartenance à chaque requête.
 
@@ -196,12 +219,30 @@ Les jetons personnels (GitHub, GitLab, Azure DevOps, Jira, Linear) sont ceux que
 chiffrés pour les appels de la personne, par exemple ceux du relais GitHub et GitLab. Le téléphone
 envoie un jeton une fois et ne le relit jamais : le serveur ne dit que lesquels sont enregistrés.
 
+Les comptes IA de la personne suivent la même règle ([ai-accounts.md](ai-accounts.md#en-mode-serveur)) :
+plusieurs clés par fournisseur, une par défaut, que ses runs utilisent à la place de celle du
+serveur. L'écran (Réglages → Mes comptes IA, si le rôle a `settings.account.read`) montre chaque
+fournisseur qui a des comptes, le défaut coché parmi eux et « Le compte du serveur » (aucun défaut) ;
+un appui change le défaut. Avec `settings.account.write`, il ajoute un compte (fournisseur, nom, clé ;
+pour Claude, un jeton de `claude setup-token`), le renomme, remplace sa clé ou le supprime après
+confirmation ; sinon il reste en lecture seule. Aucune clé n'est relue : seulement la date où elle a
+été enregistrée.
+
 La connexion Microsoft Entra utilise l'enregistrement d'application du serveur (`GET /auth/config`
 donne son tenant et son client). Le navigateur du système ouvre la page de Microsoft, l'app reçoit un
 code sur `workpilot://auth` (PKCE, aucun secret sur le téléphone), l'échange chez Microsoft contre un
 id_token et le remet au serveur, qui en vérifie la signature, l'audience et l'émetteur
 (`src/auth/entra.ts`). L'enregistrement Entra doit déclarer cette URI de redirection pour une
 plateforme « Applications mobiles et de bureau » (voir [CONFIGURATION.md](../CONFIGURATION.md)).
+
+« Se connecter par authentification unique » mène le même flux avec le fournisseur OpenID Connect
+du serveur (`src/auth/sso.ts`) : `/auth/config` donne ses adresses, que le serveur a lues dans le
+document de découverte du fournisseur, et l'`id_token` part à `POST /auth/sso/exchange`. Cette
+réponse vient du réseau : l'app revérifie chaque adresse (https, ou http sur la boucle locale, sans
+identifiants ni fragment), l'identifiant du client et les scopes (`openid` compris) avant d'ouvrir
+le navigateur, comme le main du bureau. Le client du fournisseur doit déclarer `workpilot://auth`.
+Les deux fournisseurs partagent `src/auth/code-flow.ts` : PKCE, le `state` que vérifie
+`expo-auth-session`, et un `nonce` que l'`id_token` doit porter avant d'être envoyé.
 
 ## Administration
 
@@ -213,8 +254,27 @@ seul un administrateur de la plateforme peut inviter un administrateur du serveu
 (membres, projets atteints avec leur rôle, rôle donné dans l'organisation) et les rôles (un rôle
 intégré se lit, un rôle personnalisé se crée, se modifie permission par permission et se supprime).
 Chaque page n'apparaît qu'avec sa permission de lecture (`org.member.read`, `org.invitation.read`,
-`org.role.read`) et chaque action qu'avec celle d'écriture ; le serveur revérifie tout. Les
-organisations, quotas, sessions et journal d'audit restent sur le bureau.
+`org.role.read`) et chaque action qu'avec celle d'écriture ; le serveur revérifie tout.
+
+La console du bureau y est aussi (`src/admin/`, `src/app/(app)/admin/`) :
+
+- **Vue d'ensemble** (`GET /admin/overview`, `analytics.read`) : les agents en cours et en attente,
+  la semaine jour par jour, qui a lancé le plus, les derniers échecs et l'usage des quotas. Un
+  contributeur a aussi `analytics.read` : comme sur le bureau, les Réglages n'offrent
+  l'administration qu'à qui administre autre chose (`administers` dans `src/admin/pages.ts`).
+- **Quotas** (`/admin/quotas`, lecture `org.quota.read`, écriture `org.quota.write`) : chaque
+  plafond avec son usage ; un champ vide lève la limite. Le téléphone n'envoie que ce qui a changé,
+  et le serveur distingue une limite absente (gardée) d'une limite `null` (levée), et refuse un
+  nombre négatif.
+- **Journal d'audit** (`GET /admin/audit`, `audit.read`) : 50 lignes à la fois jusqu'aux 500 que
+  sert le serveur, le détail d'une ligne, et le filtre par son action. L'adresse IP que le serveur
+  garde pour chaque ligne n'est pas affichée sur le téléphone (RGPD : minimisation).
+- **Sessions** (`GET /admin/sessions`, `org.session.read`) : les connexions de chaque personne,
+  comment et jusqu'à quand ; `org.session.revoke` déconnecte une autre personne de tous ses
+  appareils (`DELETE /admin/sessions/{id}`), jamais soi-même depuis là. Les adresses IP ne sont
+  pas affichées non plus.
+
+Les organisations de la plateforme restent sur le bureau.
 
 ## Tableau de bord, sessions et analyses
 
@@ -226,6 +286,18 @@ relancent comme un job. Tout cela demande `analytics.read` ; lancer une analyse 
 `agent.execute`, que le serveur revérifie. Un rapport d'analyse est une sortie d'agent : l'app ne
 l'affiche pas tel quel mais en tire des chiffres et des listes bornés (`src/insights/digest.ts`),
 et ignore ce qu'elle ne reconnaît pas.
+
+## La gouvernance
+
+La page Gouvernance d'un projet (lien du Kanban avec `audit.read`) montre ce que le serveur lit
+dans le `workpilot.policy.yaml` de son clone : heures, fichiers interdits, fichiers soumis à revue
+et qui les approuve (les rôles de `files.reviewers`, ou tout membre), budget de jetons, limite du
+coupe-circuit, erreurs d'une politique refusée ; puis les appels qu'attendent ses agents, avec
+Approuver et Refuser, les agents en cours, avec « Arrêter mes agents » et, pour le propriétaire,
+« Arrêter tous les agents du projet » après confirmation, et les vingt dernières décisions avec qui
+les a approuvées. Chaque bouton suit le `may` de la réponse ; le serveur revérifie, et quand il
+refuse une approbation faute de rôle, la page nomme les rôles demandés. L'export du journal reste
+sur le bureau. Conception : [governance-policy.md](governance-policy.md#un-projet-du-mode-serveur-shared_featuresgovernancepy).
 
 ## Les notifications push
 
@@ -246,7 +318,7 @@ n'est pas encore validé, lu dans `review_state.json` comme le fait le build) n'
 terminé » mais « Plan prêt à valider », avec la catégorie `plan_review`. « Valider et construire »
 ouvre l'app (sur iOS, l'appareil doit d'abord être déverrouillé : `isAuthenticationRequired`), demande
 le verrouillage de l'app, puis appelle les routes du bouton Démarrer : `POST …/approve`, puis un run
-`build`. Le serveur revérifie les droits sur les deux ; un refus s'affiche et la carte s'ouvre. Il
+`build`, seulement si l'approbation suffit. Le serveur revérifie les droits sur les deux ; un refus s'affiche et la carte s'ouvre. Il
 n'y a pas de bouton « Arrêter » : le serveur ne notifie que la fin d'un run, il n'y a alors rien à
 arrêter.
 
@@ -304,8 +376,127 @@ sien quand la personne change de thème (`SETTINGS_SAVE`). Les captures de l'e2e
 (`WORKPILOT_E2E_SCREENSHOTS`) sont prises en clair puis en sombre sur la même page, sans nouvelle
 connexion.
 
+## L'interface
+
+Un projet s'ouvre sur une barre d'onglets (`src/app/(app)/projects/[projectId]/(tabs)/`) : le
+tableau, Insights, la forge, le tableau de bord, puis « Plus », qui liste les autres pages en lignes
+avec ce à quoi chacune sert (`src/project/pages.ts`). Un onglet que les permissions refuseraient
+est caché (`href: null`), celui de la forge seulement une fois le projet lu sans forge ; une carte,
+une session ou une pull request s'ouvre au-dessus des onglets, dans la pile de l'app. Le routeur ne
+donne pas le segment `[projectId]` à un onglet atteint par un tap : la mise en page des onglets le
+passe par un contexte (`src/project/ProjectId.tsx`).
+
+Les écrans partagent leurs pièces : `src/ui/components.tsx` (bouton avec icône, champ qui montre le
+focus, section avec icône), `src/ui/kit.tsx` (bouton d'en-tête, puce, initiales, ligne de liste, état
+vide, bouton flottant) et `src/ui/theme.ts` (échelle de texte `TYPE`, `elevation` : une ombre
+douce en clair, la bordure seule en sombre). Les icônes sont celles de Feather
+(`@expo/vector-icons`), dont viennent les icônes Lucide du bureau ; une icône est décorative,
+le contrôle qui la porte a le libellé. Sous Jest, `jest.setup.js` remplace la police par une vue
+qui garde le nom de l'icône (`icon-<nom>`).
+
+La capture du README (`scripts/readme-screenshots/capture-mobile.cjs`) prend quatre écrans à
+390 × 844 points, chacun dans un autre thème venu des préférences du compte, et les pose dans des
+cadres aux mêmes proportions : rien n'est étiré.
+
+## Pour vous, et me prévenir ailleurs
+
+La liste des projets dit combien de cartes attendent la personne, et le bouton « Ce qui vous
+attend » ouvre `src/app/(app)/inbox.tsx` : les cartes de tous ses projets qui sont en revue
+humaine et sur lesquelles elle peut agir, rangées par ce qu'il y a à faire (un plan à approuver,
+un run arrêté à regarder, un travail terminé à relire). Une carte réservée par une autre personne
+reste à celle-ci ; une carte qu'aucune de ses permissions ne laisserait toucher n'y est pas, comme
+l'écran de la carte n'en montrerait aucun bouton (`src/inbox/forMe.ts`). Aucune route nouvelle :
+l'app lit le tableau de chaque projet par `GET /api/board/cards`, au plus 30 projets, donc le
+serveur vérifie chaque projet comme pour son tableau ; un tableau illisible est nommé, les autres
+s'affichent.
+
+« Me prévenir ailleurs », dans les réglages (`src/app/(app)/needs-you.tsx`), règle les canaux
+propres à la personne sur le serveur (`server/routers/needs_you.py`) : ntfy, Telegram, Teams, les
+moments dont elle est prévenue et la langue des messages. Un secret se tape à l'aveugle et ne
+revient jamais : le serveur répond `********`, et un champ laissé vide garde celui qu'il a. Un
+interrupteur qui met un canal en pause renvoie ce qui n'est pas secret (le serveur ntfy, l'identifiant
+Telegram), pour que le serveur ne retombe pas sur ses valeurs par défaut. Enregistrer ou tester
+demande `agent.execute` ; sans lui, sans clé de secrets sur le serveur, ou tant que l'opérateur n'a
+pas activé l'envoi, l'écran le dit au lieu de proposer un bouton qui serait refusé.
+
+## Trouver et agir vite sur le tableau
+
+Au-dessus des colonnes, un champ cherche dans le titre, le numéro et le nom de qui a pris la
+carte, sans tenir compte des accents ni de la casse ; les filtres gardent les cartes de la
+personne ou les types choisis (`src/board/filter.ts`, `src/board/FilterBar.tsx`). Les comptes des
+colonnes suivent la recherche, et la colonne ouverte suit les résultats tant que la personne n'en a
+pas choisi une.
+
+Un appui long sur une carte (ou l'action du lecteur d'écran) ouvre ses actions rapides
+(`src/board/QuickActions.tsx`) : la carte est relue (spec, approbation, runs) pour proposer ce que
+son écran proposerait, mais seulement ce qu'il lance sans redemander (démarrer, approuver la spec,
+arrêter, relancer le build). Fusionner, ouvrir la pull request, renvoyer avec des remarques et
+supprimer restent sur l'écran de la carte, derrière sa confirmation et le verrouillage de l'app ;
+« Ouvrir la carte » est toujours là. Le serveur n'a pas de route pour déplacer une carte d'une
+colonne à l'autre : une carte change de colonne par ces actions, comme sur le bureau en mode
+serveur. Un glisser-déposer libre aurait demandé au serveur d'écrire un statut de plan à la main,
+hors des runs qui le tiennent.
+
+Un retour haptique léger (`src/ui/haptics.ts`, `expo-haptics`) marque un changement de colonne,
+un filtre, l'ouverture des actions rapides, et leur réussite ou leur échec ; rien sur le web ou
+sans moteur, et un retour manqué ne fait jamais échouer l'action.
+
+À partir de 900 points de large (une tablette, un téléphone à l'horizontale), le tableau montre
+toutes ses colonnes côte à côte, comme le bureau (`src/board/WideBoard.tsx`), avec les mêmes
+recherche et filtres.
+
+## L'équipe : chat, classement et liens de replay
+
+Le chat d'équipe d'un projet (page « Chat d'équipe » de l'onglet Plus) passe par le même canal du
+flux que le tableau (`project:<id>`), ouvert par `src/project/useProjectSocket.ts`, que le tableau
+et le chat partagent. Le serveur (`streaming/project_room.py`) envoie qui est là (`presence`, par id
+et nom, jamais par e-mail), les 100 derniers messages à l'arrivée (`chat_history`), chaque nouveau
+(`chat_message`) et la raison d'un refus (`chat_rejected`) ; `src/team/room.ts` vérifie et borne
+tout avant l'écran. Le téléphone envoie `{"type": "chat_message", "message", "reply_to"?}` ; le
+serveur garde la conversation (`server/services/team_chat.py`) et le téléphone ne la garde qu'en
+mémoire, le temps de l'écran. Un message refusé (trop vite, indisponible) revient dans le champ.
+Un lecteur (rôle `viewer`) lit sans pouvoir écrire, comme le serveur l'exige (`can_interact`) : le
+téléphone ne lui propose pas d'écrire. Le navigateur ne peut pas mettre le jeton dans la poignée de
+main d'un WebSocket : la version web affiche la page, l'app native parle.
+
+Le classement (page « Classement », `analytics.read`) est celui de Pixel Office sur un serveur
+(`shared_features/pixel_office.py`) : les points de la saison, sur ce projet ou toute
+l'organisation, de qui a choisi de montrer son nom. Le choix est désactivé tant que la personne ne
+l'active pas, ne vaut que pour sa propre ligne et le serveur l'enregistre au journal d'audit ; sans
+lui, son score et ses badges ne sont montrés qu'à elle (RGPD : aucun nom sans consentement, aucun
+total des autres). Les points ne lisent ni jetons ni prix, donc chaque provider compte pareil.
+
+« Mes liens de replay » (Réglages, `lab.read`) liste les liens de replay que la personne a partagés
+depuis le bureau, sur chaque projet qu'elle atteint encore (`GET /api/features/replay-shares/mine`),
+avec leur état et leurs ouvertures, et arrête un lien (`DELETE /{id}?project_id=`, le serveur
+revérifie l'auteur).
+
+## La carte en profondeur : journal, fichiers, revue et mémoire
+
+« Voir tout le journal » ouvre le journal d'une carte en plein écran
+(`cards/[cardId]/logs.tsx`) : une phase à la fois, filtré aux erreurs ou sans les appels d'outils,
+avec une recherche par mots. Tant qu'une phase tourne, l'écran relit `GET .../logs` toutes les
+3 secondes et suit la fin, sauf si la personne coupe « Suivre la fin » ; il ne dessine que les
+2 000 dernières lignes d'une phase. Un fichier modifié s'ouvre lui aussi en plein écran
+(`cards/[cardId]/files.tsx`) avec les numéros de ligne avant et après, lus des en-têtes `@@`
+(`src/card/patch.ts`), et le fichier précédent ou suivant. Le fichier est désigné par sa place dans
+la liste des changements (`?file=`), jamais par un chemin que le serveur aurait à croire.
+
+Sur une PR GitHub, chaque constat de la revue IA reçoit l'avis de l'équipe
+(`server/routes/forge_review_feedback.py`) : utile ou pas, et pourquoi (`src/forge/ReviewFeedback.tsx`).
+Il faut le droit d'écrire (`task.write`, le serveur revérifie le rôle d'auteur du projet). Un rejet
+que le serveur met de côté attend un mainteneur, qui l'approuve ou l'écarte depuis la même PR. GitLab
+n'a pas encore cette route : l'app n'affiche pas les boutons.
+
+La mémoire du projet (Contexte) se gère du téléphone avec le cycle de vie du serveur
+(`shared_features/context_lifecycle.py`, `src/context/MemoryViews.tsx`) : épingler un souvenir
+(dans la limite du serveur), l'oublier (il part à la corbeille, jamais effacé tout de suite) et le
+remettre tant que la durée de rétention court. Lire demande `insight.read`, changer
+`insight.write` ; un refus du serveur (limite atteinte, souvenir épinglé, délai passé) est dit dans
+la langue de l'app.
+
 ## Ce qui vient
 
 - Le partage vers une carte sur iOS (l'extension d'`expo-sharing`, voir « Créer une carte »), et le partage d'images.
-- Les organisations, les quotas, les sessions et le journal d'audit de l'administration.
+- Les organisations de la plateforme dans l'administration.
 - La publication sur l'App Store et Google Play (comptes Apple et Google, projet EAS).

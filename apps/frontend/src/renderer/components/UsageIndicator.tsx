@@ -33,6 +33,7 @@ import { useTranslation } from "react-i18next";
 import type { AppSection } from "@/components/settings/AppSettings";
 import { getBadgeColorClasses, getColorClass } from "../utils/usageColors";
 import { useEffectiveUsageProvider } from "../hooks/useEffectiveUsageProvider";
+import { useUsagePlanStore } from "../stores/usage-plan-store";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import {
 	Tooltip,
@@ -44,6 +45,8 @@ import { CopilotUsageContent } from "./usage/CopilotUsageContent";
 import { DefaultUsageContent } from "./usage/DefaultUsageContent";
 import { OpenAIUsageContent } from "./usage/OpenAIUsageContent";
 import { ProfileRenderer } from "./usage/ProfileRenderer";
+import { ProviderAccountSwitcher } from "./usage/ProviderAccountSwitcher";
+import { UsagePlanBadge } from "./usage/UsagePlanBadge";
 import { ReauthContent } from "./usage/ReauthContent";
 import { THRESHOLD_ELEVATED, THRESHOLD_WARNING } from "./usage/usageConstants";
 import { useContextUsage } from "../hooks/useContextUsage";
@@ -77,6 +80,12 @@ export function UsageIndicator() {
 	// person picked one (UsageLensSelector). Not the default provider, except
 	// when nothing chose any yet (first start), where it was stuck loading.
 	const selectedProvider = useEffectiveUsageProvider();
+
+	// The authentication details show the plan this snapshot reports.
+	const publishPlan = useUsagePlanStore((s) => s.setPlan);
+	useEffect(() => {
+		if (usage) publishPlan(usage.providerName || selectedProvider, usage.plan);
+	}, [usage, selectedProvider, publishPlan]);
 
 	/**
 	 * Helper function to get initials from a profile name
@@ -255,22 +264,14 @@ export function UsageIndicator() {
 	 * Uses optimistic UI update for immediate feedback, then fetches fresh data
 	 */
 	const handleSwapProfile = useCallback(
-		async (e: React.MouseEvent, profileId: string) => {
+		async (e: React.MouseEvent, targetProfile: ProfileUsageSummary) => {
 			e.preventDefault();
 			e.stopPropagation();
+			const profileId = targetProfile.profileId;
 
 			// Capture previous state for revert (before any changes)
 			const previousUsage = usage;
 			const previousOtherProfiles = otherProfiles;
-
-			// Find the profile we're swapping to
-			const targetProfile = otherProfiles.find(
-				(p) => p.profileId === profileId,
-			);
-			if (!targetProfile) {
-				console.error("[UsageIndicator] Target profile not found:", profileId);
-				return;
-			}
 
 			// Optimistic update: immediately swap profiles in the UI
 			// 1. Convert a current active profile to a ProfileUsageSummary for the "other" list
@@ -469,11 +470,7 @@ export function UsageIndicator() {
 
 	// Real-time polling effect - refresh usage data every 30 seconds
 	useEffect(() => {
-		// Clear any existing interval
-		if (pollingIntervalRef.current) {
-			clearInterval(pollingIntervalRef.current);
-		}
-
+		// The previous run's cleanup already cleared its interval.
 		// Helper to fetch and apply fresh usage data (uses deduplicated fetch)
 		const fetchAndApplyUsage = async () => {
 			await fetchUsageDeduplicated(selectedProvider);
@@ -678,23 +675,7 @@ export function UsageIndicator() {
 	if (!isAvailable || !usage) {
 		const needsReauth = activeProfileNeedsReauth;
 
-		// Debug: Log current provider and known providers
-
-		// Debug OpenAI
 		if (selectedProvider?.toLowerCase() === "openai") {
-			const globalAny = globalThis as Record<string, unknown>;
-			let debugProfiles: Array<{
-				name: string;
-				baseUrl: string;
-				detectedProvider: string;
-			}> = [];
-			if (typeof globalThis !== "undefined" && globalAny.debugProfiles) {
-				debugProfiles = globalAny.debugProfiles as typeof debugProfiles;
-			}
-			const openaiError =
-				typeof globalThis === "undefined"
-					? undefined
-					: (globalAny.lastOpenAIUsageError as string | undefined);
 			return (
 				<TooltipProvider delayDuration={200}>
 					<Tooltip>
@@ -728,31 +709,6 @@ export function UsageIndicator() {
 										</a>
 									</span>
 								</p>
-								{openaiError && (
-									<div className="mt-2 p-1 bg-destructive/10 border border-destructive/30 rounded text-3xs text-destructive">
-										<b>{t("common:usage.openaiError")}</b> {openaiError}
-									</div>
-								)}
-								<div className="mt-2 p-1 bg-muted/30 rounded text-3xs">
-									<b>{t("common:usage.debugProfiles")}</b>
-									<ul>
-										{debugProfiles.length > 0 ? (
-											debugProfiles.map((p) => (
-												<li key={`${p.name}-${p.baseUrl}`}>
-													{p.name} | {p.baseUrl} | {t("common:usage.debugProvider")}{" "}
-													{p.detectedProvider}
-												</li>
-											))
-										) : (
-											<li>{t("common:usage.noProfileDetected")}</li>
-										)}
-									</ul>
-									<div>
-										{t("common:usage.selectedProvider", {
-											provider: selectedProvider,
-										})}
-									</div>
-								</div>
 							</div>
 						</TooltipContent>
 					</Tooltip>
@@ -1176,8 +1132,8 @@ export function UsageIndicator() {
 
 						{/* Account Info */}
 						<div className="flex-1 min-w-0 text-left">
-							<div className="flex items-center gap-1.5">
-								<span className="text-3xs text-muted-foreground font-medium">
+							<div className="flex items-center gap-1.5 min-w-0">
+								<span className="text-3xs text-muted-foreground font-medium shrink-0">
 									{t("common:usage.activeAccount")}
 								</span>
 								{usage.needsReauthentication && (
@@ -1185,6 +1141,7 @@ export function UsageIndicator() {
 										{t("common:usage.needsReauth")}
 									</span>
 								)}
+								<UsagePlanBadge plan={usage.plan} className="min-w-0" />
 							</div>
 							<div
 								className={`font-medium text-xs truncate ${
@@ -1236,12 +1193,16 @@ export function UsageIndicator() {
 											rateLimitEvents: [],
 										}}
 										isActive={false}
-										onClick={(e) => handleSwapProfile(e, profile.profileId)}
+										plan={profile.plan}
+										onClick={(e) => handleSwapProfile(e, profile)}
 									/>
 								);
 							})}
 						</div>
 					)}
+
+					{/* The provider's other API-key accounts (OpenAI, Mistral…), one click away */}
+					<ProviderAccountSwitcher provider={selectedProvider} />
 				</div>
 			</PopoverContent>
 		</Popover>

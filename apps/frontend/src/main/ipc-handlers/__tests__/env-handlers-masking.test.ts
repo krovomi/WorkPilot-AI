@@ -132,6 +132,20 @@ describe("ENV_GET masking and the webhook test", () => {
 		expect(config.gitlabToken).toBeUndefined();
 	});
 
+	it("writes and reads the memory-conflict notice switch (#352)", async () => {
+		await invoke(IPC_CHANNELS.ENV_UPDATE, "p1", { notifyWebhookEnabled: true });
+		expect(envFile()).toContain("# WORKPILOT_MEMORY_CONFLICT_NOTIFY=false");
+		expect((await getConfig()).memoryConflictNotify).toBeUndefined();
+
+		await invoke(IPC_CHANNELS.ENV_UPDATE, "p1", { memoryConflictNotify: true });
+		expect(envFile()).toContain("\nWORKPILOT_MEMORY_CONFLICT_NOTIFY=true\n");
+		expect((await getConfig()).memoryConflictNotify).toBe(true);
+
+		await invoke(IPC_CHANNELS.ENV_UPDATE, "p1", { memoryConflictNotify: false });
+		expect(envFile()).toContain("\nWORKPILOT_MEMORY_CONFLICT_NOTIFY=false\n");
+		expect((await getConfig()).memoryConflictNotify).toBeUndefined();
+	});
+
 	it("keeps every token when the whole masked config comes back", async () => {
 		await invoke(IPC_CHANNELS.ENV_UPDATE, "p1", {
 			claudeOAuthToken: "sk-ant-oat01-secret",
@@ -182,6 +196,111 @@ describe("ENV_GET masking and the webhook test", () => {
 		await invoke(IPC_CHANNELS.ENV_UPDATE, "p1", { ...config });
 		expect(envFile()).not.toContain(fakeEncrypted("sk-ant-oat01-global"));
 		expect(envFile()).not.toContain("sk-ant-oat01-global");
+	});
+
+	describe("custom MCP servers", () => {
+		const HTTP = {
+			id: "docs",
+			name: "Docs",
+			type: "http" as const,
+			url: "https://mcp.example.com/mcp",
+			headers: { Authorization: "Bearer tok_stored", "X-Api-Key": "key_stored" },
+		};
+		const COMMAND = {
+			id: "notion",
+			name: "Notion",
+			type: "command" as const,
+			command: "npx",
+			args: ["-y", "@notionhq/notion-mcp-server"],
+			env: { NOTION_TOKEN: "ntn_stored", EMPTY: "" },
+		};
+
+		function storedServers(): Array<Record<string, unknown>> {
+			const line = envFile()
+				.split("\n")
+				.find((l) => l.startsWith("CUSTOM_MCP_SERVERS="));
+			return JSON.parse(line?.slice("CUSTOM_MCP_SERVERS=".length) ?? "[]");
+		}
+
+		beforeEach(async () => {
+			await invoke(IPC_CHANNELS.ENV_UPDATE, "p1", {
+				customMcpServers: [HTTP, COMMAND],
+			});
+		});
+
+		it("hands the renderer their header and environment values masked", async () => {
+			const config = await getConfig();
+
+			expect(JSON.stringify(config)).not.toContain("stored");
+			expect(config.customMcpServers).toEqual([
+				{
+					...HTTP,
+					headers: {
+						Authorization: `Bearer ${MASKED_SECRET}`,
+						"X-Api-Key": MASKED_SECRET,
+					},
+				},
+				{ ...COMMAND, env: { NOTION_TOKEN: MASKED_SECRET, EMPTY: "" } },
+			]);
+		});
+
+		it("keeps the stored values when the masked servers come back", async () => {
+			const config = await getConfig();
+			await invoke(IPC_CHANNELS.ENV_UPDATE, "p1", {
+				customMcpServers: config.customMcpServers?.map((server) => ({
+					...server,
+					name: `${server.name} renamed`,
+				})),
+			});
+
+			expect(envFile()).not.toContain(MASKED_SECRET);
+			expect(storedServers()).toEqual([
+				{ ...HTTP, name: "Docs renamed" },
+				{ ...COMMAND, name: "Notion renamed" },
+			]);
+		});
+
+		it("stores a value typed over the mask, with its scheme", async () => {
+			await invoke(IPC_CHANNELS.ENV_UPDATE, "p1", {
+				customMcpServers: [
+					{
+						...HTTP,
+						headers: {
+							Authorization: `Bearer ${MASKED_SECRET}tok_new`,
+							"X-Api-Key": "key_new",
+						},
+					},
+				],
+			});
+
+			expect(storedServers()).toEqual([
+				{
+					...HTTP,
+					headers: { Authorization: "Bearer tok_new", "X-Api-Key": "key_new" },
+				},
+			]);
+		});
+
+		it("writes no masked value for another URL, command or server", async () => {
+			const config = await getConfig();
+			const [http, command] = config.customMcpServers ?? [];
+			await invoke(IPC_CHANNELS.ENV_UPDATE, "p1", {
+				customMcpServers: [
+					{ ...http, url: "https://elsewhere.example.com/mcp" },
+					{ ...command, args: ["-y", "another-server"] },
+					{ ...http, id: "copy" },
+				],
+			});
+
+			const raw = envFile();
+			expect(raw).not.toContain("stored");
+			expect(raw).not.toContain(MASKED_SECRET);
+			expect(storedServers().map((server) => [server.headers, server.env])).toEqual([
+				[{}, undefined],
+				[undefined, { EMPTY: "" }],
+				[{}, undefined],
+			]);
+		});
 	});
 
 	describe("notification webhook test", () => {

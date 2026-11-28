@@ -220,6 +220,94 @@ describe("Project Store Tab Management", () => {
 		});
 	});
 
+	// Views read either `activeProjectId` or `selectedProjectId`: when the two
+	// differed, the PR view showed another project's pull requests under the
+	// tab of the project shown.
+	describe("the selected project is the active tab", () => {
+		const ids = () => {
+			const { activeProjectId, selectedProjectId } = useProjectStore.getState();
+			return { activeProjectId, selectedProjectId };
+		};
+
+		it("follows a newly opened tab", () => {
+			useProjectStore.setState({
+				openProjectIds: ["workpilot"],
+				activeProjectId: "workpilot",
+				selectedProjectId: "workpilot",
+				tabOrder: ["workpilot"],
+			});
+
+			useProjectStore.getState().openProjectTab("dotnet");
+
+			expect(ids()).toEqual({ activeProjectId: "dotnet", selectedProjectId: "dotnet" });
+		});
+
+		it("follows the tab shown after closing the active one", () => {
+			useProjectStore.setState({
+				openProjectIds: ["workpilot", "dotnet", "lettra"],
+				activeProjectId: "workpilot",
+				selectedProjectId: "workpilot",
+				tabOrder: ["workpilot", "dotnet", "lettra"],
+			});
+
+			useProjectStore.getState().closeProjectTab("workpilot");
+
+			expect(ids()).toEqual({ activeProjectId: "dotnet", selectedProjectId: "dotnet" });
+		});
+
+		it("is cleared with the last tab", () => {
+			useProjectStore.setState({
+				openProjectIds: ["dotnet"],
+				activeProjectId: "dotnet",
+				selectedProjectId: "dotnet",
+				tabOrder: ["dotnet"],
+			});
+
+			useProjectStore.getState().closeProjectTab("dotnet");
+
+			expect(ids()).toEqual({ activeProjectId: null, selectedProjectId: null });
+		});
+
+		it("keeps the shown tab when another tab closes", () => {
+			useProjectStore.setState({
+				openProjectIds: ["workpilot", "dotnet"],
+				activeProjectId: "dotnet",
+				selectedProjectId: "dotnet",
+				tabOrder: ["workpilot", "dotnet"],
+			});
+
+			useProjectStore.getState().closeProjectTab("workpilot");
+
+			expect(ids()).toEqual({ activeProjectId: "dotnet", selectedProjectId: "dotnet" });
+		});
+
+		it("brings forward the tab of a project selected elsewhere", () => {
+			useProjectStore.setState({
+				openProjectIds: ["workpilot", "dotnet"],
+				activeProjectId: "workpilot",
+				selectedProjectId: "workpilot",
+				tabOrder: ["workpilot", "dotnet"],
+			});
+
+			useProjectStore.getState().selectProject("dotnet");
+
+			expect(ids()).toEqual({ activeProjectId: "dotnet", selectedProjectId: "dotnet" });
+		});
+
+		it("leaves the tabs alone for a project that has none", () => {
+			useProjectStore.setState({
+				openProjectIds: ["workpilot"],
+				activeProjectId: "workpilot",
+				selectedProjectId: "workpilot",
+				tabOrder: ["workpilot"],
+			});
+
+			useProjectStore.getState().selectProject("lettra");
+
+			expect(ids()).toEqual({ activeProjectId: "workpilot", selectedProjectId: "lettra" });
+		});
+	});
+
 	describe("reorderTabs", () => {
 		it("should reorder tabs by moving from index to index", () => {
 			useProjectStore.setState({
@@ -279,70 +367,6 @@ describe("Project Store Tab Management", () => {
 				"project-2",
 				"project-3",
 			]);
-		});
-	});
-
-	describe("restoreTabState", () => {
-		it("should be a no-op (tab state is now loaded via IPC in loadProjects)", () => {
-			// Set up some initial state
-			useProjectStore.setState({
-				openProjectIds: ["existing"],
-				activeProjectId: "existing",
-				tabOrder: ["existing"],
-			});
-
-			// restoreTabState is now a no-op - it just logs
-			useProjectStore.getState().restoreTabState();
-
-			// State should remain unchanged (not modified by restoreTabState)
-			expect(useProjectStore.getState().openProjectIds).toEqual(["existing"]);
-			expect(useProjectStore.getState().activeProjectId).toBe("existing");
-			expect(useProjectStore.getState().tabOrder).toEqual(["existing"]);
-		});
-	});
-
-	describe("getOpenProjects", () => {
-		it("should return projects that are open", () => {
-			const project1 = createTestProject({ id: "project-1" });
-			const project2 = createTestProject({ id: "project-2" });
-			const project3 = createTestProject({ id: "project-3" });
-
-			useProjectStore.setState({
-				projects: [project1, project2, project3],
-				openProjectIds: ["project-1", "project-3"],
-			});
-
-			const openProjects = useProjectStore.getState().getOpenProjects();
-
-			expect(openProjects).toHaveLength(2);
-			expect(openProjects.map((p) => p.id)).toEqual(["project-1", "project-3"]);
-		});
-
-		it("should return empty array when no projects are open", () => {
-			const project1 = createTestProject({ id: "project-1" });
-
-			useProjectStore.setState({
-				projects: [project1],
-				openProjectIds: [],
-			});
-
-			const openProjects = useProjectStore.getState().getOpenProjects();
-
-			expect(openProjects).toHaveLength(0);
-		});
-
-		it("should handle open project IDs that dont exist in projects", () => {
-			const project1 = createTestProject({ id: "project-1" });
-
-			useProjectStore.setState({
-				projects: [project1],
-				openProjectIds: ["project-1", "non-existent"],
-			});
-
-			const openProjects = useProjectStore.getState().getOpenProjects();
-
-			expect(openProjects).toHaveLength(1);
-			expect(openProjects[0].id).toBe("project-1");
 		});
 	});
 

@@ -255,6 +255,9 @@ export interface SidebarPrefs {
 	pinnedGroups: string[];
 	groupOrder: string[];
 	itemOrder: Record<string, string[]>;
+	// Pages the user moved to another space: page id → group id
+	// (renderer/components/sidebar/menu-layout.ts). Unset = shipped place.
+	itemGroups?: Record<string, string>;
 	expandedGroups: string[];
 	favoritesExpanded: boolean;
 	// Hides the views EXPERIMENTAL_VIEWS lists (renderer/components/sidebar).
@@ -286,6 +289,18 @@ export type OpenAIAuthMode = "api-key" | "codex-cli";
 
 export interface AppSettings {
 	jev?: import("./jev").JevSettings;
+	/** Swarm Mode: parallel subtasks in a task's build (off when absent). */
+	swarm?: import("./swarm").SwarmSettings;
+	/** Settings, Sandbox and Anomaly detection: sent to every agent process. */
+	agentSafety?: import("./agent-safety").AgentSafetySettings;
+	/** Settings, Code mode: agents chain their tools in a script (off when absent). */
+	codeMode?: import("../utils/code-mode").CodeModeSetting;
+	/** Settings, Approval tiers: sent to the PR follow-through as WORKPILOT_APPROVALS. */
+	approvalTiers?: import("../utils/approval-tiers").ApprovalTierMode;
+	/** Settings, Approval tiers, Claude Ship: auto (default), on or off. */
+	claudeShip?: import("../utils/approval-tiers").ClaudeShipMode;
+	/** Express lane: the projects' Dependabot and Renovate PRs merged in N0 (off when absent). */
+	expressLane?: boolean;
 	theme: "light" | "dark" | "system";
 	colorTheme?: ColorTheme;
 	defaultModel: string;
@@ -313,7 +328,20 @@ export interface AppSettings {
 	globalAnthropicApiKey?: string;
 	globalGoogleApiKey?: string;
 	globalGroqApiKey?: string;
+	/** OpenRouter key (shared/constants/gateway-providers.ts). */
 	globalOpenRouterApiKey?: string;
+	/** Hugging Face token with "Make calls to Inference Providers". */
+	globalHuggingFaceApiKey?: string;
+	/** Default model of each gateway (an id of its catalogue, e.g. `org/model`). */
+	globalOpenRouterModel?: string;
+	globalHuggingFaceModel?: string;
+	/** Gateway routing (shared/constants/gateway-routing.ts). */
+	/** `""` is the gateway's own choice (a saved value that clears the option). */
+	openRouterSort?: "price" | "throughput" | "latency" | "";
+	openRouterFallbackModels?: string[];
+	openRouterDenyDataCollection?: boolean;
+	openRouterZeroRetention?: boolean;
+	huggingFaceRoutingPolicy?: "fastest" | "cheapest" | "";
 	globalMistralApiKey?: string;
 	globalDeepSeekApiKey?: string;
 	globalMetaLlamaApiKey?: string;
@@ -370,6 +398,16 @@ export interface AppSettings {
 	// is in the background (registered with the OS; off by default).
 	voiceAssistantShortcut?: string;
 	voiceAssistantSystemWide?: boolean;
+	// How far above the room's noise the assistant's microphone counts speech
+	// (`voice-assistant/voice-activity.ts`; "medium" when absent).
+	voiceAssistantSensitivity?: "low" | "medium" | "high";
+	// Spoken feedback with the system's local voices (`voice-assistant/voice-speech.ts`;
+	// "off" when absent): the answers ("short"), plus the running tasks ("verbose").
+	voiceAssistantFeedback?: "off" | "short" | "verbose";
+	// The optional wake word (`voice-assistant/voice-wake.ts`), off by default, and
+	// its phrase ("Hey WorkPilot" when absent).
+	voiceAssistantWakeWord?: boolean;
+	voiceAssistantWakePhrase?: string;
 	// Developer tools preferences
 	preferredIDE?: SupportedIDE;
 	customIDEPath?: string; // For 'custom' IDE
@@ -383,6 +421,16 @@ export interface AppSettings {
 	autoNameClaudeTerminals?: boolean;
 	// Track which version warnings have been shown (e.g., ["2.7.5"])
 	seenVersionWarnings?: string[];
+	// One-line summary under each Kanban column title (default on)
+	kanbanColumnSummary?: boolean;
+	// A card whose PR was closed without a merge goes to « Abandonnée » (default on)
+	kanbanAbandonClosedPrs?: boolean;
+	// Done cards archived after this many days: 0 (off, default), 7, 14 or 30
+	kanbanAutoArchiveDays?: number;
+	// « Interroger le tableau »: rank the tickets by meaning too (default auto)
+	boardAskSemantic?: "auto" | "local" | "off";
+	// « Interroger le tableau »: the sources read besides the cards (default all)
+	boardAskSources?: ("roadmap" | "ideas" | "history")[];
 	// Sidebar collapsed state (icons only when true)
 	sidebarCollapsed?: boolean;
 	// Sidebar width in pixels when expanded (default 256)
@@ -392,7 +440,8 @@ export interface AppSettings {
 	// User sidebar customization: pinned favorites, group/item ordering, expanded state
 	sidebarPrefs?: SidebarPrefs;
 	providerPriorityOrder?: import("../../renderer/components/settings/multiconnector/types").LLMProvider[];
-	// Providers explicitly disabled from auto-switching by user toggle
+	// Failover chain entries (or providers) the person took out of the chain;
+	// read by main/provider-failover.
 	disabledAutoSwitchProviders?: string[];
 	// Configuration pour providers custom/enterprise
 	customProviderUrl?: string;
@@ -403,24 +452,8 @@ export interface AppSettings {
 	 */
 	credentialsSetAt?: import("../utils/secret-age").SecretDates;
 	customProviderModels?: import("../constants/models").ProviderModel[];
-	// Auto-switching settings
-	autoSwitchEnabled?: boolean;
-	proactiveEnabled?: boolean;
-	sessionThreshold?: number;
-	rateLimitEnabled?: boolean;
-	authFailureEnabled?: boolean;
-	routingStrategy?:
-		| "best_performance"
-		| "cheapest"
-		| "lowest_latency"
-		| "round_robin";
 	// Active view persistence (restore last view on app reload)
 	activeView?: import("../../renderer/components/Sidebar").SidebarView;
-	// Provider grid UI preferences
-	providerViewMode?: "grid" | "list";
-	providerFilterStatus?: "all" | "configured" | "unconfigured" | "errors";
-	providerSortBy?: "name" | "category" | "status" | "usage";
-	providerSearchQuery?: string;
 	// Context Mesh — Cross-Project Intelligence
 	contextMeshEnabled?: boolean;
 	// Live Development Companion — Real-time pair programming

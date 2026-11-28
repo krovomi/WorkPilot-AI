@@ -24,7 +24,9 @@ export const useSyncStatusStore = create<SyncStatusState>((set, get) => ({
 	// Actions
 	setSyncStatus: (syncStatus) => set({ syncStatus, connectionError: null }),
 
-	setConnectionError: (connectionError) => set({ connectionError }),
+	// A failed check forgets the last status: it may be another project's.
+	setConnectionError: (connectionError) =>
+		set({ syncStatus: null, connectionError }),
 
 	clearSyncStatus: () =>
 		set({
@@ -47,26 +49,39 @@ export const useSyncStatusStore = create<SyncStatusState>((set, get) => ({
 /**
  * Check GitHub connection status
  */
+/**
+ * The latest check: switching projects starts a new one, and the previous
+ * project's answer (its repository) must not land after it.
+ */
+let latestConnectionCheck = 0;
+let latestCheckedProjectId: string | null = null;
+
 export async function checkGitHubConnection(
 	projectId: string,
 ): Promise<GitHubSyncStatus | null> {
 	const store = useSyncStatusStore.getState();
+	const check = ++latestConnectionCheck;
+	// Another project: its status is unknown until GitHub answers, never the
+	// previous project's repository.
+	if (latestCheckedProjectId !== projectId) {
+		latestCheckedProjectId = projectId;
+		store.setSyncStatus(null);
+	}
 
 	try {
 		const result = await window.electronAPI.checkGitHubConnection(projectId);
+		if (check !== latestConnectionCheck) return null;
 		if (result.success && result.data) {
 			store.setSyncStatus(result.data);
 			return result.data;
 		} else {
-			store.setConnectionError(
-				result.error || "Failed to check GitHub connection",
-			);
+			// No reason given: the view says what to do in the app's language.
+			store.setConnectionError(result.error || null);
 			return null;
 		}
 	} catch (error) {
-		store.setConnectionError(
-			error instanceof Error ? error.message : "Unknown error",
-		);
+		if (check !== latestConnectionCheck) return null;
+		store.setConnectionError(error instanceof Error ? error.message : null);
 		return null;
 	}
 }

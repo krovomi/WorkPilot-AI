@@ -1,4 +1,5 @@
 import type { Incident } from "@shared/types/self-healing";
+import type React from "react";
 import {
 	AlertTriangle,
 	CheckCircle2,
@@ -13,6 +14,7 @@ import {
 	XCircle,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { webLink } from "@shared/utils/web-link";
 import { formatAppDateTime } from "@/lib/date-format";
 import { CharterButton, Chip, Chips, Panel, type Tone } from "../charter";
 
@@ -21,6 +23,8 @@ interface IncidentCardProps {
 	readonly onTriggerFix?: (id: string) => void;
 	readonly onDismiss?: (id: string) => void;
 	readonly onRetry?: (id: string) => void;
+	/** What a mode adds under the incident: its group, its bisect. */
+	readonly children?: React.ReactNode;
 }
 
 const SEVERITY_TONE: Record<string, Tone> = {
@@ -43,11 +47,12 @@ const STATUS_ICON: Record<string, LucideIcon> = {
 };
 
 /** One incident: severity rail, what broke, the files it touches, its actions. */
-export function IncidentCard({ incident, onTriggerFix, onDismiss, onRetry }: IncidentCardProps) {
+export function IncidentCard({ incident, onTriggerFix, onDismiss, onRetry, children }: IncidentCardProps) {
 	const { t } = useTranslation(["selfHealing", "common"]);
 	const isActionable = ["pending", "failed", "escalated"].includes(incident.status);
 	const tone = SEVERITY_TONE[incident.severity] ?? "muted";
 	const StatusIcon = STATUS_ICON[incident.status] ?? CircleDashed;
+	const prLink = webLink(incident.fix_pr_url);
 
 	return (
 		<Panel rail tone={tone}>
@@ -81,9 +86,12 @@ export function IncidentCard({ incident, onTriggerFix, onDismiss, onRetry }: Inc
 							</Chips>
 						</div>
 					)}
-					{incident.fix_pr_url && (
+					{incident.fix_card && (
+						<p className="wp-meta mt-1">{t("selfHealing:fixCard", { card: incident.fix_card })}</p>
+					)}
+					{prLink && (
 						<a
-							href={incident.fix_pr_url}
+							href={prLink}
 							className="mt-1 inline-block text-xs text-primary hover:underline"
 							target="_blank"
 							rel="noopener noreferrer"
@@ -95,7 +103,7 @@ export function IncidentCard({ incident, onTriggerFix, onDismiss, onRetry }: Inc
 
 				{isActionable && (
 					<div className="flex flex-col gap-1">
-						{incident.status === "pending" && onTriggerFix && (
+						{(incident.status === "pending" || incident.status === "escalated") && onTriggerFix && (
 							<CharterButton size="sm" icon={Wrench} onClick={() => onTriggerFix(incident.id)}>
 								{t("selfHealing:fix")}
 							</CharterButton>
@@ -113,6 +121,7 @@ export function IncidentCard({ incident, onTriggerFix, onDismiss, onRetry }: Inc
 					</div>
 				)}
 			</div>
+			{children}
 			<div className="wp-meta mt-2">{formatAppDateTime(incident.created_at)}</div>
 		</Panel>
 	);

@@ -1,3 +1,4 @@
+import { ciPipelineService } from "../ci-pipeline-service";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import type { BrowserWindow } from "electron";
@@ -26,6 +27,7 @@ import type {
 } from "../agent";
 import type { TaskEventPayload } from "../agent/task-event-schema";
 import { getClaudeProfileManager } from "../claude-profile-manager";
+import { announceBackendPause } from "../backend-pause-notify";
 import { fileWatcher } from "../file-watcher";
 import { taskStateManager } from "../task-state-manager";
 import { titleGenerator } from "../title-generator";
@@ -47,6 +49,7 @@ import {
 	handlePermissionTaskEvent,
 } from "./task-permission-handlers";
 import { safeSendToRenderer } from "./utils";
+import { registerProviderFailover } from "../provider-failover/provider-failover";
 
 /**
  * Validate that an implementation plan has proper structure with phases and subtasks
@@ -296,6 +299,8 @@ export function registerAgenteventsHandlers(
 	getMainWindow: () => BrowserWindow | null,
 ): void {
 	taskStateManager.configure(getMainWindow);
+	// A task stopped on a limit moves to the next account of the failover chain.
+	registerProviderFailover(agentManager);
 
 	// Track task IDs that have hit rate limits to prevent them from being
 	// incorrectly moved to human_review when the process exits non-zero.
@@ -445,6 +450,17 @@ export function registerAgenteventsHandlers(
 				rateLimitedTaskIds.delete(taskId);
 			} else if (!isPaused) {
 				taskStateManager.handleProcessExited(taskId, code, exitTask, exitProject);
+				// A suite the build sent to the forge's CI: push the branch.
+				if (code === 0 && exitTask && exitProject) {
+					void ciPipelineService.startCiSuite(exitProject, exitTask);
+				}
+			} else if (exitTask && exitProject) {
+				// The backend pauses a task itself: its cost budget, or the circuit breaker.
+				announceBackendPause(
+					exitProject.id,
+					path.dirname(getPlanPath(exitProject, exitTask)),
+					exitTask.title,
+				);
 			}
 
 			// Send final plan state to renderer BEFORE unwatching

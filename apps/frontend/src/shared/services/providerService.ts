@@ -7,6 +7,7 @@
  */
 
 import { providerRegistry } from "./providerRegistry";
+import { gatewayMap } from "../constants/gateway-providers";
 
 export interface Provider {
 	name: string;
@@ -117,6 +118,7 @@ class ProviderServiceClass {
 			mistral: "globalMistralApiKey",
 			deepseek: "globalDeepSeekApiKey",
 			grok: "globalGrokApiKey",
+			...gatewayMap((gateway) => gateway.settingsKey),
 			aws: "globalAWSApiKey",
 			ollama: null,
 			copilot: null,

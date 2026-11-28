@@ -38,7 +38,26 @@ _SUMMARY_CHARS = 200
 
 
 def _dir(project: Path) -> Path:
-    return Path(project) / ".workpilot"
+    """The project's own ``.workpilot`` folder; a link or a folder elsewhere is refused."""
+    root = Path(project).resolve()
+    directory = Path(project) / ".workpilot"
+    if directory.is_symlink() or not directory.resolve().is_relative_to(root):
+        raise OSError(f"{directory} is not a folder of the project")
+    return directory
+
+
+def _plain_file(path: Path) -> Path:
+    """``path`` itself, never what a link there points to."""
+    if path.is_symlink():
+        raise OSError(f"{path} is a link")
+    return path
+
+
+def _append(path: Path, line: str) -> None:
+    flags = os.O_WRONLY | os.O_APPEND | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0)
+    fd = os.open(_plain_file(path), flags, 0o600)
+    with os.fdopen(fd, "a", encoding="utf-8") as handle:
+        handle.write(line)
 
 
 def _now() -> datetime:
@@ -115,13 +134,12 @@ def record(
         "task": _task_of(root),
         "message": _redact(decision.message)[:1000],
     }
-    path = _dir(project) / LOG_NAME
     try:
+        path = _dir(project) / LOG_NAME
         path.parent.mkdir(parents=True, exist_ok=True)
         if outcome == "pending" and _pending_exists(path, event):
             return
-        with path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(event, ensure_ascii=False) + "\n")
+        _append(path, json.dumps(event, ensure_ascii=False) + "\n")
         _trim(path)
     except OSError:
         return
@@ -143,7 +161,7 @@ def _pending_exists(path: Path, event: dict[str, Any]) -> bool:
 
 def _tail(path: Path, count: int) -> list[dict[str, Any]]:
     try:
-        lines = path.read_text(encoding="utf-8").splitlines()[-count:]
+        lines = _plain_file(path).read_text(encoding="utf-8").splitlines()[-count:]
     except OSError:
         return []
     events = []
@@ -177,8 +195,8 @@ def _atomic_write(path: Path, text: str) -> None:
 
 
 def _load_approvals(project: Path) -> list[dict[str, Any]]:
-    path = _dir(project) / APPROVALS_NAME
     try:
+        path = _plain_file(_dir(project) / APPROVALS_NAME)
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return []
@@ -215,8 +233,9 @@ def _alive(approval: dict[str, Any]) -> bool:
 
 def consume_approval(
     project: Path, decision: GuardrailDecision, target: dict[str, str]
-) -> bool:
-    """Whether the person approved this call; an approval is used once."""
+) -> dict[str, Any] | None:
+    """The person's approval of this call, marked used (it lets one call
+    through), or ``None`` when there is none."""
     approvals = _load_approvals(project)
     wanted = {r.id for r in decision.triggered if r.action.value == "require_approval"}
     for approval in approvals:
@@ -234,15 +253,26 @@ def consume_approval(
         try:
             _save_approvals(project, approvals)
         except OSError:
-            return False  # an approval that cannot be marked used is not used
-        return True
-    return False
+            return None  # an approval that cannot be marked used is not used
+        return approval
+    return None
 
 
 def answer(
-    project: Path, request_id: str, approved: bool, by: str = "user"
+    project: Path,
+    request_id: str,
+    approved: bool,
+    by: str = "user",
+    *,
+    by_id: str | None = None,
+    roles: list[str] | None = None,
 ) -> dict[str, Any] | None:
-    """The person's answer to a pending request; ``None`` if there is no such request."""
+    """The person's answer to a pending request; ``None`` if there is no such request.
+
+    On the desktop ``by`` is the local user's word, not a verified identity.
+    A server passes the account that answered (``by_id``) and the roles it
+    held then, which is what makes the approver a named, checked person.
+    """
     request = next(
         (
             e
@@ -263,6 +293,9 @@ def answer(
         "target": request.get("target", {}).get("key"),
         "summary": request.get("target", {}).get("summary"),
         "by": by,
+        "byId": by_id,
+        "roles": list(roles or []),
+        "verified": by_id is not None,
         "at": _now().isoformat(),
         "expires_at": (_now() + APPROVAL_TTL).isoformat(),
         "used_at": None,
@@ -270,6 +303,16 @@ def answer(
     approvals = [a for a in approvals if a.get("request") != request_id] + [entry]
     _save_approvals(project, approvals)
     return entry
+
+
+def pending(project: Path) -> list[dict[str, Any]]:
+    """The requests still waiting for an answer, newest first (at most 50)."""
+    return activity(project, limit=0)["pending"]
+
+
+def find_pending(project: Path, request_id: str) -> dict[str, Any] | None:
+    """One request still waiting for an answer, or ``None``."""
+    return next((e for e in pending(project) if e.get("id") == request_id), None)
 
 
 def activity(project: Path, limit: int = 100) -> dict[str, Any]:

@@ -8,6 +8,7 @@ Une ligne par fichier et par dossier de `scripts/`, et rien d'autre :
 
 | Script | Rôle | Appelé par |
 |---|---|---|
+| `dev.mjs` | `pnpm run dev` : lance le backend et l'app côte à côte, sur un même port choisi avant (`BACKEND_PORT`, sinon 9000 ou le suivant libre). | `pnpm run dev` |
 | `install-backend.js` | Crée le venv du backend et installe ses dépendances. | `pnpm run install:backend` |
 | `test-backend.js` | Lance pytest avec le Python du venv. | `pnpm run test:backend` |
 | `pre-push.js` | Rejoue les contrôles essentiels de la CI avant un push (lint par défaut, `--full` pour les tests). | `.husky/pre-push`, `pnpm run test:all` |
@@ -16,6 +17,7 @@ Une ligne par fichier et par dossier de `scripts/`, et rien d'autre :
 | `check_encoding.py` | Signale une ouverture de fichier sans `encoding="utf-8"`. | `tests/test_text_io_encoding.py`, à la main |
 | `validate-npm-scripts.js` | Vérifie que chaque script npm pointe vers un fichier qui existe. | `pnpm run validate:npm-scripts`, CI |
 | `fix-electron.js` | Répare le binaire Electron sous Windows. | `pnpm run fix:electron`, `beta-release.yml` |
+| `dev.mjs` | Choisit le port du backend (9000, `BACKEND_PORT`, ou le port libre suivant) puis lance le backend et l'app côte à côte. | `pnpm run dev` |
 | `sync-backend-port-to-frontend-env.cjs` | Recopie le port du backend dans le `.env` du frontend. | `dev:vite` et `build` du frontend |
 | `kill_port_8765.py`, `kill_port_8765.sh`, `kill_port_8765.bat` | Libèrent le port du WebSocket (8765) quand un ancien backend le tient. | à la main |
 
@@ -45,6 +47,8 @@ Une ligne par fichier et par dossier de `scripts/`, et rien d'autre :
 | `validate-release.js` | Vérifie qu'une release est cohérente avant publication. | `bump-version.js` |
 | `mobile_device_check.py` | Installe une app mobile sur un appareil réel et rend compte. | `mobile-device-check.yml`, à la main |
 | `stack_autopilot.py` | Fusionne les PR inscrites vers `develop` dans l'ordre de leur pile : merge de `develop`, conflits résolus (Claude Code), fusion quand tous les checks sont verts. | `stack-autopilot.yml` ; `--dry-run` à la main |
+| `release_autopilot.py` | Publie `develop` sur `main` en nouvelle version : niveau majeur/mineur/patch tiré des PR fusionnées, `release/vX.Y.Z` (version, changelog, documentation), fusion par commit de merge quand tout est vert, puis `main` dans `develop`. Au plus une version par jour, après 2 h sans fusion. | `release-autopilot.yml` ; `--dry-run`, `--now` à la main |
+| `release_docs.py` | Fait écrire par Claude Code la documentation d'une version sur sa branche (README EN/FR, `docs/`, titre et intro du changelog, patch du wiki), tenue à ces fichiers. | `release_autopilot.py` |
 
 ## Fusion intelligente des worktrees
 
@@ -63,6 +67,8 @@ Une ligne par fichier et par dossier de `scripts/`, et rien d'autre :
 | Script | Rôle | Appelé par |
 |---|---|---|
 | `quality_cli.py` | Lance le Quality Scorer de la revue de code sur des fichiers. | `quality-handlers.ts` (main) |
+| `docs_index.py` | L'index de `docs/architecture/`, lu dans le frontmatter (`feature`, `summary`) de chaque fichier : toute la table, les lignes qui contiennent des mots (`docs_index.py sandbox mcp`) ou la vérification (`--check`). | `tests/test_docs_context.py`, `scripts/wiki/update_narrative.py` ; à la main pour trouver une conception |
 | `audit_findings.py` | Écrit la carte `F<n>.js` de chaque constat `docs/audit/findings/F<n>.md` (`build`) ou vérifie qu'elles sont à jour (`check`). | `pre-push.js`, `tests/test_audit_findings.py` ; `build` à la main après un constat |
 | `quality_baselines.py` | Plafonds par fichier des `except` aveugles (backend), des `biome-ignore` (frontend) et de la taille des fichiers de plus de 2 000 lignes dans `tests/baselines/` : `check`, et `update` qui ne fait que les baisser. | `pre-push.js`, `tests/test_quality_baselines.py` ; `update` à la main après une correction |
+| `diff_coverage.py` | Chaque ligne qu'une PR ajoute ou modifie, et chaque branche qui y commence, est lancée par un test : lit le diff (`--base`) et un rapport Cobertura (`--cobertura`) ou Istanbul (`--istanbul`), une annotation par trou. | `ci.yml` (`coverage-python`, `test-frontend` sous Linux), `mobile.yml`, `tests/test_diff_coverage.py` ; à la main après la suite avec couverture |
 | `audit-large-files.js` | Liste les fichiers source de plus de 500 lignes. | à la main |

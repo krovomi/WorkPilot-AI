@@ -38,6 +38,7 @@ try:
         ReviewSeverity,
         StructuralIssue,
         TriageResult,
+        verdict_to_github_status,
     )
     from .permissions import GitHubPermissionChecker
     from .rate_limiter import RateLimiter
@@ -53,15 +54,8 @@ try:
     )
     from .services.io_utils import safe_print
 except (ImportError, ValueError, SystemError):
-    # When imported directly (runner.py adds github dir to path)
-    import sys
-    from pathlib import Path
-
-    # Add parent directory to path for absolute imports
-    parent_dir = Path(__file__).parent.parent
-    if str(parent_dir) not in sys.path:
-        sys.path.insert(0, str(parent_dir))
-
+    # When imported directly (runner.py puts apps/backend and the github dir
+    # on sys.path), the package is still reachable from the backend root.
     from runners.github.bot_detection import BotDetector
     from runners.github.context_gatherer import PRContext, PRContextGatherer
     from runners.github.gh_client import GHClient
@@ -80,6 +74,7 @@ except (ImportError, ValueError, SystemError):
         ReviewSeverity,
         StructuralIssue,
         TriageResult,
+        verdict_to_github_status,
     )
     from runners.github.permissions import GitHubPermissionChecker
     from runners.github.rate_limiter import RateLimiter
@@ -237,14 +232,6 @@ class GitHubOrchestrator:
     # GitHub API Helpers
     # =========================================================================
 
-    async def _fetch_pr_data(self, pr_number: int) -> dict:
-        """Fetch PR data from GitHub API via gh CLI."""
-        return await self.gh_client.pr_get(pr_number)
-
-    async def _fetch_pr_diff(self, pr_number: int) -> str:
-        """Fetch PR diff from GitHub."""
-        return await self.gh_client.pr_diff(pr_number)
-
     async def _fetch_issue_data(self, issue_number: int) -> dict:
         """Fetch issue data from GitHub API via gh CLI."""
         return await self.gh_client.issue_get(issue_number)
@@ -265,10 +252,6 @@ class GitHubOrchestrator:
             body=body,
             event=event.lower(),
         )
-
-    async def _post_issue_comment(self, issue_number: int, body: str) -> None:
-        """Post a comment to an issue."""
-        await self.gh_client.issue_comment(issue_number, body)
 
     async def _add_issue_labels(self, issue_number: int, labels: list[str]) -> None:
         """Add labels to an issue."""
@@ -291,11 +274,18 @@ class GitHubOrchestrator:
                 continue
 
             try:
-                # Post as inline comment reply
-                await self.gh_client.pr_comment_reply(
-                    pr_number=pr_number,
-                    comment_id=triage.comment_id,
-                    body=triage.response_comment,
+                # Post as a reply in the comment's thread. `-f` sends the body
+                # as a literal string field (no `@file` reading).
+                repo = self.config.repo or "{owner}/{repo}"
+                await self.gh_client.run(
+                    [
+                        "api",
+                        "--method",
+                        "POST",
+                        f"repos/{repo}/pulls/{pr_number}/comments/{triage.comment_id}/replies",
+                        "-f",
+                        f"body={triage.response_comment}",
+                    ]
                 )
                 safe_print(
                     f"[AI TRIAGE] Posted reply to {triage.tool_name} comment {triage.comment_id}",
@@ -481,6 +471,29 @@ class GitHubOrchestrator:
                 flush=True,
             )
 
+            # The review reads its findings again: a remark made twice at one
+            # place is one finding, at its most severe (#361).
+            from runners.github.services import self_critique
+            from runners.github.services.learned_suppression import (
+                apply_learned_suppressions,
+            )
+
+            findings, merged_findings = self_critique.merge_redundant(findings)
+            # Then two remarks asking for opposite changes keep the stronger;
+            # importing core installs the agent runtime the check asks.
+            import core.agent_runtime  # noqa: F401
+            from runners.github.services import contradiction_check
+
+            findings, contradicted = await contradiction_check.drop_contradictions(
+                findings
+            )
+
+            # What this project rejected often enough is downgraded or dropped
+            # here, after the review, so it holds on every provider (#361).
+            findings, learned_suppressions = apply_learned_suppressions(
+                self.project_dir, findings
+            )
+
             self._report_progress(
                 "generating",
                 70,
@@ -532,14 +545,7 @@ class GitHubOrchestrator:
             )
 
             # Map verdict to overall_status for backward compatibility
-            if verdict == MergeVerdict.BLOCKED:
-                overall_status = "request_changes"
-            elif verdict == MergeVerdict.NEEDS_REVISION:
-                overall_status = "request_changes"
-            elif verdict == MergeVerdict.MERGE_WITH_CHANGES:
-                overall_status = "comment"
-            else:
-                overall_status = "approve"
+            overall_status = verdict_to_github_status(verdict)
 
             # Generate summary
             summary = self._generate_enhanced_summary(
@@ -551,7 +557,8 @@ class GitHubOrchestrator:
                 ai_triages=ai_triages,
                 risk_assessment=risk_assessment,
                 ci_status=ci_status,
-            )
+            ) + self_critique.summary_note(merged_findings)
+            summary += contradiction_check.summary_note(contradicted)
 
             # Get HEAD SHA for follow-up review tracking
             head_sha = self.bot_detector.get_last_commit_sha(pr_context.commits)
@@ -596,6 +603,7 @@ class GitHubOrchestrator:
                 # Track file blobs for rebase-resistant follow-up reviews
                 reviewed_file_blobs=file_blobs,
                 deep_context=pr_context.deep_context,
+                learned_suppressions=learned_suppressions,
             )
 
             # Post review if configured
@@ -638,9 +646,13 @@ class GitHubOrchestrator:
                     flush=True,
                 )
 
-            # Mark as reviewed (head_sha already fetched above)
+            # Mark as reviewed (head_sha already fetched above); without a
+            # commit to record, still end the in-progress mark, or the next
+            # review is refused as "already in progress".
             if head_sha:
                 self.bot_detector.mark_reviewed(pr_number, head_sha)
+            else:
+                self.bot_detector.mark_review_finished(pr_number, success=True)
 
             # What hermes learned meanwhile, filed for review. Never changes
             # the verdict above, which is saved and possibly posted already.
@@ -744,6 +756,7 @@ class GitHubOrchestrator:
                 self.project_dir,
                 pr_number,
                 previous_review,
+                repo=self.config.repo,
             )
             followup_context = await gatherer.gather()
 
@@ -907,21 +920,14 @@ class GitHubOrchestrator:
                         if blocker_msg not in blockers:
                             blockers.append(blocker_msg)
 
-                # Add back workflows pending if any
+                # Add back workflows pending if any (filtered out just above)
                 if current_awaiting > 0:
-                    blocker_msg = f"Workflows Pending: {current_awaiting} workflow(s) awaiting maintainer approval"
-                    if blocker_msg not in blockers:
-                        blockers.append(blocker_msg)
+                    blockers.append(
+                        f"Workflows Pending: {current_awaiting} workflow(s) awaiting maintainer approval"
+                    )
 
                 # Map verdict to overall_status (consistent with rest of codebase)
-                if updated_verdict == MergeVerdict.BLOCKED:
-                    overall_status = "request_changes"
-                elif updated_verdict == MergeVerdict.NEEDS_REVISION:
-                    overall_status = "request_changes"
-                elif updated_verdict == MergeVerdict.MERGE_WITH_CHANGES:
-                    overall_status = "comment"
-                else:
-                    overall_status = "approve"
+                overall_status = verdict_to_github_status(updated_verdict)
 
                 result = PRReviewResult(
                     pr_number=pr_number,
@@ -937,6 +943,26 @@ class GitHubOrchestrator:
                     is_followup_review=True,
                     unresolved_findings=[f.id for f in previous_review.findings],
                     blockers=blockers,
+                    learned_suppressions=list(previous_review.learned_suppressions),
+                )
+                # Feedback given since the review counts, as in a follow-up
+                # with new commits (#361).
+                from runners.github.services.learned_suppression import (
+                    apply_to_followup,
+                )
+
+                apply_to_followup(
+                    self.project_dir,
+                    result,
+                    lambda remaining: self._generate_verdict(
+                        remaining,
+                        [],
+                        [],
+                        ci_status,
+                        has_merge_conflicts=followup_context.has_merge_conflicts,
+                        merge_state_status=followup_context.merge_state_status,
+                    ),
+                    ci_status,
                 )
                 await result.save(self.github_dir)
                 return result
@@ -1016,6 +1042,35 @@ class GitHubOrchestrator:
                 result = await reviewer.review_followup(followup_context)
                 result.jev = jev_observation
 
+            # The self-check and what this project rejected often enough, as
+            # in the initial review; the verdict is then recomputed with the
+            # initial review's rule on the findings that remain (#361).
+            from runners.github.services import self_critique
+            from runners.github.services.learned_suppression import (
+                apply_to_followup,
+            )
+
+            self_critique.apply_to_followup(result)
+            import core.agent_runtime  # noqa: F401 - the runtime the check asks
+            from runners.github.services import contradiction_check
+
+            await contradiction_check.apply_to_followup(result)
+
+            followup_ci = followup_context.ci_status or {}
+            apply_to_followup(
+                self.project_dir,
+                result,
+                lambda remaining: self._generate_verdict(
+                    remaining,
+                    [],
+                    [],
+                    followup_ci,
+                    has_merge_conflicts=followup_context.has_merge_conflicts,
+                    merge_state_status=followup_context.merge_state_status,
+                ),
+                followup_ci,
+            )
+
             # Fallback: ensure CI failures block merge even if AI didn't factor it in
             # (CI status was already passed to AI via followup_context.ci_status)
             failed_checks = followup_context.ci_status.get("failed_checks", [])
@@ -1079,6 +1134,11 @@ class GitHubOrchestrator:
             )
             await result.save(self.github_dir)
             return result
+        finally:
+            # Every way out ends the in-progress mark set above (a no-op once
+            # mark_reviewed or the error path cleared it), or the next review
+            # of this PR is refused as "already in progress".
+            self.bot_detector.mark_review_finished(pr_number)
 
     def _generate_verdict(
         self,
@@ -1442,18 +1502,22 @@ class GitHubOrchestrator:
         blocking_findings = [
             f for f in findings if f.severity.value in ("critical", "high", "medium")
         ]
+        # By the prefix `_generate_verdict` writes: a finding or a structural
+        # issue whose title mentions "CI" or "merge conflict" is still code.
         code_blockers = [
-            b for b in blockers if "CI" not in b and "Merge Conflict" not in b
+            b for b in blockers if not b.startswith(("CI Failed:", "Merge Conflicts:"))
         ]
-        has_merge_conflicts = any("Merge Conflict" in b for b in blockers)
+        has_merge_conflicts = any(b.startswith("Merge Conflicts:") for b in blockers)
 
         # Determine the bottom line based on verdict and context
         if verdict == MergeVerdict.READY_TO_MERGE:
+            if pending_ci > 0:
+                return f"**⏳ Ready once CI passes** - {pending_ci} check(s) pending, no blocking code issues."
             return (
                 "**✅ Ready to merge** - All checks passing, no blocking issues found."
             )
 
-        elif verdict == MergeVerdict.BLOCKED:
+        if verdict == MergeVerdict.BLOCKED:
             if has_merge_conflicts:
                 return "**🔴 Blocked** - Merge conflicts must be resolved before merge."
             elif failing_ci > 0:
@@ -1465,28 +1529,11 @@ class GitHubOrchestrator:
             else:
                 return "**🔴 Blocked** - Critical issues must be resolved before merge."
 
-        elif verdict == MergeVerdict.NEEDS_REVISION:
-            # Key insight: distinguish "waiting on CI" from "needs code fixes"
-            # Check code issues FIRST before checking pending CI
-            if blocking_findings:
-                return f"**🟠 Needs revision** - {len(blocking_findings)} issue(s) require attention."
-            elif code_blockers:
-                return f"**🟠 Needs revision** - {len(code_blockers)} structural/other issue(s) require attention."
-            elif pending_ci > 0:
-                # Only show "Ready once CI passes" when no code issues exist
-                return f"**⏳ Ready once CI passes** - {pending_ci} check(s) pending, no blocking code issues."
-            else:
-                return "**🟠 Needs revision** - See details below."
-
-        elif verdict == MergeVerdict.MERGE_WITH_CHANGES:
-            if pending_ci > 0:
-                return (
-                    "**🟡 Can merge once CI passes** - Minor suggestions, no blockers."
-                )
-            else:
-                return "**🟡 Can merge** - Minor suggestions noted, no blockers."
-
-        return "**📝 Review complete** - See details below."
+        # NEEDS_REVISION, the one other verdict `_generate_verdict` gives: it
+        # comes from code findings or from blockers that are not CI ones.
+        if blocking_findings:
+            return f"**🟠 Needs revision** - {len(blocking_findings)} issue(s) require attention."
+        return f"**🟠 Needs revision** - {len(code_blockers)} structural/other issue(s) require attention."
 
     def _format_review_body(self, result: PRReviewResult) -> str:
         """Format the review body for posting to GitHub."""

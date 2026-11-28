@@ -11,6 +11,7 @@ import {
 import { ensureOllamaReady } from "../services/ollama-portable";
 import { projectStore } from "../project-store";
 import { readSettingsFile } from "../settings-utils";
+import { swarmEnv } from "../../shared/utils/swarm-settings";
 import type { EnginePhase } from "../../shared/utils/task-engine";
 import { AgentEvents } from "./agent-events";
 import { AgentProcessManager } from "./agent-process";
@@ -18,11 +19,13 @@ import { AgentQueueManager } from "./agent-queue";
 import { buildSpecModelArgs } from "./spec-launch-config";
 import {
 	planTaskProviders,
+	taskAccountPins,
 	readTaskMetadataFor,
 	taskEngineFromMetadata,
 	type TaskProviderPlan,
 } from "./task-provider-env";
 import { AgentState } from "./agent-state";
+import { ClaudeSwapPins } from "./claude-swap-pins";
 import { applyMobileTargets, applyTddOverride, applyVerifyLoop } from "./env-utils";
 import type {
 	RoadmapConfig,
@@ -35,6 +38,8 @@ import type {
  * This is a slim facade that delegates to focused modules
  */
 export class AgentManager extends EventEmitter {
+	/** The Claude profile an auto-swap moved a pinned task to (claude-swap-pins.ts). */
+	private readonly claudeSwaps = new ClaudeSwapPins();
 	private state: AgentState;
 	private events: AgentEvents;
 	private processManager: AgentProcessManager;
@@ -81,6 +86,7 @@ export class AgentManager extends EventEmitter {
 	private taskProviderPlan(
 		location: { projectPath: string; specId?: string; specDir?: string },
 		startPhase: EnginePhase,
+		taskId?: string,
 	): TaskProviderPlan | undefined {
 		const metadata = readTaskMetadataFor(location);
 		if (!metadata) return undefined;
@@ -91,6 +97,8 @@ export class AgentManager extends EventEmitter {
 			taskEngineFromMetadata(metadata, undefined, project?.settings?.provider),
 			startPhase,
 		);
+		// The accounts the card (else its project) pins, per provider.
+		plan.accounts = this.claudeSwaps.apply(taskId, taskAccountPins(metadata, project?.settings));
 		// The cross review opens a session on its own provider: its
 		// credentials go to the build too. Claude's are not added here; they
 		// follow the task's own OAuth chain, as `buildTaskProviderEnv` says.
@@ -299,6 +307,7 @@ export class AgentManager extends EventEmitter {
 		const providerPlan = this.taskProviderPlan(
 			{ projectPath, specDir },
 			"spec",
+			taskId,
 		);
 		if (
 			this.requiresClaudeAuth(providerPlan) &&
@@ -456,6 +465,7 @@ export class AgentManager extends EventEmitter {
 		const providerPlan = this.taskProviderPlan(
 			{ projectPath, specId },
 			"coding",
+			taskId,
 		);
 		if (
 			this.requiresClaudeAuth(providerPlan) &&
@@ -568,12 +578,15 @@ export class AgentManager extends EventEmitter {
 		// Inject the Claude SDK resume session_id into the subprocess env.
 		// The Python side reads AUTO_CLAUDE_RESUME_SESSION_ID inside create_client()
 		// (apps/backend/core/client.py) and passes it to ClaudeAgentOptions(resume=...).
-		const spawnEnv = options.resumeSessionId
-			? {
-					...combinedEnv,
-					AUTO_CLAUDE_RESUME_SESSION_ID: options.resumeSessionId,
-				}
-			: combinedEnv;
+		// Swarm Mode, when the person turned it on: the build runs the subtasks
+		// its plan lets run side by side in parallel (agents/swarm/build_phase.py).
+		const spawnEnv = {
+			...combinedEnv,
+			...swarmEnv(readSettingsFile()?.swarm),
+			...(options.resumeSessionId && {
+				AUTO_CLAUDE_RESUME_SESSION_ID: options.resumeSessionId,
+			}),
+		};
 
 		// Auto-start the local Ollama server if that's the active provider.
 		await this.ensureLocalServerIfNeeded(undefined, providerPlan);
@@ -641,7 +654,7 @@ export class AgentManager extends EventEmitter {
 		];
 
 		// Auto-start the local Ollama server if that's the active provider.
-		const providerPlan = this.taskProviderPlan({ projectPath, specId }, "qa");
+		const providerPlan = this.taskProviderPlan({ projectPath, specId }, "qa", taskId);
 		await this.ensureLocalServerIfNeeded(undefined, providerPlan);
 
 		await this.processManager.spawnProcess(
@@ -858,6 +871,8 @@ export class AgentManager extends EventEmitter {
 			if (currentActiveId !== newProfileId) {
 				profileManager.setActiveProfile(newProfileId);
 			}
+			// A task pinned on a Claude profile restarts on the new one too.
+			this.claudeSwaps.remember(taskId, newProfileId);
 		}
 		this.killTask(taskId);
 		setTimeout(() => {

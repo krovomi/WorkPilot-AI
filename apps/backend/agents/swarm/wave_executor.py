@@ -20,7 +20,9 @@ import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
+
+from security.constants import PROJECT_DIR_ENV_VAR
 
 from .types import SubtaskNode, SubtaskState, SwarmConfig, Wave
 
@@ -28,6 +30,9 @@ logger = logging.getLogger(__name__)
 
 # Marker for swarm-specific events emitted to stdout
 SWARM_EVENT_PREFIX = "__SWARM_EVENT__:"
+
+# Bytes read from a subtask's pipe at a time.
+_READ_CHUNK = 64 * 1024
 
 
 @dataclass
@@ -58,6 +63,47 @@ def emit_swarm_event(event_type: str, payload: dict[str, Any] | None = None) -> 
         print(f"{SWARM_EVENT_PREFIX}{json.dumps(event, default=str)}", flush=True)
     except (OSError, UnicodeEncodeError):
         pass
+
+
+async def _read_lines(stream: asyncio.StreamReader):
+    """Yield the lines of ``stream``, however long each one is.
+
+    ``StreamReader``'s own line iteration raises once a line outgrows its
+    64KB buffer, which a subtask's JSON event or minified output can do.
+    """
+    pending = b""
+    while chunk := await stream.read(_READ_CHUNK):
+        pending += chunk
+        *lines, pending = pending.split(b"\n")
+        for line in lines:
+            yield line
+    if pending:
+        yield pending
+
+
+# A subtask's phase and task events, as its process prints them.
+_MARKERS = {"__EXEC_PHASE__:": "phase", "__TASK_EVENT__:": "task"}
+
+
+def _forward_marker(subtask_id: str, line: str) -> None:
+    """Pass a subtask's phase or task event on as a swarm event.
+
+    The marker is left out: the app reads ``__TASK_EVENT__:`` anywhere in a
+    line of the build's output, and a subtask's own events (its
+    ``ALL_SUBTASKS_DONE``, its failure) are not the task's.
+    """
+    for marker, kind in _MARKERS.items():
+        at = line.find(marker)
+        if at >= 0:
+            emit_swarm_event(
+                "subtask_log",
+                {
+                    "subtask_id": subtask_id,
+                    "kind": kind,
+                    "data": line[at + len(marker) :],
+                },
+            )
+            return
 
 
 class WaveExecutor:
@@ -147,7 +193,7 @@ class WaveExecutor:
 
         # Collect results — pair each result with its scheduled subtask_id so
         # retry logic in `_retry_failed_subtasks` can locate the failed node
-        # via `nodes.get(sr.subtask_id)` instead of silently dropping.
+        # via `nodes[sr.subtask_id]` instead of silently dropping.
         wave_result = WaveResult(wave_index=wave.index)
         for subtask_id, result in zip(scheduled_ids, results, strict=True):
             if isinstance(result, Exception):
@@ -258,10 +304,13 @@ class WaveExecutor:
         Spawn a Python subprocess to execute the subtask.
 
         The subprocess runs `run.py --spec {spec_id} --subtask {subtask_id}`
-        which scopes the coder agent to a single subtask within the spec.
+        (``cli/subtask_command.py``), which keeps the coder on that one
+        subtask, in the subtask's own worktree when the orchestrator gave it
+        one.
         """
         spec_name = self.spec_dir.name
         subtask_id = node.id
+        workdir = node.worktree_path or self.project_dir
 
         # Build command
         run_script = Path(self.source_path) / "run.py"
@@ -270,6 +319,8 @@ class WaveExecutor:
             str(run_script),
             "--spec",
             spec_name,
+            "--project-dir",
+            str(workdir),
             "--subtask",
             subtask_id,
         ]
@@ -279,6 +330,9 @@ class WaveExecutor:
         env["SWARM_MODE"] = "1"
         env["SWARM_SUBTASK_ID"] = subtask_id
         env["SWARM_WAVE_INDEX"] = str(node.wave_index)
+        # The worker's command and write checks are confined to its worktree,
+        # not to the task's that the parent process holds.
+        env[PROJECT_DIR_ENV_VAR] = str(workdir)
         env["PYTHONPATH"] = self.source_path
 
         start = time.time()
@@ -287,7 +341,7 @@ class WaveExecutor:
                 *args,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
-                cwd=str(self.project_dir),
+                cwd=str(workdir),
                 env=env,
             )
             self._running_processes[subtask_id] = process
@@ -298,37 +352,34 @@ class WaveExecutor:
             # than the OS pipe buffer (~64KB on Linux) to stderr — the kernel
             # blocks the write, the child can't progress, stdout never closes,
             # we wait forever. Spawn a background task that consumes stderr
-            # in parallel.
+            # in parallel, in chunks: a traceback or a progress bar has no
+            # line end to wait for.
             stderr_chunks: list[bytes] = []
 
+            # Both are pipes: create_subprocess_exec was given PIPE for each.
+            stdout = cast(asyncio.StreamReader, process.stdout)
+            stderr = cast(asyncio.StreamReader, process.stderr)
+
             async def _drain_stderr() -> None:
-                if process.stderr is None:
-                    return
-                async for line in process.stderr:
-                    stderr_chunks.append(line)
+                while chunk := await stderr.read(_READ_CHUNK):
+                    stderr_chunks.append(chunk)
 
             stderr_task = asyncio.create_task(_drain_stderr())
 
-            # Stream stdout
-            if process.stdout:
-                async for line_bytes in process.stdout:
+            async def _stream_until_exit() -> None:
+                async for line_bytes in _read_lines(stdout):
                     line = line_bytes.decode("utf-8", errors="replace").rstrip()
                     if on_log:
                         on_log(subtask_id, line)
-                    # Forward phase events with subtask prefix
-                    if "__EXEC_PHASE__:" in line or "__TASK_EVENT__:" in line:
-                        emit_swarm_event(
-                            "subtask_log",
-                            {
-                                "subtask_id": subtask_id,
-                                "line": line,
-                            },
-                        )
+                    _forward_marker(subtask_id, line)
+                await process.wait()
 
-            # Bound the wait so a wedged child cannot stall the entire swarm.
+            # The timeout bounds the whole run, output included: a wedged
+            # child keeps its stdout open, so waiting for the end of the
+            # output first would wait for it forever.
             try:
                 await asyncio.wait_for(
-                    process.wait(), timeout=self.config.subtask_timeout_seconds
+                    _stream_until_exit(), timeout=self.config.subtask_timeout_seconds
                 )
             except TimeoutError:
                 process.kill()
@@ -342,13 +393,20 @@ class WaveExecutor:
             await stderr_task
             duration = time.time() - start
 
-            stderr_output = b"".join(stderr_chunks).decode("utf-8", errors="replace")
+            # One line end on every OS: Windows writes CRLF to a piped stderr.
+            stderr_output = (
+                b"".join(stderr_chunks)
+                .decode("utf-8", errors="replace")
+                .replace("\r\n", "\n")
+            )
 
             success = process.returncode == 0
             error = None
             if not success:
+                # The end of stderr: a traceback ends with its exception, and
+                # the interpreter's own warnings come first.
                 error = (
-                    stderr_output[:500]
+                    stderr_output[-500:]
                     if stderr_output
                     else f"Exit code {process.returncode}"
                 )
@@ -368,6 +426,7 @@ class WaveExecutor:
     async def cancel_all(self) -> None:
         """Kill all running subtask processes."""
         for subtask_id, process in list(self._running_processes.items()):
+            self._running_processes.pop(subtask_id, None)
             try:
                 process.kill()
                 logger.info(
@@ -378,8 +437,13 @@ class WaveExecutor:
         self._running_processes.clear()
 
     async def cancel_subtask(self, subtask_id: str) -> bool:
-        """Kill a specific subtask process."""
-        process = self._running_processes.get(subtask_id)
+        """Kill a specific subtask process.
+
+        Killed once: a second kill of a child that has died but is not yet
+        reaped makes `Popen.poll()` reap it under the event loop, which then
+        reports exit code 255 instead of the kill.
+        """
+        process = self._running_processes.pop(subtask_id, None)
         if process:
             try:
                 process.kill()

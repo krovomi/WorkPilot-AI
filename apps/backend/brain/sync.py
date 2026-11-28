@@ -56,6 +56,7 @@ __all__ = [
     "set_remote",
     "normalize_remote",
     "clone",
+    "ensure_attributes",
     "ensure_ignored",
     "brain_lock",
     "git_available",
@@ -81,6 +82,10 @@ class SyncResult:
     error: str | None = None
     step: str | None = None
     """Where it failed: ``commit``, ``fetch``, ``pull``, ``push`` or ``git``."""
+    received: list[str] = field(default_factory=list)
+    """The notes the pull added or changed: what came from the remote."""
+    memory_conflicts: dict[str, int] = field(default_factory=dict)
+    """What `lifecycle.review_pull` made of them (``checked``, ``auto``, ``queued``)."""
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -115,8 +120,21 @@ def _has_identity(root: Path) -> bool:
     )
 
 
+def _signing_failed(root: Path, stderr: str) -> bool:
+    """A commit refused because the signature it was configured to carry failed."""
+    if "failed to write commit object" not in (stderr or ""):
+        return False
+    return _git(root, "config", "--bool", "commit.gpgsign").stdout.strip() == "true"
+
+
 def _commit(root: Path, message: str, result: SyncResult | None = None) -> bool:
     """Commit everything on disk. A refusal is recorded on *result*.
+
+    The commit is signed when the person's git configuration says so
+    (``commit.gpgsign`` with ``gpg.format`` and ``user.signingkey``), with
+    the key they already sign their code with: nothing here creates a key or
+    turns signing on. A team that lists its trusted signers reads a signed
+    note as verified (`lifecycle.provenance`).
 
     It used to be ignored, and a commit that failed left the working tree
     dirty: the rebase after it refused ("unstaged changes"), the merge
@@ -128,6 +146,15 @@ def _commit(root: Path, message: str, result: SyncResult | None = None) -> bool:
         return False
     ident = [] if _has_identity(root) else _AUTHOR
     done = _git(root, *ident, "commit", "-q", "-m", message)
+    if done.returncode != 0 and _signing_failed(root, done.stderr):
+        # Signing is the person's own git setting, never forced here; a key
+        # it cannot reach (no agent, a removed file) must not stop the
+        # brain. The commit goes unsigned, and a team that lists its
+        # trusted signers sees the note as unverified (`lifecycle.provenance`).
+        logger.warning("brain: commit signing failed; this commit is not signed")
+        done = _git(
+            root, *ident, "-c", "commit.gpgsign=false", "commit", "-q", "-m", message
+        )
     if done.returncode != 0 and result is not None:
         result.step = "commit"
         result.error = (done.stderr or added.stderr).strip()[-500:] or "commit refused"
@@ -148,7 +175,57 @@ _IGNORED = (
     # What docintel read out of the vault's images, by content hash: derived
     # like the graph, and rebuilt on any machine that lacks it.
     ".workpilot-brain/ocr-cache.json",
+    # The memory conflicts waiting for a person on this machine: two machines
+    # flagging the same pair would conflict on the queue itself. The decision
+    # (canonical note, archived variants, journal) is in the vault.
+    ".workpilot-brain/conflicts.json",
+    # How often this machine opened a memory's history (``lifecycle.metrics``):
+    # a per-machine count, rewritten at every reading.
+    ".workpilot-brain/lifecycle-views.json",
+    # Where each project of this machine lives, and which memory conflicts
+    # were announced from here (`lifecycle.announce`), with their lock files:
+    # one machine's folders and claims. The vault's journal says the rest.
+    ".workpilot-brain/projects.json*",
+    ".workpilot-brain/announced.json*",
+    # The vectors a local embeddings model gave this machine's notes
+    # (`lifecycle.embeddings`): a cache, rebuilt by any machine that has one.
+    ".workpilot-brain/embeddings.json",
+    # What git said of each commit's signature (`lifecycle.provenance`), and
+    # the trusted signers in git's ``allowed_signers`` form: derived on each
+    # machine from the vault's list and its history.
+    ".workpilot-brain/signatures.json*",
+    ".workpilot-brain/allowed_signers*",
 )
+
+_ATTRIBUTES = "knowledge/projects/*/memory/.lifecycle/journal/*.md merge=union"
+
+
+def ensure_attributes(root: Path) -> None:
+    """Merge the memory journal by union, in the repository's own attributes.
+
+    Two machines appending to the same month's journal both add at the end:
+    a line merge conflicts every time, and the right answer is always "keep
+    both lines" — git's built-in ``union`` driver. Written to
+    ``.git/info/attributes``, not to a ``.gitattributes`` at the vault's
+    root: an adopted vault sees nothing appear at its root, and every machine
+    that syncs through WorkPilot passes here first.
+    """
+    path = root / ".git" / "info" / "attributes"
+    if not (root / ".git").is_dir():
+        return
+    try:
+        current = path.read_text(encoding="utf-8") if path.is_file() else ""
+        if _ATTRIBUTES in {line.strip() for line in current.splitlines()}:
+            return
+        sep = "" if not current or current.endswith("\n") else "\n"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            f"{current}{sep}# WorkPilot Brain: the memory journal keeps every line\n"
+            f"{_ATTRIBUTES}\n",
+            encoding="utf-8",
+        )
+    except OSError as exc:
+        logger.debug("brain: git attributes not written: %s", exc)
 
 
 def ensure_ignored(root: Path) -> None:
@@ -161,7 +238,9 @@ def ensure_ignored(root: Path) -> None:
     path = root / ".gitignore"
     try:
         current = path.read_text(encoding="utf-8") if path.is_file() else ""
-    except OSError:
+    except OSError as exc:
+        logger.debug("brain: ignore file not read: %s", exc)
+        _exclude_locally(root)
         return
     present = {line.strip() for line in current.splitlines()}
     missing = [line for line in _IGNORED if line not in present]
@@ -169,7 +248,37 @@ def ensure_ignored(root: Path) -> None:
         return
     sep = "" if not current or current.endswith("\n") else "\n"
     block = "# WorkPilot Brain\n" if "# WorkPilot Brain" not in present else ""
-    path.write_text(current + sep + block + "\n".join(missing) + "\n", encoding="utf-8")
+    try:
+        path.write_text(
+            current + sep + block + "\n".join(missing) + "\n", encoding="utf-8"
+        )
+    except OSError as exc:
+        # A read-only share: the brain still opens and syncs, and the lines go
+        # to the repository's own exclude file, so a sync never commits the
+        # machine-local files they keep out.
+        logger.debug("brain: ignore file not written: %s", exc)
+        _exclude_locally(root)
+
+
+def _exclude_locally(root: Path) -> None:
+    """The brain's ignore lines in ``info/exclude``: never committed, always read."""
+    found = _git(root, "rev-parse", "--git-path", "info/exclude")
+    if found.returncode != 0 or not found.stdout.strip():
+        logger.warning("brain: no repository to keep machine-local files out of")
+        return
+    exclude = root / found.stdout.strip()
+    try:
+        current = exclude.read_text(encoding="utf-8") if exclude.is_file() else ""
+        present = {line.strip() for line in current.splitlines()}
+        missing = [line for line in _IGNORED if line not in present]
+        if missing:
+            sep = "" if not current or current.endswith("\n") else "\n"
+            exclude.parent.mkdir(parents=True, exist_ok=True)
+            exclude.write_text(
+                current + sep + "\n".join(missing) + "\n", encoding="utf-8"
+            )
+    except OSError as exc:
+        logger.warning("brain: machine-local files not excluded: %s", exc)
 
 
 def ensure_repo(root: Path) -> bool:
@@ -182,6 +291,7 @@ def ensure_repo(root: Path) -> bool:
             return False
         _git(root, "symbolic-ref", "HEAD", "refs/heads/main")
     ensure_ignored(root)
+    ensure_attributes(root)
     return True
 
 
@@ -357,8 +467,27 @@ def _keep_both(root: Path, their_ref: str) -> list[str]:
     return conflicted
 
 
+def _received(root: Path, before: str | None) -> list[str]:
+    """The notes added or changed since *before*: what the pull brought."""
+    if not before:
+        return []
+    out = _git(
+        root, "diff", "--name-only", "-z", "--diff-filter=AM", before, "HEAD", "--"
+    ).stdout
+    return sorted({rel for rel in out.split("\0") if rel.endswith(".md")})
+
+
 def _pull(root: Path, result: SyncResult) -> str:
     """Bring ``origin`` in; returns the remote branch the push goes to."""
+    head = _git(root, "rev-parse", "--verify", "-q", "HEAD")
+    before = head.stdout.strip() if head.returncode == 0 else None
+    branch = _fetch_and_merge(root, result)
+    if result.pulled:
+        result.received = _received(root, before)
+    return branch
+
+
+def _fetch_and_merge(root: Path, result: SyncResult) -> str:
     fetch = _git(root, "fetch", "-q", "origin")
     if fetch.returncode != 0:
         result.skipped = "offline"

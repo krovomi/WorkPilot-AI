@@ -1,6 +1,6 @@
 # AGENTS.md — index du Kanban
 
-`KanbanBoard.tsx` fait ~3 250 lignes, `KanbanColumn.tsx` ~1 080. **Ne pas les ouvrir en entier.** Ce fichier donne les
+`KanbanBoard.tsx` fait ~3 250 lignes, `KanbanColumn.tsx` ~1 140. **Ne pas les ouvrir en entier.** Ce fichier donne les
 points d'entrée : cibler la ligne, lire 40 lignes autour, éditer.
 
 > Règles du frontend : [`docs/rules/frontend.md`](../../../../../../docs/rules/frontend.md) · Index frontend : [`apps/frontend/AGENTS.md`](../../../../AGENTS.md)
@@ -13,8 +13,17 @@ adresse : confirmer avec `grep -n "<nom>" KanbanBoard.tsx` avant d'éditer.
 | Fichier | Lignes | Rôle |
 |---|---|---|
 | `../KanbanBoard.tsx` | ~3 250 | le tableau : drag-and-drop, sélection en masse, file d'attente, dialogues |
-| `KanbanColumn.tsx` | ~1 080 | une colonne : `DroppableColumn`, `WipLimitPopover`, `SortableColumnWrapper`, comparateurs mémo, `COLUMN_RENDER_CAP` (lot L11) |
+| `KanbanColumn.tsx` | ~1 140 | une colonne : `DroppableColumn`, `WipLimitPopover`, `SortableColumnWrapper`, comparateurs mémo, `COLUMN_RENDER_CAP` (lot L11) |
+| `ColumnBand.tsx` | ~200 | bandeau d'une colonne : icône, compteur, jauge, résumé (`lib/column-pulse.ts`), état vide ([conception](../../../../../../docs/architecture/kanban-columns.md)) |
 | `KanbanToolbar.tsx` | ~400 | barre d'outils au-dessus du tableau |
+| `BoardLanes.tsx` · `LaneGroupingMenu.tsx` | ~200 · ~140 | couloirs (swimlanes), logique dans `lib/kanban-lanes.ts` ([conception](../../../../../../docs/architecture/kanban-swimlanes.md)) |
+| `BoardLayoutToggle.tsx` · `BoardList.tsx` | ~50 · ~170 | Tableau / Liste, rendue par `BoardLanes` ; tri : `lib/kanban-list.ts` |
+| `BoardTimeline.tsx` | ~160 | frise ; barres : `lib/kanban-timeline.ts` |
+| `labels/` | — | étiquettes ; `shared/utils/task-labels.ts`, filtres : `lib/kanban-filter.ts` |
+| `../../../main/kanban-auto-archive.ts` | ~80 | archivage auto ; « Mes tâches » : `useBoardFilters` |
+| `SprintMenu.tsx` · `SprintDialogs.tsx` | ~250 · ~200 | sprints ; `stores/sprint-store.ts`, `shared/utils/sprints.ts` |
+| `reports/` | — | rapports (burndown, vélocité…) ; `lib/kanban-reports.ts` |
+| `board-ask/` | — | « Interroger le tableau », réponse par `main/board-ask/` ([conception](../../../../../../docs/architecture/board-ask.md)) |
 | `QuickCommandBar.tsx` | ~430 | palette `/slash` — liste via le backend, exécution par le main sur une carte de revue (`main/quick-command/`, F182) |
 | `../RoadmapKanbanView.tsx` | ~350 | vue roadmap, tableau distinct |
 | `../task-detail/TaskMobilePreview.tsx` | ~430 | onglet *Mobile* : plateforme, appareil, run, capture, logs |
@@ -27,7 +36,11 @@ adresse : confirmer avec `grep -n "<nom>" KanbanBoard.tsx` avant d'éditer.
 ## Colonnes
 
 `TASK_STATUS_COLUMNS` (`shared/constants/task.ts:13`) :
-`backlog` · `queue` · `in_progress` · `ai_review` · `human_review` · `build_failed` · `pr_created` · `done`
+`backlog` · `queue` · `in_progress` · `ai_review` · `human_review` · `failed` · `build_failed` · `pr_created` · `done` · `abandoned`
+
+`failed` (« Échec ») et `abandoned` (« Abandonnée ») sont calculées, pas des statuts :
+`getBoardColumn(task)` y range une erreur, une revue finie sur un échec et une tâche abandonnée ;
+leurs dépôts passent par `hooks/useOutcomeDrop.ts` ([kanban-outcome-columns.md](../../../../../../docs/architecture/kanban-outcome-columns.md)).
 
 `build_failed` (« Build rouge ») est piloté par la CI (`main/ci-pipeline-service.ts`) : une
 tâche y entre quand le pipeline de sa branche `workpilot/<spec>` passe au rouge et en sort, vers
@@ -40,8 +53,8 @@ qu'elle est vide (`useVisibleKanbanColumns`) ; une carte sans `metadata.prUrl` n
 déplacée à la main (`canMoveTaskTo`). Un ordre de colonnes ou des préférences enregistrés avant
 l'ajout d'une colonne la reçoivent (`normalizeColumnOrder`, `withNewColumnPreferences`).
 
-Un statut n'a pas de colonne à lui : `getVisualColumn()` projette `error → human_review`.
-`getVisualColumn`, `VALID_BULK_TRANSITIONS` (déplacements en masse) et `manualMoveTargets`
+Un statut n'a pas de colonne à lui : `getVisualColumn()` projette `error → failed`.
+`getBoardColumn`, `getVisualColumn`, `VALID_BULK_TRANSITIONS` (déplacements en masse) et `manualMoveTargets`
 (menus « Déplacer vers ») vivent dans `../../lib/kanban-columns.ts`.
 
 `IMPORT_ALLOWED_COLUMNS` restreint les cibles d'import (Azure DevOps / Jira) à
@@ -49,8 +62,7 @@ Un statut n'a pas de colonne à lui : `getVisualColumn()` projette `error → hu
 
 ## Carte de `KanbanBoard.tsx` et `KanbanColumn.tsx`
 
-Les composants de colonne ont quitté `KanbanBoard.tsx` au lot L11 (audit F36), à
-l'identique ; le tableau les importe depuis `kanban/KanbanColumn.tsx`.
+Les composants de colonne vivent dans `kanban/KanbanColumn.tsx` depuis le lot L11.
 
 | Fichier · zone | Ligne ~ | Contenu |
 |---|---|---|

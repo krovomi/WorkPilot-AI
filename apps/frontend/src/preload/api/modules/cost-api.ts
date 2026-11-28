@@ -5,6 +5,8 @@
 
 import { ipcRenderer } from "electron";
 import { IPC_CHANNELS } from "../../../shared/constants/ipc";
+import type { BuildComparison, CompareReportDocument } from "../../../shared/types/build-compare";
+import type { CostBudgetConfig, CostBudgetStatus } from "../../../shared/types/cost-budget";
 import type {
 	CostSummary,
 	DashboardSnapshot,
@@ -14,14 +16,7 @@ import type {
 
 export type { CostSummary, DashboardSnapshot };
 
-export interface BudgetInfo {
-	monthly_budget: number;
-	spent_this_month: number;
-	remaining: number;
-	utilization_pct: number;
-	alerts: string[];
-	forecast_end_of_month: number;
-}
+export type { CostBudgetConfig, CostBudgetStatus } from "../../../shared/types/cost-budget";
 
 export interface ContextUsage {
 	provider: string;
@@ -46,11 +41,16 @@ export interface CostAPI {
 	}>;
 	getCostBudget(
 		projectPath: string,
-	): Promise<{ success: boolean; budget?: BudgetInfo; error?: string }>;
+	): Promise<{ success: boolean; budget?: CostBudgetStatus; error?: string }>;
 	setCostBudget(
 		projectPath: string,
-		limit: number,
-		period?: string,
+		budget: CostBudgetConfig,
+	): Promise<{ success: boolean; budget?: CostBudgetConfig; error?: string }>;
+	/** One task's own limit in USD; 0 clears it. */
+	setTaskBudget(
+		projectId: string,
+		taskId: string,
+		amountUsd: number,
 	): Promise<{ success: boolean; error?: string }>;
 	getDashboardSnapshot(projectPath: string): Promise<{
 		success: boolean;
@@ -67,6 +67,14 @@ export interface CostAPI {
 		projectId: string,
 	): Promise<IPCResult<DashboardSnapshot>>;
 	getServerSessions(projectId: string): Promise<IPCResult<WorkspaceSession[]>>;
+	/** "How you compare": a project of this computer, by its folder. */
+	getBuildComparison(projectPath: string): Promise<IPCResult<BuildComparison>>;
+	/** The path the team report was saved to; null data when the person cancelled. */
+	exportBuildComparison(report: CompareReportDocument): Promise<IPCResult<string | null>>;
+	/** "How you compare" for a server project, by id: medians only. */
+	getServerBuildComparison(
+		projectId: string,
+	): Promise<IPCResult<BuildComparison>>;
 }
 
 export const createCostAPI = (): CostAPI => ({
@@ -79,8 +87,11 @@ export const createCostAPI = (): CostAPI => ({
 	getCostBudget: (projectPath: string) =>
 		ipcRenderer.invoke(IPC_CHANNELS.COSTS_GET_BUDGET, projectPath),
 
-	setCostBudget: (projectPath: string, limit: number, period = "monthly") =>
-		ipcRenderer.invoke(IPC_CHANNELS.COSTS_SET_BUDGET, projectPath, limit, period),
+	setCostBudget: (projectPath: string, budget: CostBudgetConfig) =>
+		ipcRenderer.invoke(IPC_CHANNELS.COSTS_SET_BUDGET, projectPath, budget),
+
+	setTaskBudget: (projectId: string, taskId: string, amountUsd: number) =>
+		ipcRenderer.invoke(IPC_CHANNELS.COSTS_SET_TASK_BUDGET, projectId, taskId, amountUsd),
 
 	getDashboardSnapshot: (projectPath: string) =>
 		ipcRenderer.invoke(IPC_CHANNELS.DASHBOARD_GET_SNAPSHOT, projectPath),
@@ -93,6 +104,15 @@ export const createCostAPI = (): CostAPI => ({
 
 	getServerSessions: (projectId: string) =>
 		ipcRenderer.invoke(IPC_CHANNELS.SERVER_WORKSPACE_SESSIONS, projectId),
+
+	getBuildComparison: (projectPath: string) =>
+		ipcRenderer.invoke(IPC_CHANNELS.DASHBOARD_COMPARE, projectPath),
+
+	getServerBuildComparison: (projectId: string) =>
+		ipcRenderer.invoke(IPC_CHANNELS.SERVER_WORKSPACE_COMPARE, projectId),
+
+	exportBuildComparison: (report: CompareReportDocument) =>
+		ipcRenderer.invoke(IPC_CHANNELS.DASHBOARD_COMPARE_EXPORT, report),
 
 	onCostsUpdated: (callback: (projectPath: string) => void) => {
 		const handler = (_event: Electron.IpcRendererEvent, projectPath: string) =>

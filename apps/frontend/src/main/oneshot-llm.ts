@@ -106,6 +106,12 @@ export interface OneShotLLMOptions {
 	 * the failure gets something safe to show.
 	 */
 	onFailure?: (reason: string) => void;
+	/**
+	 * Aborting it kills the runner: the call then resolves to null and
+	 * `onFailure` receives "Stopped". A caller that stopped the run on purpose
+	 * decides itself whether that is worth reporting.
+	 */
+	signal?: AbortSignal;
 }
 
 /**
@@ -296,6 +302,13 @@ export async function runOneShotLLM(
 			child.kill();
 		}, timeoutMs);
 
+		const abort = () => {
+			reportedFailure = "Stopped";
+			child.kill();
+		};
+		if (options.signal?.aborted) abort();
+		else options.signal?.addEventListener("abort", abort, { once: true });
+
 		child.stdout?.on("data", (data: Buffer) => {
 			const text = data.toString("utf-8");
 			output += text;
@@ -307,6 +320,7 @@ export async function runOneShotLLM(
 
 		child.on("exit", (code: number | null) => {
 			clearTimeout(timeout);
+			options.signal?.removeEventListener("abort", abort);
 			cleanup();
 			const markerIndex = output.indexOf(RESULT_MARKER);
 			if (code === 0 && markerIndex !== -1) {
@@ -339,6 +353,7 @@ export async function runOneShotLLM(
 
 		child.on("error", (err) => {
 			clearTimeout(timeout);
+			options.signal?.removeEventListener("abort", abort);
 			cleanup();
 			logger.warn(`[${label}] Process error:`, err.message);
 			options.onFailure?.(err.message);

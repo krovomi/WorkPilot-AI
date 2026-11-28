@@ -133,6 +133,13 @@ export function buildCatalogServer(
 /** The agents a server installed from the marketplace is given by default. */
 export const DEFAULT_MCP_AGENTS = ["planner", "coder", "qa_reviewer"] as const;
 
+/** The agents `entry` is offered to at install: its own list, else the default. */
+export function catalogAgents(entry: McpMarketplaceServer): string[] {
+	return entry.agents && entry.agents.length > 0
+		? [...entry.agents]
+		: [...DEFAULT_MCP_AGENTS];
+}
+
 /** `overrides` with `serverId` added to each of `agents`. */
 export function withServerForAgents(
 	overrides: AgentMcpOverrides | undefined,

@@ -13,6 +13,7 @@ import {
 	EMPTY_FILTERS,
 	getTaskSource,
 	hasActiveFilters,
+	NO_SPRINT,
 	TASK_SOURCES,
 	taskMatchesFilters,
 } from "./kanban-filter";
@@ -81,5 +82,73 @@ describe("the generated source", () => {
 		const filters = { ...EMPTY_FILTERS, sources: ["generated" as const] };
 		expect(taskMatchesFilters(generated, filters)).toBe(true);
 		expect(taskMatchesFilters(whole, filters)).toBe(false);
+	});
+});
+
+describe("the sprint filter", () => {
+	const inSprint = { ...whole, id: "s1", metadata: { sprintId: "sp-0000000a" } } as unknown as Task;
+
+	beforeEach(() => {
+		useKanbanFilterStore.setState({ projectId: null, filters: { ...EMPTY_FILTERS } });
+	});
+
+	it("keeps one sprint's cards, or the backlog's", () => {
+		const sprint = { ...EMPTY_FILTERS, sprint: "sp-0000000a" };
+		expect(taskMatchesFilters(inSprint, sprint)).toBe(true);
+		expect(taskMatchesFilters(whole, sprint)).toBe(false);
+		const backlog = { ...EMPTY_FILTERS, sprint: NO_SPRINT };
+		expect(taskMatchesFilters(whole, backlog)).toBe(true);
+		expect(taskMatchesFilters(inSprint, backlog)).toBe(false);
+		expect(activeFilterCount(sprint)).toBe(1);
+		expect(hasActiveFilters(sprint)).toBe(true);
+	});
+
+	it("is set, replaced and cleared from the store", () => {
+		const { setSprint } = useKanbanFilterStore.getState();
+		setSprint("sp-0000000a");
+		expect(useKanbanFilterStore.getState().filters.sprint).toBe("sp-0000000a");
+		setSprint(NO_SPRINT);
+		expect(useKanbanFilterStore.getState().filters.sprint).toBe(NO_SPRINT);
+		setSprint(undefined);
+		expect("sprint" in useKanbanFilterStore.getState().filters).toBe(false);
+	});
+});
+
+describe("the labels and quick filters", () => {
+	const DAY = 86_400_000;
+	const now = Date.UTC(2026, 10, 27, 12);
+	const card = (metadata: Record<string, unknown>, updatedAt = new Date(now - 2 * DAY)) =>
+		({ id: "c", specId: "c", title: "c", description: "", metadata, updatedAt }) as unknown as Task;
+
+	it("keeps the cards with one of the labels, whatever its case", () => {
+		const filters = { ...EMPTY_FILTERS, labels: ["Front", "api"] };
+		expect(taskMatchesFilters(card({ labels: ["API"] }), filters, now)).toBe(true);
+		expect(taskMatchesFilters(card({ labels: ["back"] }), filters, now)).toBe(false);
+		expect(taskMatchesFilters(card({}), filters, now)).toBe(false);
+		expect(taskMatchesFilters(card({}), { ...EMPTY_FILTERS, labels: [] }, now)).toBe(true);
+		expect(hasActiveFilters(filters)).toBe(true);
+		expect(activeFilterCount(filters)).toBe(2);
+	});
+
+	it("keeps the blocked cards, and those changed in the last seven days", () => {
+		const flagged = { ...EMPTY_FILTERS, quick: ["flagged" as const] };
+		expect(taskMatchesFilters(card({ flagged: true }), flagged, now)).toBe(true);
+		expect(taskMatchesFilters(card({}), flagged, now)).toBe(false);
+
+		const recent = { ...EMPTY_FILTERS, quick: ["recent" as const] };
+		expect(taskMatchesFilters(card({}), recent, now)).toBe(true);
+		expect(taskMatchesFilters(card({}, new Date(now - 8 * DAY)), recent, now)).toBe(false);
+		expect(taskMatchesFilters(card({}, new Date(Number.NaN)), recent, now)).toBe(false);
+		expect(taskMatchesFilters(card({}, new Date()), recent)).toBe(true);
+
+		const mine = { ...EMPTY_FILTERS, quick: ["mine" as const] };
+		expect(taskMatchesFilters(card({}), { ...mine, claimedByMe: new Set(["c"]) }, now)).toBe(true);
+		expect(taskMatchesFilters(card({}), { ...mine, claimedByMe: new Set(["other"]) }, now)).toBe(false);
+		expect(taskMatchesFilters(card({}), mine, now)).toBe(false);
+
+		const both = { ...EMPTY_FILTERS, quick: ["flagged" as const, "recent" as const] };
+		expect(activeFilterCount(both)).toBe(2);
+		expect(hasActiveFilters({ ...EMPTY_FILTERS, quick: [] })).toBe(false);
+		expect(hasActiveFilters(both)).toBe(true);
 	});
 });

@@ -217,8 +217,26 @@ def _clean_mock_modules() -> None:
             # in test files always patch the same object that imported functions
             # reference (function.__globals__ points to M1's dict, not M2's).
             sys.modules[key] = _real_modules[key]
+        elif (real := _module_the_package_holds(key)) is not None:
+            # A mock put over a module already imported: its package still
+            # holds the real one. Deleting the key would leave that attribute
+            # behind, so `monkeypatch.setattr("core.client.x")` patched it
+            # while `from core.client import x` imported a fresh copy.
+            sys.modules[key] = real
         else:
             del sys.modules[key]
+
+
+def _module_the_package_holds(key: str) -> _types.ModuleType | None:
+    """The real module the parent package names ``key``, if it holds one."""
+    parent_name, dot, child = key.rpartition(".")
+    parent = sys.modules.get(parent_name) if dot else None
+    if not isinstance(parent, _types.ModuleType):
+        return None
+    held = parent.__dict__.get(child)
+    if isinstance(held, _types.ModuleType) and held.__name__ == key:
+        return held
+    return None
 
 
 def pytest_collectstart(collector) -> None:
@@ -833,18 +851,6 @@ def pytest_configure(config):
 
 
 @pytest.fixture
-def semantic_analyzer():
-    """Create a SemanticAnalyzer instance for testing."""
-    import sys
-    from pathlib import Path as _Path
-
-    sys.path.insert(0, str(_Path(__file__).parent.parent / "apps" / "backend"))
-    from merge.semantic_analyzer import SemanticAnalyzer
-
-    return SemanticAnalyzer()
-
-
-@pytest.fixture
 def temp_project(tmp_path):
     """Create a temporary project directory with a git repo and sample files.
 
@@ -913,18 +919,6 @@ def temp_project(tmp_path):
 
 
 @pytest.fixture
-def file_tracker(temp_project):
-    """Create a FileEvolutionTracker instance for testing."""
-    import sys
-    from pathlib import Path as _Path
-
-    sys.path.insert(0, str(_Path(__file__).parent.parent / "apps" / "backend"))
-    from merge.file_evolution import FileEvolutionTracker
-
-    return FileEvolutionTracker(project_dir=temp_project)
-
-
-@pytest.fixture
 def conflict_detector():
     """Create a ConflictDetector instance for testing."""
     import sys
@@ -934,46 +928,6 @@ def conflict_detector():
     from merge.conflict_detector import ConflictDetector
 
     return ConflictDetector()
-
-
-@pytest.fixture
-def auto_merger():
-    """Create an AutoMerger instance for testing."""
-    import sys
-    from pathlib import Path as _Path
-
-    sys.path.insert(0, str(_Path(__file__).parent.parent / "apps" / "backend"))
-    from merge.auto_merger import AutoMerger
-
-    return AutoMerger()
-
-
-@pytest.fixture
-def ai_resolver():
-    """Create an AIResolver instance without AI function (for testing fallback behaviour)."""
-    import sys
-    from pathlib import Path as _Path
-
-    sys.path.insert(0, str(_Path(__file__).parent.parent / "apps" / "backend"))
-    from merge.ai_resolver import AIResolver
-
-    return AIResolver(ai_call_fn=None)
-
-
-@pytest.fixture
-def mock_ai_resolver():
-    """Create an AIResolver instance with a mock AI function."""
-    import sys
-    from pathlib import Path as _Path
-
-    sys.path.insert(0, str(_Path(__file__).parent.parent / "apps" / "backend"))
-    from merge.ai_resolver import AIResolver
-
-    def _mock_ai_fn(system_prompt: str, user_prompt: str) -> str:
-        # Return a simple merged code block that the resolver can parse
-        return "```python\n# AI merged result\nmerged_code = True\n```"
-
-    return AIResolver(ai_call_fn=_mock_ai_fn)
 
 
 # ---------------------------------------------------------------------------
@@ -1269,6 +1223,18 @@ def _isolated_brain(tmp_path_factory, monkeypatch):
 # own tests (`tests/os_sandbox/`), which turn it back on.
 
 
+# Where a full QA review's suite runs is ambient too: the machine's load, the
+# queue in the home folder. A reviewer test runs it here, with the queue in a
+# temporary folder; `tests/suite_placement/` turns the decision back on.
+
+
+@pytest.fixture(autouse=True)
+def _suite_placement_here(tmp_path_factory, monkeypatch):
+    monkeypatch.setenv("WORKPILOT_TEST_PLACEMENT", "machine")
+    queue = tmp_path_factory.mktemp("suite-queue")
+    monkeypatch.setenv("WORKPILOT_SUITE_QUEUE_DIR", str(queue))
+
+
 @pytest.fixture(autouse=True)
 def _os_sandbox_off_by_default(monkeypatch):
     monkeypatch.setenv("WORKPILOT_SANDBOX", "off")
@@ -1296,6 +1262,44 @@ def _worktree_setup_off_by_default(monkeypatch):
 @pytest.fixture(autouse=True)
 def _learning_loop_model_off_by_default(monkeypatch):
     monkeypatch.setenv("WORKPILOT_LEARNING_LOOP_MODEL", "0")
+
+
+# A PR review asks the selected provider's model whether two nearby findings
+# contradict each other (`runners/github/services/contradiction_check.py`):
+# every orchestrator test with two findings in one file would make a real
+# model call. The check's own tests (`tests/test_review_contradictions.py`)
+# turn it back on, against a fake runtime.
+
+
+@pytest.fixture(autouse=True)
+def _review_contradiction_check_off_by_default(monkeypatch):
+    monkeypatch.setenv("WORKPILOT_REVIEW_CONTRADICTION_CHECK", "0")
+
+
+# A sync's review of the memory conflicts asks a local Ollama for embeddings
+# when one is running (`brain/lifecycle/embeddings.py`): on a developer
+# machine with a model pulled, every sync test would read that model. Its own
+# tests (`tests/brain/test_memory_embeddings.py`) turn it back on, against a
+# fake local server.
+
+
+@pytest.fixture(autouse=True)
+def _memory_embeddings_off_by_default(monkeypatch):
+    monkeypatch.setenv("BRAIN_CONFLICT_EMBEDDINGS", "off")
+
+
+# The desktop app starts every Python runner with PYTHONUTF8=1 and
+# PYTHONIOENCODING=utf-8 (`apps/frontend/src/main/utils/python-runner-env.ts`).
+# A test that starts a runner from this environment gets the same switches:
+# without them, a runner printing an emoji on Windows died on the cp1252
+# console encoding and the test read an empty stdout. A test about the
+# platform encoding sets its own (`tests/test_brain.py`).
+
+
+@pytest.fixture(autouse=True)
+def _python_children_speak_utf8(monkeypatch):
+    monkeypatch.setenv("PYTHONUTF8", "1")
+    monkeypatch.setenv("PYTHONIOENCODING", "utf-8")
 
 
 # ── Ambient state is not input ─────────────────────────────────────────

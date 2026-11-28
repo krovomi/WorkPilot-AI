@@ -11,7 +11,6 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { BrowserWindow } from "electron";
-import { ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../../shared/constants";
 import type { Project } from "../../../shared/types";
 import type { AuthFailureInfo } from "../../../shared/types/terminal";
@@ -22,6 +21,8 @@ import {
 	createSpecForIssue,
 	updateImplementationPlanStatus,
 } from "./spec-utils";
+import { autofixIpcMain as ipcMain } from "./autofix-ipc-guard";
+import { githubRunnerTarget } from "./runner-target";
 import { getGitHubConfig, githubFetch } from "./utils";
 import { createIPCCommunicators } from "./utils/ipc-communicator";
 import { createContextLogger } from "./utils/logger";
@@ -64,7 +65,6 @@ export interface AutoFixConfig {
 	enabled: boolean;
 	labels: string[];
 	requireHumanApproval: boolean;
-	botToken?: string;
 	model: string;
 	thinkingLevel: string;
 }
@@ -170,7 +170,6 @@ function getAutoFixConfig(project: Project): AutoFixConfig {
 			enabled: data.auto_fix_enabled ?? false,
 			labels: data.auto_fix_labels ?? ["auto-fix"],
 			requireHumanApproval: data.require_human_approval ?? true,
-			botToken: data.bot_token,
 			model: data.model ?? "claude-sonnet-4-5-20250929",
 			thinkingLevel: data.thinking_level ?? "medium",
 		};
@@ -204,12 +203,14 @@ function saveAutoFixConfig(project: Project, config: AutoFixConfig): void {
 		// File doesn't exist or is invalid - use empty config
 	}
 
+	// The runner gets its tokens elsewhere and never keeps one in this file
+	// (`GitHubRunnerConfig.save_settings`): a token found here is dropped.
+	const { bot_token: _botToken, token: _token, ...kept } = existingConfig;
 	const updatedConfig = {
-		...existingConfig,
+		...kept,
 		auto_fix_enabled: config.enabled,
 		auto_fix_labels: config.labels,
 		require_human_approval: config.requireHumanApproval,
-		bot_token: config.botToken,
 		model: config.model,
 		thinking_level: config.thinkingLevel,
 	};
@@ -334,12 +335,15 @@ async function checkNewIssues(
 
 	// biome-ignore lint/style/noNonNullAssertion: value is guaranteed by context
 	const backendPath = validation.backendPath!;
+	const target = githubRunnerTarget(project);
 	const args = buildRunnerArgs(
 		getRunnerPath(backendPath),
 		project.path,
 		"check-new",
+		[],
+		{ repo: target.repo },
 	);
-	const subprocessEnv = await getRunnerEnv();
+	const subprocessEnv = await getRunnerEnv(target.env);
 
 	const { promise } = runPythonSubprocess<Array<{ number: number }>>({
 		pythonPath: getPythonPath(backendPath),
@@ -763,13 +767,15 @@ export function registerAutoFixHandlers(
 						issueNumbers && issueNumbers.length > 0
 							? issueNumbers.map((n) => n.toString())
 							: [];
+					const target = githubRunnerTarget(project);
 					const args = buildRunnerArgs(
 						getRunnerPath(backendPath),
 						project.path,
 						"batch-issues",
 						additionalArgs,
+						{ repo: target.repo },
 					);
-					const subprocessEnv = await getRunnerEnv();
+					const subprocessEnv = await getRunnerEnv(target.env);
 
 					debugLog("Spawning batch process", { args });
 
@@ -919,13 +925,15 @@ export function registerAutoFixHandlers(
 						additionalArgs.push(...issueNumbers.map((n) => n.toString()));
 					}
 
+					const target = githubRunnerTarget(project);
 					const args = buildRunnerArgs(
 						getRunnerPath(backendPath),
 						project.path,
 						"analyze-preview",
 						additionalArgs,
+						{ repo: target.repo },
 					);
-					const subprocessEnv = await getRunnerEnv();
+					const subprocessEnv = await getRunnerEnv(target.env);
 					debugLog("Spawning analyze-preview process", { args });
 
 					const { promise } = runPythonSubprocess<AnalyzePreviewResult>({
@@ -982,12 +990,12 @@ export function registerAutoFixHandlers(
 				// Provide user-friendly error messages
 				let userMessage = "Failed to analyze issues";
 				if (error instanceof Error) {
-					if (error.message.includes("JSON")) {
-						userMessage =
-							"Analysis completed, but there was an error processing the results. Please try again.";
-					} else if (error.message.includes("No JSON found")) {
+					if (error.message.includes("No JSON found")) {
 						userMessage =
 							"No analysis results returned. Please check your GitHub connection and try again.";
+					} else if (error.message.includes("JSON")) {
+						userMessage =
+							"Analysis completed, but there was an error processing the results. Please try again.";
 					} else {
 						userMessage = error.message;
 					}
@@ -1015,11 +1023,9 @@ export function registerAutoFixHandlers(
 				batchCount: approvedBatches.length,
 			});
 			const result = await withProjectOrNull(projectId, async (project) => {
+				const tempFile = path.join(getGitHubDir(project), "temp_approved_batches.json");
 				try {
-					const tempFile = path.join(
-						getGitHubDir(project),
-						"temp_approved_batches.json",
-					);
+					fs.mkdirSync(getGitHubDir(project), { recursive: true });
 
 					// Convert camelCase to snake_case for Python
 					const pythonBatches = approvedBatches.map((b) => ({
@@ -1053,21 +1059,22 @@ export function registerAutoFixHandlers(
 
 					// biome-ignore lint/style/noNonNullAssertion: value is guaranteed by context
 					const backendPath = validation.backendPath!;
-					const { execFileSync } = await import("node:child_process");
-					// Use execFileSync with arguments array to prevent command injection
-					execFileSync(
-						getPythonPath(backendPath),
-						[
-							getRunnerPath(backendPath),
-							"--project",
-							project.path,
-							"approve-batches",
-							tempFile,
-						],
-						{ cwd: backendPath, encoding: "utf-8" },
-					);
-
-					fs.unlinkSync(tempFile);
+					// Like every other auto-fix command: the runner's environment
+					// (provider, GitHub token), off the main thread.
+					const target = githubRunnerTarget(project);
+					const { promise } = runPythonSubprocess({
+						pythonPath: getPythonPath(backendPath),
+						args: buildRunnerArgs(getRunnerPath(backendPath), project.path, "approve-batches", [tempFile], {
+							repo: target.repo,
+						}),
+						cwd: backendPath,
+						env: await getRunnerEnv(target.env),
+						onAuthFailure: createAuthFailureCallback(getMainWindow(), "approve batches"),
+					});
+					const run = await promise;
+					if (!run.success) {
+						throw new Error(run.error ?? "Failed to approve batches");
+					}
 
 					const batches = getBatches(project);
 					debugLog("Batches approved and created", { count: batches.length });
@@ -1084,6 +1091,8 @@ export function registerAutoFixHandlers(
 								? error.message
 								: "Failed to approve batches",
 					};
+				} finally {
+					fs.rmSync(tempFile, { force: true });
 				}
 			});
 			return result ?? { success: false, error: "Project not found" };

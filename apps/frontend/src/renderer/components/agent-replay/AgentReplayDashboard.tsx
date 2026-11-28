@@ -68,6 +68,16 @@ import {
 	ScanLine,
 	Section,
 } from "../charter";
+import {
+	ReplayBookmarks,
+	ReplayImportButton,
+	ReplayShareButton,
+	ReplayShareNotice,
+} from "./ReplaySharing";
+import { ReplayComparisonVideo } from "./ReplayComparisonVideo";
+import { ReplayStepsSummary } from "./ReplayStepsSummary";
+import { ReplayOpenLinkButton } from "./ReplayTeamShare";
+import { ReplayUsageMetrics } from "./ReplayUsageMetrics";
 import { TimeTravelPanel } from "./TimeTravelPanel";
 import { formatAppDateTime } from "@/lib/date-format";
 
@@ -411,6 +421,12 @@ const ComparisonPanel: React.FC<{
 				</div>
 			</CardHeader>
 			<CardContent className="space-y-4">
+				{sessionA && sessionB && (
+					<ReplayComparisonVideo
+						sessionAId={sessionA.session_id}
+						sessionBId={sessionB.session_id}
+					/>
+				)}
 				{/* Header row */}
 				<div className="grid grid-cols-4 gap-2 text-xs font-medium text-muted-foreground border-b pb-2">
 					<span>{t("replay:metric")}</span>
@@ -738,6 +754,11 @@ export const AgentReplayDashboard: React.FC<AgentReplayDashboardProps> = ({
 							onClose={clearComparison}
 						/>
 					)}
+					<ReplayShareNotice />
+					<div className="flex justify-end gap-2">
+						<ReplayOpenLinkButton />
+						<ReplayImportButton />
+					</div>
 					<SessionListView
 						sessions={sessions}
 						loading={sessionsLoading}
@@ -745,6 +766,7 @@ export const AgentReplayDashboard: React.FC<AgentReplayDashboardProps> = ({
 						onDelete={(id) => deleteSession(id)}
 						onCompare={(a, b) => compareSessionsAction(a, b)}
 					/>
+					<ReplayUsageMetrics />
 				</Page>
 			</ModuleStage>
 		);
@@ -802,6 +824,7 @@ export const AgentReplayDashboard: React.FC<AgentReplayDashboardProps> = ({
 					</span>
 					<span>{formatCost(activeSession.total_cost_usd)}</span>
 					<span>{formatDuration(activeSession.duration_seconds * 1000)}</span>
+					<ReplayShareButton sessionId={activeSession.session_id} />
 					<Button
 						variant="outline"
 						size="sm"
@@ -815,6 +838,8 @@ export const AgentReplayDashboard: React.FC<AgentReplayDashboardProps> = ({
 					</Button>
 				</div>
 			</div>
+
+			<ReplayShareNotice />
 
 			{/* Playback controls */}
 			<div className="relative z-[1] flex items-center gap-3 border-b border-[var(--wp-border)] px-4 py-2 shrink-0">
@@ -1132,6 +1157,12 @@ export const AgentReplayDashboard: React.FC<AgentReplayDashboardProps> = ({
 										{t("replay:stepDetail.selectStep")}
 									</p>
 								)}
+								<ReplayStepsSummary session={activeSession} />
+								<ReplayBookmarks
+									session={activeSession}
+									currentStep={currentStep}
+									onGoTo={goToStep}
+								/>
 							</TabsContent>
 
 							{/* Diff view */}

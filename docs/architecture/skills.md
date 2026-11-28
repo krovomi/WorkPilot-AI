@@ -1,3 +1,10 @@
+---
+feature: Skills
+summary: >-
+  `skills/` est la source, `scripts/skills_cli.py` le seul écrivain ; frontmatter lu par
+  `parse_frontmatter` ; gate 4 : un corps qui s'adresse à l'agent n'est pas émis.
+---
+
 # Skills system
 
 > Design rationale moved verbatim out of [`docs/CLAUDE.md`](../CLAUDE.md),
@@ -26,7 +33,10 @@ iteration order meant the emitted content depended on alphabetical luck.
 Those are **generated**. `skills/` is the source, and `scripts/skills_cli.py` is the only
 thing that writes the outputs — `pnpm run skills:check` fails CI on drift (the `skills` job of
 `lint.yml` checks the outputs as committed, and the weekly `skills-sync` commits the outputs it
-rebuilds; until F125 the job rebuilt them before checking, so it could not fail). Packs are
+rebuilds; until F125 the job rebuilt them before checking, so it could not fail). The sync
+pushes and opens its pull request with `PAT_TOKEN`, as the stack and release autopilots do: with
+the default token GitHub starts no workflow, so the PR got no check and the autopilot never
+merged it; the checkout keeps no token, the build runs on upstream content. Packs are
 added, updated and dropped through the same CLI (`skills:add`, `skills:update`,
 `skills:remove`), which keeps `skills-lock.json`, `.workpilot/skills.toml` and the
 `.gitignore` entries in step. See [skills/README.md](../../skills/README.md).

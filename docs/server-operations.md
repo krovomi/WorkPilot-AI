@@ -3,7 +3,8 @@
 Ce guide s'adresse à la personne qui installe et fait vivre le serveur WorkPilot d'une équipe :
 le déployer, le mettre derrière TLS, le sauvegarder, le mettre à jour, le surveiller. Il décrit ce
 que font aujourd'hui [`deploy/`](../deploy/) et le code ; ce qui n'existe pas encore est dit comme
-tel ([Limites connues](#limites-connues)). Pourquoi le serveur est construit ainsi :
+tel ([Limites connues](#limites-connues)). Le parcours de l'équipe, avec des exemples de
+réglages et de l'API : [`server-guide.md`](server-guide.md). Pourquoi le serveur est construit ainsi :
 [`architecture/server-mode.md`](architecture/server-mode.md). Les mêmes variables, en anglais :
 [`CONFIGURATION.md`](CONFIGURATION.md#4-multi-user-server-mode--tenants-roles-and-permissions).
 
@@ -35,15 +36,77 @@ depuis le dépôt, comme la CI le fait à chaque PR (job `server-image`).
   pour l'exemple de proxy, qui utilise `!override`.
 - Un accès Internet pendant la construction de l'image : paquets Debian, release de `gh`,
   dépendances Python installées par empreinte (`apps/backend/requirements.lock`).
-- Un nom DNS pour le serveur et les ports 80 et 443.
+- Selon l'hébergement choisi (section suivante) : un nom DNS et les ports 80 et 443 pour un
+  serveur public, le port 80 sur le réseau local sinon.
 - Un accès Git aux dépôts des projets pour le serveur (voir [L'accès Git](#2-laccès-git)).
 - Les identifiants du fournisseur de LLM des builds, par exemple `CLAUDE_CODE_OAUTH_TOKEN`.
 
 Le serveur sort vers : le fournisseur de LLM, les forges (git en SSH ou HTTPS, `api.github.com`,
-les instances GitLab), `login.microsoftonline.com` si Entra est réglé, `api.pwnedpasswords.com` si
+les instances GitLab), `login.microsoftonline.com` si Entra est réglé, l'émetteur OpenID Connect s'il est réglé, `api.pwnedpasswords.com` si
 la vérification HIBP est active, le serveur SMTP s'il est réglé.
 
+## Choisir où héberger le serveur
+
+Chaque équipe héberge son serveur là où elle le peut ; le code et l'image sont les mêmes, seuls
+l'adresse et le chiffrement changent. `deploy/configure.py` (Python 3.10 ou plus, sur l'hôte, sans
+dépendance) demande le choix et écrit la configuration qui va avec :
+
+```bash
+cd deploy
+python3 configure.py            # pose les questions
+python3 configure.py --hosting public --host workpilot.example.com
+python3 configure.py --hosting lan --host 192.168.1.20
+python3 configure.py --hosting local
+```
+
+| Choix | Pour qui | Adresse que l'app saisit | Ce qui passe sur le réseau |
+|---|---|---|---|
+| `public` : un VPS (OVH, Scaleway, Hetzner…) ou un serveur Linux avec un nom DNS public | une équipe répartie, une formation à distance | `https://<nom>` | HTTPS, certificat Let's Encrypt que Caddy obtient et renouvelle ; le nom doit pointer vers la machine, ports 80 et 443 ouverts |
+| `lan` : une machine du réseau local (serveur de l'entreprise, PC d'un membre) | une équipe dans les mêmes locaux ou sur le même VPN | `http://<nom ou IP>` | HTTP en clair sur le port 80 : mots de passe et jetons lisibles par qui écoute ce réseau ; un réseau de confiance seulement, ou votre certificat (ci-dessous) |
+| `local` : cet ordinateur seul | un essai, une démonstration | `http://localhost` | rien ne sort de la machine |
+
+Le script :
+
+- crée `.env.server` (droits `600`) à partir de `server-env.example` et génère les trois secrets
+  au premier passage, **jamais ensuite** : relancé pour changer d'hébergement, il garde les
+  secrets et toutes vos lignes, et ne remplace que `WORKPILOT_HOSTING`,
+  `WORKPILOT_PUBLIC_BASE_URL` et `WORKPILOT_PUBLIC_STREAM_URL` ;
+- copie `Caddyfile.example` et `docker-compose.override.example.yml` s'il n'en existe pas de
+  copie : le proxy est là dans les trois cas, car c'est lui qui rend le flux en direct joignable
+  ([pourquoi](#pourquoi-le-proxy-partage-le-réseau-du-conteneur-api)). Une adresse en `http://`
+  fait servir à Caddy du HTTP simple sur le port 80, sans certificat ;
+- refuse une adresse IP pour `public` (Let's Encrypt n'en certifie pas) et une adresse avec
+  schéma, port ou chemin.
+
+**Un PC Windows** (choix `lan` ou `local`) : installez Docker Desktop (moteur WSL 2) et lancez les
+mêmes commandes dans PowerShell, `python` à la place de `python3`. Le port 80 peut être pris par
+IIS ou un autre service : libérez-le avant de démarrer. Le PC doit rester allumé pendant que
+l'équipe travaille.
+
+**L'isolation des runs** dépend du noyau, pas de WorkPilot : sur un VPS Linux récent, elle est
+là ; sous Docker Desktop (noyau WSL 2) ou un vieux noyau, vérifiez-la après le démarrage :
+
+```bash
+docker compose --env-file .env.server exec api python -c \
+  'from foundation.landlock import abi_version; print(abi_version())'
+```
+
+Un nombre : chaque run est confiné à son projet. Une erreur : ce noyau ne sait pas le faire et
+tout run échoue avec cette raison. `WORKPILOT_RUN_ISOLATION=off` les lance quand même, sans
+confinement : seulement si chaque personne du serveur a le droit de lire tous ses projets.
+
+**Votre propre certificat** sur le réseau local : passez l'adresse en `https://` dans
+`.env.server` (les deux URL, `wss://` pour le flux) et ajoutez `tls <certificat> <clé>` au
+`Caddyfile`, fichiers montés en lecture seule. L'app de bureau doit faire confiance à l'autorité
+qui l'a émis, ce qui n'a pas été essayé avec une autorité interne.
+
+Chaque personne saisit ensuite l'adresse du serveur dans l'app, à sa connexion : rien d'autre à
+régler côté poste.
+
 ## Premier démarrage
+
+`deploy/configure.py` fait l'étape 1 et la copie du proxy ([TLS](#tls-devant-lapi-et-le-flux)) ;
+la suite est la même pour les trois hébergements.
 
 ### 1. Les secrets
 
@@ -128,6 +191,9 @@ cas), sans autre détail en mode serveur. Il ne consulte pas PostgreSQL : la pre
 reçoit l'API initialise la base et échoue si elle ne répond pas ; ensuite `/health` ne la regarde
 plus. `alembic current` doit finir par `(head)`, comme le vérifie la CI.
 
+Le détail est dans **la page de santé**, `GET /admin/platform/health`, réservée aux
+administrateurs de la plateforme (voir [Surveiller le serveur](#surveiller-le-serveur)).
+
 ### 5. Premier administrateur, première organisation
 
 ```bash
@@ -145,12 +211,24 @@ les huit rôles intégrés. Dans l'app de bureau, connectez-vous avec l'adresse 
 (`https://workpilot.example.com`), puis **Administration → Organisations** : basculez vers
 celle-ci ou créez-en une autre.
 
-Pour faire entrer quelqu'un : **Administration → Invitations** (administrateur de la plateforme).
+Pour faire entrer quelqu'un : **Administration → Invitations** (permission
+`org.invitation.write`). L'accès (membre, lecteur, ou administrateur du serveur pour un
+administrateur de la plateforme seulement) et, si les rôles se lisent, le **rôle dans
+l'organisation** (Relecteur, Mainteneur, un rôle de l'organisation…) se choisissent à
+l'invitation ; sans rôle choisi, un membre devient Contributeur et un lecteur Lecteur.
 Le lien (`<WORKPILOT_PUBLIC_BASE_URL>/invite?token=…`) n'est pas une page web : la personne le
 colle dans l'app, qui crée son compte. Il part par e-mail si SMTP est réglé, sinon l'app
-l'affiche pour que vous le transmettiez ; il sert une fois, pendant 72 heures par défaut. L'app
-n'a pas encore d'écran pour ajouter un compte existant à une organisation : c'est la route
-`POST /admin/members` (permission `org.member.write`, l'identifiant du compte et un rôle).
+l'affiche pour que vous le transmettiez ; il sert une fois, pendant 72 heures par défaut.
+
+Une invitation refuse l'adresse d'un compte qui existe déjà. Pour faire entrer dans une seconde
+organisation quelqu'un qui a un compte : **Administration → Membres → Ajouter un compte qui
+existe déjà**, par son adresse et avec un rôle (administrateur de la plateforme, le seul qui
+voit tous les comptes ; route `POST /admin/members` avec `email`, ou `user_id` pour un
+administrateur d'organisation qui connaît l'identifiant).
+
+Une organisation que vous créez n'a pas encore d'administrateur : vous l'êtes par votre rôle de
+plateforme. Donnez le rôle **Administrator** de l'organisation à la personne qui la gérera
+(Membres), ou invitez-la avec ce rôle.
 
 ## TLS devant l'API et le flux
 
@@ -212,7 +290,9 @@ passer l'upgrade WebSocket sur `/stream/` et pose `X-Forwarded-For`.
   vers le proxy. Caddy ne journalise pas les requêtes par défaut ; si vous activez `log`, un lien
   d'invitation ouvert dans un navigateur y laisserait son jeton.
 - **Les routes publiques.** `/health`, `/docs` et `/openapi.json` (la description de l'API, aucune
-  donnée) répondent sans jeton, comme la connexion et l'acceptation d'une invitation.
+  donnée) répondent sans jeton, comme la connexion et l'acceptation d'une invitation. `/metrics`
+  ne demande pas de compte mais son propre jeton (`WORKPILOT_METRICS_TOKEN`) et répond 404 sans
+  lui : ne l'exposez au proxy que si le collecteur est dehors.
 - **Les redémarrages.** Le proxy vit dans l'espace réseau d'`api` : si `api` redémarre seul et que
   le site ne répond plus, `docker compose --env-file .env.server restart proxy`.
 
@@ -236,6 +316,7 @@ Le bloc `environment:` du compose l'emporte sur `.env.server` pour `WORKPILOT_SE
 | `WORKPILOT_SANDBOX` | `auto` | Le bac à sable de l'OS autour des commandes d'un agent (bubblewrap), pas l'isolation entre projets. L'image ne l'installe pas et le profil seccomp de Docker le bloquerait : en `auto`, les builds tournent et leur carte le dit ; `required` les empêcherait de démarrer. |
 | `WORKPILOT_MAX_CONCURRENT_RUNS` | `3` | Plafond du serveur, runs et jobs ensemble : au-delà, ils attendent leur tour (`queued`). Plafond par organisation : onglet Quotas. |
 | `WORKPILOT_WS_URL` | `ws://127.0.0.1:8765` | Où l'API et les runs publient les événements du flux. Toujours la boucle locale. |
+| `WORKPILOT_HOSTING` | — | `public`, `lan` ou `local`, écrit par `configure.py` avec les deux adresses ci-dessous. Le serveur ne la lit pas : elle dit à qui relit `.env.server` quel choix ces adresses suivent. |
 | `WORKPILOT_PUBLIC_BASE_URL` | — | L'adresse publique, sans `/` final : base des liens d'invitation (sans elle, le lien est relatif) et site du Caddyfile d'exemple. |
 | `WORKPILOT_PUBLIC_STREAM_URL` | — | L'adresse du flux donnée à l'app (`ws://` ou `wss://` seulement, toute autre valeur est ignorée). Sans elle, l'hôte de l'API sur le port 8765. Derrière le proxy d'exemple : `wss://<même hôte>`. |
 | `WORKPILOT_PUSH_ENABLED` | `false` | Notifications de l'app mobile (un run que vous avez lancé a réussi ou échoué) par le service push d'Expo (`exp.host`), qui les passe à Apple et Google : le nom du projet, le numéro de la carte, la phase et son résultat, jamais le texte d'une carte. Sans elle, rien ne sort du serveur. |
@@ -245,11 +326,23 @@ Le bloc `environment:` du compose l'emporte sur `.env.server` pour `WORKPILOT_SE
 | `WORKPILOT_JWT_ISSUER` | `workpilot` | Le `iss` des jetons ; le changer invalide les jetons d'accès en cours. |
 | `WORKPILOT_ACCESS_TOKEN_TTL_MINUTES` | `15` | Durée d'un jeton d'accès. Les permissions sont relues en base à chaque requête, pas portées par le jeton. |
 | `WORKPILOT_REFRESH_TOKEN_TTL_DAYS` | `14` | Durée d'une session avant de se reconnecter. |
-| `WORKPILOT_ENTRA_TENANT_ID`, `WORKPILOT_ENTRA_CLIENT_ID` | — | Connexion Microsoft Entra, active quand les deux sont posées (ce ne sont pas des secrets). Enregistrement d'application de type « Mobile and desktop applications », URI de redirection `http://localhost`. Les comptes locaux marchent toujours. |
+| `WORKPILOT_ENTRA_TENANT_ID`, `WORKPILOT_ENTRA_CLIENT_ID` | — | Connexion Microsoft Entra, active quand les deux sont posées (ce ne sont pas des secrets). Enregistrement d'application de type « Mobile and desktop applications », URI de redirection `http://localhost`. Les comptes locaux marchent toujours. Une connexion Entra retrouve son compte par l'identifiant d'objet (`oid`) ; la première relie ou crée un compte seulement avec une adresse dont Entra se porte garant : le nom d'utilisateur principal d'un membre du tenant, ou `email` quand la revendication facultative `xms_edov` est vraie (à ajouter pour les invités). |
+| `WORKPILOT_OIDC_ISSUER`, `WORKPILOT_OIDC_CLIENT_ID` | — | Connexion par n'importe quel fournisseur OpenID Connect (Okta, Google, Keycloak, Auth0…), active quand les deux sont posées (ce ne sont pas des secrets). Le serveur lit `<issuer>/.well-known/openid-configuration` : le fournisseur doit être joignable du serveur. Client public (application native, PKCE, sans secret), URI de redirection `http://localhost`. `WORKPILOT_OIDC_NAME` nomme le bouton, `WORKPILOT_OIDC_SCOPES` (défaut `openid profile email`) les scopes ; le détail dans [CONFIGURATION.md](CONFIGURATION.md#sign-in-and-sessions). |
+| `WORKPILOT_SELF_APPROVAL` | `when-alone` | L'auteur d'une carte approuve-t-il sa propre spec : `allow`, `deny`, ou `when-alone` (seulement tant que les autres qui peuvent approuver sur le projet ne réuniraient pas seuls les approbations qu'il faut à la carte). |
+| `WORKPILOT_APPROVAL_QUORUM` | `low=1,medium=1,high=1` | Combien de personnes approuvent une carte, selon sa criticité, par exemple `low=1,medium=2,high=3` (de 1 à 10 ; un niveau absent en demande 1). Une carte est `medium` sauf si un approbateur la règle, ou si l'évaluation de sa spec la dit complexe (`high`). |
+| `WORKPILOT_APPROVAL_ROLES` | — | Les rôles qu'un des approbateurs d'une carte doit tenir, selon sa criticité : des slugs de rôle joints par `+`, par exemple `high=tech-lead+security` (5 par niveau au plus). |
+| `WORKPILOT_APPROVAL_ESCALATION_HOURS` | — (jamais) | Combien de temps le plan d'une carte attend ses approbations avant qu'un second groupe d'approbateurs en soit prévenu, en heures : `24` pour toutes les criticités, ou `low=72,medium=24,high=4` (de 0 à 720 ; un niveau absent ne s'escalade jamais). L'attente part de la fin du run de spec ; une carte s'escalade une fois par run de spec. |
+| `WORKPILOT_APPROVAL_ESCALATION_ROLES` | `owner+admin` | Le second groupe : les personnes de l'organisation qui tiennent l'un de ces rôles (slugs joints par `+`, 5 au plus) et peuvent approuver sur le projet, hors l'auteur de la carte et ceux qui l'ont approuvée. Elles en sont prévenues sur leurs canaux « Besoin de toi ». |
 | `WORKPILOT_INVITATION_TTL_HOURS` | `72` | Durée de validité d'un lien d'invitation. |
+| `WORKPILOT_PASSWORD_RESET_TTL_MINUTES` | `60` | Durée de validité d'un lien de mot de passe oublié, ramenée entre 5 et 1440 minutes. |
+| `WORKPILOT_USAGE_RETENTION_DAYS` | `365` | Combien de jours le serveur garde la consommation par run et par job et les jours de présence de chacun, ramené entre 30 et 3650 ; il efface chaque heure ce qui est plus vieux. Ce qui est enregistré : [server-usage-data.md](server-usage-data.md). |
+| `WORKPILOT_PAGE_ACTIVITY_RETENTION_DAYS` | `183` | Combien de jours le serveur garde l'activité par page (désactivée par défaut, activée par chaque organisation dans **Administration → Usage**), ramené entre 30 et 3650. Une organisation peut régler ses propres durées au même endroit ; ces deux variables sont celles des organisations qui n'en ont pas réglé. |
+| `WORKPILOT_METRICS_TOKEN` | — | Le jeton qu'un collecteur Prometheus envoie à `/metrics` (`Authorization: Bearer …`), 32 caractères au moins. Sans lui, `/metrics` répond 404. C'est un secret : il va dans `.env.server`, jamais dans un fichier suivi. |
+| `WORKPILOT_REPORT_TIMEZONE` | `Europe/Paris` | Le fuseau (nom IANA) du rapport d'usage quotidien des organisations qui n'ont pas réglé le leur ; un nom inconnu vaut `UTC`. |
+| `WORKPILOT_REPORT_LANGUAGE` | `fr` | La langue (`fr` ou `en`) du rapport d'usage des organisations qui n'ont pas réglé la leur. |
 | `WORKPILOT_PASSWORD_MIN_LENGTH` | `12` | Longueur minimale d'un mot de passe local ; ne fait que monter le plancher de 12. |
 | `WORKPILOT_PASSWORD_HIBP_CHECK` | `false` | Refuse un nouveau mot de passe connu de Have I Been Pwned (seuls cinq caractères de son empreinte SHA-1 sortent ; service injoignable, le mot de passe est accepté). |
-| `WORKPILOT_SMTP_*` | — | E-mail des invitations ; détail dans [CONFIGURATION.md](CONFIGURATION.md#invitation-email-smtp). Gardez STARTTLS ou TLS actif. |
+| `WORKPILOT_SMTP_*` | — | E-mail des invitations et des liens de mot de passe oublié (sans SMTP, l'écran renvoie vers un administrateur) ; détail dans [CONFIGURATION.md](CONFIGURATION.md#invitation-email-smtp). Gardez STARTTLS ou TLS actif. |
 | `WORKPILOT_ADMIN_PASSWORD` | — | Lu par `create_admin` au lieu de demander le mot de passe ; à retirer une fois le compte créé. |
 | `WORKPILOT_WS_ALLOWED_ORIGINS` | origines de développement locales | Origines de navigateur admises sur le flux. Une connexion sans en-tête `Origin`, comme celle que l'app ouvre depuis son processus principal, n'est pas filtrée. |
 | `CLAUDE_CODE_OAUTH_TOKEN` et autres identifiants de provider | — | Ceux du déploiement, passés à chaque run. En mode serveur, les routes qui configurent les providers répondent 403. Un run a pour `HOME` le home de son projet : un identifiant posé par une connexion interactive dans le home de l'utilisateur du serveur ne lui parvient pas. |
@@ -374,7 +467,7 @@ Un champ vide ne limite rien, et une organisation sans quota n'a aucune limite.
 | Membres maximum | ajouter un membre au-delà répond 409 |
 | Projets maximum | créer un projet au-delà répond 409 |
 | Exécutions simultanées maximum | runs et jobs de l'organisation en file ou en cours ; au-delà, lancer répond 429 |
-| Budget mensuel de tokens, blocage | enregistrés, mais la consommation n'est pas encore comptée (toujours 0) : ce budget ne bloque rien aujourd'hui |
+| Budget mensuel de tokens, blocage | tokens d'entrée, de sortie et de cache de tous les runs et jobs de l'organisation depuis le 1er du mois (UTC) ; une fois le budget atteint, lancer répond 402 si le blocage est coché, sinon le dépassement se lit dans Quotas et Vue d'ensemble |
 
 Le plafond du serveur (`WORKPILOT_MAX_CONCURRENT_RUNS`) s'applique en plus, à toutes les
 organisations ensemble.
@@ -393,6 +486,12 @@ la suppression d'une organisation.
 **Administration → Membres** : changer le rôle d'une personne, la retirer de l'organisation,
 désactiver son compte, révoquer ses sessions (elle doit se reconnecter). Le rôle de plateforme
 (`admin`, `member`, `viewer`) se change par `POST /admin/users/{id}/platform-role`.
+
+**Mot de passe oublié** : la personne demande un lien depuis l'écran de connexion, qui part par
+e-mail si SMTP est réglé. Sinon, un administrateur de la plateforme l'émet depuis **Membres** (icône
+de clé) ou `POST /admin/users/{id}/password-reset`, et le transmet. Le lien sert une fois, ferme
+toutes les sessions du compte une fois le mot de passe changé, et seule son empreinte est gardée en
+base (table `password_resets`). Détail : [server-guide.md](server-guide.md#un-mot-de-passe-oublié).
 
 ### Accès MCP des apps d'IA
 
@@ -465,6 +564,64 @@ activer : la route passe par le proxy comme le reste de l'API.
   s'appliquer, elle y donne la raison ; corrigez l'hôte (voir [Prérequis](#prérequis)) plutôt que
   de passer `WORKPILOT_RUN_ISOLATION=off`.
 
+### Surveiller le serveur
+
+**La page de santé** (`GET /admin/platform/health`, administrateur de la plateforme) dit pourquoi
+le serveur va bien ou non, chaque contrôle avec son état (`ok`, `degraded` ou `error`), l'état
+de la page étant le pire des contrôles :
+
+| Contrôle | Ce qu'il regarde | `degraded` / `error` |
+|---|---|---|
+| `database` | un `SELECT 1`, sa durée, la révision du schéma (`alembic_version`) | la base ne répond pas |
+| `disk` | l'espace libre des volumes des clones (`repositories`) et de la base SQLite (`database`) | moins de 10 % / moins de 2 % libres |
+| `queue` | runs et jobs en file et en cours, le plafond `WORKPILOT_MAX_CONCURRENT_RUNS` | — |
+| `version` | la version du serveur et de Python | — |
+| `isolation` | le mode `WORKPILOT_RUN_ISOLATION` et la version de Landlock du noyau | isolation coupée / Landlock absent |
+| `jobs` | les tâches périodiques : effacement après la durée de conservation, relance des approbations | une tâche arrêtée |
+
+```bash
+curl -sS https://workpilot.example.com/admin/platform/health -H "Authorization: Bearer $TOKEN"
+# → { "status": "ok", "checks": { "database": { "status": "ok", "latency_ms": 1.2,
+#     "revision": "0046_page_visits" }, "disk": { "status": "ok", "volumes": [ … ] }, … } }
+```
+
+**Les métriques Prometheus** : `GET /metrics`, au format texte, pour un collecteur qui envoie
+`Authorization: Bearer <WORKPILOT_METRICS_TOKEN>` (32 caractères au moins, par exemple
+`openssl rand -hex 32` ; sans lui, 404 ; un mauvais jeton, 401). Aucune ne nomme une personne,
+un projet ni un chemin :
+
+| Métrique | Contenu |
+|---|---|
+| `workpilot_info{version}` | la version |
+| `workpilot_health_status{check}` | 0 `ok`, 1 `degraded`, 2 `error`, par contrôle de la page de santé |
+| `workpilot_database_latency_milliseconds` | la durée du `SELECT 1` |
+| `workpilot_disk_free_bytes{volume}`, `workpilot_disk_total_bytes{volume}` | l'espace des volumes |
+| `workpilot_landlock_abi` | la version de Landlock, -1 sans |
+| `workpilot_runs{status}`, `workpilot_jobs{status}` | runs et jobs en base, par état |
+| `workpilot_max_concurrent_runs` | le plafond du serveur |
+| `workpilot_tokens_this_month{org,provider}` | les tokens depuis le 1er du mois (UTC), par organisation (son slug) et fournisseur |
+| `workpilot_active_people_today{org}` | combien de personnes ont utilisé le serveur aujourd'hui |
+| `workpilot_organizations`, `workpilot_accounts` | organisations et comptes actifs |
+
+```yaml
+# prometheus.yml
+scrape_configs:
+  - job_name: workpilot
+    metrics_path: /metrics
+    scheme: https
+    authorization:
+      type: Bearer
+      credentials_file: /etc/prometheus/workpilot-token
+    static_configs:
+      - targets: ["workpilot.example.com"]
+```
+
+**Les traces OpenTelemetry** : avec `AUTO_CLAUDE_OTEL_ENDPOINT` (un collecteur OTLP que vous
+gérez, `http://otel-collector:4318`), chaque requête devient un span `SERVER` nommé d'après sa
+route (`GET /projects/{project_id}`), avec sa méthode, sa route et son code, dans le service
+`workpilot` à côté des spans des agents. Un span ne porte ni chemin réel, ni paramètre, ni
+en-tête, ni corps, ni personne. Sans la variable, rien n'est tracé.
+
 ### Disque
 
 `REPOS_ROOT` grandit avec les clones, les espaces de build et les caches de `.run-homes/`.
@@ -478,9 +635,8 @@ Ce qui n'existe pas encore, à la date de ce guide :
 - l'adresse d'écoute du serveur de streaming n'est pas réglable (`localhost` dans le conteneur),
   d'où un proxy dans l'espace réseau d'`api` ;
 - aucune rotation de la clé maître des secrets ; une seule clé JWT à la fois ;
-- le budget mensuel de tokens n'est pas compté ;
+- la consommation de tokens n'a pas encore de vue par personne ni par modèle (elle est enregistrée par run et par job, table `usage_records`) ;
 - un run de carte interrompu par un arrêt du serveur n'est pas soldé automatiquement ;
-- l'app n'a pas d'écran pour ajouter un compte existant à une organisation ;
 - aucune image du serveur n'est publiée : elle se construit depuis le dépôt ;
 - le journal d'audit n'est jamais purgé ;
 - les vues GitHub d'un projet serveur ne visent que github.com (`api.github.com`).

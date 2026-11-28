@@ -177,6 +177,8 @@ PHASE_ALIASES: dict[str, str] = {
     # which composes no roster today; the entry says which one they want the
     # day they move to `create_client`.
     "batch_analysis": "research",
+    # One issue classified from the text it is given: nothing to delegate.
+    "issue_triage": "solo",
     "batch_validation": "research",
     # Writing or questioning the spec, while there is still no code to point at.
     "spec_writer": "spec",
@@ -201,12 +203,12 @@ PHASE_ALIASES: dict[str, str] = {
     "pr_template_filler": "solo",
     "spec_compaction": "solo",
     "merge_resolver": "solo",
-    # One snippet in, one rewritten snippet out (migration/llm_transformer.py).
-    "migration": "solo",
     # The one-shot features that built their own SDK options until lot L16:
     # one request in the prompt, one answer out as text, no tool.
     "git_command": "solo",
     "code_playground": "solo",
+    "replay_summary": "solo",
+    "recorder_assist": "solo",
     "linear_updater": "solo",
     "pr_followup_reviewer": "solo",
     # Writes one archify model from evidence already in its prompt; Python

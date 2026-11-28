@@ -117,3 +117,78 @@ async def send_invitation_email(
         logger.warning("[Email] invitation to %s failed: %s", to_email, exc)
         raise EmailError(str(exc)) from exc
     logger.info("[Email] invitation sent to %s", to_email)
+
+
+def _build_password_reset_message(
+    settings: ServerSettings, to_email: str, reset_link: str, minutes: int
+) -> EmailMessage:
+    safe_link = html.escape(reset_link, quote=True)
+    msg = EmailMessage()
+    msg["Subject"] = "Réinitialiser votre mot de passe WorkPilot AI"
+    msg["From"] = settings.smtp_from
+    msg["To"] = to_email
+    msg.set_content(
+        "Une demande de nouveau mot de passe a été faite pour votre compte WorkPilot AI.\n\n"
+        "Dans l'app, sur l'écran de connexion, choisissez « Mot de passe oublié ? », puis\n"
+        "« J'ai un lien » et collez ce lien :\n"
+        f"{reset_link}\n\n"
+        f"Il sert une fois et expire dans {minutes} minutes. Si vous n'avez rien demandé,\n"
+        "ignorez ce message : votre mot de passe ne change pas.\n\n"
+        "---\n\n"
+        "A new password was requested for your WorkPilot AI account. In the app, on the\n"
+        'sign-in screen, choose "Forgot password?", then "I have a link", and paste the\n'
+        f"link above. It works once and expires in {minutes} minutes. If you did not ask,\n"
+        "ignore this message: your password stays the same.\n"
+    )
+    msg.add_alternative(
+        f"""\
+<html><body style="font-family:sans-serif;line-height:1.5">
+  <h2>WorkPilot AI</h2>
+  <p>Une demande de nouveau mot de passe a été faite pour votre compte.
+     Dans l'app, sur l'écran de connexion, choisissez
+     «&nbsp;Mot de passe oublié&nbsp;?&nbsp;», puis «&nbsp;J'ai un lien&nbsp;»,
+     et collez ce lien&nbsp;:</p>
+  <p style="word-break:break-all"><code>{safe_link}</code></p>
+  <p style="color:#666;font-size:13px">Il sert une fois et expire dans
+     {minutes}&nbsp;minutes. Si vous n'avez rien demandé, ignorez ce message.</p>
+  <hr>
+  <p style="color:#666;font-size:13px">A new password was requested for your
+     account. In the app, choose "Forgot password?", then "I have a link", and
+     paste the link above. It works once and expires in {minutes} minutes.
+     If you did not ask, ignore this message.</p>
+</body></html>
+""",
+        subtype="html",
+    )
+    return msg
+
+
+async def send_password_reset_email(
+    to_email: str, reset_link: str, minutes: int
+) -> None:
+    """Send a password reset link. Raises :class:`EmailError` on failure."""
+    settings = get_settings()
+    if not settings.email_enabled:
+        raise EmailError("SMTP is not configured")
+    msg = _build_password_reset_message(settings, to_email, reset_link, minutes)
+    try:
+        await asyncio.to_thread(_send_sync, settings, msg)
+    except (OSError, smtplib.SMTPException) as exc:
+        # Never include the message body / link in the log.
+        logger.warning("[Email] password reset to %s failed: %s", to_email, exc)
+        raise EmailError(str(exc)) from exc
+    logger.info("[Email] password reset sent to %s", to_email)
+
+
+async def send_message(msg: EmailMessage) -> None:
+    """Send a message built elsewhere (the usage report). Raises
+    :class:`EmailError` when SMTP is off or the send fails; the log names
+    neither the recipients nor the body."""
+    settings = get_settings()
+    if not settings.email_enabled:
+        raise EmailError("SMTP is not configured")
+    try:
+        await asyncio.to_thread(_send_sync, settings, msg)
+    except (OSError, smtplib.SMTPException) as exc:
+        logger.warning("[Email] message failed: %s", type(exc).__name__)
+        raise EmailError(type(exc).__name__) from exc

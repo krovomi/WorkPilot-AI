@@ -6,9 +6,10 @@
  */
 
 import type { Project } from "@shared/types";
+import type { RemoteProvider } from "@shared/utils/git-remote-provider";
 
 export interface RepositoryDetectionResult {
-	provider: "github" | "azure_devops" | "unknown";
+	provider: RemoteProvider;
 	remoteUrl?: string;
 	detectedAt: Date;
 }
@@ -128,9 +129,20 @@ export async function autoDetectAndUpdateProject(project: Project): Promise<{
 			updates.githubEnabled = true;
 			updates.azureDevOpsEnabled = false;
 			updates.jiraEnabled = false;
+		} else if (detection.provider === "gitlab") {
+			updates.githubEnabled = false;
+			updates.gitlabEnabled = true;
+			updates.azureDevOpsEnabled = false;
+			updates.jiraEnabled = false;
 		} else if (detection.provider === "azure_devops") {
 			updates.githubEnabled = false;
 			updates.azureDevOpsEnabled = true;
+			updates.jiraEnabled = false;
+		} else {
+			// Bitbucket: "unknown" returned above.
+			updates.githubEnabled = false;
+			updates.azureDevOpsEnabled = false;
+			updates.bitbucketEnabled = true;
 			updates.jiraEnabled = false;
 		}
 

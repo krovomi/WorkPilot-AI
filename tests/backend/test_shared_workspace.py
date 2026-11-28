@@ -391,6 +391,117 @@ async def test_the_dashboard_counts_the_cards_and_reads_qa_and_merges(server):
     assert theirs["total_cost"] == pytest.approx(100.0)
 
 
+async def _peers(server, tmp_path, count: int, *, member_of: int) -> list[str]:
+    """`count` more projects in org A, each with one spec of 20 minutes and
+    $2; Ada is a member of the first `member_of`."""
+    from server.db.engine import get_session_factory
+    from server.db.models import Project, ProjectMember
+
+    ids = []
+    async with get_session_factory()() as db:
+        for index in range(count):
+            clone = tmp_path / "repos" / f"peer-{index}"
+            start = NOW - timedelta(days=3)
+            _write(
+                clone / ".workpilot" / "cost_data.json",
+                {
+                    "usages": [
+                        _usage(clone, "001-x", start, "coding", (1, 1), 1.0),
+                        _usage(
+                            clone,
+                            "001-x",
+                            start + timedelta(minutes=20),
+                            "qa_review",
+                            (1, 1),
+                            1.0,
+                        ),
+                    ]
+                },
+            )
+            project = Project(
+                org_id=server["ids"]["org_a"],
+                name=f"Secret peer {index}",
+                repo_url=f"https://x/peer-{index}.git",
+                server_path=str(clone),
+            )
+            db.add(project)
+            await db.flush()
+            if index < member_of:
+                db.add(
+                    ProjectMember(project_id=project.id, user_id="u-ada", role="viewer")
+                )
+            ids.append(project.id)
+        await db.commit()
+    return ids
+
+
+async def _compare(server, scope):
+    from server.authz.principal import Principal
+    from shared_features.workspace import compare
+
+    principal = Principal(
+        id="u-ada", email="u-ada@x.test", org_id=server["ids"]["org_a"]
+    )
+    return await _call(compare, scope, principal=principal)
+
+
+@pytest.mark.asyncio
+async def test_the_comparison_reads_only_the_peers_the_person_may_read(
+    server, tmp_path
+):
+    peers = await _peers(server, tmp_path, 5, member_of=4)
+    scope = await _scope(server, "u-ada", "org_a", "a")
+    answer = await _compare(server, scope)
+    # The project's own spec: from its planning to its QA, $9.60.
+    assert answer["recent"]["specs"] == 1
+    assert answer["recent"]["cost"] == pytest.approx(9.6)
+    assert answer["recent"]["minutes"] == pytest.approx(4 * 60 + 5)
+    assert answer["previous"]["specs"] == 0
+    assert answer["min_group"] == 5 and answer["min_top"] == 20
+    # Four readable peers: their number, never their median.
+    assert answer["groups"]["all"] == {
+        "projects": 4,
+        "medians": None,
+        "top": None,
+        "trend": None,
+    }
+    served = json.dumps(answer)
+    for name in ("Secret peer", "Shop", str(tmp_path)):
+        assert name not in served
+    for project_id in [*peers, server["ids"]["b"]]:
+        assert project_id not in served
+
+
+@pytest.mark.asyncio
+async def test_the_comparison_gives_a_median_from_five_readable_peers(server, tmp_path):
+    await _peers(server, tmp_path, 5, member_of=5)
+    scope = await _scope(server, "u-ada", "org_a", "a")
+    groups = (await _compare(server, scope))["groups"]
+    # Org B's project, of a larger spend, is not one of them.
+    assert groups["all"]["projects"] == 5
+    assert groups["all"]["medians"]["cost"] == pytest.approx(2.0)
+    assert groups["all"]["medians"]["minutes"] == pytest.approx(20.0)
+    assert groups["all"]["medians"]["agents"] == pytest.approx(1.0)
+    assert groups["all"]["medians"]["qa_iterations"] is None
+    # Five projects are too few for a top tenth.
+    assert groups["all"]["top"] is None
+
+
+@pytest.mark.asyncio
+async def test_the_comparison_gives_a_top_tenth_from_twenty_readable_peers(
+    server, tmp_path
+):
+    await _peers(server, tmp_path, 20, member_of=20)
+    scope = await _scope(server, "u-ada", "org_a", "a")
+    answer = await _compare(server, scope)
+    top = answer["groups"]["all"]["top"]
+    assert answer["groups"]["all"]["projects"] == 20
+    assert top["cost"] == pytest.approx(2.0)
+    assert top["qa_iterations"] is None
+    served = json.dumps(answer)
+    assert "Secret peer" not in served and str(tmp_path) not in served
+
+
 def test_a_ledger_out_of_the_clone_or_too_large_is_not_read(tmp_path):
     from shared_features import usage_ledger
 
@@ -477,13 +588,13 @@ def test_a_ledger_s_numbers_too_large_or_its_garbage_count_but_never_break_it(
         garbage.write_text("x" * 500, encoding="utf-8")
     monkeypatch.setattr(usage_ledger, "MAX_TOTAL_BYTES", 1500)
     seen: list[str] = []
-    real_read = usage_ledger._read
+    real_read = usage_ledger.read_json
 
     def counting(path, root, limit):
         seen.append(path.parent.parent.name)
         return real_read(path, root, limit)
 
-    monkeypatch.setattr(usage_ledger, "_read", counting)
+    monkeypatch.setattr(usage_ledger, "read_json", counting)
     usage_ledger.read_ledgers(clone)
     assert "002-y" not in seen and "001-x" not in seen
 
@@ -519,12 +630,14 @@ def test_the_workspace_is_read_with_the_analytics_permission():
         ("GET", "/api/features/workspace/sessions"),
         ("GET", "/api/features/workspace/costs"),
         ("GET", "/api/features/workspace/dashboard"),
+        ("GET", "/api/features/workspace/compare"),
     }
     for method, path in paths:
         assert permission_for(method, path, domain) == "analytics.read"
 
 
-def test_the_desktop_dashboard_routes_answer_only_in_local_mode(monkeypatch):
+def test_the_desktop_session_history_answers_only_in_local_mode(monkeypatch, tmp_path):
+    import replay.recorder as recorder
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
 
@@ -532,20 +645,62 @@ def test_the_desktop_dashboard_routes_answer_only_in_local_mode(monkeypatch):
         if key.startswith("WORKPILOT_"):
             monkeypatch.delenv(key, raising=False)
     server_config.reset_settings_cache()
+    monkeypatch.setattr(
+        recorder, "_replay_recorder", recorder.ReplayRecorder(tmp_path / "replays")
+    )
     from dashboard.api import router
 
     app = FastAPI()
     app.include_router(router)
     with TestClient(app) as client:
-        assert client.get("/api/dashboard/stats").status_code == 200
+        assert client.get("/api/sessions/p-1").status_code == 200
         monkeypatch.setenv("WORKPILOT_SERVER_MODE", "1")
         monkeypatch.setenv("WORKPILOT_JWT_SECRET", _VALID_SECRET)
         server_config.reset_settings_cache()
-        for path in (
-            "/api/dashboard/stats",
-            "/api/sessions/p-1",
-            "/api/dashboard/snapshot/repos/p-1",
-            "/api/dashboard/export/p-1",
-        ):
-            assert client.get(path).status_code == 404, path
+        assert client.get("/api/sessions/p-1").status_code == 404
     server_config.reset_settings_cache()
+
+
+def test_the_dashboard_averages_build_times_and_skips_empty_sessions(tmp_path):
+    """Build times by complexity are averaged across workspaces; a session that
+    recorded neither a token nor a cent (older builds left such rows) names no
+    model."""
+    from shared_features import usage_ledger
+
+    clone = tmp_path / "clone"
+    root = clone / ".workpilot"
+    workspace = root / "worktrees" / "tasks" / "004-tutu" / ".workpilot"
+    workspace.mkdir(parents=True)
+    now = datetime.now(UTC).isoformat()
+    (root / "cost_data.json").write_text(
+        json.dumps(
+            {
+                "usages": [
+                    {"provider": "claude", "model": "old", "timestamp": now},
+                    {
+                        "provider": "claude",
+                        "model": "claude-haiku-4-5",
+                        "input_tokens": 82,
+                        "output_tokens": 2411,
+                        "cost": 0.11,
+                        "timestamp": now,
+                    },
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    (root / "dashboard_snapshot.json").write_text(
+        json.dumps({"avg_completion_by_complexity": {"simple": [100.0, 200.0]}}),
+        encoding="utf-8",
+    )
+    (workspace / "dashboard_snapshot.json").write_text(
+        json.dumps({"avg_completion_by_complexity": {"simple": 300.0}}),
+        encoding="utf-8",
+    )
+
+    snapshot = usage_ledger.dashboard(usage_ledger.read_ledgers(clone), {})
+
+    assert snapshot["avg_completion_by_complexity"] == {"simple": 200.0}
+    assert snapshot["cost_by_model"] == {"claude/claude-haiku-4-5": 0.11}
+    assert snapshot["total_tokens"] == 82 + 2411

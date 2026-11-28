@@ -45,7 +45,12 @@ WS_URL = f"ws://127.0.0.1:{WS_PORT}"
 
 #: What the server processes inherit from the test's environment; the rest is
 #: built (docs/rules/security.md, S4). No proxy: everything is on the loopback.
-_INHERITED = ("PATH", "HOME", "LANG", "LC_ALL", "LC_CTYPE", "USER", "LOGNAME", "TMPDIR")
+#: The second line is what Windows needs to start a process at all: without
+#: SYSTEMROOT, git cannot open a socket, so a clone over HTTP fails there.
+_INHERITED = (
+    *("PATH", "HOME", "LANG", "LC_ALL", "LC_CTYPE", "USER", "LOGNAME", "TMPDIR"),
+    *("SYSTEMROOT", "WINDIR", "COMSPEC", "PATHEXT", "TEMP", "TMP", "USERPROFILE"),
+)
 
 
 @dataclass
@@ -85,8 +90,9 @@ def _git(*args: str, cwd: Path | None = None) -> None:
     )
 
 
-def make_origin_repo(root: Path) -> Path:
-    """A bare repository with a `main` branch, ready for git's HTTP protocol."""
+def make_origin_repo(root: Path, extra_files: dict[str, str] | None = None) -> Path:
+    """A bare repository with a `main` branch, ready for git's HTTP protocol;
+    `extra_files` (relative path → text) are in its first commit too."""
     work = root / "work"
     work.mkdir(parents=True)
     _git("init", "-q", "-b", "main", str(work))
@@ -94,6 +100,10 @@ def make_origin_repo(root: Path) -> Path:
     (work / "app.py").write_text(
         "def hello() -> str:\n    return 'hi'\n", encoding="utf-8"
     )
+    for name, text in (extra_files or {}).items():
+        target = work / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(text, encoding="utf-8")
     _git("add", ".", cwd=work)
     _git("commit", "-q", "-m", "initial", cwd=work)
     bare = root / "origin.git"

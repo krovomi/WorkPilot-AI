@@ -6,12 +6,10 @@
  */
 
 import type { ChildProcess } from "node:child_process";
-import { exec, execFile, spawn } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { promisify } from "node:util";
-
-
+import { app } from "electron";
 import type { Project } from "../../../../shared/types";
 import type {
 	AuthFailureInfo,
@@ -22,14 +20,69 @@ import {
 	type OperationType,
 } from "../../../claude-profile/operation-registry";
 import { getClaudeProfileManager } from "../../../claude-profile-manager";
-import { isMacOS, isWindows } from "../../../platform";
+import { findExecutable, isMacOS, isWindows } from "../../../platform";
 import { parsePythonCommand } from "../../../python-detector";
 import {
 	detectAuthFailure,
 	detectBillingFailure,
 } from "../../../rate-limit-detector";
 
-const execAsync = promisify(exec);
+/**
+ * Kill a runner and the processes it started: its process group on Unix
+ * (it is spawned detached), its tree through `taskkill` on Windows.
+ */
+export function killProcessTree(child: ChildProcess, signal: NodeJS.Signals): void {
+	if (!child.pid) {
+		child.kill(signal);
+		return;
+	}
+	try {
+		if (!isWindows()) {
+			process.kill(-child.pid, signal);
+		} else {
+			execFile("taskkill", ["/pid", String(child.pid), "/T", "/F"], (err: Error | null) => {
+				if (err) console.warn("[SubprocessRunner] taskkill error (process may have already exited):", err.message);
+			});
+		}
+	} catch {
+		child.kill(signal);
+	}
+}
+
+/**
+ * Hands each complete line of a stream to `onLine`. A chunk can end in the
+ * middle of a line; that part waits for the rest, and `flush` gives the last
+ * line when the stream ends without a newline.
+ */
+function lineReader(onLine: (line: string) => void) {
+	let pending = "";
+	const emit = (line: string) => {
+		const text = line.endsWith("\r") ? line.slice(0, -1) : line;
+		if (text.trim()) onLine(text);
+	};
+	return {
+		push(text: string) {
+			const combined = pending + text;
+			const end = combined.lastIndexOf("\n");
+			pending = combined.slice(end + 1);
+			if (end >= 0) for (const line of combined.slice(0, end).split("\n")) emit(line);
+		},
+		flush() {
+			emit(pending);
+			pending = "";
+		},
+	};
+}
+
+/** Runs `gh` with arguments, without a shell; a failure keeps its output. */
+function runGh(gh: string, args: string[]): Promise<void> {
+	return new Promise((resolve, reject) => {
+		execFile(gh, args, (error, stdout, stderr) => {
+			if (error) reject(Object.assign(error, { output: `${stdout}${stderr}` }));
+			else resolve();
+		});
+	});
+}
 
 /**
  * Create a fallback environment for Python subprocesses when no env is provided.
@@ -174,69 +227,27 @@ export function runPythonSubprocess<T = unknown>(
 		detached: !isWindows(),
 	});
 
-	// Register with OperationRegistry for proactive swap support
+	// Register with OperationRegistry for proactive swap support. A run without
+	// a restartFn (a PR review is one-shot) gets one that returns false: a
+	// profile swap then stops it (SIGTERM, without waiting) and does not restart it.
 	if (options.operationRegistration) {
-		const { operationId, operationType, metadata, restartFn } =
-			options.operationRegistration;
-		const profileManager = getClaudeProfileManager();
-		const activeProfile = profileManager.getActiveProfile();
-
-		if (activeProfile) {
-			const operationRegistry = getOperationRegistry();
-
-			// Create a stop function that kills the subprocess.
-			// Note: This sends SIGTERM and returns immediately without waiting for process exit.
-			//
-			// Timing dependency for restarts:
-			// - For subprocess-runner operations, restartFn returns false so no race condition
-			//   (operations are non-resumable and won't be restarted, just stopped gracefully)
-			// - For AgentManager operations, there's a 500ms setTimeout delay in restartTask
-			//   (see agent-manager.ts line 528) that mitigates the race between kill and restart
-			//
-			// RestartFn implementations should handle potential overlap between process termination
-			// and restart initialization if not using the setTimeout pattern.
-			const stopFn = async () => {
-				if (child.pid) {
-					try {
-						if (!isWindows()) {
-							process.kill(-child.pid, "SIGTERM");
-						} else {
-							execFile(
-								"taskkill",
-								["/pid", String(child.pid), "/T", "/F"],
-								() => {
-									/* noop */
-								},
-							);
-						}
-					} catch {
-						child.kill("SIGTERM");
-					}
-				}
-			};
-
-			// Register with OperationRegistry for tracking and proactive swap support.
-			// For operations that provide a restartFn, UsageMonitor can restart them with a new profile.
-			// For operations without restartFn (e.g., PR reviews which are non-resumable due to one-shot workflow),
-			// we register with a no-op restartFn that returns false. This allows the swap to stop the operation
-			// gracefully without attempting restart. The operation will be killed when the profile swaps,
-			// which is the correct behavior for non-resumable operations.
-			operationRegistry.registerOperation(
-				operationId,
-				operationType,
-				activeProfile.id,
-				activeProfile.name,
-				restartFn || (() => false), // Use provided restartFn or a no-op for non-resumable operations
-				{
-					stopFn,
-					metadata: {
-						...metadata,
-						pythonPath: options.pythonPath,
-						cwd: options.cwd,
-					},
+		const { operationId, operationType, metadata, restartFn } = options.operationRegistration;
+		const activeProfile = getClaudeProfileManager().getActiveProfile();
+		getOperationRegistry().registerOperation(
+			operationId,
+			operationType,
+			activeProfile.id,
+			activeProfile.name,
+			restartFn || (() => false),
+			{
+				stopFn: async () => killProcessTree(child, "SIGTERM"),
+				metadata: {
+					...metadata,
+					pythonPath: options.pythonPath,
+					cwd: options.cwd,
 				},
-			);
-		}
+			},
+		);
 	}
 
 	const promise = new Promise<SubprocessResult<T>>((resolve) => {
@@ -284,33 +295,7 @@ export function runPythonSubprocess<T = unknown>(
 				// Kill the subprocess to stop the auth failure spam
 				killedDueToAuthFailure = true;
 
-				// Use process.kill with negative PID to kill the entire process group on Unix
-				// This ensures child processes (like the Claude SDK subprocess) are also killed
-				if (child.pid) {
-					try {
-						// On Unix, negative PID kills the process group
-						if (!isWindows()) {
-							process.kill(-child.pid, "SIGKILL");
-						} else {
-							// On Windows, use taskkill to kill the process tree
-							execFile(
-								"taskkill",
-								["/pid", String(child.pid), "/T", "/F"],
-								(err: Error | null) => {
-									if (err)
-										console.warn(
-											"[SubprocessRunner] taskkill error (process may have already exited):",
-											err.message,
-										);
-								},
-							);
-						}
-					} catch (_err) {
-						child.kill("SIGKILL");
-					}
-				} else {
-					child.kill("SIGKILL");
-				}
+				killProcessTree(child, "SIGKILL");
 			}
 		};
 
@@ -351,82 +336,45 @@ export function runPythonSubprocess<T = unknown>(
 				// Kill the subprocess to stop the billing failure spam
 				killedDueToBillingFailure = true;
 
-				// Use process.kill with negative PID to kill the entire process group on Unix
-				// This ensures child processes (like the Claude SDK subprocess) are also killed
-				if (child.pid) {
-					try {
-						// On Unix, negative PID kills the process group
-						if (!isWindows()) {
-							process.kill(-child.pid, "SIGKILL");
-						} else {
-							// On Windows, use taskkill to kill the process tree
-							execFile(
-								"taskkill",
-								["/pid", String(child.pid), "/T", "/F"],
-								(err: Error | null) => {
-									if (err)
-										console.warn(
-											"[SubprocessRunner] taskkill error (process may have already exited):",
-											err.message,
-										);
-								},
-							);
-						}
-					} catch (_err) {
-						child.kill("SIGKILL");
-					}
-				} else {
-					child.kill("SIGKILL");
-				}
+				killProcessTree(child, "SIGKILL");
 			}
 		};
+
+		const stdoutLines = lineReader((line) => {
+			// Call custom stdout handler
+			options.onStdout?.(line);
+
+			// Check for auth and billing failures in real-time (each emitted once)
+			checkAuthFailure(line);
+			checkBillingFailure(line);
+
+			// Parse progress updates
+			const match = line.match(progressPattern);
+			if (match && options.onProgress) {
+				options.onProgress(parseInt(match[1], 10), match[2].trim());
+			}
+		});
+		const stderrLines = lineReader((line) => {
+			options.onStderr?.(line);
+			checkAuthFailure(line);
+			checkBillingFailure(line);
+		});
 
 		child.stdout.on("data", (data: Buffer) => {
 			const text = data.toString("utf-8");
 			stdout += text;
-
-			const lines = text.split("\n");
-			for (const line of lines) {
-				if (line.trim()) {
-					// Call custom stdout handler
-					options.onStdout?.(line);
-
-					// Check for auth failures in real-time (only emit once)
-					checkAuthFailure(line);
-
-					// Check for billing/credit failures in real-time (only emit once)
-					checkBillingFailure(line);
-
-					// Parse progress updates
-					const match = line.match(progressPattern);
-					if (match && options.onProgress) {
-						const percent = parseInt(match[1], 10);
-						const message = match[2].trim();
-						options.onProgress(percent, message);
-					}
-				}
-			}
+			stdoutLines.push(text);
 		});
 
 		child.stderr.on("data", (data: Buffer) => {
 			const text = data.toString("utf-8");
 			stderr += text;
-
-			const lines = text.split("\n");
-			for (const line of lines) {
-				if (line.trim()) {
-					options.onStderr?.(line);
-
-					// Also check stderr for auth failures
-					checkAuthFailure(line);
-
-					// Also check stderr for billing/credit failures
-					checkBillingFailure(line);
-				}
-			}
+			stderrLines.push(text);
 		});
 
 		child.on("close", (code: number | null) => {
+			stdoutLines.flush();
+			stderrLines.flush();
 			// Treat null exit code (killed with SIGKILL) as failure, not success
 			const exitCode = code ?? -1;
 
@@ -533,50 +481,35 @@ export function getRunnerPath(backendPath: string): string {
 }
 
 /**
- * Get the auto-claude backend path for a project
- *
- * Auto-detects the backend location using multiple strategies:
- * 1. Development repo structure (apps/backend)
- * 2. Electron app bundle location
- * 3. Current working directory
+ * The app's backend that holds a forge runner (`runners/github/runner.py`,
+ * `runners/gitlab/runner.py`), or null. It is looked for where the app runs
+ * from, never in the project's folder: the project is what the runner works
+ * on, not where the app's code lives.
  */
-export function getBackendPath(project: Project): string | null {
-	// Import app module for production path detection
-	// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-	let app: any;
+export function findAppBackendPath(runner: string): string | null {
+	let appPath: string | null = null;
 	try {
-		app = require("electron").app;
+		appPath = app.getAppPath();
 	} catch {
-		// Electron not available in tests
+		// No Electron app here (a test that mocks electron without it)
 	}
 
-	// Check if this is a development repo (has apps/backend structure)
-	const appsBackendPath = path.join(project.path, "apps", "backend");
-	if (
-		fs.existsSync(path.join(appsBackendPath, "runners", "github", "runner.py"))
-	) {
-		return appsBackendPath;
-	}
-
-	// Auto-detect from app location (same logic as agent-process.ts)
+	// Same locations as agent-process.ts
 	const possiblePaths = [
 		// Dev mode: apps/frontend/out/main -> apps/backend
 		path.resolve(import.meta.dirname, "..", "..", "..", "backend"),
 		// Alternative: from app root -> apps/backend
-		app ? path.resolve(app.getAppPath(), "..", "backend") : null,
+		appPath ? path.resolve(appPath, "..", "backend") : null,
 		// If running from repo root with apps structure
 		path.resolve(process.cwd(), "apps", "backend"),
 	].filter((p): p is string => p !== null);
 
-	for (const backendPath of possiblePaths) {
-		// Check for runner.py as marker
-		const runnerPath = path.join(backendPath, "runners", "github", "runner.py");
-		if (fs.existsSync(runnerPath)) {
-			return backendPath;
-		}
-	}
+	return possiblePaths.find((p) => fs.existsSync(path.join(p, runner))) ?? null;
+}
 
-	return null;
+/** The app's backend that holds the GitHub runner, or null. */
+export function getBackendPath(): string | null {
+	return findAppBackendPath(path.join("runners", "github", "runner.py"));
 }
 
 /**
@@ -593,46 +526,19 @@ export interface GitHubModuleValidation {
 }
 
 /**
- * Validate that the GitHub runner exists (synchronous, legacy)
- * @deprecated Use validateGitHubModule() for comprehensive async validation
- */
-export function validateRunner(backendPath: string | null): {
-	valid: boolean;
-	error?: string;
-} {
-	if (!backendPath) {
-		return {
-			valid: false,
-			error:
-				"GitHub runner not found. Make sure the GitHub automation module is installed.",
-		};
-	}
-
-	const runnerPath = getRunnerPath(backendPath);
-	if (!fs.existsSync(runnerPath)) {
-		return {
-			valid: false,
-			error: `GitHub runner not found at: ${runnerPath}`,
-		};
-	}
-
-	return { valid: true };
-}
-
-/**
  * Comprehensive async validation of GitHub automation module
  *
  * Checks:
- * 1. runner.py exists (dev repo or production install)
+ * 1. runner.py exists in the app's backend (dev repo or production install)
  * 2. gh CLI is installed
  * 3. gh CLI is authenticated
  * 4. Python virtual environment is set up
  *
- * @param project - The project to validate
+ * @param _project - The project the review will run on; the runner is the app's
  * @returns Detailed validation result with specific error messages
  */
 export async function validateGitHubModule(
-	project: Project,
+	_project?: Project,
 ): Promise<GitHubModuleValidation> {
 	const result: GitHubModuleValidation = {
 		valid: false,
@@ -643,30 +549,19 @@ export async function validateGitHubModule(
 	};
 
 	// 1. Check runner.py location
-	const backendPath = getBackendPath(project);
+	const backendPath = getBackendPath();
 	if (!backendPath) {
 		result.error =
-			"GitHub automation module not installed. This project does not have the GitHub runner configured.";
+			"GitHub automation module not installed: the app's backend has no GitHub runner.";
 		return result;
 	}
 
 	result.backendPath = backendPath;
-
-	const runnerPath = getRunnerPath(backendPath);
-	result.runnerAvailable = fs.existsSync(runnerPath);
-
-	if (!result.runnerAvailable) {
-		result.error = `GitHub runner script not found at: ${runnerPath}`;
-		return result;
-	}
+	result.runnerAvailable = true;
 
 	// 2. Check gh CLI installation (cross-platform)
-	try {
-		const whichCommand = isWindows() ? "where gh" : "which gh";
-		await execAsync(whichCommand);
-		result.ghCliInstalled = true;
-	} catch {
-		result.ghCliInstalled = false;
+	const gh = findExecutable("gh");
+	if (!gh) {
 		const installInstructions = isWindows()
 			? "winget install --id GitHub.cli"
 			: isMacOS()
@@ -675,27 +570,20 @@ export async function validateGitHubModule(
 		result.error = `GitHub CLI (gh) is not installed. Install it with:\n  ${installInstructions}`;
 		return result;
 	}
+	result.ghCliInstalled = true;
 
-	// 3. Check gh authentication
+	// 3. Check gh authentication: `gh auth status` exits non-zero when not
+	// logged in. Any other failure (a network issue) still counts as logged in.
 	try {
-		await execAsync("gh auth status 2>&1");
-		result.ghAuthenticated = true;
-		// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-	} catch (error: any) {
-		// gh auth status returns non-zero when not authenticated
-		// Check the output to determine if it's an auth issue
-		const output = error.stdout || error.stderr || "";
-		if (
-			output.includes("not logged in") ||
-			output.includes("not authenticated")
-		) {
-			result.ghAuthenticated = false;
+		await runGh(gh, ["auth", "status"]);
+	} catch (error) {
+		const { output } = error as { output: string };
+		if (output.includes("not logged in") || output.includes("not authenticated")) {
 			result.error = "GitHub CLI is not authenticated. Run:\n  gh auth login";
 			return result;
 		}
-		// If it's some other error, still consider it authenticated (might be network issue)
-		result.ghAuthenticated = true;
 	}
+	result.ghAuthenticated = true;
 
 	// 4. Check Python virtual environment (cross-platform)
 	const venvPath = getPythonPath(backendPath);
@@ -790,9 +678,17 @@ export function buildRunnerArgs(
 	options?: {
 		model?: string;
 		thinkingLevel?: string;
+		/** The flag that names the project folder (the GitLab runner's is `--project-dir`). */
+		projectFlag?: string;
+		/** The GitHub runner's `--repo` (`owner/repo`, checked by the caller). */
+		repo?: string;
 	},
 ): string[] {
-	const args = [runnerPath, "--project", projectPath];
+	const args = [runnerPath, options?.projectFlag ?? "--project", projectPath];
+
+	if (options?.repo) {
+		args.push("--repo", options.repo);
+	}
 
 	if (options?.model) {
 		args.push("--model", options.model);

@@ -4,7 +4,8 @@
 	"tabs": {
 		"browser": "Browser",
 		"visualRegression": "Visual Regression",
-		"testRunner": "Test Runner"
+		"testRunner": "Test Runner",
+		"recorder": "Recorder"
 	},
 	"stats": {
 		"totalTests": "Tests",
@@ -73,5 +74,133 @@
 		"compareFailed": "Visual comparison failed",
 		"testsFailed": "Test execution failed",
 		"noProject": "Select a project to use the Browser Agent"
+	},
+	"recorder": {
+		"title": "Record a test",
+		"description": "Open a page in a browser window, do what the test should do, then export the steps as a Playwright, Cypress, Selenium or WebdriverIO test. Alt+click an element to check its visible text. Hovers, scrolls, drags, editable text and lists with several choices are recorded, as are iframes and open shadow roots; a dialog the page opens is answered here. The test waits for what each action caused (a page, a request, an element) instead of pausing.",
+		"urlLabel": "Address to record from",
+		"start": "Record",
+		"stop": "Stop",
+		"starting": "Opening the browser window…",
+		"recording": "Recording: act in the browser window",
+		"stopping": "Closing the browser window…",
+		"truncated": "The recording reached its limit of 300 steps; later actions were not recorded.",
+		"stepsTitle": "Steps",
+		"noSteps": "No step yet. Start a recording and act in the browser window.",
+		"removeStep": "Remove this step",
+		"secretValue": "secret, read from {{name}}",
+		"kinds": {
+			"navigate": "Open",
+			"click": "Click",
+			"fill": "Type",
+			"select": "Choose",
+			"press": "Press",
+			"assert_text": "Check text",
+			"hover": "Hover",
+			"scroll": "Scroll",
+			"drag": "Drag"
+		},
+		"place": {
+			"frame": "in a frame",
+			"shadow": "in a shadow root"
+		},
+		"waits": {
+			"visible": "waits for it to show",
+			"request": "waits for {{method}} {{path}}",
+			"url": "waits for {{url}}",
+			"hidden": "waits for the loading indicator to go"
+		},
+		"suggestions": {
+			"title": "Suggested checks",
+			"hint": "What showed up right after an action. Keep a check to add it after that action; it is not in the test until you do.",
+			"check": "Check that “{{text}}” shows",
+			"after": "after: {{action}}",
+			"keep": "Keep",
+			"dismiss": "Set this check aside"
+		},
+		"exportTitle": "Export",
+		"nameLabel": "Test name",
+		"namePlaceholder": "recorded flow",
+		"formatLabel": "Test format",
+		"formats": {
+			"playwright-ts": "Playwright (TypeScript)",
+			"playwright-python": "Playwright (Python)",
+			"cypress": "Cypress",
+			"selenium-python": "Selenium (Python)",
+			"selenium-java": "Selenium (Java)",
+			"webdriverio": "WebdriverIO (JavaScript)",
+			"selenium-csharp": "Selenium (C#)",
+			"selenium-ruby": "Selenium (Ruby)",
+			"selenium-js": "Selenium (JavaScript)",
+			"webdriverio-ts": "WebdriverIO (TypeScript)"
+		},
+		"preview": "Preview",
+		"review": "Propose on a review card",
+		"file": "Save as a file…",
+		"reviewHint": "A review card puts the test on its own branch, never in the project folder; a file is saved outside the project.",
+		"savedTo": "Saved to {{path}}",
+		"envVars": "Set these environment variables before running the test: {{names}}",
+		"skipped": "{{count}} step(s) have no selector this framework can express and were left as comments.",
+		"data": {
+			"file": "The values typed while recording are read from {{path}}, written beside the test: edit them there.",
+			"keys": "Typed values",
+			"kinds": {
+				"email": "email",
+				"date": "date",
+				"number": "number",
+				"phone": "phone",
+				"url": "address",
+				"name": "name",
+				"text": "text"
+			},
+			"secrets": "The test reads the name of each secret's environment variable from {{path}}, written beside the test: never its value."
+		},
+		"window": "the page",
+		"dropOn": "onto {{target}}",
+		"dialog": {
+			"alert": "Alert",
+			"confirm": "Confirmation",
+			"prompt": "Question",
+			"beforeunload": "Leave the page?",
+			"hint": "The page opened a dialog and waits for your answer. The test will answer it the same way.",
+			"textLabel": "Your answer",
+			"accept": "OK",
+			"dismiss": "Cancel"
+		},
+		"answered": {
+			"accept": "{{kind}} answered OK",
+			"dismiss": "{{kind}} cancelled"
+		},
+		"check": {
+			"title": "Run and check",
+			"hint": "Run the test proposed on a review card in that card's worktree, without credentials, or replay the recording without a window to see which selectors still find their element."
+		},
+		"run": {
+			"start": "Run the test on its review card",
+			"passed": "The test passed.",
+			"failed": "The test failed (exit code {{code}}).",
+			"awaitingApproval": "The project's worktree recipe is waiting for approval: its dependencies may not be installed.",
+			"firstRun": "First run of this test.",
+			"rate": "{{passed}} of {{runs}} recorded tests passed on their first run."
+		},
+		"reshoot": {
+			"start": "Check the selectors again",
+			"empty": "Nothing to replay.",
+			"now": "now:",
+			"applied": "updated",
+			"apply": "Use the new selectors",
+			"status": {
+				"ok": "Found",
+				"changed": "Changed",
+				"missing": "Not found",
+				"failed": "Action failed",
+				"not-reached": "Not reached"
+			}
+		},
+		"assist": {
+			"start": "Suggest a name and rank the checks",
+			"model": "Named and ranked by the provider's fast model; nothing you typed was sent.",
+			"rules": "Named and ranked by rules: no model was asked."
+		}
 	}
 }

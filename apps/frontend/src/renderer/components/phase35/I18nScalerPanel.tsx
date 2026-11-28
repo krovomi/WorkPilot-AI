@@ -22,10 +22,12 @@
 import { FolderOpen, Sparkles, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useShallow } from "zustand/react/shallow";
 import { useI18nEditorStore } from "../../stores/i18n-editor-store";
 import { useI18nScalerStore } from "../../stores/phase35-stores";
 import { Button } from "../ui/button";
 import { PanelShell } from "./_panel-shell";
+import { translateBackendError } from "./_translate-backend-error";
 import { TranslationEditor } from "./i18n-editor/TranslationEditor";
 
 import { Input } from "../ui/input";
@@ -66,14 +68,37 @@ interface I18nScalerPanelProps {
 
 export function I18nScalerPanel({ projectPath = "" }: I18nScalerPanelProps) {
 	const { t } = useTranslation("phase35");
-	const { phase, error, report, scannedDir, redirectedFrom, runReport } =
-		useI18nScalerStore();
-	const editor = useI18nEditorStore();
+	const { phase, error, report, scannedDir, redirectedFrom, formats, runReport } =
+		useI18nScalerStore(
+			useShallow((s) => ({
+				phase: s.phase,
+				error: s.error,
+				report: s.report,
+				scannedDir: s.scannedDir,
+				redirectedFrom: s.redirectedFrom,
+				formats: s.formats,
+				runReport: s.runReport,
+			})),
+		);
+	const editor = useI18nEditorStore(
+		useShallow((s) => ({
+			phase: s.phase,
+			error: s.error,
+			detectedRoots: s.detectedRoots,
+			localesDir: s.localesDir,
+			locales: s.locales,
+			namespaces: s.namespaces,
+			selectedNamespace: s.selectedNamespace,
+			detectRoots: s.detectRoots,
+			loadNamespaces: s.loadNamespaces,
+		})),
+	);
 	const [mode, setMode] = useState<"report" | "editor">("report");
 	const [dir, setDir] = useState("");
 	const [source, setSource] = useState<string>("en");
 	const [customSource, setCustomSource] = useState("");
 	const [usingCustom, setUsingCustom] = useState(false);
+	const [browseFailed, setBrowseFailed] = useState(false);
 
 	const isRunning = phase === "running";
 
@@ -106,11 +131,13 @@ export function I18nScalerPanel({ projectPath = "" }: I18nScalerPanelProps) {
 	}, [mode, projectPath, detectRoots]);
 
 	const handleBrowse = async () => {
+		setBrowseFailed(false);
 		try {
+			// A dismissed dialog answers null; only a failure throws.
 			const picked = await globalThis.electronAPI.selectDirectory();
 			if (picked) setDir(picked);
 		} catch {
-			// dialog dismissed or unavailable — leave state unchanged.
+			setBrowseFailed(true);
 		}
 	};
 
@@ -212,9 +239,28 @@ export function I18nScalerPanel({ projectPath = "" }: I18nScalerPanelProps) {
 								{t("i18nScaler.browseDir")}
 							</Button>
 						</div>
+						{mode === "report" && projectPath && dir !== projectPath && (
+							<Button
+								type="button"
+								size="sm"
+								variant="link"
+								className="mt-1 h-auto p-0 text-xs"
+								onClick={() => setDir(projectPath)}
+							>
+								{t("i18nScaler.useProject")}
+							</Button>
+						)}
+						{mode === "report" && (
+							<p className="mt-1 text-xs text-muted-foreground">{t("i18nScaler.formatsNote")}</p>
+						)}
 						{dirError && (
 							<p id="dir-error" className="mt-1 text-xs text-destructive">
 								{dirError}
+							</p>
+						)}
+						{browseFailed && (
+							<p role="alert" className="mt-1 text-xs text-destructive">
+								{t("common.pickerFailed")}
 							</p>
 						)}
 					</div>
@@ -243,7 +289,7 @@ export function I18nScalerPanel({ projectPath = "" }: I18nScalerPanelProps) {
 										size="sm"
 										variant="ghost"
 										onClick={cancelCustom}
-										aria-label={t("common.clearAll")}
+										aria-label={t("i18nScaler.sourceLocaleCustomCancel")}
 									>
 										<X className="h-3.5 w-3.5" />
 									</Button>
@@ -254,8 +300,6 @@ export function I18nScalerPanel({ projectPath = "" }: I18nScalerPanelProps) {
 								id="source-locale-select"
 								value={source}
 								onChange={(e) => handleSourceChange(e.target.value)}
-								aria-invalid={Boolean(sourceError) || undefined}
-								aria-describedby={sourceError ? "source-error" : undefined}
 								className="w-full p-2 text-sm h-auto"
 							>
 								{COMMON_LOCALES.map((code) => (
@@ -309,8 +353,11 @@ export function I18nScalerPanel({ projectPath = "" }: I18nScalerPanelProps) {
 
 				{mode === "editor" && (
 					<div className="space-y-2">
-						{editor.error && (
-							<p className="text-xs text-destructive">{editor.error}</p>
+						{/* Once a namespace is open the editor shows its own error; once is enough. */}
+						{editor.error && editor.selectedNamespace === null && (
+							<p role="alert" className="text-xs text-destructive">
+								{translateBackendError(editor.error, t)}
+							</p>
 						)}
 						{editor.localesDir && (
 							<p className="font-mono text-xs text-muted-foreground break-all">
@@ -336,6 +383,16 @@ export function I18nScalerPanel({ projectPath = "" }: I18nScalerPanelProps) {
 									dir: scannedDir,
 								})
 							: t("i18nScaler.scannedDir", { dir: scannedDir })}
+					</p>
+				)}
+
+				{mode === "report" && report && formats.length > 0 && (
+					<p className="text-xs text-muted-foreground">
+						{t("i18nScaler.formatsRead", {
+							formats: formats
+								.map((f) => t(`i18nScaler.formats.${f}` as never, { defaultValue: f }))
+								.join(", "),
+						})}
 					</p>
 				)}
 

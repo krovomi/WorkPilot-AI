@@ -7,7 +7,7 @@ fichiers y renvoient.
 
 | Dossier / fichier | Contenu | Statut |
 |---|---|---|
-| [`CLAUDE.md`](CLAUDE.md) | carte des règles et table des justifications de conception (les règles critiques sont dans [`../AGENTS.md`](../AGENTS.md)) | normatif |
+| [`CLAUDE.md`](CLAUDE.md) | carte des règles et mode d'emploi de `architecture/` (les règles critiques sont dans [`../AGENTS.md`](../AGENTS.md)) | normatif |
 | [`rules/`](rules/) | règles par thème : [sécurité](rules/security.md), [backend](rules/backend.md), [frontend](rules/frontend.md), [workflow](rules/workflow.md) | normatif |
 | [`architecture/`](architecture/) | pourquoi chaque feature est construite ainsi, une feature par fichier | référence |
 | [`SECURITY.md`](SECURITY.md) | politique de sécurité : versions supportées, signaler une vulnérabilité | public |
@@ -17,7 +17,9 @@ fichiers y renvoient.
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | vue d'ensemble : agents, sous-agents, workflows, état, couches de sécurité | référence |
 | [`CONFIGURATION.md`](CONFIGURATION.md) | providers, résolution des identifiants, variables d'environnement | référence |
 | [`CLI-USAGE.md`](CLI-USAGE.md) | utilisation en terminal et en CI | guide |
+| [`server-guide.md`](server-guide.md) | paramétrer, configurer et utiliser le serveur d'équipe, avec exemples et formats : `.env.server`, rôles, projets, quotas, app, téléphone, MCP, API | guide |
 | [`server-operations.md`](server-operations.md) | exploiter le serveur multi-utilisateurs d'une équipe : déploiement, TLS, sauvegarde, mise à jour, quotas, audit | guide |
+| [`server-usage-data.md`](server-usage-data.md) | ce que le serveur garde sur l'usage de ses membres (consommation, présence, connexions), combien de temps, pour le registre RGPD de l'équipe | référence |
 | [`MODEL_CATALOG.md`](MODEL_CATALOG.md) | mettre à jour le catalogue de modèles livré | guide |
 | [`RELEASE.md`](RELEASE.md) | publier une version | mainteneurs |
 | [`linux.md`](linux.md), [`windows-development.md`](windows-development.md) | notes par plateforme | guide |

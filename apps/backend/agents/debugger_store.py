@@ -3,9 +3,9 @@ Agent Debugger — file-backed persistent store.
 
 Why this exists
 ---------------
-:class:`agents.debugger.DebuggerRegistry` keeps sessions in *process memory*.
-That is fine for the live agent process (where the ``PreToolUse`` hook runs),
-but the Electron UI drives the debugger through
+A debugger that kept its sessions in *process memory* (the former
+``agents.debugger.DebuggerRegistry``) worked inside the live agent process
+(where the ``PreToolUse`` hook runs), but the Electron UI drives the debugger through
 ``runners/agent_debugger_runner.py``, which is spawned as a **one-shot process
 per IPC call**. In-memory state therefore never survives from one call to the
 next: attach in one process, the process exits, and the next call sees an empty
@@ -114,7 +114,7 @@ def _normalize_breakpoint(bp: dict[str, Any]) -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
-# Public API — mirrors the DebuggerSession surface used by the runner.
+# Public API — what the runner and the persistent hook use.
 # ---------------------------------------------------------------------------
 
 
@@ -306,11 +306,32 @@ def session_is_armed(session_id: str) -> bool:
     return any(b.get("enabled", True) for b in session.get("breakpoints") or [])
 
 
+# A finished run nobody set a breakpoint on leaves the picker after this long.
+_IDLE_SESSION_SECONDS = 7 * 24 * 3600
+
+
+def _drop_idle_sessions(state: dict[str, Any], now: float) -> None:
+    """Every run is listed now, so the finished, untouched ones must leave."""
+    for sid, session in list(state["sessions"].items()):
+        if not isinstance(session, dict):
+            del state["sessions"][sid]
+            continue
+        idle = now - float(session.get("updated_at") or 0) > _IDLE_SESSION_SECONDS
+        if (
+            idle
+            and not session.get("active")
+            and not session.get("breakpoints")
+            and not session.get("frames")
+        ):
+            del state["sessions"][sid]
+
+
 def register_active(session_id: str, meta: dict[str, Any] | None = None) -> None:
     """Advertise a session as a live agent run so the UI can attach to it."""
     state = _load()
-    session = _session(state, session_id)
     now = time.time()
+    _drop_idle_sessions(state, now)
+    session = _session(state, session_id)
     if session is None:
         session = {"created_at": now, "breakpoints": [], "frames": []}
         state["sessions"][session_id] = session

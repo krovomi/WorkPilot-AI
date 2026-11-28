@@ -22,6 +22,7 @@ export const phase35Mock: Phase35FeaturesAPI = {
 	scoreAgentHealth: () => browserUnavailable("Agent health"),
 	scoreAllAgentHealth: () => browserUnavailable("Agent health"),
 	resetAgentHealth: () => browserUnavailable("Agent health"),
+	scoreProjectAgentHealth: () => browserUnavailable("Agent health"),
 
 	routeModel: () => browserUnavailable("Model routing"),
 	compareModels: () => browserUnavailable("Model routing"),
@@ -29,6 +30,8 @@ export const phase35Mock: Phase35FeaturesAPI = {
 	listDomains: () => browserUnavailable("Domain agents"),
 	getDomainProfile: () => browserUnavailable("Domain agents"),
 	buildDomainBundle: () => browserUnavailable("Domain agents"),
+	getProjectDomain: () => browserUnavailable("Domain agents"),
+	setProjectDomain: () => browserUnavailable("Domain agents"),
 
 	scanCicdLog: () => browserUnavailable("CI/CD anomaly detection"),
 	analyseCicdLogs: () => browserUnavailable("CI/CD anomaly detection"),
@@ -44,6 +47,10 @@ export const phase35Mock: Phase35FeaturesAPI = {
 	captureGeneration: () => browserUnavailable("Generational testing"),
 	compareGeneration: () => browserUnavailable("Generational testing"),
 	deleteGeneration: () => browserUnavailable("Generational testing"),
+	detectGenTestCommands: () => browserUnavailable("Generational testing"),
+	runGenTests: () => browserUnavailable("Generational testing"),
+	cancelGenTests: async () => false,
+	importGenTestsReport: () => browserUnavailable("Generational testing"),
 
 	diffI18n: () => browserUnavailable("i18n auto-scaling"),
 	skeletonI18n: () => browserUnavailable("i18n auto-scaling"),
@@ -75,6 +82,7 @@ export const phase35Mock: Phase35FeaturesAPI = {
 	pairOps: () => browserUnavailable("Pair programming"),
 	subscribePairRoom: () => browserUnavailable("Pair programming"),
 	unsubscribePairRoom: () => browserUnavailable("Pair programming"),
+	pairAskAi: async () => ({ success: false as const, error: "unavailable" as const }),
 	onPairOpEvent: () => () => undefined,
 	onPairStreamError: () => () => undefined,
 };

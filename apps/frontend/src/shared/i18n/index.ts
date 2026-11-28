@@ -55,12 +55,14 @@ import enDesignToCode from "./locales/en/designToCode.json";
 import enDialogs from "./locales/en/dialogs.json";
 import enDocumentation from "./locales/en/documentation.json";
 import enErrors from "./locales/en/errors.json";
+import enBitbucket from "./locales/en/bitbucket.json";
 import enGitlab from "./locales/en/gitlab.json";
 import enGuidedTour from "./locales/en/guidedTour.json";
 import enIdeation from "./locales/en/ideation.json";
 import enInitDialog from "./locales/en/initDialog.json";
 import enInsights from "./locales/en/insights.json";
 import enLearningLoop from "./locales/en/learningLoop.json";
+import enReviewFeedback from "./locales/en/reviewFeedback.json";
 import enArchitectureVisualizer from "./locales/en/architectureVisualizer.json";
 import enPerformanceProfiler from "./locales/en/performanceProfiler.json";
 import enCodeMigration from "./locales/en/codeMigration.json";
@@ -152,12 +154,14 @@ import frDesignToCode from "./locales/fr/designToCode.json";
 import frDialogs from "./locales/fr/dialogs.json";
 import frDocumentation from "./locales/fr/documentation.json";
 import frErrors from "./locales/fr/errors.json";
+import frBitbucket from "./locales/fr/bitbucket.json";
 import frGitlab from "./locales/fr/gitlab.json";
 import frGuidedTour from "./locales/fr/guidedTour.json";
 import frIdeation from "./locales/fr/ideation.json";
 import frInitDialog from "./locales/fr/initDialog.json";
 import frInsights from "./locales/fr/insights.json";
 import frLearningLoop from "./locales/fr/learningLoop.json";
+import frReviewFeedback from "./locales/fr/reviewFeedback.json";
 import frArchitectureVisualizer from "./locales/fr/architectureVisualizer.json";
 import frPerformanceProfiler from "./locales/fr/performanceProfiler.json";
 import frCodeMigration from "./locales/fr/codeMigration.json";
@@ -246,11 +250,13 @@ export const resources = {
 		dialogs: enDialogs,
 		documentation: enDocumentation,
 		errors: enErrors,
+		bitbucket: enBitbucket,
 		gitlab: enGitlab,
 		guidedTour: enGuidedTour,
 		initDialog: enInitDialog,
 		insights: enInsights,
 		learningLoop: enLearningLoop,
+		reviewFeedback: enReviewFeedback,
 		multiRepo: enMultiRepo,
 		architectureVisualizer: enArchitectureVisualizer,
 		performanceProfiler: enPerformanceProfiler,
@@ -343,11 +349,13 @@ export const resources = {
 		dialogs: frDialogs,
 		documentation: frDocumentation,
 		errors: frErrors,
+		bitbucket: frBitbucket,
 		gitlab: frGitlab,
 		guidedTour: frGuidedTour,
 		initDialog: frInitDialog,
 		insights: frInsights,
 		learningLoop: frLearningLoop,
+		reviewFeedback: frReviewFeedback,
 		multiRepo: frMultiRepo,
 		architectureVisualizer: frArchitectureVisualizer,
 		performanceProfiler: frPerformanceProfiler,
@@ -447,11 +455,13 @@ i18n.use(initReactI18next).init({
 		"dialogs",
 		"documentation",
 		"errors",
+		"bitbucket",
 		"gitlab",
 		"guidedTour",
 		"initDialog",
 		"insights",
 		"learningLoop",
+		"reviewFeedback",
 		"multiRepo",
 		"architectureVisualizer",
 		"performanceProfiler",

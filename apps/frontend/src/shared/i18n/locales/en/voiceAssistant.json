@@ -45,7 +45,8 @@
 		"createTask": "“Create a task to add a CSV export”",
 		"open": "“Open the Kanban board”",
 		"draw": "“Open the feature that lets me draw an architecture”",
-		"settings": "“Open settings”"
+		"settings": "“Open settings”",
+		"stop": "“Stop” (the running agents stop after their current step)"
 	},
 	"errors": {
 		"model": "The speech model is not on this computer yet.",
@@ -67,7 +68,7 @@
 		"recording": "Press the keys…",
 		"reset": "Restore the default",
 		"conflict": {
-			"invalid": "Use Ctrl, Alt or ⌘ with a letter, a digit, a function key or Space.",
+			"invalid": "Use Ctrl, Alt or ⌘ with a letter, a digit, a function key or Space, or a key from F13 to F24 alone (a foot pedal).",
 			"altgr": "Ctrl+Alt is AltGr on many keyboards (it types @, € or [). Choose another combination.",
 			"used": "{{shortcut}} is already used by WorkPilot or by the system."
 		},
@@ -75,6 +76,92 @@
 		"systemWideHelp": "Registers the shortcut with the operating system: pressing it brings WorkPilot forward and opens the assistant. Takes effect when you save.",
 		"systemWideRefused": "The system refused this shortcut (another app may use it, or the desktop does not allow it). It still works inside WorkPilot.",
 		"speech": "Speech is transcribed on this computer (Whisper). No audio is kept.",
-		"model": "Simple commands are understood without a model. Other sentences use the “Voice assistant” model of Settings → Agent."
+		"model": "Simple commands are understood without a model. Other sentences use the “Voice assistant” model of Settings → Agent.",
+		"sensitivity": "Microphone sensitivity",
+		"sensitivityHelp": "How far above the room's noise your voice must be to count as speech. The first moments of each session measure the room; choose Low in a noisy place.",
+		"sensitivityLevels": {
+			"low": "Low (noisy room)",
+			"medium": "Medium",
+			"high": "High (quiet room, soft voice)"
+		},
+		"feedback": "Spoken feedback",
+		"feedbackLevels": {
+			"off": "Off",
+			"short": "Short: the answers",
+			"verbose": "Verbose: the answers and the running tasks"
+		},
+		"feedbackTry": "Listen",
+		"feedbackSample": "Voice assistant ready.",
+		"feedbackHelp": "Said with your system's voices, on this computer. In continuous mode, the microphone ignores what the assistant says.",
+		"feedbackUnavailable": "No local voice is installed on this system, so nothing can be said aloud.",
+		"wake": "Wake word",
+		"wakeHelp": "When the continuous mode is off, the microphone waits for this phrase, then opens the assistant. A pulsing light and a mute button stay on screen. Speech is transcribed on this computer.",
+		"wakePhrase": "Phrase"
+	},
+	"stop": {
+		"confirm": "Stop the running agents after their current step?",
+		"explain": "Each running task finishes the tool call it is in, does not start the next one, and waits for you to resume it from its card.",
+		"yes": "Stop after this step",
+		"no": "Keep going",
+		"stopping_one": "{{count}} task stops after its current step.",
+		"stopping_other": "{{count}} tasks stop after their current step.",
+		"none": "No task is running.",
+		"failed": "A running task could not be asked to stop. Use Stop all agents."
+	},
+	"continuous": {
+		"offer": "Keep the microphone on between commands, with a pulsing light and a mute button.",
+		"start": "Listen continuously",
+		"title": "Voice assistant, continuous mode",
+		"phase": {
+			"listening": "Listening",
+			"preparing": "Starting the microphone…",
+			"thinking": "Understanding…",
+			"muted": "Microphone muted",
+			"paused": "Paused while the panel is open",
+			"off": "Microphone off",
+			"dictating": "Paused while you dictate in the task form"
+		},
+		"mute": "Mute the microphone",
+		"unmute": "Turn the microphone back on",
+		"close": "Stop listening",
+		"hint": "Speak a command. Pause when you are done.",
+		"question": "Waiting for your answer",
+		"createQuestion": "Create the task “{{title}}”?",
+		"sayYes": "Say “yes” or “no”, or use the buttons.",
+		"cancelled": "Cancelled."
+	},
+	"heard": "Heard in {{language}}.",
+	"speech": {
+		"opening": "Opening {{view}}."
+	},
+	"narration": {
+		"phase": {
+			"planning": "{{title}}: planning.",
+			"coding": "{{title}}: coding.",
+			"qa_review": "{{title}}: checking the work.",
+			"qa_fixing": "{{title}}: fixing what the check found.",
+			"rate_limit_paused": "{{title}}: paused by the provider's rate limit."
+		},
+		"planReview": "{{title}}: the plan is ready for your review.",
+		"review": "{{title}}: done, ready for your review.",
+		"failed": "{{title}}: it failed.",
+		"stopped": "{{title}}: stopped.",
+		"done": "{{title}}: finished.",
+		"subtaskDone": "Done: {{detail}}.",
+		"working": "Now working on: {{detail}}."
+	},
+	"pair": {
+		"follow": "Pair mode: follow a running task",
+		"none": "No task followed",
+		"hint": "Say what the agent should do: it gets your words at its next session.",
+		"sendQuestion": "Send to “{{title}}”: “{{text}}”?",
+		"send": "Send to the agent",
+		"sent": "Sent to “{{title}}”: its agent reads it at its next session.",
+		"sendFailed": "The message could not be sent to “{{title}}”."
+	},
+	"wake": {
+		"title": "Voice assistant, waiting for its wake word",
+		"waiting": "Say “{{phrase}}”",
+		"muted": "Wake word muted"
 	}
 }

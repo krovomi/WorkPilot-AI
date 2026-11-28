@@ -85,6 +85,7 @@ DOMAINS: dict[str, str] = {
     "settings": "Provider credentials, models, MCP servers, agent tools",
     "marketplace": "MCP and plugin marketplaces",
     "lab": "Arena, playground, replay, parallel variations, pair programming",
+    "usage": "Who used the server and how much, per person; what is collected",
 }
 
 
@@ -153,6 +154,11 @@ _ALL: tuple[Permission, ...] = (
     # -- analytics ---------------------------------------------------------
     _p("analytics", "read"),
     _p("analytics", "write"),
+    # -- usage -------------------------------------------------------------
+    # Who used the server and how much, per person: privileged, so a viewer
+    # or an analyst does not read it unless a role grants it by name.
+    _p("usage", "read", privileged=True),
+    _p("usage", "write", privileged=True),
     # -- ops ---------------------------------------------------------------
     _p("ops", "read"),
     _p("ops", "write"),
@@ -170,8 +176,16 @@ _ALL: tuple[Permission, ...] = (
     _p("settings", "write"),
     _p("settings", "provider.read", privileged=True),
     _p("settings", "provider.write", privileged=True),
+    # A person's own AI accounts (``/users/me/ai-accounts``): their keys,
+    # used by their own runs only, never the deployment's.
+    _p("settings", "account.read"),
+    _p("settings", "account.write"),
     # -- marketplace -------------------------------------------------------
     _p("marketplace", "read"),
+    # A review of a catalogue server shared within the organization (#369
+    # lots 5 and 6): text, never code, so not privileged; maintainers and
+    # administrators hold it.
+    _p("marketplace", "write"),
     _p("marketplace", "install", privileged=True),
     # -- lab ---------------------------------------------------------------
     _p("lab", "read"),
@@ -243,7 +257,6 @@ def catalog_payload() -> list[dict]:
 
 FEATURE_DOMAINS: MappingProxyType[str, str] = MappingProxyType(
     {
-        "analytics": "analytics",
         "mission_control": "ops",
         "replay": "lab",
         "model_router": "settings",
@@ -281,7 +294,6 @@ FEATURE_DOMAINS: MappingProxyType[str, str] = MappingProxyType(
         # Same reasoning as rtk, and the same desktop-only router: whether the
         # generated-file cleaner is wired up here, and what it has stripped,
         # are facts about how this deployment's agent tooling is configured.
-        "watermarks": "settings",
         "spec_traceability": "task",
         # The cards of a server-mode project's shared board (shared_board/).
         "board": "task",
@@ -300,6 +312,20 @@ FEATURE_DOMAINS: MappingProxyType[str, str] = MappingProxyType(
         # A server project's dashboard, analytics, sessions and costs, read
         # from its runs, jobs and the ledgers in its clone.
         "workspace": "analytics",
+        # A recorded agent session left with a server project's team, behind
+        # a link that expires and can be revoked (replay is lab, like it).
+        "replay_shares": "lab",
+        # Pixel Office's team leaderboard and each person's badges, computed
+        # from a server project's runs and approvals (analytics, like the
+        # workspace views it sits beside).
+        "pixel_office": "analytics",
+        # A server project's workpilot.policy.yaml, the audit trail its agents
+        # write in the clone, the approvals they wait on and its kill switch
+        # (shared_features/governance.py): reading it is the audit domain.
+        "governance": "audit",
+        # A server project's execution waves (shared_features/execution_waves.py):
+        # the plan of its backlog and the run that starts it wave after wave.
+        "execution_waves": "task",
         # What a task's attachments and the project's ADRs say. Read-only and
         # addressed like spec_traceability, so it answers to the same domain.
         "docintel": "task",
@@ -317,9 +343,7 @@ FEATURE_DOMAINS: MappingProxyType[str, str] = MappingProxyType(
         "virtual_reviewer": "review",
         "test_generation": "qa",
         "github": "vcs",
-        "system_status": "ops",
         "dashboard": "analytics",
-        "agent_endpoints": "agent",
         "event_hooks": "ops",
         "notifications": "integration",
         # How a task's worktree is prepared (setup commands, ports) is the
@@ -329,6 +353,9 @@ FEATURE_DOMAINS: MappingProxyType[str, str] = MappingProxyType(
         # The schema guard's record and a re-check of the task's migrations.
         # Desktop-only like verify; files and git only, no agent.
         "schema_guard": "qa",
+        # A server project team's security reviews of catalogue MCP servers
+        # (shared_features/mcp_reviews.py).
+        "mcp_reviews": "marketplace",
     }
 )
 
@@ -358,13 +385,17 @@ SERVER_FEATURES: frozenset[str] = frozenset(
         "forge",
         "analyses",
         "workspace",
+        "replay_shares",
+        "pixel_office",
+        "governance",
+        "mcp_reviews",
+        "execution_waves",
     }
 )
 
 LOCAL_ONLY_FEATURES: frozenset[str] = frozenset(
     {
         "providers",
-        "analytics",
         "mission_control",
         "replay",
         "model_router",
@@ -390,7 +421,6 @@ LOCAL_ONLY_FEATURES: frozenset[str] = frozenset(
         "brain",
         "mcp_pins",
         "rtk",
-        "watermarks",
         "spec_traceability",
         "docintel",
         "uiux",
@@ -401,9 +431,7 @@ LOCAL_ONLY_FEATURES: frozenset[str] = frozenset(
         "virtual_reviewer",
         "test_generation",
         "github",
-        "system_status",
         "dashboard",
-        "agent_endpoints",
         "event_hooks",
         "notifications",
         "worktree_recipe",

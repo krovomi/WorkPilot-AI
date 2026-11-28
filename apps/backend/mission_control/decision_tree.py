@@ -14,6 +14,9 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
+# Shorter than this, a thought is a heartbeat, not a step of the reasoning.
+MIN_THOUGHT_CHARS = 30
+
 
 class NodeType(str, Enum):
     """Type of decision node."""
@@ -99,7 +102,8 @@ class DecisionTree:
         self._current_node_id: str | None = None
 
     def create_root(self, label: str = "Start") -> DecisionNode:
-        """Create the root node of the tree."""
+        """Start a new tree: a restarted agent does not keep the last run's nodes."""
+        self._nodes = {}
         node = DecisionNode(
             node_type=NodeType.ROOT,
             status=NodeStatus.ACTIVE,
@@ -146,30 +150,6 @@ class DecisionTree:
         self._current_node_id = node.id
         return node
 
-    def add_decision(
-        self,
-        label: str,
-        options: list[str],
-        chosen: str,
-        reasoning: str = "",
-        parent_id: str | None = None,
-    ) -> DecisionNode:
-        """Add a decision node with options considered."""
-        pid = parent_id or self._current_node_id
-        node = DecisionNode(
-            parent_id=pid,
-            node_type=NodeType.DECISION,
-            label=label,
-            options_considered=options,
-            chosen_option=chosen,
-            reasoning=reasoning[:300],
-        )
-        self._nodes[node.id] = node
-        if pid and pid in self._nodes:
-            self._nodes[pid].children.append(node.id)
-        self._current_node_id = node.id
-        return node
-
     def add_result(
         self,
         label: str,
@@ -192,20 +172,24 @@ class DecisionTree:
             self._nodes[pid].status = NodeStatus.COMPLETED
         return node
 
-    def complete_current(self, duration_ms: float = 0.0):
-        """Mark the current node as completed."""
-        if self._current_node_id and self._current_node_id in self._nodes:
-            node = self._nodes[self._current_node_id]
-            node.status = NodeStatus.COMPLETED
-            node.duration_ms = duration_ms
-            # Move back to parent
-            if node.parent_id:
-                self._current_node_id = node.parent_id
+    def steps(self, limit: int) -> list[str]:
+        """The last ``limit`` thoughts and tool calls, oldest first, as comparable keys.
 
-    def update_tool_output(self, node_id: str, output: str):
-        """Update the output of a tool call node."""
-        if node_id in self._nodes:
-            self._nodes[node_id].tool_output = output[:500]
+        Only the current run's: a result (an answer, an error, a rebalancing)
+        ends a run. A thought too short to be one (a "Thinking..." heartbeat)
+        is not a step.
+        """
+        keys: list[str] = []
+        for node in reversed(self._nodes.values()):
+            if len(keys) == limit or node.node_type in (NodeType.RESULT, NodeType.ROOT):
+                break
+            if node.node_type == NodeType.TOOL_CALL:
+                keys.append(f"tool\0{node.tool_name}\0{node.tool_input}")
+            elif node.node_type == NodeType.THINKING:
+                thought = " ".join(node.description.lower().split())
+                if len(thought) >= MIN_THOUGHT_CHARS:
+                    keys.append(f"thought\0{thought}")
+        return keys[::-1]
 
     @property
     def node_count(self) -> int:

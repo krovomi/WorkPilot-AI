@@ -303,6 +303,10 @@ img{display:block}
 }
 const FRAME_TITLES = {
 	kanban: "WorkPilot AI — Kanban",
+	"kanban-lanes": "WorkPilot AI — Kanban, lanes by sprint",
+	"kanban-list": "WorkPilot AI — Kanban, list",
+	"kanban-timeline": "WorkPilot AI — Kanban, timeline",
+	"kanban-reports": "WorkPilot AI — Kanban reports",
 	"task-detail": "WorkPilot AI — Task",
 	terminals: "WorkPilot AI — Agent terminals",
 	insights: "WorkPilot AI — Insights",
@@ -313,6 +317,10 @@ const FRAME_TITLES = {
 	"import-design": "WorkPilot AI — Import Design",
 	"test-generation": "WorkPilot AI — Test generation",
 	settings: "WorkPilot AI — Settings",
+	"ai-accounts": "WorkPilot AI — AI accounts",
+	sandbox: "WorkPilot AI — Sandbox",
+	"code-migration": "WorkPilot AI — Code migration",
+	"menu-customize": "WorkPilot AI — Customize the menu",
 };
 
 async function shoot(browser, html, file, scale) {

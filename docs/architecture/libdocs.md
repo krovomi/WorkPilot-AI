@@ -1,3 +1,9 @@
+---
+feature: libdocs
+summary: >-
+  Pages Context7 des bibliothèques sans exemple dans le dépôt, avant le build.
+---
+
 # Library documentation (libdocs)
 
 > Design rationale moved verbatim out of [`docs/CLAUDE.md`](../CLAUDE.md),

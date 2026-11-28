@@ -37,7 +37,8 @@
 		"costs": "Coûts",
 		"performance": "Performance",
 		"builds": "Builds",
-		"errors": "Erreurs"
+		"errors": "Erreurs",
+		"compare": "Où vous en êtes"
 	},
 	"sections": {
 		"tasksByStatus": "Tâches par Statut",
@@ -98,5 +99,92 @@
 		"pending": "En attente",
 		"failed": "Échouées",
 		"cancelled": "Annulées"
+	},
+	"compare": {
+		"title": "Où vous en êtes",
+		"loading": "Lecture de vos projets...",
+		"error": "Impossible de comparer ce projet",
+		"privacyLocal": "Comparé à vos autres projets sur cet ordinateur, lus dans leurs dossiers. Rien ne quitte votre ordinateur.",
+		"privacyServer_one": "Comparé aux projets de votre organisation que vous pouvez lire, en médianes seulement, jamais par leur nom, et pour des groupes d'au moins {{count}} projet. Rien ne quitte le serveur.",
+		"privacyServer_other": "Comparé aux projets de votre organisation que vous pouvez lire, en médianes seulement, jamais par leur nom, et pour des groupes d'au moins {{count}} projets. Rien ne quitte le serveur.",
+		"window_one": "Médianes par spec sur les {{days}} derniers jours ({{count}} spec), contre les {{days}} jours d'avant ({{previous}}).",
+		"window_other": "Médianes par spec sur les {{days}} derniers jours ({{count}} specs), contre les {{days}} jours d'avant ({{previous}}).",
+		"columns": {
+			"metric": "Par spec",
+			"recent": "Ce projet",
+			"previous": "Avant",
+			"trend": "Tendance",
+			"project": "Projet",
+			"segment": "Pile et taille",
+			"specs": "Specs",
+			"weeks_one": "Dernière semaine",
+			"weeks_other": "{{count}} dernières semaines"
+		},
+		"groups": {
+			"segment": "Même pile et taille",
+			"stack": "Même pile",
+			"all": "Tous les projets",
+			"team": "Même taille d'équipe"
+		},
+		"projectCount_one": "{{count}} projet",
+		"projectCount_other": "{{count}} projets",
+		"metrics": {
+			"minutes": "Durée du build",
+			"cost": "Coût (USD)",
+			"qaIterations": "Itérations de QA",
+			"agents": "Agents",
+			"mutationScore": "Score de mutation",
+			"firstCi": "CI verte du premier coup"
+		},
+		"sizes": {
+			"small": "Petit dépôt",
+			"medium": "Dépôt moyen",
+			"large": "Grand dépôt",
+			"monorepo": "Monorepo",
+			"unknown": "Taille inconnue"
+		},
+		"otherStack": "Autre pile",
+		"smallGroup_one": "La médiane d'un groupe s'affiche à partir de {{count}} projet actif.",
+		"smallGroup_other": "La médiane d'un groupe s'affiche à partir de {{count}} projets actifs : en dessous, seul leur nombre.",
+		"lowerIsBetter": "Plus bas est mieux, sauf pour le score de mutation et le taux de CI verte du premier coup, où plus haut est mieux. La durée de build d'une spec va de sa première session d'agent à sa dernière.",
+		"yourProjects": "Vos autres projets",
+		"noOtherProjects": "Aucun de vos autres projets n'a construit de spec sur cette période.",
+		"teams": {
+			"solo": "Solo",
+			"small": "Équipe de 2 à 5",
+			"medium": "Équipe de 6 à 20",
+			"large": "Équipe de plus de 20",
+			"unknown": "Équipe inconnue"
+		},
+		"top": "10 % les meilleurs : {{value}}",
+		"topNote_one": "« 10 % les meilleurs » est le chiffre qu'atteint le meilleur dixième d'un groupe ; il s'affiche à partir de {{count}} projet actif.",
+		"topNote_other": "« 10 % les meilleurs » est le chiffre qu'atteint le meilleur dixième d'un groupe ; il s'affiche à partir de {{count}} projets actifs qui ont ce chiffre.",
+		"sparkline": "{{metric}}, semaine par semaine",
+		"report": {
+			"button": "Générer le rapport d'équipe",
+			"title": "Où vous en êtes : rapport d'équipe",
+			"generated": "Généré le {{date}}.",
+			"segment": "Segment : {{stack}}, {{size}}, {{team}}.",
+			"saved": "Rapport d'équipe enregistré dans {{path}}",
+			"error": "Impossible d'enregistrer le rapport d'équipe"
+		},
+		"kinds": {
+			"title": "Par type de travail",
+			"kind": "Type",
+			"others": "Autres projets",
+			"none": "Aucune spec de cette période n'a de type enregistré sur sa carte.",
+			"note_one": "Chaque case : ce projet, puis la médiane des autres projets pour le même type, à partir de {{count}} projet.",
+			"note_other": "Chaque case : ce projet, puis la médiane des autres projets pour le même type, à partir de {{count}} projets."
+		},
+		"qualitySources": "Le score de mutation vient de la porte de mutation de la spec en QA, la CI verte du premier coup du suivi de sa pull request : la CI est-elle passée sur la pull request telle qu'elle a été ouverte, avant tout correctif. Une spec qui ne les a pas n'est pas comptée pour eux.",
+		"groupTrend": "tendance : {{value}}",
+		"movedChip": "{{from}} → {{to}}",
+		"moving": "Ce projet est passé de {{from}} à {{to}} ces {{days}} derniers jours : tant que ce changement a moins de {{days}} jours, il est comparé aux projets des deux.",
+		"pace": {
+			"title": "Votre rythme face à vos pairs",
+			"faster": "{{metric}} : {{own}} pour ce projet, {{group}} pour la médiane de « {{groupName}} ». Vous progressez plus vite.",
+			"slower": "{{metric}} : {{own}} pour ce projet, {{group}} pour la médiane de « {{groupName}} ». Vos pairs progressent plus vite.",
+			"same": "{{metric}} : {{own}} pour ce projet, {{group}} pour la médiane de « {{groupName}} ». À peu près au même rythme."
+		}
 	}
 }

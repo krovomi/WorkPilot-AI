@@ -1,3 +1,11 @@
+---
+feature: Garde-fous en code
+summary: >-
+  Lue du projet principal (worktrees compris), couches globale → `workpilot.policy.yaml` →
+  `.workpilot/guardrails.*` sans affaiblir ; chemins relatifs ; tests supprimés, dépendance
+  ajoutée (toutes stacks) ; invalide = refus ; approbation unique.
+---
+
 # Garde-fous en code (Policy-as-Code)
 
 Une politique écrite dans le dépôt dit ce que les agents ne peuvent pas faire : toucher
@@ -33,6 +41,10 @@ passer serait pire qu'une politique absente.
 
 Le chargement est mis en cache par date de modification des fichiers : une modification
 s'applique au prochain appel d'outil, sans relancer la tâche.
+
+À côté de ses `rules`, `workpilot.policy.yaml` (et lui seul) peut fixer des heures permises, des
+fichiers interdits ou soumis à revue et un budget de jetons par heure : voir
+[governance-policy.md](governance-policy.md). Les fichiers y deviennent des règles comme celles-ci.
 
 ## Une règle
 

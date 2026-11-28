@@ -24,15 +24,59 @@
 	"model": "Model",
 	"createAgent": "Create Agent",
 	"agentNamePlaceholder": "e.g. Architecture Agent",
+	"defaultAgentName": "Agent {{role}}",
+	"createError": "Unable to create the agent: {{error}}",
+	"createFailed": "The agent was not created.",
+	"roles": {
+		"architect": "Architect",
+		"coder": "Coder",
+		"tester": "Tester",
+		"reviewer": "Reviewer",
+		"documenter": "Documenter",
+		"planner": "Planner",
+		"debugger": "Debugger",
+		"custom": "Custom"
+	},
+	"roleHints": {
+		"architect": "System design & architecture",
+		"coder": "Code implementation",
+		"tester": "Testing & QA",
+		"reviewer": "Code review",
+		"documenter": "Documentation",
+		"planner": "Task planning",
+		"debugger": "Bug fixing",
+		"custom": "Custom role"
+	},
+	"tiers": {
+		"flagship": "Flagship",
+		"standard": "Standard",
+		"fast": "Fast",
+		"local": "Local"
+	},
+	"status": {
+		"idle": "Idle",
+		"running": "Running",
+		"paused": "Paused",
+		"completed": "Completed",
+		"error": "Error",
+		"waiting": "Waiting"
+	},
 	"noEvents": "No events yet",
 	"agentPanel": {
+		"actions": "Actions for {{name}}",
+		"taskLabel": "Task for {{name}}",
+		"start": "Start",
+		"stopAgent": "Stop {{name}}",
 		"files": "Files ({{count}})",
 		"remove": "Remove",
 		"thinking": "Thinking",
 		"taskPlaceholder": "Task description...",
 		"restart": "Restart",
 		"noModel": "No model",
-		"working": "Working..."
+		"answering": "Answering…",
+		"waitingForModel": "Waiting for the model…",
+		"answer": "Answer",
+		"stop": "Stop"
 	},
 	"noDecisions": "No decisions recorded yet",
 	"session": "Session",
@@ -50,5 +94,172 @@
 		"featureModelMixing": "Pick a provider and a model per agent: Claude, OpenAI, Gemini, Ollama…",
 		"featureDecisionTree": "Follow why each agent chose its next step.",
 		"featureLiveView": "Tokens, cost and events as they happen."
-	}
+	},
+	"events": {
+		"agent_created": "Agent created",
+		"agent_removed": "Agent removed",
+		"agent_started": "Agent started",
+		"agent_paused": "Agent paused",
+		"agent_resumed": "Agent resumed",
+		"agent_stopped": "Agent stopped",
+		"agent_config_updated": "Agent settings changed",
+		"agent_completed": "Agent answered",
+		"agent_failed": "Agent failed",
+		"agent_rebalanced": "Agent rebalanced",
+		"agent_rebalance_skipped": "Agent not rebalanced",
+		"agent_loop_detected": "Agent is looping"
+	},
+	"compose": {
+		"tabManual": "Manual",
+		"tabAuto": "Auto-compose",
+		"tabsLabel": "How to add agents",
+		"intro": "Describe the work, pick a spec or a template: Mission Control suggests a crew across the providers you choose, and a cheaper one if you set a budget.",
+		"templatesLabel": "Template",
+		"templates": {
+			"auto": {
+				"label": "From the description",
+				"hint": "The work decides: its kind, size, domains and tests."
+			},
+			"bug_fix": {
+				"label": "Bug fix",
+				"hint": "A debugger, a coder, a tester when the project has tests."
+			},
+			"new_feature": {
+				"label": "New feature",
+				"hint": "An architect, coders by size, a reviewer, a tester."
+			},
+			"refactor_module": {
+				"label": "Refactor module",
+				"hint": "An architect, coders by size, a critical reviewer."
+			},
+			"incident_response": {
+				"label": "Incident response",
+				"hint": "A flagship debugger, a coder, a reviewer, a post-mortem writer."
+			},
+			"generic": {
+				"label": "Generic",
+				"hint": "A coder and a reviewer."
+			}
+		},
+		"promptLabel": "Work to do",
+		"promptPlaceholder": "e.g. Fix the crash when the login API times out",
+		"specLabel": "Spec of a task",
+		"noSpec": "No spec",
+		"providersLabel": "Providers",
+		"providersHint": "Each role goes to the first provider that has a capable model of its tier.",
+		"providerOrder": "Order of preference: {{list}}",
+		"budgetLabel": "Maximum budget",
+		"budgetPlaceholder": "No limit",
+		"budgetUnits": {
+			"usd": "US dollars",
+			"tokens": "Tokens"
+		},
+		"refine": "Ask a fast model of the first provider for a second opinion",
+		"suggest": "Suggest a crew",
+		"summary": "Template: {{template}} · size: {{complexity}}",
+		"complexity": {
+			"small": "small",
+			"medium": "medium",
+			"large": "large"
+		},
+		"tiers": {
+			"flagship": "flagship",
+			"standard": "standard",
+			"fast": "fast",
+			"local": "local",
+			"provider_default": "provider's choice"
+		},
+		"providerDefault": "Model chosen by the provider",
+		"unpriced": "price unknown",
+		"flatRate": "no token price",
+		"cost": "${{value}}",
+		"tokens": "{{value}} tokens",
+		"total": "Estimated: ${{cost}} · {{tokens}} tokens",
+		"degraded": "Over budget: the full crew costs ${{full}}. Proposed crew: ${{proposed}} (saves ${{delta}}, expected quality {{quality}} %).",
+		"refused": "Budget too low: even the smallest crew needs ${{cost}} and {{tokens}} tokens. Raise the budget or start from a smaller template.",
+		"changes": {
+			"dropped": "{{role}} left out",
+			"model": "{{role}}: {{from}} → {{to}}"
+		},
+		"apply": "Create {{count}} agents",
+		"agentName": "{{role}} {{n}}",
+		"warnings": {
+			"vague_input": "The description is too vague: a generic crew is suggested. Add details or pick a template.",
+			"provider_unsupported": "{{provider}} cannot run an agent on its own here and was left out.",
+			"role_unserved": "No chosen provider has a model fit for the {{role}} role (tool use or context window).",
+			"unpriced_models": "Some models have no price in the catalog: their cost is not counted.",
+			"hints_unusable": "The fast model's answer could not be used: the heuristics decided alone.",
+			"refine_failed": "{{provider}} did not answer the second opinion: the heuristics decided alone."
+		},
+		"errors": {
+			"invalid_request": "The request is not valid.",
+			"invalid_providers": "Pick at least one provider (eight at most).",
+			"unknown_template": "Unknown template.",
+			"invalid_budget": "The budget must be a positive number (a whole number of tokens).",
+			"invalid_project": "The project is not known.",
+			"invalid_spec": "The spec cannot be found in this project.",
+			"no_provider": "None of the chosen providers can run an agent on its own.",
+			"no_capable_model": "None of the chosen providers has a model fit for these roles.",
+			"generic": "Could not suggest a crew: {{error}}"
+		},
+		"calibrated": "Token estimates calibrated on your past sessions for: {{roles}}.",
+		"rebalanceHint": "While the crew runs, an agent that fails or loops is moved to another of these providers or to a bigger model, within the budget."
+	},
+	"rebalance": {
+		"badge_one": "Rebalanced once",
+		"badge_other": "Rebalanced {{count}} times",
+		"loopBadge": "Looping",
+		"helperBadge": "Helping {{name}}",
+		"helpedBadge": "Helper started",
+		"helperTask": "Works out why {{name}} got stuck, then does its task",
+		"moved": "{{reason}}: {{action}}, {{from}} → {{to}}",
+		"notMoved": "{{reason}}: {{skipped}}",
+		"reasons": {
+			"loop": "The answer kept repeating itself",
+			"rate_limited": "Provider rate limit or quota",
+			"provider_failed": "Provider unavailable",
+			"failed": "The run failed"
+		},
+		"actions": {
+			"retry_profile": "retried on another Claude profile",
+			"reroute": "moved to another provider",
+			"escalate": "moved to a bigger model",
+			"helper": "handed to a helper agent"
+		},
+		"skipped": {
+			"limit": "already rebalanced as many times as allowed for this task",
+			"over_budget": "the session is over its budget",
+			"no_alternative": "no other provider or bigger model can take the role",
+			"disabled": "automatic rebalancing is off"
+		},
+		"loopSources": {
+			"answer": "Read in the answer",
+			"steps": "Read in the decision tree: the same steps over and over"
+		}
+	},
+	"health": {
+		"budgetUsd": "Spent ${{spent}} of ${{budget}}",
+		"budgetTokens": "Spent {{spent}} of {{budget}} tokens",
+		"rebalances_one": "{{count}} rebalancing",
+		"rebalances_other": "{{count}} rebalancings",
+		"autoRebalance": "Rebalance stuck agents automatically",
+		"overBudget": "This session has used up its budget: agents are no longer moved to bigger models, and new runs add to the overrun."
+	},
+	"metrics": {
+		"kicker": "History",
+		"title": "Past sessions",
+		"sessions_one": "{{count}} session",
+		"sessions_other": "{{count}} sessions",
+		"none": "—",
+		"percent": "{{value}}%",
+		"autoShare": "Started from auto-compose",
+		"tokensAutoManual": "Tokens per session, auto / manual",
+		"tokensPair": "{{auto}} / {{manual}} ({{delta}})",
+		"delta": "Δ {{value}}",
+		"estimateRatio": "Spent vs. estimated (auto)",
+		"ratio": "× {{value}}",
+		"rebalances": "Rebalancings per session",
+		"overrun": "Budgets exceeded"
+	},
+	"serverDescription": "A project of the team server: its agents run on the server, which plans and runs its execution waves."
 }

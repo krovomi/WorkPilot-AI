@@ -8,6 +8,22 @@ import { type OpenApiSpec } from "../../stores/api-explorer-store";
 
 // ── Utilities ────────────────────────────────────────────────────────────────
 
+/** The keys of an OpenAPI path item that are operations; the others
+ * (`parameters`, `summary`, `servers`…) describe the path itself. */
+export const HTTP_METHODS = [
+	"get",
+	"post",
+	"put",
+	"delete",
+	"patch",
+	"head",
+	"options",
+] as const;
+
+export function isHttpMethod(key: string): boolean {
+	return (HTTP_METHODS as readonly string[]).includes(key);
+}
+
 export const HTTP_METHOD_COLORS: Record<string, string> = {
 	GET: "text-blue-400 bg-blue-400/10 border-blue-400/30",
 	POST: "text-success bg-success/10 border-success/30",
@@ -27,14 +43,6 @@ export const STATUS_COLORS: Record<string, string> = {
 
 export function getStatusColor(status: number): string {
 	return STATUS_COLORS[String(status)[0]] ?? "text-gray-400";
-}
-
-export function _prettyJson(value: string): string {
-	try {
-		return JSON.stringify(JSON.parse(value), null, 2);
-	} catch {
-		return value;
-	}
 }
 
 export function prettifyXml(value: string): string {
@@ -75,18 +83,20 @@ export function syntaxHighlightJson(value: string): string {
 	} catch {
 		return escapeHtml(value);
 	}
+	// The text is escaped first, so a string's quotes are `&quot;` here; a
+	// number or a keyword inside a string is part of that string's match.
 	return escapeHtml(pretty).replaceAll(
-		/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?)/g,
+		/(&quot;(?:\\.|(?!&quot;)[^\\])*&quot;(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?)/g,
 		(match) => {
-			if (match.startsWith('"')) {
+			if (match.startsWith("&quot;")) {
 				if (match.endsWith(":")) {
 					return `<span style="color:var(--color-primary)">${match}</span>`;
 				}
 				return `<span style="color:#98c379">${match}</span>`;
 			}
-			if (/true|false/.test(match))
+			if (match === "true" || match === "false")
 				return `<span style="color:#e5c07b">${match}</span>`;
-			if (/null/.test(match))
+			if (match === "null")
 				return `<span style="color:#abb2bf">${match}</span>`;
 			return `<span style="color:#d19a66">${match}</span>`;
 		},
@@ -103,15 +113,20 @@ export function resolveRef(
 	spec: OpenApiSpec,
 ): Record<string, unknown> | null {
 	if (!ref.startsWith("#/")) return null;
-	const parts = ref.slice(2).split("/");
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-	let current: any = spec;
+	// A JSON pointer: `~1` stands for `/` and `~0` for `~` inside a name.
+	const parts = ref
+		.slice(2)
+		.split("/")
+		.map((part) => part.replaceAll("~1", "/").replaceAll("~0", "~"));
+	let current: unknown = spec;
 	for (const part of parts) {
-		if (!current || typeof current !== "object") return null;
-		current = current[part];
+		if (!current || typeof current !== "object" || !Object.hasOwn(current, part))
+			return null;
+		current = (current as Record<string, unknown>)[part];
 	}
-	return current ?? null;
+	return current && typeof current === "object"
+		? (current as Record<string, unknown>)
+		: null;
 }
 
 // ── Sub-components ───────────────────────────────────────────────────────────

@@ -12,10 +12,11 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Request
 from server.auth.deps import (
     CurrentUser,
+    effective_project_role,
     get_current_user,
-    get_project_role,
     require_project_role,
 )
+from server.authz.delegation import end_delegations_of
 from server.authz.principal import Principal, get_principal
 from server.db.engine import get_db
 from server.db.models import (
@@ -207,7 +208,7 @@ async def get_project(
         # exists, which is itself a cross-tenant leak.
         raise HTTPException(status_code=404, detail="Project not found")
     item = ProjectPublic.model_validate(project)
-    item.my_role = await get_project_role(db, user, project_id)
+    item.my_role = effective_project_role(request)
     return item
 
 
@@ -345,12 +346,13 @@ async def remove_member(
     if member is None:
         raise HTTPException(status_code=404, detail="Member not found")
     await db.delete(member)
+    ended = await end_delegations_of(db, user_id=member_user_id, project_id=project_id)
     db.add(
         AuditLog(
             user_id=user.id,
             project_id=project_id,
             action="project.member.removed",
-            payload={"member_user_id": member_user_id},
+            payload={"member_user_id": member_user_id, "delegations_ended": ended},
         )
     )
     await db.commit()

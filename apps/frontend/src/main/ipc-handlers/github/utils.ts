@@ -6,8 +6,14 @@ import { execFile, execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { promisify } from "node:util";
 import type { Project } from "../../../shared/types";
+import { isGitHubFullName } from "../../../shared/utils/git-remote-repo";
 import { getToolPath } from "../../cli-tool-manager";
 import { getAugmentedEnv } from "../../env-utils";
+import {
+	detectedGitHubRepo,
+	listGitRemotes,
+} from "../../forge/project-forge-binding";
+import { withForgeAccounts } from "../../forge/forge-credentials";
 import { getProjectEnvPath, readProjectEnvFile } from "../../project-env-file";
 import { isServerHandle, relayGitHubFetch, serverGitHubConfig } from "./server-relay";
 import type { GitHubConfig } from "./types";
@@ -62,7 +68,10 @@ export async function getGitHubTokenForSubprocess(): Promise<string | null> {
 }
 
 /**
- * Get GitHub configuration from project environment file
+ * Get GitHub configuration from project environment file, the repository as
+ * `owner/repo` whatever form it was saved in. A project that names no
+ * repository uses the one of its own github.com remote (origin first), never
+ * another project's: `forge/project-forge-binding.ts`.
  * Falls back to gh CLI token if GITHUB_TOKEN not in .env.
  * A server project's calls go through the server (`server-relay.ts`).
  */
@@ -71,24 +80,17 @@ export function getGitHubConfig(project: Project): GitHubConfig | null {
 	const envPath = getProjectEnvPath(project);
 	if (!envPath || !existsSync(envPath)) return null;
 
-	try {
-		const vars = readProjectEnvFile(envPath);
-		let token: string | undefined = vars.GITHUB_TOKEN;
-		const repo = vars.GITHUB_REPO;
-
-		// If no token in .env, try to get it from gh CLI (sync version for sync function)
-		if (!token) {
-			const ghToken = getTokenFromGhCliSync();
-			if (ghToken) {
-				token = ghToken;
-			}
-		}
-
-		if (!token || !repo) return null;
-		return { token, repo };
-	} catch {
-		return null;
-	}
+	// Neither reading the file nor asking gh throws: each answers "nothing".
+	const vars = withForgeAccounts(readProjectEnvFile(envPath));
+	// Saved as typed: a clone URL becomes the `owner/repo` of every API path.
+	const repo =
+		normalizeRepoReference(vars.GITHUB_REPO ?? "") ||
+		detectedGitHubRepo(listGitRemotes(project.path)) ||
+		"";
+	// If no token in .env, try to get it from gh CLI (sync version for sync function)
+	const token = vars.GITHUB_TOKEN || getTokenFromGhCliSync();
+	if (!token || !repo) return null;
+	return { token, repo };
 }
 
 /**
@@ -115,6 +117,15 @@ export function normalizeRepoReference(repo: string): string {
 	}
 
 	return normalized.trim();
+}
+
+/**
+ * `owner/repo` as GitHub names them: the only form a repository reference may
+ * take before it becomes part of an API path (no `..`, no extra segment, no
+ * query).
+ */
+export function isRepoFullName(value: string): boolean {
+	return isGitHubFullName(value);
 }
 
 /**
@@ -148,4 +159,15 @@ export async function githubFetch(
 	}
 
 	return response.json();
+}
+
+/**
+ * An issue or pull request number received from the renderer: a positive
+ * whole number, or null. It becomes part of an API path, so nothing else may
+ * pass.
+ */
+export function issueNumberArg(value: unknown): number | null {
+	return typeof value === "number" && Number.isSafeInteger(value) && value > 0
+		? value
+		: null;
 }

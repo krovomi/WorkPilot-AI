@@ -8,6 +8,8 @@ callers across requests share the same in-memory ring buffer.
 * `GET  /score/{agent_name}`   — score a specific agent
 * `GET  /scores`               — score all known agents
 * `POST /reset`                — reset one or all agent histories
+* `POST /project`              — score the agents that ran the project's Kanban
+                                 tasks, read from their ``task_logs.json``
 """
 
 from __future__ import annotations
@@ -16,10 +18,11 @@ import logging
 import threading
 
 from fastapi import APIRouter, HTTPException, Path
-from foundation.api_safety import safe_error
+from foundation.api_safety import safe_error, validated_dir
 from pydantic import BaseModel, Field
 
 from .monitor import AgentRun, HealthMonitor
+from .task_history import project_health
 
 logger = logging.getLogger(__name__)
 
@@ -71,10 +74,6 @@ def record(req: RecordRunRequest):
             )
         )
         return {"success": True}
-    except ValueError as e:
-        raise HTTPException(
-            status_code=400, detail=safe_error(e, logger, "record")
-        ) from e
     except Exception as e:  # noqa: BLE001
         logger.exception("record failed")
         return {"success": False, "error": safe_error(e, logger, "record")}
@@ -95,10 +94,6 @@ def record_batch(req: RecordBatchRequest):
         ]
         _get_monitor().record_many(runs)
         return {"success": True, "recorded": len(runs)}
-    except ValueError as e:
-        raise HTTPException(
-            status_code=400, detail=safe_error(e, logger, "record_batch")
-        ) from e
     except Exception as e:  # noqa: BLE001
         logger.exception("record-batch failed")
         return {"success": False, "error": safe_error(e, logger, "record_batch")}
@@ -142,3 +137,23 @@ def reset(req: ResetRequest):
     except Exception as e:  # noqa: BLE001
         logger.exception("reset failed")
         return {"success": False, "error": safe_error(e, logger, "reset")}
+
+
+class ProjectHealthRequest(BaseModel):
+    project_path: str = Field(..., min_length=1, max_length=4096)
+
+
+@router.post("/project")
+def project_scores(req: ProjectHealthRequest):
+    """Health of every agent × provider × model from the project's own tasks."""
+    try:
+        project_dir = validated_dir(req.project_path, "project_path")
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400, detail=safe_error(e, logger, "project_scores")
+        ) from e
+    try:
+        return {"success": True, **project_health(project_dir).to_dict()}
+    except OSError as e:
+        logger.warning("project health failed: %s", e)
+        return {"success": False, "error": safe_error(e, logger, "project_scores")}

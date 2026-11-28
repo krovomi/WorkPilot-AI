@@ -12,8 +12,6 @@
 	"sections": {
 		"accounts": {
 			"alerts": {
-				"noProviders": "Aucun fournisseur configuré. Configurez vos clés API pour commencer.",
-				"providerErrors": "{{count}} fournisseur(s) avec erreurs",
 				"sophisticated": {
 					"noProvidersTitle": "Commencez avec votre premier provider",
 					"noProvidersDescription": "Configurez au moins un provider pour commencer à utiliser l'application.",
@@ -28,8 +26,7 @@
 				"providerDescription": "{{providerName}} a été {{action}} à la liste de basculement auto",
 				"providerRemoved": "Fournisseur retiré du basculement auto",
 				"syncError": "Erreur de synchronisation",
-				"syncErrorDescription": "Échec de la synchronisation du fournisseur avec le basculement auto",
-				"title": "Basculement auto"
+				"syncErrorDescription": "Échec de la synchronisation du fournisseur avec le basculement auto"
 			},
 			"description": "Comptes & endpoints API",
 			"form": {
@@ -47,59 +44,20 @@
 				"save": "Enregistrer"
 			},
 			"providerCard": {
-				"apiKey": "Clé API",
-				"authCli": "Auth CLI",
-				"authLocal": "Local",
-				"authOauth": "OAuth",
 				"authentication": "Authentification",
-				"cliAuthenticated": "CLI authentifié",
-				"configure": "Configurer",
 				"deleteConfirm": "Êtes-vous sûr de vouloir supprimer cette configuration de fournisseur ?",
-				"edit": "Modifier",
-				"errors": {
-					"unknownError": "Erreur inconnue"
-				},
-				"lastTest": "Dernier test",
-				"localRunning": "Instance locale",
-				"needsReauth": "Ré-authentification requise",
-				"toggleDetails": "Afficher les détails",
-				"keySaved": "Clé enregistrée",
-				"keySavedToday": "aujourd'hui",
-				"keySavedDaysAgo_one": "il y a {{count}} jour",
-				"keySavedDaysAgo_other": "il y a {{count}} jours",
-				"keySavedUnknown": "date inconnue",
 				"keyRenewal_one": "Clé enregistrée il y a {{count}} jour : pensez à la renouveler (plus de {{threshold}} jours)",
 				"keyRenewal_other": "Clé enregistrée il y a {{count}} jours : pensez à la renouveler (plus de {{threshold}} jours)",
-				"neverTested": "Jamais testé",
-				"notAvailable": "Non disponible",
-				"notConfigured": "Non configuré",
 				"oauthCli": "OAuth (CLI)",
-				"oauthConnected": "OAuth connecté",
-				"rateLimited": "Limite de débit atteinte",
-				"source": "Source",
-				"statusLabel": "Statut",
-				"status": {
-					"active": "Actif",
-					"error": "Erreur",
-					"notConfigured": "Non configuré"
-				},
 				"statusNested": {
 					"active": "Actif",
 					"error": "Erreur",
 					"notConfigured": "Non configuré"
 				},
-				"test": "Tester",
-				"testDetails": {
-					"modelUsed": "Modèle utilisé : {{model}}",
-					"modelsAvailable": "{{count}} modèles disponibles"
-				},
 				"testError": "Échec du test",
 				"testErrorDescription": "Le fournisseur {{providerName}} a échoué : {{error}}",
 				"testSuccess": "Test réussi",
-				"testSuccessDescription": "Le fournisseur {{providerName}} fonctionne correctement",
-				"usage": "Utilisation",
-				"usageThisMonth": "Utilisation ce mois",
-				"week": "semaine"
+				"testSuccessDescription": "Le fournisseur {{providerName}} fonctionne correctement"
 			},
 			"providerConfig": {
 				"title": "Configuration",
@@ -122,6 +80,7 @@
 					"openWindsurfLogin": "windsurf.com/account",
 					"orManual": "Ou connectez-vous manuellement :",
 					"saveAndConnect": "Enregistrer et connecter",
+					"saveFailed": "Impossible d'enregistrer le jeton Windsurf détecté. Relancez la détection ou collez une clé dans l'onglet Clé API.",
 					"saveSuccess": "Connexion Windsurf enregistrée avec succès !",
 					"terminalInstructions": "Cela ouvrira un terminal où vous pourrez exécuter la commande `/login` pour vous authentifier.",
 					"tokenDetected": "Clé API détectée",
@@ -172,13 +131,6 @@
 					"terminalStep2": "Suivez les étapes de connexion du CLI",
 					"terminalStep3": "Fermez ce terminal une fois connecté"
 				}
-			},
-			"providerToggle": {
-				"description": "{{providerId}} a été {{action}} avec succès",
-				"disabled": "Fournisseur désactivé",
-				"enabled": "Fournisseur activé",
-				"error": "Erreur",
-				"errorDescription": "Échec de {{action}} du fournisseur {{providerId}}"
 			},
 			"localModels": {
 				"title": "Modèles installés localement",
@@ -286,7 +238,16 @@
 					"unverified": "● Tool-calling à vérifier",
 					"unverifiedDetail": "— non confirmé d'après le nom ; ouvrez la carte du modèle. Les tailles « ~Go » sont estimées (quant 4-bit)."
 				},
-				"estimatedSize": " · ~{{size}} Go"
+				"estimatedSize": " · ~{{size}} Go",
+				"cloudBadge": "Cloud",
+				"cloudBadgeTitle": "Servi par le routeur Hugging Face, avec appel d’outils",
+				"cloudPrice": "{{price}} par M de jetons",
+				"tryInCloud": "Essayer dans le cloud",
+				"tryInCloudTooltip": "Faire de {{id}} le modèle cloud de Hugging Face, sans rien télécharger",
+				"cloudDefault": "Modèle cloud",
+				"cloudChosen": "{{id}} est maintenant le modèle cloud de Hugging Face. Choisissez le moteur Hugging Face sur une tâche pour l’essayer, sans rien télécharger.",
+				"cloudNeedsToken": "Ajoutez d’abord un jeton Hugging Face dans la page du provider Hugging Face.",
+				"cloudSaveFailed": "Le modèle cloud n’a pas pu être enregistré."
 			},
 			"providers": {
 				"anthropic": "Modèles Anthropic Claude",
@@ -296,6 +257,8 @@
 				"deepseek": "Modèles DeepSeek (DeepSeek-Coder, etc.)",
 				"google": "Accès API Google et Google DeepMind",
 				"grok": "Modèles Grok xAI",
+				"openrouter": "Des centaines de modèles de nombreux éditeurs (Kimi, GLM, DeepSeek, Claude, GPT…) avec une seule clé OpenRouter",
+				"huggingface": "Les modèles ouverts du Hub Hugging Face via Inference Providers, facturés sur votre compte Hugging Face",
 				"loadError": "Échec du chargement de la liste des fournisseurs",
 				"meta": "Modèles officiels Meta AI",
 				"mistral": "Modèles Mistral AI (Mistral, Codéal, etc.)",
@@ -307,57 +270,111 @@
 				"pi": "Agent de code minimaliste, piloté via le CLI pi",
 				"gemini-cli": "Gemini CLI, l'agent open source de Google, piloté via le protocole ACP"
 			},
-			"title": "Comptes"
+			"title": "Comptes",
+			"gatewayCatalog": {
+				"title": "Modèles de {{name}}",
+				"description": "La liste en direct des modèles que {{name}} sert avec appel d’outils, avec leur prix. Cliquez sur l’un d’eux pour en faire le modèle par défaut.",
+				"searchPlaceholder": "Filtrer les modèles…",
+				"empty": "Aucun modèle ne correspond.",
+				"more": "Encore {{count}} : affinez le filtre.",
+				"price": "{{price}} par M de jetons",
+				"context": "contexte de {{size}}",
+				"providers_one": "{{count}} fournisseur",
+				"providers_other": "{{count}} fournisseurs",
+				"default": "Par défaut",
+				"setDefault": "Faire de {{id}} le modèle par défaut",
+				"offline": "Liste hors ligne : {{name}} n’a pas pu être joint.",
+				"loading": "Chargement des modèles…"
+			},
+			"gatewayRouting": {
+				"title": "Routage",
+				"description": {
+					"openrouter": "Comment OpenRouter choisit le fournisseur qui répond, et ce que ce fournisseur peut faire de vos prompts.",
+					"huggingface": "Comment le routeur Hugging Face choisit le fournisseur d’inférence qui répond."
+				},
+				"sort": "Ordre des fournisseurs",
+				"sortDefault": "Choix d’OpenRouter (répartition de charge)",
+				"sorts": {
+					"price": "Le moins cher d’abord",
+					"throughput": "Le débit le plus rapide d’abord",
+					"latency": "La latence la plus basse d’abord"
+				},
+				"denyDataCollection": "Seulement les fournisseurs qui ne conservent pas les prompts et n’entraînent pas dessus",
+				"zeroRetention": "Seulement les fournisseurs sans conservation des données",
+				"fallbacks": "Modèles de secours",
+				"fallbacksHint": "Essayés dans l’ordre quand le modèle par défaut est indisponible, limité ou refuse la requête. {{count}} au plus.",
+				"fallbackAria": "Modèle de secours {{index}}",
+				"fallbackPlaceholder": "éditeur/modèle",
+				"invalidModel": "Pas un identifiant de modèle : {{id}}",
+				"policy": "Politique du routeur",
+				"policyDefault": "Par défaut de Hugging Face",
+				"policies": {
+					"fastest": "Le fournisseur le plus rapide",
+					"cheapest": "Le fournisseur le moins cher"
+				},
+				"saveFailed": "Le routage n’a pas pu être enregistré."
+			}
 		},
 		"agent": {
 			"description": "Modèle par défaut et framework",
 			"title": "Paramètres d'agent"
 		},
+		"codeMode": {
+			"title": "Mode code",
+			"description": "Les agents enchaînent leurs outils dans un court script au lieu d'un tour de modèle par appel",
+			"mode": {
+				"title": "Quand les agents peuvent écrire un script",
+				"description": "Un script cherche, lit, modifie et lance des commandes en une étape, plusieurs à la fois, et ne rend que ce dont l'agent a besoin. Arrêté, chaque agent travaille comme aujourd'hui.",
+				"off": {
+					"label": "Arrêté",
+					"description": "Aucun agent n'écrit de script. Le réglage par défaut."
+				},
+				"auto": {
+					"label": "Auto",
+					"description": "Seulement là où il fait gagner : le codage, la QA et les analyses du code. La rédaction de spec, les revues et l'idéation restent telles quelles."
+				},
+				"on": {
+					"label": "Activé",
+					"description": "Tout agent qui a des outils peut écrire un script."
+				}
+			},
+			"safety": {
+				"title": "Chaque appel d'un script est contrôlé comme un appel direct",
+				"description": "Le script lui-même ne lit aucun fichier, ne lance aucun processus et n'atteint aucun réseau. Chacun de ses appels passe par les droits de l'agent, les chemins protégés, les garde-fous, la liste des commandes permises et le bac à sable de l'OS, et la surveillance des anomalies note chacun d'eux."
+			},
+			"providers": "Marche avec tout fournisseur dont WorkPilot exécute les outils : OpenAI, Google, Mistral, Copilot, Windsurf, Ollama, LM Studio, les fournisseurs compatibles et les passerelles. Les tâches Claude prennent le mode code de Claude Code dans leur worktree, sur l'API Anthropic avec Opus ou Sonnet 5.5 et suivants, et les terminaux aussi. Une tâche peut choisir son propre mode par phase."
+		},
 		"anomaly-detection": {
-			"description": "Surveillance du comportement des agents et alertes",
+			"description": "Le score de confiance de chaque session d'agent, et ce qui la met en pause ou l'arrête",
 			"title": "Détection d'anomalies",
 			"enable": {
 				"title": "Activer la détection d'anomalies",
-				"description": "Surveiller toutes les sessions d'agents pour un comportement suspect"
+				"description": "Surveiller chaque session d'agent, quel que soit le provider"
 			},
 			"trustScore": {
-				"title": "Seuils de score de confiance",
-				"description": "Chaque session d'agent commence à 100. Les anomalies réduisent le score. Les actions se déclenchent à ces seuils.",
-				"pauseThreshold": "Seuil de pause",
-				"pauseDescription": "L'agent est mis en pause et une notification est envoyée",
-				"terminateThreshold": "Seuil de terminaison",
-				"terminateDescription": "L'agent est terminé immédiatement"
+				"title": "Seuils du score de confiance",
+				"description": "Chaque session d'agent commence à 100 ; chaque anomalie le fait baisser.",
+				"pauseThreshold": "Pause à partir de",
+				"pauseDescription": "La tâche est mise en pause et une notification est envoyée ; ses fichiers restent tels quels.",
+				"stopThreshold": "Arrêt à partir de",
+				"stopDescription": "La session est arrêtée et, si c'est activé dans Bac à sable, ses fichiers sont ramenés à l'instantané pris avant elle."
 			},
 			"detectionLimits": {
 				"title": "Limites de détection",
-				"description": "Ajuster quand les types d'anomalies spécifiques se déclenchent.",
-				"massDeletionCount": "Nombre de suppressions massives",
-				"massDeletionDesc": "Suppressions de fichiers avant alerte",
-				"maxRepetitiveErrors": "Erreurs répétitives maximales",
-				"maxRepetitiveDesc": "Erreurs avant alerte",
-				"rapidChangeWindow": "Fenêtre de changement rapide (s)",
-				"rapidChangeDesc": "Fenêtre de temps pour les changements rapides",
-				"tokenUsageMultiplier": "Multiplicateur d'utilisation de tokens",
-				"tokenUsageDesc": "× baseline avant alerte"
+				"description": "À partir de quand certaines anomalies comptent.",
+				"massDeletionCount": "Suppression massive",
+				"massDeletionDesc": "Fichiers supprimés dans une session avant que ça compte",
+				"maxRepetitiveErrors": "Erreurs répétées",
+				"maxRepetitiveDesc": "Appels d'outils en échec dans une session avant que ça compte",
+				"rapidChangeWindow": "Fenêtre des changements rapides (s)",
+				"rapidChangeDesc": "20 écritures dans cette fenêtre comptent comme des changements rapides"
 			},
 			"anomalyTypes": {
-				"title": "Types d'anomalies",
-				"description": "10 types d'anomalies sont surveillés. Chacun réduit le score de confiance d'un montant fixe.",
+				"title": "Ce qui fait baisser le score",
+				"description": "Une commande est jugée sur les programmes qu'elle lance, un chemin sur des noms de fichier entiers : rsync n'est pas nc, .env.example n'est pas .env.",
 				"anomaly": "Anomalie",
 				"severity": "Gravité",
-				"scoreImpact": "Impact sur le score",
-				"types": {
-					"massFileDeletion": "Suppression massive de fichiers",
-					"sensitiveFileAccess": "Accès aux fichiers sensibles",
-					"dangerousCommand": "Commande dangereuse",
-					"unexpectedNetworkAccess": "Accès réseau inattendu",
-					"pathTraversalAttempt": "Tentative de traversée de chemin",
-					"rapidFileChanges": "Changements de fichiers rapides",
-					"excessiveTokenUsage": "Utilisation excessive de tokens",
-					"systemConfigModification": "Modification de configuration système",
-					"repetitiveErrors": "Erreurs répétitives",
-					"longRunningSession": "Session longue"
-				},
+				"scoreImpact": "Score",
 				"severityLevels": {
 					"critical": "critique",
 					"high": "élevée",
@@ -366,8 +383,8 @@
 				}
 			},
 			"sensitivePaths": {
-				"title": "Chemins sensibles (toujours surveillés)",
-				"description": "Ces chemins sont toujours surveillés pour une activité suspecte."
+				"title": "Chemins sensibles",
+				"description": "Lire ou écrire l'un d'eux fait baisser le score, une fois par fichier."
 			}
 		},
 		"appearance": {
@@ -390,7 +407,6 @@
 			"description": "Choisir votre langue préférée",
 			"title": "Langue"
 		},
-		"llm-router": {},
 		"notifications": {
 			"description": "Préférences d'alertes",
 			"title": "Notifications"
@@ -400,58 +416,73 @@
 			"title": "Outils CLI"
 		},
 		"sandbox": {
-			"description": "Isolation de l'exécution des agents et rollback",
 			"title": "Bac à sable",
-			"defaultMode": {
-				"title": "Mode de bac à sable par défaut",
-				"description": "Choisissez le mode d'isolation par défaut pour l'exécution des agents.",
+			"description": "Instantanés avant chaque session d'agent, et les limites d'une session",
+			"snapshots": {
+				"title": "Instantanés et retour arrière",
+				"description": "Avant chaque session d'agent (planification, code, QA), le worktree de la tâche est enregistré dans un commit git caché. Ça marche pour tous les langages et toutes les stacks : les fichiers ignorés (node_modules, bin, obj, .venv…) ne sont pas copiés. On en restaure un depuis la carte d'une tâche en pause.",
+				"enable": "Instantané avant chaque session",
+				"enableHint": "Seulement dans les worktrees de tâche ; le dépôt principal du projet n'est jamais touché.",
+				"autoRollback": "Restaurer automatiquement quand une session est arrêtée",
+				"autoRollbackHint": "Quand la détection d'anomalies arrête une session, ou que l'agent écrit hors des règles du bac à sable. L'état remplacé est gardé lui aussi en instantané.",
+				"keep": "Instantanés gardés par tâche",
+				"keepHint": "Les plus anciens sont supprimés."
+			},
+			"mode": {
+				"title": "Mode d'écriture",
+				"description": "Dans le projet. Une écriture hors du projet est toujours refusée.",
 				"normal": {
 					"label": "Normal",
-					"description": "Liste blanche + limites de ressources"
+					"description": "L'agent écrit partout dans son worktree."
 				},
 				"restricted": {
 					"label": "Restreint",
-					"description": "Liste blanche stricte, limites réduites"
-				},
-				"dryRun": {
-					"label": "Simulation",
-					"description": "Planification uniquement, aucune modification de fichier"
-				},
-				"docker": {
-					"label": "Docker",
-					"description": "Isolation complète du conteneur"
+					"description": "Seuls les chemins listés ci-dessous sont modifiables (les fichiers propres à la tâche le restent)."
 				}
 			},
-			"fileAccess": {
-				"title": "Liste blanche d'accès aux fichiers",
-				"description": "Chemins que les agents sont autorisés à accéder. Les chemins sensibles (.git/, .env, .ssh/) sont toujours bloqués.",
-				"placeholder": "ex: lib/ ou config/app.json",
-				"read": "Lecture",
-				"write": "Écriture",
-				"readWrite": "Lecture/Écriture",
-				"readOnly": "Lecture seule",
-				"add": "Ajouter"
+			"paths": {
+				"title": "Chemins modifiables (mode restreint)",
+				"description": "Relatifs au projet, dossiers ou fichiers. Refusé avant l'écriture quand le provider passe par les hooks de WorkPilot ; pour les agents CLI qui écrivent avec leurs propres outils, l'écriture est détectée, la session arrêtée et l'instantané restauré.",
+				"placeholder": "ex. src/ ou tests/unit",
+				"add": "Ajouter",
+				"remove": "Retirer {{path}}",
+				"invalid": "Un chemin dans le projet, sans .. et non absolu.",
+				"emptyRestricted": "Mode restreint sans chemin : l'agent ne peut écrire que les fichiers propres à la tâche."
 			},
-			"resourceLimits": {
-				"title": "Limites de ressources",
-				"description": "Ressources maximales qu'un agent peut consommer par exécution.",
-				"cpu": "CPU (%)",
-				"ram": "RAM (Mo)",
-				"maxTime": "Temps max (s)",
-				"maxFiles": "Fichiers max",
-				"maxFileSize": "Taille max fichier (Mo)"
+			"limits": {
+				"title": "Limites par session",
+				"description": "Comptées pour tous les providers. 0 veut dire sans limite.",
+				"none": "sans limite",
+				"maxFiles": "Fichiers écrits",
+				"maxFilesHint": "Fichiers distincts ; au-delà, la tâche est mise en pause.",
+				"maxFileSize": "Plus gros fichier",
+				"maxFileSizeHint": "Une écriture plus grosse est refusée (ou arrête la session).",
+				"maxSession": "Plus longue session",
+				"maxSessionHint": "Au-delà, la tâche est mise en pause."
 			},
-			"snapshots": {
-				"title": "Instantanés & Rollback",
-				"description": "Un instantané des fichiers est automatiquement créé avant chaque exécution d'agent. Si l'agent échoue, les fichiers sont restaurés automatiquement.",
-				"warning": "Les instantanés sont créés par bac à sable et stockés en mémoire. Le rollback automatique se déclenche lorsqu'une exécution d'agent échoue ou est terminée par le détecteur d'anomalies. Le rollback manuel est disponible dans la vue des détails de tâche."
-			},
-			"blockedCommands": {
-				"title": "Commandes bloquées (par défaut)",
-				"description": "Ces commandes sont toujours bloquées à l'intérieur du bac à sable."
+			"always": "Toujours actifs, quels que soient ces réglages : la liste des commandes autorisées, les écritures confinées aux dossiers du build, les fichiers de sécurité protégés, et le bac à sable de l'OS autour des commandes quand le système en a un.",
+			"microvm": {
+				"title": "MicroVM Docker par tâche",
+				"description": "Les commandes de chaque tâche tournent dans sa propre microVM Docker Sandboxes, avec son noyau et son moteur Docker : seuls le worktree et les fichiers de la tâche y sont montés, et le réseau est fermé sauf aux registres de paquets et au fournisseur. Marche sous Windows 11, macOS (Apple silicon) et Linux avec KVM.",
+				"enable": "Lancer chaque tâche dans une microVM Docker",
+				"enableHint": "Coupé : les commandes tournent dans le bac à sable de l'OS, comme avant. Activé sans sbx fonctionnel, le bac à sable de l'OS prend le relais et la tâche dit pourquoi.",
+				"memory": "Mémoire par tâche",
+				"memoryHint": "Auto : une part de la mémoire libre, entre 2 et 16 Gio.",
+				"cpus": "Processeurs par tâche",
+				"cpusHint": "Auto : la moitié des cœurs de la machine.",
+				"cliAgents": "Lancer aussi les CLI d'agents dans la microVM (expérimental)",
+				"cliAgentsHint": "OpenCode tourne dans la microVM de la tâche, avec les seules clés d'API que vous avez rangées dans sbx (sbx secret set openai, anthropic…) : le proxy de sbx les ajoute, la VM ne les voit jamais. Sans clé dans sbx, ou avec une connexion par abonnement, le CLI reste sur cette machine dans le bac à sable de l'OS, et la carte le dit.",
+				"auto": "auto",
+				"requirements": "Demande la commande sbx (Windows : winget install -h Docker.sbx ; macOS : brew install docker/tap/sbx) et un compte Docker : lance sbx login une fois. Sous Windows, active la plateforme d'hyperviseur Windows. WorkPilot coupe la télémétrie de sbx ; aucun code ni prompt ne quitte la machine. Dans cette version, les commandes de la boucle WorkPilot (OpenAI, Google, Mistral, Copilot, modèles locaux…) tournent dans la VM ; les agents en CLI gardent le bac à sable de l'OS.",
+				"status": {
+					"unknown": "Pas encore vérifié.",
+					"ready": "sbx {{version}} est prêt · {{count}} VM de tâche en ce moment.",
+					"notReady": "sbx est installé mais pas prêt : {{reason}}",
+					"missing": "sbx est introuvable sur cette machine.",
+					"check": "Vérifier"
+				}
 			}
 		},
-		"scheduler": {},
 		"terminal-fonts": {
 			"description": "Personnaliser l'apparence des polices du terminal",
 			"title": "Polices de terminal"
@@ -459,6 +490,78 @@
 		"updates": {
 			"description": "Mises à jour de WorkPilot AI",
 			"title": "Mises à jour"
+		},
+		"approvals": {
+			"title": "Validation par niveaux",
+			"description": "Le niveau de la pull request de chaque tâche, et si elle fusionne seule une fois verte",
+			"mode": {
+				"title": "Mode",
+				"description": "Pour tous les projets et tous les providers. Le workpilot.policy.yaml d'un projet ne peut que le durcir.",
+				"off": {
+					"label": "Arrêtée",
+					"description": "Pas de niveau. Une personne fusionne chaque pull request, comme avant."
+				},
+				"observe": {
+					"label": "Observer",
+					"description": "Le niveau s'affiche sur la carte. Rien ne fusionne seul."
+				},
+				"enforce": {
+					"label": "Appliquer",
+					"description": "Une N0 verte, ou une N1 approuvée par la revue croisée, fusionne seule. N2 et N3 attendent une personne."
+				}
+			},
+			"express": {
+				"title": "Voie express des PR de dépendances",
+				"description": "Les pull requests Dependabot et Renovate de vos projets fusionnent seules quand leur niveau est N0 et que tous les checks sont passés. Seulement quand les niveaux sont appliqués.",
+				"toggle": "Fusionner les pull requests N0 vertes des bots",
+				"toggleDescription": "Environ toutes les demi-heures, pour chaque projet local sur GitHub. Une montée majeure, un changement de code ou de fichiers de CI, un check rouge ou en cours, un brouillon ou un fork reste à une personne.",
+				"needsEnforce": "Inactive tant que le mode n'est pas Appliquer."
+			},
+			"tiers": {
+				"title": "Les quatre niveaux",
+				"N0": {
+					"badge": "N0",
+					"when": "Montée de version ou documentation seule : fusion dès que la CI est verte."
+				},
+				"N1": {
+					"badge": "N1",
+					"when": "Un changement dans une seule couche, sous les limites : fusion quand la CI est verte et que la revue croisée est d'accord."
+				},
+				"N2": {
+					"badge": "N2",
+					"when": "Une feature, plusieurs couches, une migration, un contrat public, une montée majeure : une personne valide."
+				},
+				"N3": {
+					"badge": "N3",
+					"when": "Secrets, authentification, données personnelles, paiement, CI ou fichiers de politique : une personne valide, toujours."
+				}
+			},
+			"policyNote": "Le niveau se lit sans modèle, à partir des fichiers modifiés par la pull request, de son titre et des faits mesurés par la tâche. Les règles de la section approvals de workpilot.policy.yaml ne peuvent que le relever.",
+			"claudeShip": {
+				"title": "Claude Ship",
+				"description": "Claude Code Review, Claude Approvals et PR Steward, pour une organisation Claude sur un plan Team ou Enterprise. Activé, leurs checks sur la PR GitHub d'une tâche comptent : Code Review remplace une revue croisée absente, Approvals ne peut que retenir une fusion, et WorkPilot arrête ses propres correctifs sur une PR que le Steward suit.",
+				"auto": {
+					"label": "Automatique",
+					"description": "Activé dès qu'un compte Claude connecté est sur un plan Team ou Enterprise."
+				},
+				"on": {
+					"label": "Activé",
+					"description": "Toujours lire les checks de Claude Ship."
+				},
+				"off": {
+					"label": "Désactivé",
+					"description": "Ne jamais les lire, quel que soit le plan."
+				},
+				"checking": "Lecture des comptes Claude…",
+				"detected": "Détecté : {{accounts}}",
+				"notDetected": "Aucun compte Claude connecté sur un plan Team ou Enterprise.",
+				"plan": {
+					"team": "Team",
+					"enterprise": "Enterprise"
+				},
+				"active": "Claude Ship est utilisé pour les PR des tâches.",
+				"inactive": "Claude Ship n'est pas utilisé."
+			}
 		}
 	},
 	"tasks": {
@@ -603,28 +706,10 @@
 			"oauthToken": "Jeton OAuth",
 			"oauthTokenPlaceholder": "Jeton OAuth (si requis)"
 		},
-		"multiConnector": {
-			"title": "Gestion des fournisseurs IA",
-			"description": "Connectez et gérez plusieurs fournisseurs IA (Claude, OpenAI, Mistral, etc...).",
-			"loadingProviders": "Chargement des fournisseurs..."
-		},
 		"priority": {
 			"active": "Actif",
 			"apiSection": "Endpoints de secours (quand tous les comptes sont épuisés)",
-			"description": "Glissez pour réordonner. Le système basculera vers le prochain compte disponible dans l'ordre.",
-			"duplicateUsage": "Utilisation dupliquée détectée",
-			"duplicateUsageHint": "Ce profil a une utilisation identique à un autre profil, suggérant qu'ils sont peut-être authentifiés au même compte Anthropic. Ré-authentifiez avec un compte différent pour corriger.",
-			"inUse": "En cours d'utilisation",
-			"needsAuth": "Non authentifié",
-			"needsReauth": "Ré-authentification requise",
-			"needsReauthHint": "Le jeton de rafraîchissement de ce profil est invalide. Cliquez pour ré-authentifier.",
-			"next": "Suivant",
-			"noAccounts": "Aucun compte configuré. Ajoutez des comptes ci-dessus pour définir la priorité.",
-			"noEmail": "Pas d'e-mail",
 			"oauthSection": "Comptes Claude (utilisés en premier)",
-			"payPerUse": "Paiement à l'usage",
-			"providerAuth": "Authentifié via clé API",
-			"sessionUsage": "Utilisation de session (fenêtre de 5 heures)",
 			"status": {
 				"healthy": "Sain",
 				"highUsage": "Utilisation élevée",
@@ -632,14 +717,9 @@
 				"nearLimit": "Proche de la limite",
 				"rateLimited": "Limite de débit atteinte"
 			},
-			"tipDescription": "Les comptes Claude sont inclus dans votre abonnement et seront utilisés en premier. Les endpoints API facturent par requête et servent de secours lorsque tous les comptes Claude atteignent leurs limites.",
-			"tipTitle": "Comment fonctionne la priorité",
 			"title": "Ordre de priorité des comptes",
-			"typeAPI": "API",
-			"typeOAuth": "OAuth",
 			"unavailable": "Indisponible",
-			"unlimited": "Illimité",
-			"weeklyUsage": "Utilisation hebdomadaire (fenêtre de 7 jours)"
+			"unlimited": "Illimité"
 		},
 		"priorityOrder": {
 			"down": "Descendre",
@@ -735,6 +815,10 @@
 		"pr_template_filler": {
 			"label": "Remplisseur de template PR",
 			"description": "Remplit automatiquement les templates de PR GitHub à partir des changements de code"
+		},
+		"verifier": {
+			"label": "Vérificateur",
+			"description": "Mène la boucle de vérification : lance l'app, corrige ce qui casse, la conduit jusqu'au changement, trace les performances (MCP Chrome DevTools)."
 		}
 	},
 	"agentProfile": {
@@ -762,11 +846,33 @@
 		"customDescription": "Choisir un modèle et un niveau de réflexion spécifiques",
 		"clickToCustomize": "Cliquer pour personnaliser",
 		"selectThinkingLevel": "Sélectionner un niveau de réflexion",
-		"autoLabel": "Auto (Optimisé)",
-		"autoDescription": "Utilise Opus pour toutes les phases avec des niveaux de réflexion optimisés",
 		"autoDescriptionModel": "Utilise {{model}} pour toutes les phases avec des niveaux de réflexion optimisés",
 		"phaseConfiguration": "Configuration des Phases",
 		"phaseConfigurationDescription": "Configurez les modèles et les niveaux de réflexion pour chaque phase du pipeline de développement",
+		"presets": {
+			"auto": {
+				"name": "Auto (Optimisé)"
+			},
+			"complex": {
+				"name": "Tâches complexes",
+				"description": "Pour les implémentations délicates en plusieurs étapes, qui demandent une analyse approfondie"
+			},
+			"balanced": {
+				"name": "Équilibré",
+				"description": "Un bon équilibre entre vitesse et qualité pour la plupart des tâches"
+			},
+			"quick": {
+				"name": "Modifications rapides",
+				"description": "Des itérations rapides pour les changements simples et les petits correctifs"
+			}
+		},
+		"thinkingLevelDescriptions": {
+			"none": "Pas de réflexion étendue",
+			"low": "Réflexion brève",
+			"medium": "Analyse modérée",
+			"high": "Réflexion approfondie",
+			"ultrathink": "Profondeur de raisonnement maximale"
+		},
 		"phases": {
 			"spec": {
 				"label": "Création de Spécifications",
@@ -866,32 +972,13 @@
 		}
 	},
 	"autoSwitching": {
-		"authFailureDescription": "Changer de compte en cas d'échec d'authentification",
-		"authFailureSwitching": "Basculer en cas d'échec d'auth",
 		"debug": {
 			"accountsFound": "Debug : {{count}} compte(s) trouvé(s)"
 		},
-		"disabled": "Basculement auto désactivé",
-		"disabledDescription": "Les comptes ne basculeront plus automatiquement",
-		"enableDescription": "Basculer automatiquement entre les comptes selon l'utilisation",
-		"enableLabel": "Activer le basculement auto",
-		"enabled": "Basculement auto activé",
-		"enabledDescription": "Les comptes basculeront automatiquement",
 		"priorityOrder": {
-			"description": "Définir l'ordre dans lequel les comptes seront utilisés pour le basculement auto",
-			"title": "Ordre de priorité des comptes"
+			"description": "Définir l'ordre dans lequel les comptes seront utilisés pour le basculement auto"
 		},
-		"proactiveDescription": "Basculer avant d'atteindre les limites",
-		"proactiveMonitoring": "Surveillance proactive",
-		"rateLimitDescription": "Changer de compte lorsque la limite de débit est atteinte",
-		"rateLimitSwitching": "Basculer en cas de limite de débit",
-		"sessionThreshold": "Seuil de session",
-		"sessionThresholdDescription": "Basculer lorsque l'utilisation atteint ce pourcentage",
-		"title": "Basculement auto",
-		"toast": {
-			"error": "Erreur",
-			"errorDescription": "Impossible de mettre à jour les paramètres"
-		}
+		"title": "Basculement auto"
 	},
 	"azureDevOps": {
 		"addModel": "Ajouter",
@@ -940,6 +1027,8 @@
 		"patLabel": "Jeton d'accès personnel (PAT)",
 		"patLinkLabel": "Paramètres utilisateur Azure DevOps",
 		"patPlaceholder": "Entrez votre PAT",
+		"patShow": "Afficher le jeton",
+		"patHide": "Masquer le jeton",
 		"repositoryDescription": "Sélectionnez le dépôt Azure DevOps à utiliser pour ce projet",
 		"repositoryError": "Erreur de chargement des dépôts",
 		"repositoryLabel": "Dépôt",
@@ -977,7 +1066,7 @@
 		"filterStateLabel": "État",
 		"filterTypeAll": "Tous les types",
 		"filterTypeLabel": "Type d'élément de travail",
-		"importButton_one": "Importer les éléments depuis Azure DevOps",
+		"importButton_one": "Importer {{count}} élément",
 		"importButton_other": "Importer {{count}} éléments",
 		"importConfirmButton": "Importer {{count}} élément(s)",
 		"importConfirmDescription": "Les éléments suivants seront importés dans la colonne {{column}}.",
@@ -1001,11 +1090,11 @@
 		"successTitle": "Import réussi !",
 		"title": "Importer les éléments Azure DevOps",
 		"titleWithRepository": "Importer les éléments de {{repository}}",
-		"toggleSelection": "Basculer la sélection pour l'élément de travail {{id}}",
 		"importError": "Échec de l'import Azure DevOps",
 		"repositoryLabel": "Dépôt :",
 		"sidePanelAriaLabel": "Panneau d'import Azure DevOps",
-		"resizeHandleAriaLabel": "Redimensionner le panneau"
+		"resizeHandleAriaLabel": "Redimensionner le panneau",
+		"priorityBadge": "P{{priority}}"
 	},
 	"collaboration": {
 		"description": "Paramètres de collaboration multi-utilisateurs",
@@ -1446,7 +1535,9 @@
 				"name": "Webhook générique",
 				"hint": "POST JSON brut vers n'importe quel endpoint HTTP (intégrations maison)"
 			}
-		}
+		},
+		"triggerMemoryConflict": "Quand la synchronisation d'un coéquipier apporte une mémoire qui en contredit une autre",
+		"triggerMemoryConflictHint": "Sur demande : publie le titre des deux notes, un court aperçu nettoyé et le nom de leurs auteurs (jamais un e-mail)."
 	},
 	"cicd": {
 		"title": "Pipeline CI/CD",
@@ -1468,6 +1559,33 @@
 		"autoFixDescription": "Quand un build passe au rouge, lancer automatiquement l'agent pour le corriger",
 		"pollLabel": "Intervalle de vérification (secondes)",
 		"pollDescription": "Fréquence de vérification du statut du pipeline (minimum 15 s, défaut 60 s)"
+	},
+	"serverSession": {
+		"navLabel": "Serveur d'équipe",
+		"connect": {
+			"title": "Se connecter à un serveur d'équipe",
+			"description": "Vous travaillez en mode local, sur les projets de cet ordinateur seulement. Connectez-vous au serveur WorkPilot de votre équipe pour partager ses projets et son tableau, par mot de passe, invitation, Microsoft ou votre SSO.",
+			"button": "Se connecter à un serveur"
+		},
+		"title": "Ma session sur le serveur",
+		"description": "Qui est connecté au serveur d'équipe sur cet ordinateur, et comment la session a été ouverte, tel que le serveur le dit.",
+		"loading": "Lecture de la session",
+		"unavailable": "La session ne peut pas être lue sur le serveur",
+		"server": "Serveur",
+		"identity": "Connecté en tant que",
+		"identityValue": "{{name}} ({{email}})",
+		"role": "Rôle",
+		"method": "Ouverte avec",
+		"methods": {
+			"local": "Mot de passe",
+			"entra": "Microsoft Entra ID",
+			"oidc": "Connexion unique : {{name}}",
+			"invite": "Invitation acceptée",
+			"unknown": "Non enregistrée (session ouverte avant que le serveur ne nomme les connexions)"
+		},
+		"issuer": "Fournisseur d'identité",
+		"signedInAt": "Connecté le",
+		"signOut": "Se déconnecter"
 	},
 	"serverTokens": {
 		"navLabel": "Mes jetons sur le serveur",
@@ -1551,7 +1669,9 @@
 		"events": {
 			"plan_review": "Un plan attend son approbation",
 			"review_ready": "Un travail est prêt pour ma revue",
-			"failed": "Un run s'est arrêté sur une erreur"
+			"failed": "Un run s'est arrêté sur une erreur",
+			"approval_escalated": "Un plan a trop attendu ses approbateurs",
+			"review_feedback_held": "Le rejet d'une remarque de revue par un membre attend un mainteneur"
 		},
 		"language": "Langue des messages",
 		"enabled": "{{channel}} activé",
@@ -1600,14 +1720,18 @@
 		"role": "Rôle",
 		"roleMember": "Membre",
 		"roleViewer": "Lecteur",
-		"roleAdmin": "Administrateur",
+		"roleAdmin": "Administrateur du serveur",
 		"create": "Inviter",
 		"emailSent": "Invitation envoyée par email. Vous pouvez aussi partager le lien :",
 		"emailNotSent": "Email non envoyé (SMTP non configuré). Partagez ce lien à usage unique :",
 		"pending": "Invitations en attente",
 		"none": "Aucune invitation en attente.",
 		"expires": "expire le",
-		"revoke": "Révoquer"
+		"revoke": "Révoquer",
+		"copyLink": "Copier le lien",
+		"copyFailed": "Le lien n'a pas pu être copié",
+		"orgRole": "Rôle dans l'organisation",
+		"orgRoleDefault": "Par défaut pour cet accès"
 	},
 	"jiraImport": {
 		"cancel": "Annuler",
@@ -1658,7 +1782,8 @@
 		"statusLabel": "Statut",
 		"allStatuses": "Tous les statuts",
 		"dragHint": "Glissez les tickets sélectionnés dans une colonne du Kanban pour les importer",
-		"resize": "Redimensionner"
+		"resize": "Redimensionner",
+		"sidePanelAriaLabel": "Panneau d'import Jira"
 	},
 	"language": {
 		"description": "Sélectionnez la langue de l'interface de l'application",
@@ -1670,6 +1795,10 @@
 		"label": "Ordre des logs",
 		"reverseChronological": "Anti-chronologique (plus récent en premier)"
 	},
+	"kanbanColumnSummary": {
+		"label": "Résumé des colonnes",
+		"description": "Affiche une ligne de résumé sous le titre de chaque colonne du Kanban (tâches urgentes, phase des agents, plans à approuver…)."
+	},
 	"mcp": {
 		"addCustomServer": "Ajouter un serveur personnalisé",
 		"addMcpDescription": "Sélectionnez un serveur MCP à ajouter à cet agent",
@@ -1677,7 +1806,6 @@
 		"addServer": "Ajouter un serveur",
 		"added": "ajouté",
 		"advancedHeaders": "En-têtes supplémentaires",
-		"allMcpsAdded": "Tous les serveurs MCP disponibles sont déjà ajoutés",
 		"alwaysEnabled": "toujours activé",
 		"args": "Arguments",
 		"argsHint": "Arguments séparés par des espaces",
@@ -1694,10 +1822,7 @@
 		"description": "Configurer quels serveurs MCP sont disponibles pour les agents dans ce projet",
 		"descriptionNoProject": "Sélectionnez un projet pour configurer les serveurs MCP",
 		"editCustomServer": "Modifier le serveur personnalisé",
-		"errorCommandRequired": "La commande est requise pour les serveurs basés sur une commande",
 		"errorIdExists": "Un serveur avec cet ID existe déjà",
-		"errorNameRequired": "Le nom du serveur est requis",
-		"errorUrlRequired": "L'URL est requise pour les serveurs HTTP",
 		"headerName": "Nom de l'en-tête",
 		"headerValue": "Valeur de l'en-tête",
 		"headers": "En-têtes",
@@ -1797,6 +1922,10 @@
 			"teams": {
 				"name": "Microsoft Teams",
 				"description": "Envoyer des messages aux canaux Teams. Nécessite la variable d'env TEAMS_WEBHOOK_URL."
+			},
+			"workpilotVerify": {
+				"name": "WorkPilot Verify",
+				"description": "Lance l'app, lit ses logs, la pilote dans un navigateur et trace ses performances pendant la vérification"
 			}
 		},
 		"serversEnabled": "{{count}} serveurs activés",
@@ -1847,7 +1976,18 @@
 				"long": "anormalement longue ({{detail}} caractères)",
 				"injection": "injection de prompt : {{detail}}"
 			}
-		}
+		},
+		"healthCheckFailed": "La vérification de l'état a échoué",
+		"connectionTestFailed": "Le test de connexion a échoué",
+		"errorNameNoId": "Le nom doit contenir au moins une lettre ou un chiffre",
+		"removeHeader": "Retirer l'en-tête {{name}}",
+		"confine": {
+			"label": "Exécuter confiné (bac à sable de l'OS)",
+			"hint": "Le serveur ne démarre que dans le bac à sable de l'OS : il n'écrit que dans le projet et ne joint que les hôtes ci-dessous et le registre d'où son lanceur s'installe. Sans bac à sable (Windows), il ne démarre pas.",
+			"hosts": "Hôtes qu'il peut joindre",
+			"hostsHint": "Séparés par des espaces ou des virgules : api.example.com, *.example.com, ou un local 127.0.0.1:5432."
+		},
+		"confinedNotTested": "Non testé : ce serveur tourne confiné, et seul un agent le démarre, dans le bac à sable de l'OS."
 	},
 	"modelSelect": {
 		"discoveryNotAvailable": "Découverte de modèles non disponible. Saisissez le nom du modèle manuellement.",
@@ -1953,6 +2093,23 @@
 				"byKindTitle": "Lignes à relire max par PR, selon le type de tâche",
 				"byKindHelp": "Le code compte pleinement, les tests et la documentation pour moitié, les fichiers générés et les lockfiles pas du tout. Les valeurs par défaut suivent les études sur la revue de code : au-delà de 200 à 400 lignes ou d'une heure, le relecteur trouve moins de défauts. Laisser vide pour la valeur par défaut.",
 				"neverSplit": "Les investigations, les spikes et les tâches d'exploitation ne sont jamais découpées : elles n'ouvrent pas de code à relire."
+			},
+			"groups": {
+				"agent": {
+					"description": "Le modèle qui travaille sur les tâches et ce qu'il lit du projet."
+				},
+				"planning": {
+					"title": "Avant le code",
+					"description": "Comment une tâche est préparée : sa taille et ce qui est écrit avant de coder."
+				},
+				"coding": {
+					"title": "Pendant le code",
+					"description": "Comment l'agent écrit le code."
+				},
+				"checks": {
+					"title": "Avant la revue",
+					"description": "Ce qui est vérifié avant qu'une tâche arrive en revue, et où tournent les tests."
+				}
 			}
 		},
 		"github": {
@@ -2026,7 +2183,6 @@
 			"syncDescription": "Synchroniser avec les issues GitLab",
 			"title": "GitLab"
 		},
-		"jira": {},
 		"linear": {
 			"apiKey": "YOUR_LINEAR_API_KEY",
 			"checking": "Vérification...",
@@ -2098,48 +2254,19 @@
 			"remoteSaveFailed": "Impossible d'enregistrer le remote.",
 			"mainBranchPlaceholder": "main",
 			"mainBranchDetect": "Auto-détecter",
-			"mainBranchHint": "Branche de base des worktrees de tâches. Enregistrée avec cette fenêtre."
+			"mainBranchHint": "Branche de base des worktrees de tâches. Enregistrée avec cette fenêtre.",
+			"copyPathAria": "Copier le chemin du dépôt",
+			"copyRemoteAria": "Copier l'URL du dépôt distant",
+			"copyWorkpilotAria": "Copier le chemin du dossier WorkPilot",
+			"repathFailed": "Impossible de changer de dossier.",
+			"openTerminalFailed": "Impossible d'ouvrir un terminal.",
+			"mainBranchDetectFailed": "Aucune branche principale trouvée : saisissez-la."
 		}
 	},
 	"projectSettings": {
 		"noProjectSelected": {
 			"description": "Sélectionnez un projet dans la barre latérale pour configurer ses paramètres.",
 			"title": "Aucun projet sélectionné"
-		}
-	},
-	"providerGrid": {
-		"actions": {
-			"add": "Ajouter",
-			"refresh": "Actualiser"
-		},
-		"filters": {
-			"all": "Tous",
-			"configured": "Configurés",
-			"errors": "Avec erreurs",
-			"placeholder": "Filtrer",
-			"unconfigured": "Non configurés"
-		},
-		"search": {
-			"addFirst": "Commencez par ajouter votre premier fournisseur.",
-			"addFirstButton": "Ajouter votre premier fournisseur",
-			"adjustCriteria": "Essayez d'ajuster vos critères de recherche.",
-			"noProviders": "Aucun fournisseur disponible",
-			"noResults": "Aucun fournisseur trouvé",
-			"placeholder": "Rechercher un fournisseur...",
-			"results_one": "{{count}} résultat pour « {{query}} »",
-			"results_other": "{{count}} résultats pour « {{query}} »"
-		},
-		"sort": {
-			"category": "Catégorie",
-			"name": "Nom",
-			"placeholder": "Trier par",
-			"status": "Statut",
-			"usage": "Utilisation"
-		},
-		"stats": {
-			"configured": "{{count}} configuré(s)",
-			"errors": "{{count}} erreur(s)",
-			"total": "{{count}} au total"
 		}
 	},
 	"scale": {
@@ -2456,20 +2583,6 @@
 			"authFailed": "Échec de l'authentification",
 			"logoutFailed": "Échec de la déconnexion",
 			"unknownError": "Une erreur inconnue est survenue."
-		}
-	},
-	"llmRouter": {
-		"routingStrategy": {
-			"title": "Stratégie de Routage par Défaut",
-			"description": "Comment le routeur sélectionne un fournisseur lorsque plusieurs sont disponibles.",
-			"bestPerformance": "Meilleure Performance",
-			"bestPerformanceDescription": "Priorité au score de qualité",
-			"cheapest": "Le Moins Cher",
-			"cheapestDescription": "Minimiser le coût par tâche",
-			"lowestLatency": "Plus Faible Latence",
-			"lowestLatencyDescription": "Temps de réponse le plus rapide",
-			"roundRobin": "Round Robin",
-			"roundRobinDescription": "Distribution équitable"
 		}
 	},
 	"cicdTriggers": {
@@ -2891,7 +3004,10 @@
 		"copyThenOpen": "Copiez ce code puis ouvrez le lien ci-dessous pour vous authentifier.",
 		"accountConnected": "Votre compte GitHub est connecté",
 		"timedOut": "Délai d'authentification dépassé",
-		"failed": "Échec de l'authentification"
+		"failed": "Échec de l'authentification",
+		"timedOutDescription": "La fenêtre de connexion est restée ouverte trop longtemps. Réessayez.",
+		"tokenFailed": "Impossible de lire la connexion de la CLI GitHub",
+		"cliCheckFailed": "Impossible de vérifier la CLI GitHub"
 	},
 	"apiKeyConfig": {
 		"apiUrl": "URL de l'API",
@@ -3036,7 +3152,8 @@
 		"awaiting": "Cette recette lance des commandes sur votre machine. Elle ne s'exécute qu'une fois approuvée telle qu'elle est maintenant.",
 		"approve": "Approuver",
 		"saveHint": "Enregistrez-la en .workpilot/worktree.toml pour la modifier (fichiers à copier, ports, nettoyage).",
-		"saveDetected": "Enregistrer en worktree.toml"
+		"saveDetected": "Enregistrer en worktree.toml",
+		"failed": "Impossible de lire ou d'enregistrer la recette du worktree."
 	},
 	"kicker": "WorkPilot · Configuration",
 	"headerDescription": "Paramètres de l’application et du projet, rangés par thème.",
@@ -3081,5 +3198,359 @@
 			"scheduler": "Planification",
 			"updates": "Mises à jour"
 		}
+	},
+	"aiAccounts": {
+		"title": "Comptes IA",
+		"description": "Chaque provider sur lequel WorkPilot peut tourner : comment il se connecte, s'il répond, et lequel prend le relais quand une tâche atteint une limite.",
+		"loading": "Chargement des providers…",
+		"tabs": {
+			"label": "Vues des comptes IA",
+			"providers": "Providers",
+			"failover": "Basculement auto"
+		},
+		"stats": {
+			"connected": "Connectés",
+			"connectedValue": "{{connected}} / {{total}}",
+			"default": "Provider par défaut",
+			"failover": "Basculement auto",
+			"failoverOn_one": "Actif · {{count}} compte",
+			"failoverOn_other": "Actif · {{count}} comptes",
+			"failoverOff": "Désactivé",
+			"attention": "À vérifier",
+			"none": "Aucun"
+		},
+		"filters": {
+			"label": "Filtrer les providers",
+			"all": "Tous",
+			"connected": "Connectés",
+			"available": "À connecter",
+			"attention": "À vérifier"
+		},
+		"search": "Rechercher un provider",
+		"groups": {
+			"connected": "Connectés",
+			"available": "À connecter"
+		},
+		"empty": {
+			"title": "Aucun provider ne correspond",
+			"body": "Modifiez la recherche ou le filtre."
+		},
+		"noneConnected": "Aucun provider n'est encore connecté. Connectez-en un pour lancer des tâches.",
+		"toast": {
+			"testOkModels": "{{name}} répond ({{count}} modèles disponibles)."
+		},
+		"card": {
+			"status": {
+				"connected": "Connecté",
+				"reauth": "Reconnexion requise",
+				"failing": "Ne répond pas",
+				"off": "Non connecté"
+			},
+			"auth": {
+				"oauth": "Connexion",
+				"api-key": "Clé API",
+				"cli": "CLI",
+				"local": "Local"
+			},
+			"default": "Par défaut",
+			"setDefault": "Utiliser par défaut",
+			"test": "Tester",
+			"testing": "Test…",
+			"edit": "Modifier",
+			"connect": "Connecter",
+			"reconnect": "Reconnecter",
+			"lastTest": "Testé le {{date}}",
+			"neverTested": "Jamais testé",
+			"keyToday": "Clé posée aujourd'hui",
+			"keyAge_one": "Clé posée il y a {{count}} jour",
+			"keyAge_other": "Clé posée il y a {{count}} jours",
+			"usage": "Session {{session}} %",
+			"usageWeekly": "Session {{session}} % · semaine {{weekly}} %",
+			"account": "Compte : {{name}}",
+			"accounts_one": "Comptes · {{count}}",
+			"accounts_other": "Comptes · {{count}}"
+		},
+		"failover": {
+			"masterTitle": "Basculement auto",
+			"masterOn": "Une tâche arrêtée par une limite ou une connexion perdue reprend sur le compte suivant de la chaîne, à la phase où elle s'est arrêtée.",
+			"masterOff": "Désactivé : une tâche arrêtée par une limite vous attend.",
+			"triggersTitle": "Quand basculer",
+			"rateLimit": "Sur une limite d'usage",
+			"rateLimitHint": "Le provider refuse les requêtes jusqu'à la remise à zéro de sa limite, ou le quota ou le crédit du compte est épuisé.",
+			"authFailure": "Sur une connexion perdue",
+			"authFailureHint": "La connexion ou la clé du compte ne fonctionne plus.",
+			"sameProviderFirst": "D'abord les autres comptes du même provider",
+			"sameProviderFirstHint": "Une tâche arrêtée sur un compte passe au compte suivant de ce provider dans la chaîne avant d'essayer un autre provider.",
+			"proactive": "Avant la limite (comptes Claude)",
+			"proactiveHint": "Passe à un autre compte Claude quand l'usage dépasse ces seuils.",
+			"session": "Seuil de session",
+			"weekly": "Seuil hebdomadaire",
+			"chainTitle": "Chaîne de basculement",
+			"chainDescription": "Les comptes sont essayés de haut en bas. Glissez pour réordonner ; l'interrupteur retire un compte de la chaîne.",
+			"chainEmpty": "Aucun compte connecté pour l'instant.",
+			"chainSingle": "Un seul compte est dans la chaîne : connectez ou incluez-en un autre pour qu'une tâche arrêtée puisse continuer.",
+			"kind": {
+				"oauth": "Compte Claude",
+				"api": "Profil API",
+				"account": "Compte",
+				"provider": "Provider"
+			},
+			"active": "En cours",
+			"include": "Inclure {{name}} dans la chaîne",
+			"dragHandle": "Déplacer {{name}}",
+			"saveError": "Les réglages du basculement n'ont pas pu être enregistrés.",
+			"orderError": "L'ordre de la chaîne n'a pas pu être enregistré."
+		},
+		"accounts": {
+			"title": "Comptes {{provider}}",
+			"description": "Chaque compte se connecte séparément. Le compte par défaut est celui des nouvelles tâches, des tests de connexion et des vues ; changez-le ici ou depuis la popin d'utilisation en haut à droite.",
+			"apiKeyIntro": "Enregistrez un compte par clé {{provider}} (perso, entreprise, client). Les clés sont chiffrées sur cet ordinateur et ne sont plus jamais affichées.",
+			"empty": "Aucun compte pour l'instant.",
+			"mainKey": "Clé principale",
+			"mainKeyHint": "La clé saisie dans « Modifier » de ce provider.",
+			"default": "Par défaut",
+			"useByDefault": "Utiliser par défaut",
+			"name": "Nom",
+			"namePlaceholder": "Perso, Entreprise, Client X…",
+			"key": "Clé API",
+			"keyPlaceholder": "Collez la clé API du compte",
+			"keyKeep": "Laissez vide pour garder la clé enregistrée",
+			"keySet": "Clé enregistrée",
+			"keySetOn": "Clé enregistrée le {{date}}",
+			"noKey": "Aucune clé",
+			"add": "Ajouter un compte",
+			"addAndTest": "Ajouter et tester",
+			"save": "Enregistrer",
+			"cancel": "Annuler",
+			"test": "Tester",
+			"testOk": "Le compte répond.",
+			"testOkModels": "Le compte répond ({{count}} modèles disponibles).",
+			"testFailed": "Échec du test : {{error}}",
+			"edit": "Modifier {{name}}",
+			"rename": "Renommer {{name}}",
+			"delete": "Supprimer {{name}}",
+			"deleteTitle": "Supprimer le compte « {{name}} » ?",
+			"deleteDescription": "Sa clé est effacée de cet ordinateur.",
+			"deleteDefaultDescription": "C'est le compte par défaut : le provider repasse sur sa clé principale, s'il en a une. Sa clé est effacée de cet ordinateur.",
+			"saveFailed": "Le compte n'a pas pu être enregistré.",
+			"deleteFailed": "Le compte n'a pas pu être supprimé.",
+			"defaultFailed": "Le compte par défaut n'a pas pu être changé.",
+			"singleAccount": "{{provider}} se connecte par son propre outil (CLI ou IDE) : il tourne sur le compte connecté dans cet outil. Plusieurs comptes pour lui arrivent dans une prochaine mise à jour.",
+			"claude": {
+				"intro": "Chaque compte Claude se connecte dans son propre dossier : plusieurs abonnements cohabitent. Le basculement auto peut reprendre une tâche arrêtée sur le compte suivant.",
+				"signedIn": "Connecté",
+				"signedOut": "Non connecté",
+				"signIn": "Se connecter",
+				"reconnect": "Se reconnecter",
+				"signInFailed": "La connexion n'a pas pu démarrer.",
+				"invalidName": "Mettez au moins une lettre ou un chiffre dans le nom.",
+				"addAndSignIn": "Ajouter et se connecter",
+				"deleteDescription": "Son dossier de connexion reste sur le disque ; WorkPilot cesse de l'utiliser."
+			},
+			"login": {
+				"title": "Connexions {{cli}}",
+				"intro": "Chaque compte {{cli}} se connecte dans un dossier à lui, pour que plusieurs abonnements cohabitent. Les tâches tournent sur le compte par défaut ; sans lui, {{cli}} garde la connexion de cet ordinateur.",
+				"system": "Connexion de cet ordinateur",
+				"systemHint": "Le compte avec lequel {{cli}} est connecté hors de WorkPilot.",
+				"signedIn": "Connecté",
+				"signedOut": "Non connecté",
+				"signIn": "Se connecter",
+				"reconnect": "Se reconnecter",
+				"signInFailed": "La connexion n'a pas pu démarrer.",
+				"addAndSignIn": "Ajouter et se connecter",
+				"deleteDescription": "Son dossier de connexion {{cli}} est effacé de cet ordinateur.",
+				"terminalTitle": "Se connecter à {{cli}} en tant que « {{name}} »",
+				"stepRun": "Appuyez sur Entrée pour lancer la commande affichée.",
+				"stepFollow": "Suivez les étapes qu'elle affiche (une page du navigateur peut s'ouvrir).",
+				"stepClose": "Fermez ce terminal quand il indique que vous êtes connecté."
+			},
+			"keyId": "ID de clé d'accès",
+			"secretKey": "Clé d'accès secrète",
+			"secretPlaceholder": "Collez la clé d'accès secrète du compte",
+			"secretKeep": "Laisser vide pour garder le secret enregistré",
+			"region": "Région",
+			"testUnchecked": "Clé enregistrée. {{provider}} n'offre aucune vérification que WorkPilot puisse lancer avec elle : la première tâche dira si elle marche."
+		},
+		"spend": {
+			"month": "Ce mois-ci : {{cost}} · {{tokens}} tokens",
+			"monthShort": "Dépensé ce mois-ci",
+			"floor": "(au moins)",
+			"floorHint": "Des sessions ont utilisé des tokens sans prix connu : le coût réel est plus élevé.",
+			"noBudget": "Aucun budget mensuel",
+			"budget": "{{pct}} % de {{budget}} par mois",
+			"editBudget": "Fixer le budget mensuel",
+			"budgetLabel": "Budget mensuel en dollars US",
+			"budgetPlaceholder": "ex. 50 (vide : aucun)",
+			"invalid": "Saisis un montant en dollars, ou laisse vide pour aucun budget."
+		},
+		"pins": {
+			"loginChoice": "{{name}} (connexion {{cli}})",
+			"title": "Compte IA",
+			"projectDescription": "Le compte sur lequel chaque provider tourne pour les tâches de ce projet. Une carte peut en choisir un autre.",
+			"cardDescription": "Le compte sur lequel chaque provider de cette carte tourne. Laisser tel quel pour suivre le projet, ou le compte par défaut du provider.",
+			"inheritDefault": "Compte par défaut ({{name}})",
+			"inheritProject": "Compte du projet ({{name}})",
+			"removed": "Compte supprimé (le compte par défaut est utilisé)"
+		}
+	},
+	"governance": {
+		"kicker": "Gouvernance",
+		"title": "Heures, fichiers et budget de jetons",
+		"hint": "Ce que workpilot.policy.yaml impose à chaque agent, sur tous les providers. En lecture seule : modifiez le fichier dans le dépôt et faites-le relire comme du code.",
+		"refresh": "Actualiser",
+		"loadFailed": "La politique de gouvernance n'a pas pu être lue : {{error}}",
+		"invalid": "workpilot.policy.yaml est refusé : tant qu'il n'est pas corrigé, chaque tâche se met en pause avant sa prochaine session et aucun agent n'écrit de fichier ni ne lance de commande.",
+		"none": "workpilot.policy.yaml ne fixe ni heures, ni fichiers, ni budget de jetons.",
+		"scheduleTitle": "Heures permises",
+		"noSchedule": "À toute heure",
+		"openNow": "Ouvert maintenant",
+		"closedNow": "Fermé maintenant",
+		"scheduleLine": "{{hours}} ({{timezone}}), {{days}}",
+		"filesTitle": "Fichiers",
+		"forbidden": "Interdits",
+		"requiresReview": "Revue requise",
+		"noFiles": "Aucune règle de fichier",
+		"budgetTitle": "Budget de jetons",
+		"noBudget": "Pas de limite de jetons",
+		"budgetLine": "{{spent}} jetons sur {{limit}} dans la dernière heure",
+		"taskBudgetLine": "Au plus {{limit}} jetons par tâche",
+		"loopTitle": "Coupe-circuit",
+		"loopLine": "Met un agent en pause après {{count}} appels d'outil identiques",
+		"noLoop": "La limite propre à l'app",
+		"metricsBlocked_one": "{{count}} action d'agent arrêtée dans les dernières 24 h",
+		"metricsBlocked_other": "{{count}} actions d'agent arrêtées dans les dernières 24 h",
+		"metricsTrips_one": "{{count}} déclenchement du coupe-circuit sur les 7 derniers jours",
+		"metricsTrips_other": "{{count}} déclenchements du coupe-circuit sur les 7 derniers jours",
+		"decisionsTitle": "Dernières décisions",
+		"noDecisions": "La politique n'a encore pris aucune décision.",
+		"exportCsv": "Exporter en CSV",
+		"exportJson": "Exporter en JSON",
+		"exported_one": "{{count}} décision exportée dans {{path}}",
+		"exported_other": "{{count}} décisions exportées dans {{path}}",
+		"exportFailed": "L'export a échoué : {{error}}",
+		"approvedBy": "approuvé par {{name}}",
+		"localApprover": "Sur cet ordinateur, une approbation est donnée en votre nom, sans identité vérifiée. Sur un serveur, le compte qui approuve et ses rôles sont enregistrés.",
+		"serverApprover": "Tout membre du projet qui peut approuver répond, sous son compte du serveur.",
+		"serverReviewers": "Approuvé par un membre qui a l'un de ces rôles : {{roles}}. Quiconque peut approuver peut refuser.",
+		"serverTitle": "Gouvernance du projet du serveur",
+		"serverHint": "Les agents de ce projet tournent sur le serveur : son workpilot.policy.yaml, son journal d'audit, les appels qu'attendent ses agents et son arrêt d'urgence sont lus et exécutés là-bas. Le serveur revérifie vos droits à chaque action.",
+		"agentsLine": "Agents en cours sur le serveur : {{mine}} à vous, {{project}} en tout",
+		"stopMine": "Arrêter mes agents",
+		"stopProject": "Arrêter tous les agents du projet",
+		"stopProjectConfirm_one": "Confirmer : arrêter {{count}} agent, quel que soit qui l'a lancé",
+		"stopProjectConfirm_other": "Confirmer : arrêter {{count}} agents, quel que soit qui les a lancés",
+		"stopped_one": "{{count}} agent arrêté. Sa carte peut être relancée.",
+		"stopped_other": "{{count}} agents arrêtés. Leurs cartes peuvent être relancées.",
+		"stopFailed": "Les agents n'ont pas pu être arrêtés : {{error}}",
+		"pendingTitle_one": "{{count}} appel attend une approbation",
+		"pendingTitle_other": "{{count}} appels attendent une approbation",
+		"approve": "Approuver",
+		"refuse": "Refuser",
+		"answered": {
+			"approved": "Approuvé en votre nom : le prochain appel identique de l'agent passe, une fois.",
+			"refused": "Refusé : l'agent reste refusé sur cet appel."
+		},
+		"answerFailed": "La réponse n'a pas été enregistrée : {{error}}",
+		"decisions": {
+			"deny": "Refusé",
+			"review": "Revue",
+			"approved": "Approuvé",
+			"warn": "Averti",
+			"outside_hours": "Hors horaires",
+			"budget_exceeded": "Budget atteint",
+			"invalid_policy": "Politique invalide",
+			"tool_loop": "Coupe-circuit"
+		}
+	},
+	"forgeBinding": {
+		"mismatchTitle": "Ce projet pointe sur {{saved}}, qui n'est aucun de ses remotes",
+		"mismatchDescription": "Ce dépôt vient peut-être d'un autre projet. Utiliser le dépôt du remote de ce projet :",
+		"mismatchNoRemote": "Aucun remote de ce projet n'est sur cette forge : ce dépôt appartient sans doute à un autre projet. Vérifiez-le, ou désactivez cette intégration pour ce projet.",
+		"useRemote": "Utiliser {{repo}}",
+		"detected": "Aucun dépôt enregistré : ce projet utilise celui de son remote git, {{repo}}.",
+		"saveDetected": "L'enregistrer dans les réglages"
+	},
+	"forgeAccounts": {
+		"navLabel": "Comptes des forges",
+		"title": "Comptes des forges",
+		"description": "Enregistrez une fois vos comptes GitHub, GitLab, Azure DevOps et Bitbucket (travail, perso, un client…). Chaque projet choisit ensuite celui qu'il utilise dans ses propres réglages. Les jetons restent chiffrés sur cet ordinateur et ne sont plus jamais affichés.",
+		"empty": "Aucun compte de forge enregistré.",
+		"add": "Ajouter un compte",
+		"forge": "Forge",
+		"label": "Nom",
+		"labelPlaceholder": "Travail, Perso, Client X…",
+		"gitlabHost": "Instance GitLab",
+		"azureHost": "Organisation Azure DevOps",
+		"bitbucketUsername": "Nom d'utilisateur ou e-mail (facultatif)",
+		"bitbucketUsernameHint": "Avec un jeton d'API ou un mot de passe d'application, le nom d'utilisateur ou l'e-mail Atlassian qui se connecte. Laisser vide pour un jeton d'accès d'espace de travail ou de dépôt.",
+		"token": "Jeton",
+		"tokenPlaceholder": "Jeton d'accès personnel",
+		"tokenKeep": "Laisser vide pour garder le jeton enregistré",
+		"save": "Enregistrer",
+		"cancel": "Annuler",
+		"tokenSet": "Jeton enregistré",
+		"noToken": "Aucun jeton",
+		"test": "Tester",
+		"testOk": "Connecté en tant que {{username}}",
+		"testFailed": "Échec de la connexion : {{error}}",
+		"edit": "Modifier {{label}}",
+		"delete": "Supprimer {{label}}",
+		"deleteTitle": "Supprimer le compte {{label}} ?",
+		"deleteDescription": "Les projets qui l'utilisent n'auront plus de jeton pour cette forge tant que vous n'aurez pas choisi un autre compte ou saisi un jeton propre au projet.",
+		"picker": {
+			"label": "Compte",
+			"ownToken": "Le jeton propre à ce projet",
+			"withUsername": "{{label}} ({{username}})",
+			"missing": "Compte supprimé",
+			"hint": "Un compte enregistré apporte son jeton et son adresse. Gérez les comptes dans Réglages, Comptes des forges.",
+			"noneHint": "Pour utiliser le même compte dans plusieurs projets, enregistrez-le une fois dans Réglages, Comptes des forges.",
+			"missingHint": "Le compte qu'utilisait ce projet a été supprimé : choisissez-en un autre ou saisissez un jeton pour ce projet."
+		}
+	},
+	"serverReplayLinks": {
+		"navLabel": "Liens de rejeu",
+		"title": "Mes liens d'équipe vers un rejeu",
+		"description": "Chaque lien d'équipe vers un rejeu que vous avez créé, sur chaque projet de ce serveur dont vous êtes encore membre. Révoquer un lien ici y met fin aussitôt : qui l'a reçu ne peut plus l'ouvrir.",
+		"refresh": "Actualiser",
+		"empty": "Vous n'avez encore créé aucun lien d'équipe.",
+		"project": "Projet : {{project}}"
+	},
+	"kanbanAbandonClosedPrs": {
+		"label": "Mettre de côté les cartes dont la PR est fermée",
+		"description": "Une carte dont la pull request a été fermée sans fusion passe dans « Abandonnée », avec la raison « PR fermée sans fusion ». La reprendre la remet au travail."
+	},
+	"kanbanAutoArchive": {
+		"label": "Archiver les tâches terminées",
+		"description": "Une tâche terminée depuis plus longtemps est archivée. « Afficher les archivées » dans la colonne Terminée la fait revenir. Projets locaux seulement.",
+		"off": "Jamais",
+		"after_one": "Après {{count}} jour",
+		"after_other": "Après {{count}} jours"
+	},
+	"myUsage": {
+		"navLabel": "Mon usage",
+		"title": "Mon usage",
+		"description": "Ce que les administrateurs de cette organisation voient de vous sur les 30 derniers jours : totaux, noms d'actions, runs et jobs. Jamais un prompt, du code, un texte saisi ou un nom de fichier.",
+		"export": "Télécharger tout ce qui est conservé sur moi (JSON)",
+		"notice": "Relire ce qui est mesuré",
+		"failed": "Le serveur a refusé : {{error}}",
+		"visibleTo": "Lisible par : {{roles}}, et les administrateurs de la plateforme du serveur."
+	},
+	"usageNotice": {
+		"title": "Ce que ce serveur mesure de vous",
+		"intro": "Le serveur de cette organisation conserve quelques chiffres sur chaque membre, pour suivre son usage et ses coûts.",
+		"measured": {
+			"tokens": "Les jetons et le coût des agents que vous lancez, par fournisseur et modèle",
+			"runs": "Vos runs : phase, statut, début et fin",
+			"jobs": "Vos jobs de projet : fonctionnalité, statut, début et fin",
+			"sign_ins": "Vos connexions : heure, méthode, adresse et application",
+			"presence": "Les jours où vous étiez connecté, et votre dernière présence",
+			"pages": "Combien de fois par jour vous ouvrez chaque page de l'app (son nom seulement)"
+		},
+		"never": "Jamais un prompt, du code, un texte saisi ou un nom de fichier.",
+		"retention": "Ces chiffres sont conservés {{days}} jours.",
+		"pageRetention": "Les comptes de pages sont conservés {{days}} jours.",
+		"visibleTo": "Lisible par : {{roles}}, et les administrateurs de la plateforme du serveur.",
+		"rights": "Vous pouvez les consulter et télécharger tout ce qui est conservé sur vous dans Paramètres, Mon usage. Pour faire effacer votre compte, demandez à un administrateur de la plateforme.",
+		"understood": "J'ai compris"
 	}
 }

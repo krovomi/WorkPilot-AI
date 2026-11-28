@@ -40,7 +40,16 @@ from pathlib import Path
 
 from .agents import AGENTS, AgentSpec, agent
 from .home import digest_path, kind_dir
-from .notes import Note, inside, iter_notes, now_iso, read_note, slugify, write_note
+from .notes import (
+    Note,
+    inside,
+    iter_notes,
+    listed,
+    now_iso,
+    read_note,
+    slugify,
+    write_note,
+)
 
 __all__ = [
     "BRIDGE_START",
@@ -199,12 +208,19 @@ def _instruction_text(note: Note) -> str:
     return " ".join(line.strip() for line in lines).strip()
 
 
-def instructions(root: Path, *, include_inactive: bool = False) -> list[Instruction]:
+def instructions(
+    root: Path, *, include_inactive: bool = False, signed_only: bool = False
+) -> list[Instruction]:
     """The instructions in force: ``status: active`` (or no status at all).
 
     ``proposed`` ones — written by a WorkPilot agent rather than a person — and
     ``retired`` ones are left out of every prompt and bridge until a person
     changes the status. ``include_inactive`` is for deduplication only.
+
+    ``signed_only``: for what agents get (a prompt, a bridge, the digest, the
+    MCP tool), without the instructions whose note no key of the vault's
+    trusted list signed (`lifecycle.provenance.vault_unverified`); no list,
+    no change.
     """
     folder = kind_dir(root, "instruction").name
     out: list[Instruction] = []
@@ -229,6 +245,11 @@ def instructions(root: Path, *, include_inactive: bool = False) -> list[Instruct
                 status=status,
             )
         )
+    if signed_only and out:
+        from .lifecycle.provenance import unverified_among
+
+        hidden = unverified_among(root, [item.rel for item in out])
+        out = [item for item in out if item.rel not in hidden]
     return out
 
 
@@ -275,8 +296,8 @@ def remember(
     score, match = best
     if match is not None and score >= _threshold():
         note = read_note(root, match.rel)
-        agents = list(note.meta.get("agents") or [])
-        sources = list(note.meta.get("sources") or [])
+        agents = listed(note.meta.get("agents"))
+        sources = listed(note.meta.get("sources"))
         changed = False
         if agent_name not in agents:
             agents.append(agent_name)
@@ -284,7 +305,7 @@ def remember(
         if source and source not in sources:
             sources.append(source)
             changed = True
-        tasks = list(note.meta.get("tasks") or [])
+        tasks = listed(note.meta.get("tasks"))
         if task and task not in tasks:
             tasks.append(task)
             note.meta["tasks"] = tasks
@@ -477,7 +498,10 @@ def write_digest(root: Path) -> Path:
     Written into the brain's hidden state folder, where Claude Code and Gemini
     import it from (``@path``) and Obsidian does not list it.
     """
-    items = sorted(instructions(root), key=lambda i: (-len(i.agents), i.text.lower()))
+    items = sorted(
+        instructions(root, signed_only=True),
+        key=lambda i: (-len(i.agents), i.text.lower()),
+    )
     lines = [
         "---",
         "kind: digest",
@@ -509,7 +533,10 @@ def bridge_block(root: Path, spec: AgentSpec, own_text: str = "") -> str:
     a similar instruction reads as confirmation rather than as a second rule.
     """
     own = extract_instructions(own_text)
-    items = sorted(instructions(root), key=lambda i: (-len(i.agents), i.text.lower()))
+    items = sorted(
+        instructions(root, signed_only=True),
+        key=lambda i: (-len(i.agents), i.text.lower()),
+    )
     shared, already = [], []
     for item in items:
         if any(similarity(item.text, mine) >= _threshold() for mine in own):

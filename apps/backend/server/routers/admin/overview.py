@@ -207,23 +207,25 @@ async def set_quotas(
         quota = OrgQuota(org_id=org_id)
         db.add(quota)
 
+    sent = body.model_fields_set
+    # A limit sent as null is lifted (unlimited); one left out stays as it is.
     for field in (
         "max_users",
         "max_projects",
         "max_concurrent_runs",
         "monthly_token_budget",
-        "enforce_hard_stop",
     ):
-        value = getattr(body, field)
-        if value is not None:
-            setattr(quota, field, value)
+        if field in sent:
+            setattr(quota, field, getattr(body, field))
+    if body.enforce_hard_stop is not None:
+        quota.enforce_hard_stop = body.enforce_hard_stop
 
     await record(
         db,
         action="org.quota.updated",
         actor_id=actor.id,
         org_id=org_id,
-        payload=body.model_dump(exclude_none=True),
+        payload=body.model_dump(exclude_unset=True),
         request=request,
     )
     await db.commit()
@@ -241,10 +243,12 @@ async def list_audit(
     _: CurrentUser = Depends(require_permission("audit.read")),
     db: AsyncSession = Depends(get_db),
     action: str | None = None,
+    login_id: str | None = Query(None, max_length=36),
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
 ) -> list[AuditEntryPublic]:
-    """This organization's administrative history, newest first."""
+    """This organization's administrative history, newest first; with
+    ``login_id``, what was done under one sign-in."""
     query = (
         select(AuditLog, User)
         .outerjoin(User, User.id == AuditLog.user_id)
@@ -255,6 +259,8 @@ async def list_audit(
     )
     if action:
         query = query.where(AuditLog.action == action)
+    if login_id:
+        query = query.where(AuditLog.login_id == login_id)
 
     return [
         AuditEntryPublic(
@@ -267,6 +273,8 @@ async def list_audit(
             payload=entry.payload,
             ip=entry.ip,
             created_at=entry.created_at,
+            login_id=entry.login_id,
+            login_method=entry.login_method,
         )
         for entry, user in (await db.execute(query)).all()
     ]

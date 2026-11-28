@@ -7,11 +7,21 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Request
 from server.auth.deps import CurrentUser
 from server.auth.jwt_tokens import revoke_all_sessions
+from server.auth.password_reset import (
+    PasswordResetError,
+    build_reset_link,
+    issue_reset,
+    ttl,
+)
+from server.authz.delegation import end_delegations_of
 from server.authz.deps import require_org, require_permission, require_platform_admin
+from server.authz.principal import Principal
+from server.config import get_settings
 from server.db.engine import get_db
 from server.db.models import AuthSession, GlobalRole, OrgMember, User
-from server.schemas import SessionPublic, UserPublic
+from server.schemas import PasswordResetIssued, SessionPublic, UserPublic
 from server.services.audit import record
+from server.services.email import EmailError, send_password_reset_email
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -58,16 +68,21 @@ async def deactivate_user(
     if user_id == actor.id:
         raise HTTPException(status_code=400, detail="You cannot deactivate yourself")
 
-    user = await _member_of(db, org_id, user_id)
+    user = await _account_of(db, org_id, user_id, actor)
     user.is_active = False
     revoked = await revoke_all_sessions(db, user_id, commit=False)
+    ended = await end_delegations_of(db, user_id=user_id)
 
     await record(
         db,
         action="user.deactivated",
         actor_id=actor.id,
         org_id=org_id,
-        payload={"user_id": user_id, "sessions_revoked": revoked},
+        payload={
+            "user_id": user_id,
+            "sessions_revoked": revoked,
+            "delegations_ended": ended,
+        },
         request=request,
     )
     await db.commit()
@@ -82,7 +97,7 @@ async def activate_user(
     org_id: str = Depends(require_org),
     db: AsyncSession = Depends(get_db),
 ) -> UserPublic:
-    user = await _member_of(db, org_id, user_id)
+    user = await _account_of(db, org_id, user_id, actor)
     user.is_active = True
     await record(
         db,
@@ -138,6 +153,52 @@ async def set_platform_role(
     return UserPublic.model_validate(user)
 
 
+@router.post("/users/{user_id}/password-reset", response_model=PasswordResetIssued)
+async def issue_password_reset(
+    user_id: str,
+    request: Request,
+    actor: CurrentUser = Depends(require_platform_admin),
+    db: AsyncSession = Depends(get_db),
+) -> PasswordResetIssued:
+    """A link for the account to set a new password, for someone who lost theirs.
+
+    Platform admin only: an account can belong to several organizations, and
+    the admin of one must not take it over in the others. The link goes by
+    email when the server has SMTP; otherwise, or when sending fails, it is
+    in this answer, once, for the admin to hand over.
+    """
+    user = await db.get(User, user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    await record(
+        db,
+        action="auth.password_reset.issued",
+        actor_id=actor.id,
+        payload={"user_id": user_id},
+        request=request,
+    )
+    try:
+        issued = await issue_reset(db, user, created_by=actor.id)
+    except PasswordResetError as e:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+    link = build_reset_link(issued.token)
+    email_sent = False
+    if get_settings().email_enabled:
+        try:
+            minutes = int(ttl().total_seconds() // 60)
+            await send_password_reset_email(user.email, link, minutes)
+            email_sent = True
+        except EmailError:
+            pass  # logged by the sender, without the link
+    return PasswordResetIssued(
+        email=user.email,
+        expires_at=issued.expires_at,
+        email_sent=email_sent,
+        reset_link=None if email_sent else link,
+    )
+
+
 @router.get("/sessions", response_model=list[SessionPublic])
 async def list_sessions(
     org_id: str = Depends(require_org),
@@ -165,6 +226,8 @@ async def list_sessions(
             ip=session.ip,
             created_at=session.created_at,
             expires_at=session.expires_at,
+            login_id=session.login_id,
+            login_method=session.login_method,
         )
         for session, user in (await db.execute(query)).all()
     ]
@@ -179,7 +242,7 @@ async def revoke_user_sessions(
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Force a user out of every device now."""
-    await _member_of(db, org_id, user_id)
+    await _account_of(db, org_id, user_id, actor)
     revoked = await revoke_all_sessions(db, user_id, commit=False)
     await record(
         db,
@@ -206,4 +269,30 @@ async def _member_of(db: AsyncSession, org_id: str, user_id: str) -> User:
     )
     if user is None:
         raise HTTPException(status_code=404, detail="Not a member of this organization")
+    return user
+
+
+async def _account_of(
+    db: AsyncSession, org_id: str, user_id: str, actor: Principal
+) -> User:
+    """The account, if this organization's administrator may act on it as a whole.
+
+    Turning an account off or signing it out reaches every organization it
+    belongs to, not only this one. An organization administrator acts on an
+    account of their organization alone; one that is also elsewhere, or that
+    administers the platform, is the platform administrator's to manage.
+    """
+    user = await _member_of(db, org_id, user_id)
+    if actor.is_platform_admin:
+        return user
+    elsewhere = await db.scalar(
+        select(OrgMember.org_id).where(
+            OrgMember.user_id == user_id, OrgMember.org_id != org_id
+        )
+    )
+    if user.role == GlobalRole.ADMIN.value or elsewhere is not None:
+        raise HTTPException(
+            status_code=403,
+            detail="This account is managed by the platform administrator",
+        )
     return user

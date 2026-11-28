@@ -326,6 +326,56 @@
 			0 0 24px -4px var(--di-rc);
 	}
 
+	/* Zones drawn on the design, left out of the render loop's score (#379). */
+	.di-mask-surface {
+		position: absolute;
+		inset: 0;
+		pointer-events: none;
+	}
+
+	.di-mask-surface[data-drawing="true"] {
+		pointer-events: auto;
+		cursor: crosshair;
+		touch-action: none;
+	}
+
+	.di-mask {
+		position: absolute;
+		border: 1.5px solid var(--di-muted);
+		border-radius: 4px;
+		background: repeating-linear-gradient(
+			45deg,
+			color-mix(in srgb, var(--di-title) 22%, transparent) 0 6px,
+			color-mix(in srgb, var(--di-title) 8%, transparent) 6px 12px
+		);
+	}
+
+	.di-mask[data-draft="true"] {
+		border-style: dashed;
+	}
+
+	.di-mask button {
+		position: absolute;
+		top: 2px;
+		right: 2px;
+		display: grid;
+		place-items: center;
+		width: 1.1rem;
+		height: 1.1rem;
+		border-radius: 999px;
+		background: var(--di-card-solid);
+		color: var(--di-title);
+		pointer-events: auto;
+	}
+
+	.di-mask-bar {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.5rem;
+		margin-top: 0.5rem;
+	}
+
 	.di-scan {
 		position: absolute;
 		left: 0;
@@ -1087,5 +1137,140 @@
 
 	.di-node .di-switch {
 		pointer-events: auto;
+	}
+
+	/* ── Render loop (#379) ─────────────────────────────────────────────── */
+
+	.di-loop {
+		display: flex;
+		flex-direction: column;
+		gap: 0.45rem;
+	}
+
+	.di-loop-title {
+		font-size: 0.85rem;
+		color: var(--di-title);
+	}
+
+	.di-loop-title[data-status="failed"] {
+		color: var(--di-danger);
+	}
+
+	.di-loop-strip {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.35rem;
+		min-width: 0;
+		margin: 0;
+		padding: 0;
+		border: 0;
+	}
+
+	.di-loop-strip .di-chip {
+		cursor: pointer;
+		background: transparent;
+	}
+
+	.di-loop-strip .di-chip[aria-pressed="true"] {
+		border-color: var(--di-code);
+		background: color-mix(in srgb, var(--di-code) 12%, transparent);
+	}
+
+	.di-loop-kept {
+		color: var(--di-tests);
+		font-weight: 600;
+	}
+
+	.di-loop-images {
+		display: grid;
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+		gap: 0.5rem;
+	}
+
+	.di-loop-images figure {
+		margin: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+	}
+
+	.di-loop-images img {
+		width: 100%;
+		border: 1px solid var(--di-border);
+		border-radius: 6px;
+		background: var(--di-code-bg);
+	}
+
+	.di-loop-images figcaption {
+		font-family: var(--di-mono);
+		font-size: 0.6rem;
+		color: var(--di-muted);
+	}
+
+	.di-loop-warn {
+		color: var(--di-tokens);
+		font-weight: 600;
+	}
+
+	.di-loop-breakpoint img {
+		max-height: 240px;
+		object-fit: contain;
+		object-position: top;
+	}
+
+	.di-loop-states {
+		display: flex;
+		flex-direction: column;
+		gap: 0.375rem;
+		font-size: 0.72rem;
+	}
+
+	.di-loop-states li {
+		display: grid;
+		grid-template-columns: minmax(0, 1.4fr) repeat(3, minmax(0, 1fr));
+		gap: 0.5rem;
+		align-items: center;
+	}
+
+	.di-loop-states img {
+		max-width: 100%;
+		max-height: 48px;
+		border: 1px solid var(--di-border);
+		border-radius: 4px;
+		background: var(--di-code-bg);
+	}
+
+	.di-loop-state {
+		display: flex;
+		flex-direction: column;
+		gap: 0.125rem;
+	}
+
+	.di-loop-issues {
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+		font-size: 0.72rem;
+	}
+
+	.di-loop-issue {
+		display: flex;
+		gap: 0.5rem;
+		align-items: baseline;
+	}
+
+	.di-loop-status {
+		font-family: var(--di-mono);
+		font-size: 0.6rem;
+		min-width: 5.5rem;
+		color: var(--di-tokens);
+	}
+
+	.di-loop-issue[data-status="resolved"] .di-loop-status {
+		color: var(--di-tests);
+	}
+
+	.di-loop-issue[data-status="abandoned"] .di-loop-status {
+		color: var(--di-danger);
 	}
 }
