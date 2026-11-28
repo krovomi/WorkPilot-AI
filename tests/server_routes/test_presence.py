@@ -141,12 +141,18 @@ class TestPresence:
         await world.ok("contributor_a", "GET", "/projects")
         [again] = await presence_rows(world, "contributor_a")
         assert again.last_seen_at == first
-        # Past it, the same day's row moves; it is not duplicated.
-        later = datetime.now(UTC) + presence.REFRESH
-        assert await presence.touch(
-            world.users["contributor_a"], world.orgs["a"], later
-        )
-        [moved] = await presence_rows(world, "contributor_a")
+        # Past it, the same day's row moves; it is not duplicated. On a fixed
+        # noon: from the clock, a run near midnight would cross into a new day.
+        uid, org = world.users["contributor_a"], world.orgs["a"]
+        noon = datetime(2026, 1, 15, 12, 0, tzinfo=UTC)
+        later = noon + presence.REFRESH
+        assert await presence.touch(uid, org, noon)
+        assert await presence.touch(uid, org, later)
+        [moved] = [
+            r
+            for r in await presence_rows(world, "contributor_a")
+            if r.day == noon.date()
+        ]
         assert moved.last_seen_at.replace(tzinfo=UTC) == later
 
     async def test_a_new_day_adds_a_row_and_no_organization_is_one_too(self, world):

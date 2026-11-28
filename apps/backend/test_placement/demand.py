@@ -191,10 +191,10 @@ class Meter:
         return ram, cpu_total, vram
 
     def _loop(self) -> None:
-        last = time.monotonic()
+        last = time.perf_counter()
         while not self._stop.wait(self._interval):
             ram, cpu, vram = self._read()
-            now = time.monotonic()
+            now = time.perf_counter()
             elapsed = max(now - last, 1e-6)
             last = now
             self._core_samples.append(cpu / elapsed)
@@ -202,7 +202,9 @@ class Meter:
             self._peak_vram = max(self._peak_vram, vram)
 
     def __enter__(self) -> Meter:
-        self._started = time.monotonic()
+        # perf_counter, not monotonic: on Windows (Python 3.12) monotonic ticks
+        # every ~15 ms, so a short session lasted 0 s and was never recorded.
+        self._started = time.perf_counter()
         self._base_ram, _cpu, self._base_vram = self._read()
         self._peak_ram, self._peak_vram = self._base_ram, self._base_vram
         self._thread = threading.Thread(
@@ -223,5 +225,5 @@ class Meter:
             cores=cores,
             ram=max(0, self._peak_ram - self._base_ram),
             vram=max(0, self._peak_vram - self._base_vram),
-            seconds=time.monotonic() - self._started,
+            seconds=time.perf_counter() - self._started,
         )

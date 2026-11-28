@@ -299,6 +299,8 @@ export interface AppSettings {
 	approvalTiers?: import("../utils/approval-tiers").ApprovalTierMode;
 	/** Settings, Approval tiers, Claude Ship: auto (default), on or off. */
 	claudeShip?: import("../utils/approval-tiers").ClaudeShipMode;
+	/** Express lane: the projects' Dependabot and Renovate PRs merged in N0 (off when absent). */
+	expressLane?: boolean;
 	theme: "light" | "dark" | "system";
 	colorTheme?: ColorTheme;
 	defaultModel: string;

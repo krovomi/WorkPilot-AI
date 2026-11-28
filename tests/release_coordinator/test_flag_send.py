@@ -30,6 +30,12 @@ class _Quiet(http.server.BaseHTTPRequestHandler):
     def log_message(self, *args) -> None:
         pass
 
+    def send_response(self, code: int, message: str | None = None) -> None:
+        # Read the body before answering: a socket closed with unread data
+        # is reset on Windows, and the client then sees no answer at all.
+        self.rfile.read(int(self.headers.get("Content-Length") or 0))
+        super().send_response(code, message)
+
 
 def test_send_returns_the_status_the_provider_answered() -> None:
     class Ok(_Quiet):
