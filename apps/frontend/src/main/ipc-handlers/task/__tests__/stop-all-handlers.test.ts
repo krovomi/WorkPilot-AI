@@ -41,7 +41,7 @@ vi.mock("../../../server-governance", () => ({ stopServerAgents }));
 import { IPC_CHANNELS } from "../../../../shared/constants";
 import type { AgentManager } from "../../../agent";
 import { projectStore } from "../../../project-store";
-import { wasInterruptedByAppExit } from "../interrupted-runs";
+import { interruptionOrigin } from "../interrupted-origin";
 import { killProcessGracefully } from "../../../platform";
 import { registerStopAllHandlers, stopAllAgents, stopAllAgentsEverywhere } from "../stop-all-handlers";
 
@@ -101,9 +101,9 @@ describe("stopAllAgents", () => {
 		const state = pauseOf("001-a");
 		expect(state.enabled).toBe(true);
 		expect(state.reason).toBe("kill_switch");
-		// Unlike a pause taken when the app closed, the next launch leaves it paused.
+		// Unlike a pause taken when the app closed, the next launch offers it unticked.
 		const paused = { ...task("t1", "001-a"), metadata: { paused: state } } as Task;
-		expect(wasInterruptedByAppExit(paused, () => false)).toBe(false);
+		expect(interruptionOrigin(paused, () => false)).toBe("stopped_by_you");
 	});
 
 	it("stops a task whose pause cannot be written all the same", () => {

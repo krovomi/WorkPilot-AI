@@ -84,6 +84,15 @@ export class AgentManager extends EventEmitter {
 	}
 
 	/**
+	 * Whether starting this task at this phase needs a signed-in Claude
+	 * account — the check `startTaskExecution` makes before it spawns, asked
+	 * beforehand by the launch dialog of interrupted builds.
+	 */
+	taskNeedsClaudeAuth(projectPath: string, specId: string, phase: EnginePhase): boolean {
+		return this.requiresClaudeAuth(this.taskProviderPlan({ projectPath, specId }, phase));
+	}
+
+	/**
 	 * The providers of the task about to run, read from its task_metadata.json
 	 * (written by TASK_CREATE before any process starts). Undefined when the
 	 * task has no metadata yet, which keeps the default-provider behaviour.

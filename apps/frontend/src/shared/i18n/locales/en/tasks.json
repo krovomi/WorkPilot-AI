@@ -1,4 +1,70 @@
 {
+	"interrupted": {
+		"title_one": "{{count}} task was interrupted",
+		"title_other": "{{count}} tasks were interrupted",
+		"description": "WorkPilot stopped while they were running. Pick the ones to resume: each one picks up from its last finished step.",
+		"selectedCount_one": "{{count}} of {{total}} selected",
+		"selectedCount_other": "{{count}} of {{total}} selected",
+		"selectAll": "Select all",
+		"selectNone": "Select none",
+		"steps": {
+			"spec": "Spec",
+			"planning": "Plan",
+			"coding": "Code",
+			"codingCount": "Code {{done}}/{{total}}",
+			"qa": "QA"
+		},
+		"where": {
+			"spec": "Resumes the spec, keeping the files already written.",
+			"planning": "Resumes the planning.",
+			"coding": "Resumes the coding at the next unfinished subtask.",
+			"subtask": "Resumes at “{{subtask}}”, with the work already on disk.",
+			"qa_review": "Resumes the QA review.",
+			"qa_fixing": "Resumes the QA fixes."
+		},
+		"stoppedByYou": "Unticked because you stopped it. {{where}}",
+		"origin": {
+			"app_exit": "App closed",
+			"app_exitWithTime": "App closed · {{ago}}",
+			"crash": "Unexpected stop",
+			"crashWithTime": "Unexpected stop · {{ago}}",
+			"stopped_by_you": "Stopped by you",
+			"stopped_by_youWithTime": "Stopped by you · {{ago}}"
+		},
+		"ago": {
+			"now": "just now",
+			"minutes_one": "{{count}} min ago",
+			"minutes_other": "{{count}} min ago",
+			"hours_one": "{{count}} h ago",
+			"hours_other": "{{count}} h ago"
+		},
+		"blocker": {
+			"claude_auth": "Claude sign-in expired: the resume would fail.",
+			"spec_missing": "Its spec folder is gone: it cannot be resumed.",
+			"reconnect": "Sign in again"
+		},
+		"slots_one": "“In progress” of {{project}} takes {{limit}} tasks: {{count}} will wait for a free slot.",
+		"slots_other": "“In progress” of {{project}} takes {{limit}} tasks: {{count}} will wait for a free slot.",
+		"nextTime": "Next time:",
+		"policy": {
+			"ask": "Ask me",
+			"always": "Resume all",
+			"never": "Resume none"
+		},
+		"later": "Later",
+		"resume_one": "Resume ({{count}})",
+		"resume_other": "Resume ({{count}})",
+		"toast": {
+			"resumed_one": "{{count}} task resumed",
+			"resumed_other": "{{count}} tasks resumed",
+			"waiting_one": "{{count}} waits for a free slot in “In progress”.",
+			"waiting_other": "{{count}} wait for a free slot in “In progress”.",
+			"failed_one": "{{count}} could not restart: open its card.",
+			"failed_other": "{{count}} could not restart: open their cards.",
+			"autoResumed_one": "{{count}} interrupted task resumed",
+			"autoResumed_other": "{{count}} interrupted tasks resumed"
+		}
+	},
 	"readiness": {
 		"checking": "Checking “{{title}}” before it starts…",
 		"questionsIntro": "The card is short: without more detail the agent will have to guess. Answer what you know, leave the rest blank.",

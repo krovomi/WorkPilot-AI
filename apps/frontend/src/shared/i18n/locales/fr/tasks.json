@@ -1,4 +1,70 @@
 {
+	"interrupted": {
+		"title_one": "{{count}} tâche a été interrompue",
+		"title_other": "{{count}} tâches ont été interrompues",
+		"description": "WorkPilot s'est arrêté pendant qu'elles tournaient. Choisis celles à reprendre : chacune repart de la dernière étape terminée.",
+		"selectedCount_one": "{{count}} sur {{total}} sélectionnée",
+		"selectedCount_other": "{{count}} sur {{total}} sélectionnées",
+		"selectAll": "Tout sélectionner",
+		"selectNone": "Tout désélectionner",
+		"steps": {
+			"spec": "Spec",
+			"planning": "Plan",
+			"coding": "Code",
+			"codingCount": "Code {{done}}/{{total}}",
+			"qa": "QA"
+		},
+		"where": {
+			"spec": "Reprendra la spec, en gardant les fichiers déjà écrits.",
+			"planning": "Reprendra la planification.",
+			"coding": "Reprendra le code à la prochaine sous-tâche non terminée.",
+			"subtask": "Reprendra à « {{subtask}} », avec le travail déjà sur disque.",
+			"qa_review": "Reprendra la revue QA.",
+			"qa_fixing": "Reprendra les corrections QA."
+		},
+		"stoppedByYou": "Décochée car c'est toi qui l'as arrêtée. {{where}}",
+		"origin": {
+			"app_exit": "Fermeture de l'app",
+			"app_exitWithTime": "Fermeture de l'app · {{ago}}",
+			"crash": "Arrêt inattendu",
+			"crashWithTime": "Arrêt inattendu · {{ago}}",
+			"stopped_by_you": "Arrêtée par toi",
+			"stopped_by_youWithTime": "Arrêtée par toi · {{ago}}"
+		},
+		"ago": {
+			"now": "à l'instant",
+			"minutes_one": "il y a {{count}} min",
+			"minutes_other": "il y a {{count}} min",
+			"hours_one": "il y a {{count}} h",
+			"hours_other": "il y a {{count}} h"
+		},
+		"blocker": {
+			"claude_auth": "Connexion Claude expirée : la reprise échouerait.",
+			"spec_missing": "Son dossier de spec a disparu : elle ne peut pas reprendre.",
+			"reconnect": "Se reconnecter"
+		},
+		"slots_one": "« En cours » de {{project}} accepte {{limit}} tâches : {{count}} attendra une place libre.",
+		"slots_other": "« En cours » de {{project}} accepte {{limit}} tâches : {{count}} attendront une place libre.",
+		"nextTime": "La prochaine fois :",
+		"policy": {
+			"ask": "Me demander",
+			"always": "Tout reprendre",
+			"never": "Ne rien reprendre"
+		},
+		"later": "Plus tard",
+		"resume_one": "Reprendre ({{count}})",
+		"resume_other": "Reprendre ({{count}})",
+		"toast": {
+			"resumed_one": "{{count}} tâche reprise",
+			"resumed_other": "{{count}} tâches reprises",
+			"waiting_one": "{{count}} attend une place libre dans « En cours ».",
+			"waiting_other": "{{count}} attendent une place libre dans « En cours ».",
+			"failed_one": "{{count}} n'a pas pu redémarrer : ouvre sa carte.",
+			"failed_other": "{{count}} n'ont pas pu redémarrer : ouvre leurs cartes.",
+			"autoResumed_one": "{{count}} tâche interrompue reprise",
+			"autoResumed_other": "{{count}} tâches interrompues reprises"
+		}
+	},
 	"readiness": {
 		"checking": "Pré-analyse de « {{title}} »…",
 		"questionsIntro": "La carte est courte : sans précisions, l'agent devra deviner. Répondez à ce que vous savez, laissez vide le reste.",

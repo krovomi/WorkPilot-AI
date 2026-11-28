@@ -87,23 +87,46 @@ drops a resume whose transcript is not under `<CLAUDE_CONFIG_DIR>/projects/`
 `ClaudeAgentClient` that *is* rehydrating natively skips the log replay
 (`resumes_native_session`) — the SDK already holds those turns.
 
-**Closing the application is a pause, opening it is the resume.** Quitting used
+**Closing the application is a pause; opening it offers the resume.** Quitting used
 to kill every agent and leave the card `in_progress` with nothing behind it; a
 minute later it read "stuck", and the stuck recovery reset the subtask in
 progress to `pending`, deleted what it had recorded and restarted without the
 session — the phase from the top, on every provider. `before-quit` now calls
 `pauseRunningTasksForShutdown` (`ipc-handlers/task/interrupted-runs.ts`) before
 `killAll`: the Pause button's own `pause_state.json`, in every spec directory
-copy, with `reason: "app_shutdown"`. At launch, once the profile manager is up
-and the window has loaded, `resumeTasksInterruptedByAppExit` resumes those — and
-the tasks persisted `in_progress`/`ai_review` with no process behind them, which
-is what a crash, a forced kill or an OS shutdown that never delivered
-`before-quit` leaves. A pause the **user** asked for has no reason and stays a
-pause, as do the pauses the backend takes itself (`budget`, `budget_stall`,
-`tool_loop`) and those of "Stop all agents" (`kill_switch`,
-[agent-kill-switch.md](agent-kill-switch.md)). Both go through `resumePausedTask` (`resume-task.ts`), the Reprendre
-button's path, which sends a task with no `spec.md` back to the spec pipeline
-(it skips every artefact it already wrote) — `run.py` refuses that directory.
+copy, with `reason: "app_shutdown"`, and writes the close to `main.log`.
+
+At launch, once the profile manager is up and the window has loaded,
+`offerInterruptedTasksAtLaunch` (`interrupted-prompt.ts`) lists the interrupted
+builds (`interrupted-origin.ts`): the shutdown pauses (`app_exit`), the tasks
+persisted `in_progress`/`ai_review` with no process behind them, which is what a
+crash, a forced kill or an OS shutdown that never delivered `before-quit` leaves
+(`crash`: the launch writes the shutdown pause they never got, `crashed: true`,
+so the card reads paused and the stuck recovery never resets its subtask), and
+the pauses of "Stop all agents" (`kill_switch`, [agent-kill-switch.md](agent-kill-switch.md))
+or of « stop » to the voice assistant (`voice_stop`), the person's own stop.
+Settings › Agents (`interruptedTasksOnLaunch`) decides what happens:
+
+- `ask` (default): the renderer's `InterruptedTasksDialog` shows each build with
+  its project, engine, how it stopped, the phase steps and where it resumes
+  (the next unfinished subtask). What the app interrupted is ticked; the
+  person's own stop is listed unticked; a build whose resume would fail at once
+  (Claude sign-in expired for a phase on Claude, spec folder gone) is unticked
+  with the reason. « Plus tard » (or Escape) writes `deferred_at` on the other
+  pauses: they keep their Reprendre and are not offered again.
+  `TASK_INTERRUPTED_RESOLVE` takes only ids the launch offered.
+- `always`: what the app did before this setting, minus the person's own stops
+  and the builds a check says would fail; a toast lists what restarted.
+- `never`: nothing starts; each card keeps its pause and its Reprendre.
+
+Every resume is `resumePausedTask` (`resume-task.ts`), the Reprendre button's
+path, which sends a task with no `spec.md` back to the spec pipeline (it skips
+every artefact it already wrote) — `run.py` refuses that directory. Resumes keep
+the project's « En cours » limit (`maxParallelTasks`, 3 by default): past it, a
+build in `in_progress` waits in main and starts when a build of that project
+exits; one in AI review takes no slot, as on the board. A pause the **user**
+asked for has no reason and stays a pause, as do the pauses the backend takes
+itself (`budget`, `budget_stall`, `tool_loop`) and the policy ones.
 
 **The interrupted subtask is continued, not skipped.** `get_next_subtask` picks
 `pending` work only, so a subtask the dead process had marked `in_progress` was

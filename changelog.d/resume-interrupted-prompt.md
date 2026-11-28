@@ -1,0 +1,5 @@
+---
+section: ✨ Nouveautés
+---
+
+- **Au démarrage, WorkPilot demande quelles tâches interrompues reprendre.** Les tâches Kanban qui tournaient quand l'app s'est fermée ou a planté, et celles arrêtées par « Arrêter tous les agents », sont listées avec leur projet, leur moteur, la façon dont elles se sont arrêtées et l'étape où chacune repartira. Celles que l'app a interrompues sont cochées, celles que tu as arrêtées sont décochées, et une tâche dont la reprise échouerait (connexion Claude expirée, dossier de spec disparu) est décochée avec la raison. « Plus tard » les laisse en pause avec leur bouton Reprendre. La limite « En cours » est respectée : au-delà, une tâche attend une place. Réglages › Agents : Me demander (par défaut), Tout reprendre (le comportement d'avant, sans les arrêts manuels) ou Ne rien reprendre. Une tâche coupée par un plantage n'apparaît plus « bloquée » : sa sous-tâche n'est plus remise à zéro. La fermeture de l'app est maintenant écrite dans le journal.

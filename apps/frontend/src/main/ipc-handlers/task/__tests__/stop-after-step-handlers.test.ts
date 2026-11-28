@@ -38,7 +38,7 @@ vi.mock("../../../app-logger", () => ({
 import { IPC_CHANNELS } from "../../../../shared/constants";
 import type { AgentManager } from "../../../agent";
 import { projectStore } from "../../../project-store";
-import { wasInterruptedByAppExit } from "../interrupted-runs";
+import { interruptionOrigin } from "../interrupted-origin";
 import { registerStopAfterStepHandlers, stopAgentsAfterStep } from "../stop-after-step-handlers";
 
 let root: string;
@@ -98,9 +98,9 @@ describe("stopAgentsAfterStep", () => {
 		const state = pauseOf("001-a");
 		expect(state.enabled).toBe(true);
 		expect(state.reason).toBe("voice_stop");
-		// The next launch leaves it paused, like the kill switch.
+		// The next launch offers it unticked, like the kill switch.
 		const paused = { ...task("t1", "001-a"), metadata: { paused: state } } as Task;
-		expect(wasInterruptedByAppExit(paused, () => false)).toBe(false);
+		expect(interruptionOrigin(paused, () => false)).toBe("stopped_by_you");
 	});
 
 	it("leaves a task already paused, and agents that are not tasks, alone", () => {
