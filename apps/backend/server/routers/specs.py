@@ -43,6 +43,8 @@ router = APIRouter(prefix="/projects/{project_id}/specs", tags=["specs"])
 PHASE_PERMISSIONS: dict[str, tuple[str, ...]] = {
     "merge": ("task.merge",),
     "pr": ("vcs.pr.create",),
+    # Hosting a card's captures and editing its pull request's body.
+    "captures": ("vcs.pr.create",),
 }
 
 

@@ -69,6 +69,10 @@ ROUTE_OVERRIDES: dict[tuple[str, str], str] = {
     ("PUT", "/api/board/cards/{card_id}/criticality"): "review.approve",
     ("POST", "/api/board/delegations"): "review.approve",
     ("DELETE", "/api/board/delegations/{delegation_id}"): "review.approve",
+    # Publishing a card's captures in its pull request, or withdrawing them,
+    # answers the team's review of those images (``CAPTURES_PUBLISH=review``).
+    ("POST", "/api/board/cards/{card_id}/captures/publish"): "review.approve",
+    ("POST", "/api/board/cards/{card_id}/captures/withdraw"): "review.approve",
     # Asking the board a question (« Interroger le tableau ») reads it: who
     # may see the cards may ask about them, and stop their own question.
     ("POST", "/api/board/ask"): "task.read",
