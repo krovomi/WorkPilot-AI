@@ -6,7 +6,7 @@
  * planned feature requirement by requirement (`IdeaCheckView.tsx`).
  */
 
-import { ArrowUp, Languages, Lightbulb, Loader2, MessageSquareText, RotateCcw, Sparkles } from "lucide-react";
+import { ArrowUp, Lightbulb, Loader2, MessageSquareText, RotateCcw, Sparkles } from "lucide-react";
 import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { BoardAskMatch, Task } from "../../../../shared/types";
