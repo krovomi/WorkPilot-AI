@@ -21,10 +21,22 @@ export function dateLocale(language?: string | null): string {
 	return base === "fr" ? "fr-FR" : "en-US";
 }
 
-/** The value as a valid Date, or null. */
+/** A bare calendar day: `new Date("2026-11-28")` would read it as UTC midnight. */
+const BARE_DAY = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/**
+ * The value as a valid Date, or null. A bare YYYY-MM-DD is that day at local
+ * midnight, so it is not written as the day before west of Greenwich.
+ */
 export function toValidDate(value: DateInput): Date | null {
 	if (value === null || value === undefined || value === "") return null;
-	const date = value instanceof Date ? value : new Date(value);
+	const day = typeof value === "string" ? BARE_DAY.exec(value) : null;
+	const date =
+		value instanceof Date
+			? value
+			: day
+				? new Date(Number(day[1]), Number(day[2]) - 1, Number(day[3]))
+				: new Date(value);
 	return Number.isNaN(date.getTime()) ? null : date;
 }
 

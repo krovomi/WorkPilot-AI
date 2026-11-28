@@ -18,7 +18,7 @@ import type {
 	EvidenceKind,
 	Words,
 } from "../../../shared/types/compliance";
-import { formatAppDate, formatAppDateTime } from "../../lib/date-format";
+import { formatAppDate, formatAppDateTime, formatAppMonth } from "../../lib/date-format";
 import { CharterButton, Chip, Chips, Notice, Panel, Section, type Tone } from "../charter";
 
 export const STATUS_TONES: Record<ControlStatus, Tone> = {
@@ -68,7 +68,7 @@ export function SummaryCard({ report }: { readonly report: ComplianceReport }): 
 	return (
 		<Section
 			kicker={t("summary.kicker")}
-			title={t("summary.title", { framework: report.framework.name, period: report.period.label })}
+			title={t("summary.title", { framework: report.framework.name, period: formatAppMonth(report.period.label) })}
 			meta={formatAppDateTime(report.generatedAt)}
 		>
 			<Notice tone={tone} icon={FileText}>
@@ -176,7 +176,7 @@ export function SavedReports({
 					>
 						<span className="flex items-center gap-2">
 							<CalendarClock className="h-3.5 w-3.5" aria-hidden="true" />
-							<span className="wp-mono">{r.period}</span>
+							<span className="wp-mono">{formatAppMonth(r.period, "short")}</span>
 							<span>{r.framework}</span>
 						</span>
 						<Chips>
@@ -207,7 +207,7 @@ export function exportDocument(t: TFunction, language: string, report: Complianc
 		]),
 	);
 	return {
-		title: t("export.title", { framework: report.framework.name, period: report.period.label }),
+		title: t("export.title", { framework: report.framework.name, period: formatAppMonth(report.period.label) }),
 		summary: [
 			t("export.generated", {
 				date: formatAppDateTime(report.generatedAt),

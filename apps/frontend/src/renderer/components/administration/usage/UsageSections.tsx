@@ -17,7 +17,7 @@ import type {
 	UsageSummary,
 } from "@shared/types/server-usage";
 import { Button, Card, CardContent } from "@/components/ui";
-import { formatAppDateTime } from "@/lib/date-format";
+import { formatAppDateTime, formatAppDay } from "@/lib/date-format";
 import type { Loaded } from "./use-usage-view";
 import { formatCount, formatRate, formatTokens, formatUsd } from "./usage-format";
 
@@ -166,7 +166,7 @@ export function DailyChart({ rows }: { readonly rows: readonly UsageDailyRow[] }
 				aria-label={t("usage.dashboard.dailyChart")}
 			>
 				{days.map((day) => (
-					<div key={day} className="flex h-full flex-1 flex-col justify-end" title={day}>
+					<div key={day} className="flex h-full flex-1 flex-col justify-end" title={formatAppDay(day)}>
 						{providers.map((provider) => {
 							const row = rows.find((r) => r.day === day && r.provider === provider);
 							if (!row || row.tokens === 0) return null;
@@ -175,7 +175,7 @@ export function DailyChart({ rows }: { readonly rows: readonly UsageDailyRow[] }
 									key={provider}
 									className={`w-full ${colour(provider)}`}
 									style={{ height: `${(row.tokens / max) * 100}%` }}
-									title={`${day} · ${provider || "?"} · ${formatTokens(row.tokens)} · ${formatUsd(row.cost_usd)}`}
+									title={`${formatAppDay(day)} · ${provider || "?"} · ${formatTokens(row.tokens)} · ${formatUsd(row.cost_usd)}`}
 								/>
 							);
 						})}

@@ -49,6 +49,25 @@ export function formatAppTime(
 }
 
 /**
+ * A YYYY-MM-DD day (a calendar day, not a moment) in the app's language:
+ * 28/11/2026 or 11/28/2026, or what the options ask for. Anything that is not
+ * such a day comes back as it was.
+ */
+export function formatAppDay(day: string, options?: Intl.DateTimeFormatOptions): string {
+	if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return day;
+	return formatAppDate(`${day}T00:00:00`, options) || day;
+}
+
+/**
+ * A YYYY-MM month in the app's language: "novembre 2026" / "November 2026",
+ * or "nov. 2026" / "Nov 2026" when short. Anything else comes back as it was.
+ */
+export function formatAppMonth(month: string, style: "long" | "short" = "long"): string {
+	if (!/^\d{4}-\d{2}$/.test(month)) return month;
+	return formatAppDate(`${month}-01T00:00:00`, { month: style, year: "numeric" }) || month;
+}
+
+/**
  * A YYYY-MM-DD day as "Today", "Yesterday" or a short date ("2 nov." /
  * "Nov 2") in the app's language.
  */

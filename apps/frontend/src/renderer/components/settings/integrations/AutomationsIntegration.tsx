@@ -20,6 +20,7 @@ import { useSettingsStore } from "../../../stores/settings-store";
 import { loadTasks } from "../../../stores/task-store";
 import { EngineTrioPicker } from "../../task-engine/EngineTrioPicker";
 import { Button } from "../../ui/button";
+import { TimeField } from "../../ui/date-fields";
 import { Input } from "../../ui/input";
 import { Label } from "../../ui/label";
 import { Separator } from "../../ui/separator";
@@ -441,11 +442,10 @@ export function AutomationsIntegration({ projectId }: AutomationsIntegrationProp
 							<div className="flex flex-wrap items-end gap-4">
 								<div className="space-y-2">
 									<Label htmlFor="automation-time">{t("automations.fields.time")}</Label>
-									<Input
+									<TimeField
 										id="automation-time"
-										type="time"
 										value={editing.time}
-										onChange={(e) => setEditing({ ...editing, time: e.target.value })}
+										onValueChange={(time) => setEditing({ ...editing, time })}
 									/>
 								</div>
 								<fieldset className="space-y-2">

@@ -9,7 +9,7 @@ import type {
 } from "@shared/types/server-approval";
 import { formatAppDate } from "../../lib/date-format";
 import { CharterButton, Chip, Notice, Panel } from "../charter";
-import { Input } from "../ui/input";
+import { DateField } from "../ui/date-fields";
 import { NativeSelect } from "../ui/native-select";
 
 interface ServerDelegationsPanelProps {
@@ -154,11 +154,11 @@ export function ServerDelegationsPanel({
 				</label>
 				<label className="grid gap-1" htmlFor={`${ids}-from`}>
 					<span>{t("specApproval:delegations.from")}</span>
-					<Input id={`${ids}-from`} type="date" value={starts} onChange={(e) => setStarts(e.target.value)} />
+					<DateField id={`${ids}-from`} value={starts} onValueChange={setStarts} />
 				</label>
 				<label className="grid gap-1" htmlFor={`${ids}-until`}>
 					<span>{t("specApproval:delegations.until")}</span>
-					<Input id={`${ids}-until`} type="date" value={ends} onChange={(e) => setEnds(e.target.value)} />
+					<DateField id={`${ids}-until`} value={ends} onValueChange={setEnds} />
 				</label>
 				<CharterButton
 					icon={UserPlus}

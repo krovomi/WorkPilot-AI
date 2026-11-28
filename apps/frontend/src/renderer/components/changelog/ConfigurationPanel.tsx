@@ -31,6 +31,7 @@ import {
 	CollapsibleContent,
 	CollapsibleTrigger,
 } from "../ui/collapsible";
+import { DateField } from "../ui/date-fields";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Progress } from "../ui/progress";
@@ -154,11 +155,10 @@ export function ConfigurationPanel({
 							<Label htmlFor="date">
 								{t("changelog:configuration.dateLabel")}
 							</Label>
-							<Input
+							<DateField
 								id="date"
-								type="date"
 								value={date}
-								onChange={(e) => onDateChange(e.target.value)}
+								onValueChange={onDateChange}
 							/>
 						</div>
 						{(existingChangelog?.lastVersion || versionBumpDescription) && (

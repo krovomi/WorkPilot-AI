@@ -73,7 +73,7 @@ describe("the overview", () => {
 		expect(await screen.findByText("76 %")).toBeTruthy();
 		expect(screen.getByText("4 active of 5")).toBeTruthy();
 		expect(screen.getByText("Acme")).toBeTruthy();
-		expect(screen.getByLabelText("2026-11-27: 4 runs")).toBeTruthy();
+		expect(screen.getByLabelText("11/27/2026: 4 runs")).toBeTruthy();
 		// A status this version does not know keeps the server's word.
 		expect(screen.getByText("Succeeded")).toBeTruthy();
 		expect(screen.getByText("paused")).toBeTruthy();

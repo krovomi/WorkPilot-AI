@@ -300,7 +300,7 @@ describe("DeployWatchFigures", () => {
 		expect(panel.textContent).toContain('"rate":33');
 		expect(panel.textContent).toContain('"mean":"5 min 00 s"');
 		expect(screen.getByText("cicdTriggers:figures.slow")).toBeTruthy();
-		expect(screen.getByTestId("deploy-figures-months").textContent).toContain("2026-11");
+		expect(screen.getByTestId("deploy-figures-months").textContent).toContain("Nov 2026");
 	});
 
 	it("says when no verdict was reviewed, and keeps quiet under the goal", () => {

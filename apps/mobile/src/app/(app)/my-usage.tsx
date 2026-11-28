@@ -12,7 +12,7 @@ import { useApi } from "../../auth/session";
 import { useLoad } from "../../hooks/useLoad";
 import { describeError } from "../../i18n";
 import { Button, ErrorBanner, Loading, Section } from "../../ui/components";
-import { dateLocale, formatDate } from "../../ui/format";
+import { dateLocale, formatDate, formatDay } from "../../ui/format";
 import { SPACE, TYPE, useTheme } from "../../ui/theme";
 import { periodOf } from "../../usage/period";
 import type { MyUsage, UsageNotice } from "../../usage/types";
@@ -92,7 +92,7 @@ export default function MyUsageScreen() {
 						{days.size === 0 ? <Text style={[TYPE.small, muted]}>{t("myUsage.empty")}</Text> : null}
 						{[...days].sort(([a], [b]) => b.localeCompare(a)).map(([day, tokens]) => (
 							<View key={day} style={styles.row}>
-								<Text style={[TYPE.small, line, { flex: 1 }]}>{day}</Text>
+								<Text style={[TYPE.small, line, { flex: 1 }]}>{formatDay(day, i18n.language)}</Text>
 								<Text style={[TYPE.small, muted]}>{number.format(tokens)}</Text>
 							</View>
 						))}

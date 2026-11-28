@@ -9,6 +9,7 @@
 import type React from "react";
 import { useTranslation } from "react-i18next";
 import type { DeployWatchFigures as Figures } from "../../../shared/types/deploy-watch";
+import { formatAppMonth } from "../../lib/date-format";
 
 /** The goal of the issue: a rollback within three minutes of the degradation. */
 export const TARGET_SECONDS = 180;
@@ -75,7 +76,7 @@ export function DeployWatchFigures({ figures }: { readonly figures: Figures }): 
 				<tbody>
 					{figures.months.map((m) => (
 						<tr key={m.month}>
-							<td className="font-mono">{m.month}</td>
+							<td className="font-mono">{formatAppMonth(m.month, "short")}</td>
 							<td>{m.automatic}</td>
 							<td>{m.person}</td>
 							<td>{m.critical}</td>

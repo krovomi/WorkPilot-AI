@@ -116,7 +116,8 @@ describe("UsageReportSettings", () => {
 			data: { ...SETTINGS, ...body, recipients: body.recipients.map((a: string) => ({ address: a, member: true })) },
 		}));
 		render(<UsageReportSettings />);
-		expect(await screen.findByLabelText("Time")).toHaveValue("09:00");
+		// English keeps the 12-hour clock the native field showed.
+		expect(await screen.findByLabelText("Time")).toHaveValue("09:00 AM");
 		expect(screen.getByLabelText("Time zone")).toHaveValue("Europe/Paris");
 		expect(screen.getByLabelText("Recipients")).toHaveValue("boss@example.com\ncfo@outside.example");
 		expect(screen.getByText(/cfo@outside.example is not a member/)).toBeInTheDocument();

@@ -16,6 +16,7 @@ import { type SprintOutcome, sprintReport, useSprintStore } from "../../stores/s
 import { useTaskStore } from "../../stores/task-store";
 import { Button } from "../ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../ui/dialog";
+import { DateField } from "../ui/date-fields";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Textarea } from "../ui/textarea";
@@ -109,11 +110,11 @@ export function SprintEditDialog({ sprint, open, onOpenChange }: SprintEditDialo
 					<div className="grid grid-cols-2 gap-3">
 						<div className="space-y-1.5">
 							<Label htmlFor={`${ids}-start`}>{t("tasks:kanban.sprints.startDate")}</Label>
-							<Input id={`${ids}-start`} type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
+							<DateField id={`${ids}-start`} value={startDate} onValueChange={setStartDate} />
 						</div>
 						<div className="space-y-1.5">
 							<Label htmlFor={`${ids}-end`}>{t("tasks:kanban.sprints.endDate")}</Label>
-							<Input id={`${ids}-end`} type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
+							<DateField id={`${ids}-end`} value={endDate} onValueChange={setEndDate} />
 						</div>
 					</div>
 					{endsTooSoon && <p className="text-xs text-destructive">{t("tasks:kanban.sprints.endBeforeStart")}</p>}
