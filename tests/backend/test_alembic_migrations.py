@@ -246,3 +246,39 @@ def test_the_bookmark_count_of_a_replay_share_comes_and_goes(alembic_config):
         engine.dispose()
     command.downgrade(config, "0019_login_sessions")
     assert "bookmarks" not in _columns(db, "replay_shares")
+
+
+def test_the_resume_columns_of_a_run_come_and_go(alembic_config):
+    config, db = alembic_config
+    resume = {"started_approved", "resume_answered_at"}
+    command.upgrade(config, "head")
+    assert resume <= _columns(db, "agent_runs")
+    command.downgrade(config, "0049_user_ai_accounts")
+    assert not resume & _columns(db, "agent_runs")
+    # A database that has one already (a newer build's create_all) gets the other.
+    engine = sa.create_engine(f"sqlite:///{db}")
+    try:
+        with engine.begin() as connection:
+            connection.execute(
+                sa.text("ALTER TABLE agent_runs ADD COLUMN resume_answered_at DATETIME")
+            )
+            connection.execute(
+                sa.text(
+                    "INSERT INTO agent_runs (id, spec_id, phase, status, started_at)"
+                    " VALUES ('r1', 's1', 'build', 'interrupted', '2026-11-28')"
+                )
+            )
+    finally:
+        engine.dispose()
+    command.upgrade(config, "head")
+    assert resume <= _columns(db, "agent_runs")
+    engine = sa.create_engine(f"sqlite:///{db}")
+    try:
+        with engine.begin() as connection:
+            approved = connection.execute(
+                sa.text("SELECT started_approved FROM agent_runs WHERE id = 'r1'")
+            ).scalar_one()
+    finally:
+        engine.dispose()
+    # A run from before the revision did not start approved.
+    assert not approved

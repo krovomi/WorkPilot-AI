@@ -4,7 +4,8 @@ one running forever.
 Before: ``cancel_run`` answered False for a run still waiting for a slot (no
 process yet), so Stop did nothing and the run started later anyway; and runs
 left queued or running by a stopped server stayed that way, counted against
-the organization's quota, so every new run got a 429.
+the organization's quota, so every new run got a 429. They are now settled as
+interrupted, which no quota counts.
 """
 
 from __future__ import annotations
@@ -73,7 +74,7 @@ async def _spec(factory):
 
 
 @pytest.mark.asyncio
-async def test_settle_orphans_fails_runs_no_process_holds():
+async def test_settle_orphans_interrupts_runs_no_process_holds():
     from server.db.models import AgentRun
     from server.services.run_manager import INTERRUPTED, RunManager
 
@@ -92,7 +93,12 @@ async def test_settle_orphans_fails_runs_no_process_holds():
 
     async with factory() as db:
         q, r, d = [await db.get(AgentRun, i) for i in ids]
-        assert (q.status, r.status, d.status) == ("failed", "failed", "succeeded")
+        # Interrupted, not failed: their card offers to resume them.
+        assert (q.status, r.status, d.status) == (
+            "interrupted",
+            "interrupted",
+            "succeeded",
+        )
         assert q.error == INTERRUPTED and q.finished_at is not None
 
 

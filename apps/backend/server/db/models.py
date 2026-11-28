@@ -597,7 +597,8 @@ class AgentRun(Base):
     provider: Mapped[str | None] = mapped_column(String(40), nullable=True)
     model: Mapped[str | None] = mapped_column(String(120), nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="queued")
-    # queued / running / succeeded / failed / cancelled
+    # queued / running / succeeded / failed / cancelled, or interrupted: the
+    # server stopped while it was queued or running (``settle_orphans``).
     started_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow
     )
@@ -605,6 +606,16 @@ class AgentRun(Base):
         DateTime(timezone=True), nullable=True
     )
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # A build that started with a valid approval of its plan: resumed after an
+    # interruption, it keeps that approval over the progress it wrote.
+    started_approved: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="0"
+    )
+    # When someone answered the offer to resume this interrupted run (resumed
+    # it, or « Later »): it is not offered again.
+    resume_answered_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
 
 class ProjectJob(Base):
@@ -626,7 +637,8 @@ class ProjectJob(Base):
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     status: Mapped[str] = mapped_column(String(20), default="queued")
-    # queued / running / succeeded / failed / cancelled
+    # queued / running / succeeded / failed / cancelled, or interrupted: the
+    # server stopped while it was queued or running (``settle_orphans``).
     started_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow
     )
@@ -634,6 +646,16 @@ class ProjectJob(Base):
         DateTime(timezone=True), nullable=True
     )
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # A build that started with a valid approval of its plan: resumed after an
+    # interruption, it keeps that approval over the progress it wrote.
+    started_approved: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="0"
+    )
+    # When someone answered the offer to resume this interrupted run (resumed
+    # it, or « Later »): it is not offered again.
+    resume_answered_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
 
 class InsightSession(Base):
