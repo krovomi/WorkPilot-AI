@@ -782,6 +782,13 @@ def _write_output(ctx: PhaseContext, phase_id: str, text: str) -> Path | None:
         return None
 
 
+def _discard_output(ctx: PhaseContext, phase_id: str) -> None:
+    try:
+        (ctx.spec_dir / OUTPUT_DIRNAME / f"{phase_id}.md").unlink(missing_ok=True)
+    except OSError as exc:
+        logger.debug("could not remove the %s output: %s", phase_id, exc)
+
+
 def _announce(phase_id: str) -> None:
     """Tell the Kanban which phase of the build this is, when it has a name.
 
@@ -1096,16 +1103,20 @@ async def run_skill_phase(resolved, ctx: PhaseContext) -> PhaseOutcome:
         if stashed is not None:
             os.environ["AUTO_CLAUDE_RESUME_SESSION_ID"] = stashed
 
-    output_path = _write_output(ctx, phase.id, response or "")
     if status == "error":
+        # The error text is not a report: written as one, it was handed to the
+        # planner as this phase's findings (an expired sign-in's 401 sentence,
+        # under "REPORTS FROM EARLIER PHASES"). A report left by an earlier run
+        # of this phase goes too, so no stale finding stands in for this one.
+        _discard_output(ctx, phase.id)
         return PhaseOutcome(
             phase.id,
             impl,
             resolved.dispatch,
             False,
             detail="the session ended in an error",
-            output_path=output_path,
         )
+    output_path = _write_output(ctx, phase.id, response or "")
     return PhaseOutcome(
         phase.id,
         impl,

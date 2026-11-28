@@ -63,6 +63,11 @@ from .memory_manager import save_session_memory
 from .provider_errors import is_authentication_error, is_rate_limit_error
 from .session_guards import SessionGuards
 from .session_recording import SessionRecording, client_usage
+from .session_signals import (
+    auth_failure_in_turn,
+    break_replay_channels,
+    is_auth_failure_echo,
+)
 from .tool_display import (
     extract_streaming_command,
     extract_streaming_file_change,
@@ -177,6 +182,8 @@ MAX_REPLAY_MESSAGES = 200
 # out the actual task. 600 KB ≈ 150k tokens, leaving headroom for the new
 # prompt + assistant response.
 MAX_REPLAY_TOTAL_CHARS = 600_000
+# How far into a replayed user turn the session preamble marker is looked for.
+_PREAMBLE_SEARCH_CHARS = 4_000
 
 
 def _entry_is_useful_for_replay(entry: dict) -> bool:
@@ -224,6 +231,9 @@ def _entry_is_useful_for_replay(entry: dict) -> bool:
             RuntimeError(only_text)
         ):
             return False
+        # Nor a sign-in refusal: it is not context, and it is the same failure.
+        if is_auth_failure_echo(only_text):
+            return False
 
     # Drop the recurring "⛔ ISOLATED WORKTREE" / planner-prompt preamble.
     # It's recreated fresh on every session start by the prompt generators,
@@ -238,7 +248,10 @@ def _entry_is_useful_for_replay(entry: dict) -> bool:
             "⛔ ISOLATED WORKTREE",
             "## CRITICAL: TOOL CONCURRENCY ERROR",
         )
-        if any(first_text.startswith(m) for m in preamble_markers):
+        # Searched past the start: the engine puts "EFFORT: …" (and a handoff
+        # note) before it, and a startswith let every retry replay all the
+        # earlier prompts — the replay grew by one whole prompt per attempt.
+        if any(m in first_text[:_PREAMBLE_SEARCH_CHARS] for m in preamble_markers):
             return False
 
     return True
@@ -1324,28 +1337,19 @@ async def run_agent_session(
                 "message": response_text.strip(),
                 "exception_type": "PromptTooLongResponse",
             }
-            # Same defense-in-depth cleanup as the exception path so the next
-            # session doesn't trip the same wall — see the equivalent block
-            # below in `except Exception as e:` for the rationale.
-            try:
-                import os as _os
-                from datetime import datetime as _dt
-
-                _timestamp = _dt.now().strftime("%Y%m%d-%H%M%S")
-                from core.conversation_log import archive_all_logs
-
-                archive_all_logs(spec_dir, "too-long")
-                _session_state = spec_dir / ".session.json"
-                if _session_state.exists():
-                    _session_state.rename(
-                        spec_dir / f".session.{_timestamp}.too-long.json"
-                    )
-                _os.environ.pop("AUTO_CLAUDE_RESUME_SESSION_ID", None)
-            except OSError:
-                # L'archivage des logs est du menage : il ne doit pas masquer la vraie cause.
-                pass
+            # Same defense-in-depth cleanup as the exception path.
+            break_replay_channels(spec_dir)
             _rec.end("failed")
             return "error", response_text, error_info
+
+        # An expired or revoked sign-in that the CLI answered as a message.
+        if _auth_echo := auth_failure_in_turn(response_text):
+            _rec.end("failed")
+            return (
+                "error",
+                _auth_echo,
+                {"type": "authentication", "message": _auth_echo},
+            )
 
         debug_success(
             "session",
@@ -1426,33 +1430,7 @@ async def run_agent_session(
         # be reached without going through that shield (e.g. callers that
         # haven't wired the shield in yet).
         if is_too_long:
-            try:
-                import os as _os
-                from datetime import datetime as _dt
-
-                _timestamp = _dt.now().strftime("%Y%m%d-%H%M%S")
-                from core.conversation_log import archive_all_logs
-
-                _moved = archive_all_logs(spec_dir, "too-long")
-                if _moved:
-                    logger.info(
-                        "[session] Archived %d oversized conversation log(s)",
-                        _moved,
-                    )
-                _session_state = spec_dir / ".session.json"
-                if _session_state.exists():
-                    _state_archive = spec_dir / f".session.{_timestamp}.too-long.json"
-                    _session_state.rename(_state_archive)
-                    logger.info(
-                        "[session] Archived .session.json resume marker to %s",
-                        _state_archive.name,
-                    )
-                _os.environ.pop("AUTO_CLAUDE_RESUME_SESSION_ID", None)
-            except OSError as _archive_err:
-                logger.warning(
-                    "[session] Could not archive oversized session state: %s",
-                    _archive_err,
-                )
+            break_replay_channels(spec_dir)
 
         error_info = {
             "type": error_type,
@@ -2045,23 +2023,7 @@ async def _run_agent_client_session(
                 "Reclassifying short prompt-too-long response as error (AgentClient)",
                 response_preview=response_text[:120],
             )
-            try:
-                import os as _os
-                from datetime import datetime as _dt
-
-                _timestamp = _dt.now().strftime("%Y%m%d-%H%M%S")
-                from core.conversation_log import archive_all_logs
-
-                archive_all_logs(spec_dir, "too-long")
-                _session_state = spec_dir / ".session.json"
-                if _session_state.exists():
-                    _session_state.rename(
-                        spec_dir / f".session.{_timestamp}.too-long.json"
-                    )
-                _os.environ.pop("AUTO_CLAUDE_RESUME_SESSION_ID", None)
-            except OSError:
-                # L'archivage des logs est du menage : il ne doit pas masquer la vraie cause.
-                pass
+            break_replay_channels(spec_dir)
             return (
                 "error",
                 response_text,
@@ -2070,6 +2032,14 @@ async def _run_agent_client_session(
                     "message": response_text.strip(),
                     "exception_type": "PromptTooLongResponse",
                 },
+            )
+
+        # An expired or revoked sign-in, as the answer or as the only status.
+        if _auth_echo := auth_failure_in_turn(response_text, status_text):
+            return (
+                "error",
+                _auth_echo,
+                {"type": "authentication", "message": _auth_echo},
             )
 
         debug_success(

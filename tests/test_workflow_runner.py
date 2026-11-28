@@ -470,6 +470,30 @@ class TestRunSkillPhase:
         outcome = asyncio.run(run_skill_phase(review, self._ctx(tmp_path)))
         assert outcome.succeeded is False
 
+    def test_a_session_error_is_not_kept_as_the_phase_report(
+        self, workflow, tmp_path, monkeypatch
+    ):
+        """An expired sign-in's 401 sentence was saved as `brainstorm.md` and
+        handed to the planner as that phase's findings."""
+        seen = {}
+        refusal = (
+            "Failed to authenticate. API Error: 401 OAuth access token has expired."
+        )
+        _install_fake_agent_stack(monkeypatch, seen, status="error", response=refusal)
+        _write_skill(tmp_path, "review-lenses", "Read the diff.")
+        ctx = self._ctx(tmp_path)
+        stale = ctx.spec_dir / "workflow" / "review.md"
+        stale.parent.mkdir(parents=True)
+        stale.write_text("Findings of an earlier run.", encoding="utf-8")
+
+        profile = profile_at(workflow, "high")
+        review = next(r for r in profile.run if r.id == "review")
+        outcome = asyncio.run(run_skill_phase(review, ctx))
+
+        assert outcome.succeeded is False
+        assert outcome.output_path is None
+        assert not stale.exists()
+
     def test_the_output_is_kept_where_the_next_phase_can_read_it(
         self, workflow, tmp_path, monkeypatch
     ):
