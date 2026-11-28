@@ -50,13 +50,17 @@ describe("SandboxSettings", () => {
 		expect(toggle).not.toBeChecked();
 		expect(screen.queryByLabelText(`${K}.microvm.memory`)).toBeNull();
 		fireEvent.click(toggle);
-		expect(saved(change).sandbox.microvm).toEqual({ enabled: true, memoryGb: 0, cpus: 0 });
+		expect(saved(change).sandbox.microvm).toEqual({ enabled: true, memoryGb: 0, cpus: 0, cliAgents: false });
 		view.rerender(<SandboxSettings settings={change.mock.calls.at(-1)?.[0]} onSettingsChange={change} />);
 		expect(screen.getAllByText(`${K}.microvm.auto`)).toHaveLength(2);
 		fireEvent.change(screen.getByLabelText(`${K}.microvm.memory`), { target: { value: "8" } });
-		expect(saved(change).sandbox.microvm).toEqual({ enabled: true, memoryGb: 8, cpus: 0 });
+		expect(saved(change).sandbox.microvm).toEqual({ enabled: true, memoryGb: 8, cpus: 0, cliAgents: false });
 		fireEvent.change(screen.getByLabelText(`${K}.microvm.cpus`), { target: { value: "4" } });
 		expect(saved(change).sandbox.microvm.cpus).toBe(4);
+		const cli = screen.getByLabelText(`${K}.microvm.cliAgents`);
+		expect(cli).not.toBeChecked();
+		fireEvent.click(cli);
+		expect(saved(change).sandbox.microvm.cliAgents).toBe(true);
 		expect(screen.getByText(`${K}.microvm.requirements`)).toBeInTheDocument();
 		expect(screen.getByTestId("microvm-status")).toHaveTextContent(`${K}.microvm.status.unknown`);
 	});
@@ -74,7 +78,7 @@ describe("SandboxSettings", () => {
 			...base,
 			agentSafety: {
 				...DEFAULT_AGENT_SAFETY,
-				sandbox: { ...DEFAULT_AGENT_SAFETY.sandbox, microvm: { enabled: true, memoryGb: 0, cpus: 0 } },
+				sandbox: { ...DEFAULT_AGENT_SAFETY.sandbox, microvm: { enabled: true, memoryGb: 0, cpus: 0, cliAgents: false } },
 			},
 		} as AppSettings;
 		render(<SandboxSettings settings={settings} onSettingsChange={vi.fn()} />);
