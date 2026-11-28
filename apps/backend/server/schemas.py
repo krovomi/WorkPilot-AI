@@ -287,10 +287,12 @@ class QuotaPublic(BaseModel):
 
 
 class UpdateQuotaRequest(BaseModel):
-    max_users: int | None = None
-    max_projects: int | None = None
-    max_concurrent_runs: int | None = None
-    monthly_token_budget: int | None = None
+    """A limit left out stays as it is; a limit sent as ``null`` is lifted."""
+
+    max_users: int | None = Field(default=None, ge=0)
+    max_projects: int | None = Field(default=None, ge=0)
+    max_concurrent_runs: int | None = Field(default=None, ge=0)
+    monthly_token_budget: int | None = Field(default=None, ge=0)
     enforce_hard_stop: bool | None = None
 
 

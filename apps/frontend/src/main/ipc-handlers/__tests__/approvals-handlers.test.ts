@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("electron", () => ({ ipcMain: { handle: vi.fn() } }));
 vi.mock("../../app-logger", () => ({ appLog: { warn: vi.fn() } }));
+const lane = vi.hoisted(() => ({ start: vi.fn() }));
+vi.mock("../../express-lane", () => ({ startExpressLane: lane.start }));
 vi.mock("../../agent/approvals-env", () => ({
 	claudeShipStatus: () => ({ detected: true, accounts: [{ name: "Work", plan: "team" }] }),
 }));
@@ -29,10 +31,11 @@ describe("approvals handlers", () => {
 		});
 	});
 
-	it("registers its one channel", async () => {
+	it("registers its one channel and starts the express lane", async () => {
 		registerApprovalsHandlers();
 		const call = vi.mocked(ipcMain.handle).mock.calls[0];
 		expect(call[0]).toBe(IPC_CHANNELS.APPROVALS_CLAUDE_SHIP_STATUS);
 		expect((call[1] as () => unknown)()).toMatchObject({ success: true });
+		expect(lane.start).toHaveBeenCalledTimes(1);
 	});
 });

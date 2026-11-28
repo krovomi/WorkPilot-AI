@@ -160,6 +160,8 @@ Les plus utilisées :
 | `WORKPILOT_USAGE_RETENTION_DAYS` | `365` | votre registre RGPD fixe une autre durée pour la consommation et la présence (de 30 à 3650 jours) ; ce qui est gardé : [server-usage-data.md](server-usage-data.md) |
 | `WORKPILOT_PAGE_ACTIVITY_RETENTION_DAYS` | `183` | une autre durée pour l'activité par page (de 30 à 3650 jours) ; chaque organisation peut aussi régler les siennes dans **Administration → Usage** |
 | `WORKPILOT_METRICS_TOKEN` | — | un Prometheus lit les métriques du serveur (`/metrics`) : un jeton de 32 caractères au moins, à générer comme les autres secrets ; détail : [server-operations.md, Surveiller le serveur](server-operations.md#surveiller-le-serveur) |
+| `WORKPILOT_REPORT_TIMEZONE` | `Europe/Paris` | l'équipe vit dans un autre fuseau (nom IANA) : celui du rapport d'usage quotidien, tant que l'organisation n'a pas réglé le sien |
+| `WORKPILOT_REPORT_LANGUAGE` | `fr` | `en` pour un rapport d'usage en anglais par défaut |
 | `WORKPILOT_PASSWORD_MIN_LENGTH` | `12` | une politique de mot de passe plus stricte (jamais moins de 12) |
 | `WORKPILOT_PASSWORD_HIBP_CHECK` | `false` | refuser les mots de passe connus des fuites |
 | `WORKPILOT_ACCESS_TOKEN_TTL_MINUTES` | `15` | rarement |
@@ -310,6 +312,10 @@ est attendu, y compris dans `WORKPILOT_APPROVAL_ROLES`.
 L'usage par personne (consommation, présence, activité par page, onglet **Usage**) demande
 `usage.read`, et ses réglages `usage.write` : seuls Owner et Administrator les ont. Un Analyst
 ne lit l'usage par personne que si un rôle propre à l'organisation lui ajoute `usage.read`.
+L'onglet a deux volets : **Chiffres** (tokens, coûts, budget, personnes, modèles, projets,
+livraison, présence et pages, sur une période et des filtres, chaque table exportable en CSV) et
+**Collecte et conservation**. Chaque membre retrouve dans **Paramètres → Mon usage** ce que ces
+rôles voient de lui, et peut tout exporter en JSON.
 
 Deux autres niveaux existent, à ne pas confondre :
 
@@ -391,6 +397,19 @@ ensuite les membres du projet, avec le rôle `member` ou `viewer`.
 
 Exemple : 25 membres, 10 projets, 4 exécutions simultanées, 50 000 000 tokens par mois, blocage
 coché.
+
+### Le rapport d'usage par e-mail
+
+**Usage → Rapport** règle le rapport que chaque organisation reçoit : par défaut chaque jour à
+9 h (heure de Paris, ou `WORKPILOT_REPORT_TIMEZONE`), en français, aux propriétaires et
+administrateurs. L'heure se règle à la minute, dans n'importe quel fuseau ; les jours (tous, les
+jours ouvrés ou ceux choisis) ; jusqu'à 20 adresses, une adresse hors de l'organisation étant
+signalée ; la langue ; un rapport sans noms ; un rapport hebdomadaire le lundi et mensuel le 1er.
+Il faut le SMTP (section 3) ; sans lui, le rapport se lit dans l'app et l'écran le dit. Le
+contenu exact et ce qui est gardé : [server-usage-data.md](server-usage-data.md#le-rapport-par-e-mail).
+
+Exemple : chaque jour ouvré à 8 h 30, heure de Montréal, en anglais, à la direction et à la
+personne qui suit le budget, avec le rapport mensuel.
 
 ### L'audit
 
@@ -618,6 +637,21 @@ curl -sS "$WP/admin/usage/summary?start=2026-11-01&end=2026-11-30&provider=anthr
 # Une table en CSV (daily, people, models, phases, projects, pages ou failures), inscrit à l'audit
 curl -sS "$WP/admin/usage/export?view=people" -H "Authorization: Bearer $TOKEN" -o usage-people.csv
 # Les mêmes vues pour toute la plateforme (administrateur de la plateforme) : /admin/platform/usage/…
+
+# Le rapport d'usage : ses réglages (usage.read), puis chaque jour ouvré à 8 h 30 à Montréal
+curl -sS $WP/admin/usage/report/settings -H "Authorization: Bearer $TOKEN"
+# → { "enabled": true, "time": "09:00", "timezone": "Europe/Paris", "days": [0,1,2,3,4,5,6],
+#     "recipients": [], "default_recipients": ["alice@example.com"], "email_enabled": true, … }
+curl -sS -X PUT $WP/admin/usage/report/settings -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"enabled": true, "time": "08:30", "timezone": "America/Montreal", "days": [0,1,2,3,4],
+       "recipients": ["direction@example.com"], "language": "en", "names": true,
+       "weekly": false, "monthly": true}'
+# → les adresses avec "member": false quand elles ne sont pas celles d'un membre
+# Le rapport tel que l'e-mail le porte : kind daily, weekly ou monthly ; day dans la période
+curl -sS "$WP/admin/usage/report?kind=weekly&day=2026-11-18" -H "Authorization: Bearer $TOKEN"
+# Envoyer le rapport de la veille maintenant (usage.write ; 409 sans SMTP)
+curl -sS -X POST $WP/admin/usage/report/send -H "Authorization: Bearer $TOKEN"
+# → { "status": "sent", "recipients": 2, "period": "2026-11-26" }
 
 # Mon usage : ce que les administrateurs voient de moi, et l'export de toutes mes données d'usage
 curl -sS $WP/users/me/usage -H "Authorization: Bearer $TOKEN"

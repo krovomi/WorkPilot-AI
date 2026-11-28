@@ -29,6 +29,9 @@ suivi d'usage la met à jour dans la même PR.
 | Jobs lancés | `audit_log`, action `project.job.started` | personne, projet, feature, identifiant du job | historique de l'audit |
 | Exports de l'onglet Usage | `audit_log`, action `usage.exported` | qui a exporté quelle table, sur quelle période, combien de lignes | historique de l'audit |
 | Message d'information lu | `audit_log`, action `usage.notice.seen` | qui l'a lu, quand, et si l'activité par page était mesurée | historique de l'audit |
+| Rapports d'usage envoyés | `usage_report_sends` | une ligne par organisation, type (`daily`, `weekly`, `monthly`) et période : comment l'envoi s'est terminé (`sent`, `failed`, `no_smtp`, `no_recipient`) et **à combien** d'adresses, jamais lesquelles | jusqu'à la suppression de l'organisation |
+| Envois du rapport | `audit_log`, actions `usage.report.sent` (l'envoi planifié) et `usage.report.sent_now` (**Envoyer maintenant**, avec qui l'a demandé) | type, période, issue, nombre d'adresses | historique de l'audit |
+| Réglages du rapport | `audit_log`, actions `usage.report.settings_updated` (heure, fuseau, jours, langue, noms, hebdomadaire, mensuel, avant et après) et `usage.report.recipients_changed` (les adresses ajoutées et retirées) | qui a changé quoi | historique de l'audit |
 | Compte effacé | `audit_log`, action `user.erased` | qui a effacé un compte, quand, combien de lignes ont été changées ; jamais quel compte | historique de l'audit |
 
 ### Ce que le tableau en montre
@@ -66,9 +69,50 @@ connexion au provider, délai dépassé, tests) : le message lui-même ne sort p
 mêmes vues existent sous `/admin/platform/usage/*` pour les administrateurs de la plateforme,
 toutes organisations confondues.
 
+Dans l'app de bureau, **Administration → Usage → Chiffres** montre ces vues : une période (7 ou
+30 derniers jours, ce mois-ci ou des jours choisis), les filtres, un bouton d'export CSV par
+table, la fiche d'une personne en cliquant sur son nom, et la désactivation d'un compte dormant
+pour qui gère les membres (`org.member.write`). Un administrateur de la plateforme y bascule sur
+toute la plateforme et efface un compte depuis sa fiche. **Collecte et conservation**, à côté,
+règle l'activité par page et les durées.
+
 **Jamais enregistré** : le texte d'un prompt, du code, ce qu'une personne a tapé, un nom de
 fichier, le chemin ou le corps d'une requête, un mot de passe, ni l'adresse tapée pour un compte
 qui n'existe pas.
+
+## Le rapport par e-mail
+
+Chaque organisation reçoit chaque jour, à **9 h** par défaut, le rapport de la veille
+(jour UTC). Chaque chiffre y est comparé à la veille et à la moyenne des 7 jours d'avant :
+tokens et coût, part du budget mensuel ; personnes actives, nouveaux membres, comptes sans
+activité depuis 30 jours ; runs, réussites, échecs, taux de succès, tâches fusionnées, coût par
+tâche livrée. Suivent les 5 personnes qui ont le plus consommé, la répartition par fournisseur et
+modèle, les causes des échecs (une liste fermée : limite d'usage, connexion au fournisseur, délai
+dépassé, tests, autre) et l'alerte de budget à 80 % et 100 %. **Rien d'autre** : ni prompt, ni
+code, ni texte saisi, ni nom de fichier, ni message d'erreur.
+
+Il se règle dans **Administration → Usage → Rapport** (`/admin/usage/report/settings` : lecture
+`usage.read`, modification `usage.write`) :
+
+| Réglage | Défaut | Valeurs |
+|---|---|---|
+| Envoyé | oui | oui ou non |
+| Heure | `09:00` | `HH:MM`, à la minute |
+| Fuseau | `WORKPILOT_REPORT_TIMEZONE` (`Europe/Paris`) | un nom IANA (`Europe/Paris`, `America/Montreal`, `UTC`…) |
+| Jours | tous | de 0 (lundi) à 6 (dimanche) : tous, les jours ouvrés, ou ceux choisis |
+| Destinataires | les membres actifs dont le rôle lit l'usage (`usage.read` : propriétaire et administrateur) | jusqu'à 20 adresses ; une adresse hors de l'organisation est signalée, pas refusée |
+| Langue | `WORKPILOT_REPORT_LANGUAGE` (`fr`) | `fr` ou `en` |
+| Noms | oui | non : les personnes ne sont désignées que par leur rang (« Personne 1 ») |
+| Hebdomadaire, mensuel | non | le rapport de la semaine passée chaque lundi, du mois passé chaque 1er, à la même heure |
+
+Un rapport n'est envoyé **qu'une fois** : avant l'envoi, le serveur réserve sa ligne dans
+`usage_report_sends`, unique par organisation, type et période ; un redémarrage ne le renvoie
+pas, et un serveur arrêté à l'heure l'envoie à son retour, le même jour. Il passe par le SMTP du
+serveur (`WORKPILOT_SMTP_*`), sans nouveau sous-traitant ; sans SMTP, rien ne part, l'envoi
+est noté `no_smtp` et le rapport reste lisible dans l'app (`GET /admin/usage/report`).
+**Envoyer maintenant** (`POST /admin/usage/report/send`) envoie le rapport de la veille tout de
+suite, sans compter comme l'envoi du jour. L'effacement d'un compte retire son adresse des
+destinataires de chaque organisation.
 
 ## L'activité par page
 
@@ -109,7 +153,7 @@ l'activité par page.
 
 ## Les droits des personnes
 
-- **Accès** : chacun voit dans **Mon usage** exactement ce que les administrateurs voient de lui
+- **Accès** : chacun voit dans **Mon usage** (Paramètres de l'app de bureau, en mode serveur) exactement ce que les administrateurs voient de lui
   dans l'onglet Usage (`GET /users/me/usage`), et quels rôles de l'organisation le lisent.
 - **Portabilité** : **Mon usage** exporte en un fichier JSON tout ce que le serveur garde de son
   usage, dans toutes ses organisations (`GET /users/me/usage/export`) : compte, consommation,
@@ -126,3 +170,7 @@ l'activité par page.
 - **Opposition** : l'activité par page reste désactivée, ou se désactive (ses comptes sont alors
   effacés) ; pour la consommation et la présence, qui servent aussi aux quotas et aux budgets,
   l'organisation abaisse la durée jusqu'à 30 jours.
+
+Sur le téléphone, **Réglages → Mon usage** montre la même chose sur 30 jours, partage le fichier
+JSON de tout ce qui est gardé et relit le message de ce qui est mesuré ; l'app mobile affiche ce
+message une fois par organisation, comme l'app de bureau.
