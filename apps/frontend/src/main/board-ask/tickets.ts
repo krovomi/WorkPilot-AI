@@ -132,3 +132,13 @@ export function ticketDigest(ticket: BoardTicket, maxChars: number): string {
 	const text = lines.join("\n");
 	return text.length > maxChars ? `${text.slice(0, maxChars - 1)}…` : text;
 }
+
+/** What an embeddings model reads of a ticket: its words, not its state. */
+export function ticketMeaning(ticket: BoardTicket, maxChars = 2000): string {
+	const parts = [ticket.title, ticket.description.replace(/\s+/g, " "), ticket.spec, ticket.subtasks.join(". ")];
+	return parts
+		.map((part) => part.trim())
+		.filter(Boolean)
+		.join("\n")
+		.slice(0, maxChars);
+}

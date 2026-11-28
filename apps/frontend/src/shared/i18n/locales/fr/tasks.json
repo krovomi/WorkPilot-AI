@@ -618,8 +618,27 @@
 				"failed": "Échec",
 				"abandoned": "Abandonné"
 			},
-			"privacy": "La question et les tickets vont au provider IA choisi dans les réglages. Rien n'est enregistré.",
-			"newConversation": "Nouvelle conversation"
+			"privacy": "La question et les tickets vont au provider IA choisi dans les réglages, et à un modèle d'embeddings (celui de cet ordinateur d'abord). Les vecteurs restent sur cet ordinateur.",
+			"newConversation": "Nouvelle conversation",
+			"modeSemantic": "Classés par le sens",
+			"semanticHint": "Pas de réponse de l'IA (aucun provider, ou il n'a pas répondu) : ces tickets sont les plus proches de la question, par le sens et les mots, quelle que soit leur langue.",
+			"semanticTitle": "Un modèle d'embeddings a comparé le sens de la question à celui de chaque ticket",
+			"semanticSource": {
+				"local": "Sens : {{model}}, sur cet ordinateur",
+				"cloud": "Sens : {{model}} (API {{provider}})"
+			},
+			"semanticPartial": "{{indexed}} tickets sur {{total}} lus par le sens pour l'instant ; la suite aux prochaines questions",
+			"semanticMode": {
+				"label": "Par le sens",
+				"auto": "Auto",
+				"local": "Cet ordinateur seulement",
+				"off": "Désactivé",
+				"hint": {
+					"auto": "Un modèle d'embeddings sur cet ordinateur (Ollama, LM Studio), sinon l'API d'embeddings de votre provider (OpenAI, Mistral, Google, Hugging Face)",
+					"local": "Seulement un modèle d'embeddings sur cet ordinateur : pour cette étape, les tickets n'en sortent pas",
+					"off": "Mots-clés et modèle d'IA seulement"
+				}
+			}
 		},
 		"lanes": {
 			"title": "Couloirs",

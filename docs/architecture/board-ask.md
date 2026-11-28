@@ -2,9 +2,10 @@
 feature: Interroger le tableau
 summary: >-
   Une question en n'importe quelle langue, répondue avec tous les tickets du projet qui s'y
-  rapportent : le modèle du provider choisi traduit la question vers les langues du tableau, un
-  BM25 sans dictionnaire trouve les candidats, le modèle juge la couverture ; sans modèle, les
-  mots-clés répondent seuls.
+  rapportent : le modèle du provider choisi traduit la question vers les langues du tableau ; un
+  BM25 et, avec un modèle d'embeddings (local d'abord), un classement par
+  le sens trouvent les candidats, fusionnés ; le modèle juge la couverture ; sans lui, le
+  classement fusionné répond seul.
 ---
 
 # Interroger le tableau
@@ -12,12 +13,12 @@ summary: >-
 Demandé par Leub le 27 novembre 2026 : une rubrique du Kanban où l'on pose une question, comme à
 un chatbot, et qui ressort tous les tickets liés, quelle que soit la langue de la question et
 celle des tickets. Le but : aider le product owner à voir si une future fonctionnalité n'a pas
-déjà été développée, même en partie. Leub a retenu quatre lots ; celui-ci est le premier.
+déjà été développée, même en partie. Leub a retenu quatre lots.
 
 | Lot | Contenu |
 |---|---|
-| 1 (ici) | le panneau, la recherche par mots-clés, le modèle pour comprendre et juger |
-| 2 | des embeddings multilingues quand un modèle est là (Ollama, LM Studio, API du provider) |
+| 1 | le panneau, la recherche par mots-clés, le modèle pour comprendre et juger |
+| 2 | des embeddings multilingues quand un modèle est là (Ollama, LM Studio, API du provider) : [le sens](#le-sens-lot-2) |
 | 3 | « Vérifier une idée » : une fonctionnalité collée, sa couverture exigence par exigence |
 | 4 | d'autres sources (roadmap, idées, PR et commits), le mode serveur, l'app mobile |
 
@@ -26,7 +27,7 @@ déjà été développée, même en partie. Leub a retenu quatre lots ; celui-ci
 Tous les providers ne servent pas d'embeddings (Claude n'en a pas), et un modèle local n'est pas
 toujours installé. Le lot 1 marche donc avec **n'importe quel** provider : c'est le modèle de
 conversation, par `runOneShotLLM`, qui fait le pont entre les langues. Les embeddings du lot 2
-s'ajouteront aux candidats, ils ne remplaceront pas cette base.
+s'ajoutent aux candidats, ils ne remplacent pas cette base.
 
 ## Les trois étapes (`main/board-ask/board-ask-service.ts`)
 
@@ -46,8 +47,54 @@ s'ajouteront aux candidats, ils ne remplaceront pas cette base.
    ou seulement `related`, en une phrase, puis répond en citant les tickets. La réponse et les
    raisons sont dans la langue de la question, sinon dans celle de l'app.
 
-Sans réponse lisible du modèle (pas de provider, délai de 60 s dépassé, sortie illisible), les
-mots-clés répondent seuls et le panneau le dit. Le panneau a toujours quelque chose à montrer.
+Sans réponse lisible du modèle (pas de provider, délai de 60 s dépassé, sortie illisible), le
+classement répond seul et le panneau le dit (`semantic` : par le sens et les mots-clés,
+`keywords` : par les mots-clés). Le panneau a toujours quelque chose à montrer.
+
+## Le sens (lot 2)
+
+Un modèle d'embeddings lit la question et chaque ticket ; deux textes qui disent la même chose ont
+des vecteurs proches, quelles que soient leurs langues et leurs mots. « admin page review » trouve
+« Revisión del panel de administración » sans un mot en commun, même quand aucun modèle de
+conversation ne répond.
+
+- **Quel modèle** (`apps/backend/board_ask/semantic.py`, appelé par
+  `runners/board_ask_embed_runner.py`, lancé par `main/board-ask/semantic-search.ts`) : d'abord
+  celui d'un serveur local, le même que la passe de conflits du cerveau
+  (`brain.lifecycle.embeddings.find` : Ollama puis LM Studio, un modèle multilingue comme `bge-m3`
+  d'abord, jamais téléchargé) ; sinon, en `auto`, l'API d'embeddings du provider choisi : OpenAI (ou
+  une `OPENAI_BASE_URL` compatible), Mistral, Google, Hugging Face (`multilingual-e5-large`, qui lit
+  la question et les tickets avec leurs préfixes `query:` / `passage:`). Claude n'a pas d'API
+  d'embeddings : sans modèle local, le lot 1 reste la base. `BOARD_ASK_EMBEDDINGS_MODEL` change le
+  modèle de l'API.
+- **Le réglage** (`boardAskSemantic`, choisi dans le pied du panneau) : `auto` (par défaut),
+  `local` (cet ordinateur seulement : pour cette étape, aucun ticket n'en sort), `off`. Le main le
+  relit dans une liste fermée.
+- **La fusion** (`fuseRanks`) : rang réciproque (1 / (60 + rang)) des mots-clés et du sens. Le
+  modèle de conversation reçoit les 30 premiers des deux ; sans lui, le panneau liste les tickets
+  par le sens qui sont à moins de `SEMANTIC_BAND` (0,12) du cosinus du plus proche. Le sens est
+  demandé pendant que le modèle comprend la question : il n'ajoute pas d'attente.
+- **Borné.** 1 500 tickets de 2 000 caractères au plus ; le modèle est interrogé 30 s au plus,
+  par lots, le runner tué à 45 s. Les vecteurs sont gardés par provider, modèle et empreinte du
+  texte dans `<userData>/board-ask/` (dossier de l'app, jamais un projet), 4 000 au plus : la
+  question suivante n'envoie que ce qui a changé. Un grand tableau est donc lu en quelques
+  questions, et le panneau dit combien l'ont été (« 30 tickets sur 40 lus par le sens »).
+
+Frontières du lot 2 :
+
+- **Secrets (S1).** Le runner reçoit `pythonRunnerEnv` : le provider choisi et sa clé, rien
+  d'hérité. La clé ne part que dans l'en-tête `Authorization` ; aucun message ne la contient. Le
+  texte d'un ticket passe par `redact_text` (et la redaction du cerveau pour un modèle local) avant
+  d'être envoyé.
+- **Réseau.** Une API est en `https` (`http` seulement sur la boucle locale), sans identifiants
+  dans l'URL, sans redirection suivie, avec délai et réponse bornée (16 Mo). Le serveur local
+  passe par `offline_policy.local_endpoint`, qui refuse tout ce qui n'est pas la boucle locale.
+- **Hors-ligne strict (S7).** Sous `airgapStrict`, seul un modèle local est demandé.
+- **Ce qui revient** est lu comme des nombres (vecteurs finis, 8 192 dimensions au plus) côté
+  Python, puis champ par champ (zod) côté main, et seulement pour les ids envoyés.
+- **RGPD.** Les tickets vont au modèle local d'abord ; à l'API du provider déjà choisi sinon, que
+  `local` ou `off` évitent. Les vecteurs restent sur la machine ; ni la question ni la conversation
+  ne sont écrites.
 
 ## Ce qui est lu
 
@@ -78,12 +125,15 @@ comprises** : c'est ce qu'un product owner veut retrouver. L'état est dit avec 
 | `shared/utils/board-ask-search.ts` | mots, langues, BM25 |
 | `shared/types/board-ask.ts` | requête, résultat, bornes |
 | `main/board-ask/tickets.ts` | une carte en ticket : état, spec, document de recherche, résumé |
-| `main/board-ask/board-ask-service.ts` | prompts, lecture des réponses, les trois étapes |
+| `main/board-ask/board-ask-service.ts` | prompts, lecture des réponses, les trois étapes, la fusion |
+| `main/board-ask/semantic-search.ts` | lance le runner d'embeddings, relit son classement, le réglage |
+| `apps/backend/board_ask/semantic.py`, `runners/board_ask_embed_runner.py` | le modèle d'embeddings : choix, appels, cache des vecteurs |
 | `main/ipc-handlers/board-ask-handlers.ts` | canal `boardAsk:ask`, revalidation |
 | `renderer/stores/board-ask-store.ts` | panneau ouvert, une conversation par projet |
 | `renderer/components/kanban/board-ask/` | bouton de la barre, panneau |
 
 Tests : `shared/utils/__tests__/board-ask-search.test.ts`,
 `main/board-ask/__tests__/board-ask-service.test.ts`,
+`main/board-ask/__tests__/semantic-search.test.ts`, `tests/board_ask/`,
 `main/ipc-handlers/__tests__/board-ask-handlers.test.ts`,
 `renderer/components/kanban/board-ask/BoardAskPanel.test.tsx`.
