@@ -14,6 +14,23 @@ function recorder() {
 }
 
 describe("server routes", () => {
+	it("lists, resumes and sets aside the runs a server restart interrupted", async () => {
+		const client = {
+			request: jest.fn(async (method: string, path: string, body?: unknown) =>
+				method === "GET" ? { runs: [{ run_id: "r1" }] } : { method, path, body },
+			),
+		} as unknown as ServerClient;
+		const routes = api(client);
+		expect(await routes.interruptedRuns()).toEqual([{ run_id: "r1" }]);
+		await routes.resumeRun("p 1", "s1", "r/1");
+		await routes.setInterruptedRunsAside(["r1", "r2"]);
+		expect((client.request as jest.Mock).mock.calls).toEqual([
+			["GET", "/users/me/interrupted-runs"],
+			["POST", "/projects/p%201/specs/s1/runs/r%2F1/resume"],
+			["POST", "/users/me/interrupted-runs/later", { run_ids: ["r1", "r2"] }],
+		]);
+	});
+
 	it("registers and forgets this phone for push", async () => {
 		const { calls, routes } = recorder();
 		await routes.registerDevice("tok", "android", "fr");
