@@ -8,6 +8,7 @@ import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { NativeSelect } from "../ui/native-select";
 import { Switch } from "../ui/switch";
+import { formatAppMonth } from "../../lib/date-format";
 
 const STATE_TONES: Record<CarbonBudget["state"], Tone> = {
 	none: "muted",
@@ -23,7 +24,7 @@ export function BudgetMeter({ budget }: { readonly budget: CarbonBudget }): Reac
 	const { t } = useTranslation("carbonProfiler");
 	const tone = STATE_TONES[budget.state];
 	return (
-		<Section kicker={t("kickers.budget")} title={t("budget.title", { month: budget.month })}>
+		<Section kicker={t("kickers.budget")} title={t("budget.title", { month: formatAppMonth(budget.month) })}>
 			{budget.state === "none" ? (
 				<p className="wp-meta">{t("budget.none")}</p>
 			) : (

@@ -27,6 +27,17 @@ export function formatDate(iso: string | null | undefined, language: string): st
 	return date.toLocaleString(dateLocale(language), { dateStyle: "short", timeStyle: "short" });
 }
 
+/**
+ * A calendar day (YYYY-MM-DD, as the server counts days) in the app's
+ * language: 28/11/2026 or 11/28/2026. Read as that local day, never shifted
+ * by the time zone; anything else comes back as it was.
+ */
+export function formatDay(day: string, language: string): string {
+	const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day);
+	if (!match) return day;
+	const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+	return date.toLocaleDateString(dateLocale(language), { day: "2-digit", month: "2-digit", year: "numeric" });
+}
 
 /**
  * How long ago, in the app's language: "just now", "5 min ago", "3 h ago",

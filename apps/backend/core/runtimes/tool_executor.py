@@ -792,6 +792,7 @@ class ToolExecutor:
         try:
             started = time.time()
             sandbox = self.session_sandbox()
+            argv: list[str] | None = None
             if sandbox.isolated:
                 # The same shell line, inside the sandbox (`os_sandbox`):
                 # writes held to the build's roots, network to the allowlist.
@@ -823,6 +824,9 @@ class ToolExecutor:
                 )
             except (TimeoutError, asyncio.CancelledError) as error:
                 await self._stop_command(process)
+                if argv is not None:
+                    # In a microVM the command outlives its host process.
+                    await asyncio.to_thread(sandbox.stop, argv)
                 if isinstance(error, asyncio.CancelledError):
                     raise
                 raise RuntimeError(

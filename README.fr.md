@@ -101,6 +101,29 @@ Installation pas à pas, configuration des providers, notes Windows et dépannag
 
 **Tableau agile, comme Jira** ([sprints](docs/architecture/kanban-sprints.md), [couloirs](docs/architecture/kanban-swimlanes.md), [liste](docs/architecture/kanban-list-view.md), [frise](docs/architecture/kanban-timeline.md), [rapports](docs/architecture/kanban-reports.md)) : les tâches qui finissent sans succès ont leurs colonnes, **Échec** et **Abandonnée** (avec la raison : doublon, ne sera pas fait, PR fermée…), et une tâche peut être marquée **Bloquée** avec ce qui la bloque. Planifiez en **sprints** (démarrage, clôture avec report, points issus de Smart Estimation, jamais une durée), coupez le tableau en **couloirs** par sprint, sous-projet, priorité, type, source ou tâche parente, et passez de **Tableau** à **Liste** (colonnes triables) ou **Frise** (chaque tâche de son début à sa fin, les sprints en tête). Les **Rapports** tracent le burndown, la vélocité, le flux cumulé, le temps de cycle, le débit et les fins non abouties. **Étiquettes**, filtres rapides (Bloquées, Modifiées cette semaine, Mes tâches sur un serveur d'équipe) et vues enregistrées gardent le tableau lisible ; les tâches terminées peuvent s'archiver d'elles-mêmes après 7, 14 ou 30 jours.
 
+**Planifier et proposer un sprint** ([planification](docs/architecture/kanban-sprints.md), [proposition](docs/architecture/sprint-proposal.md)) : « Planifier » met le backlog et le sprint côte à côte, avec une jauge de capacité en points face à la vélocité des 3 derniers sprints (disponibilité de l'équipe en %, une cible de 20 points pour un premier sprint). Glissez les tâches d'un côté à l'autre ou appuyez sur → / ←, annulez le dernier déplacement, filtrez le backlog (urgentes, bugs, non estimées) et « Estimez » une tâche sans points ; les tâches reportées et celles qui attendent une tâche restée au backlog sont signalées. **Proposer le sprint** le remplit jusqu'à sa capacité : les règles classent le backlog et ajoutent d'abord ce qu'une tâche attend, le modèle du provider choisi compose le sprint et donne une raison par tâche, et les meilleures tâches qui ne tiennent pas restent sous la ligne. Variantes : Équilibré, Plus prudent (80 %), Bugs d'abord, Autour du but ; un but est suggéré quand le sprint n'en a pas. Rien ne bouge avant que vous ajoutiez les tâches, et cela marche aussi sans modèle. Le modèle ne lit que le titre d'une tâche, le début de sa description, sa priorité, son type, ses points, ses étiquettes et ses dépendances, jamais qui travaille dessus.
+
+<table>
+<tr>
+<td width="50%" valign="top">
+
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset=".github/assets/showcase/sprint-planning-light.png">
+  <img alt="Planifier un sprint : la jauge de capacité face à la vélocité des 3 derniers sprints, le backlog et le sprint côte à côte" src=".github/assets/showcase/sprint-planning.png">
+</picture>
+
+</td>
+<td width="50%" valign="top">
+
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset=".github/assets/showcase/sprint-proposal-light.png">
+  <img alt="Proposer le sprint : les tâches proposées en pointillés violets avec leur raison, la ligne de capacité et ce qui passe dessous" src=".github/assets/showcase/sprint-proposal.png">
+</picture>
+
+</td>
+</tr>
+</table>
+
 **Interroger le tableau** ([interroger le tableau](docs/architecture/board-ask.md)) : posez une question dans n'importe quelle langue (« l'export CSV a-t-il déjà été fait ? ») et obtenez tous les tickets liés, avec la feuille de route, les idées et les changements fusionnés, trouvés par les mots et par le sens (un modèle d'embeddings local d'abord) et jugés par le modèle du provider choisi ; « Vérifier une idée » dit si une fonctionnalité prévue est déjà sur le tableau. Il répond sur un tableau local, sur celui d'un serveur d'équipe depuis le bureau, et depuis le téléphone.
 
 <table>
@@ -259,6 +282,7 @@ La liste complète, avec chaque détail, est dans **[docs/FEATURES.md](docs/FEAT
 **Pipeline de construction**
 - **Tableau Kanban** avec approbation de la spec, pause et reprise, relance par phase, messages de pilotage pendant que l'agent travaille, et une revue guidée avec des commentaires de ligne renvoyés au fixer ; des diffs aux couleurs de git, colorés selon le langage pour chaque stack, mots modifiés surlignés et disposition côte à côte « Auto » ; cartes colorées par type avec aperçu au survol, ajout rapide, clic droit, sélection multiple avec actions en masse et Ctrl+Z, jauge de capacité par colonne, temps des agents, tokens et coût sur les cartes terminées, et une courte relecture par l'IA avant le départ.
 - **Tableau agile** : colonnes Échec et Abandonnée, drapeau Bloquée, sprints avec points, couloirs, affichages Tableau / Liste / Frise, rapports (burndown, vélocité, flux cumulé, temps de cycle, débit, fins non abouties), étiquettes, filtres rapides et archivage auto, en local comme en mode serveur ; chaque changement de statut d'une carte est gardé dans son `status_history.json`.
+- **Planification de sprint** avec jauge de capacité (vélocité, disponibilité), glisser-déposer, annulation, et **Proposer le sprint** : les règles et le modèle du provider choisi remplissent le sprint jusqu'à sa capacité en points, ce qu'une tâche attend d'abord, avec une raison par tâche et un but quand il n'y en a pas ; les règles seules sans modèle ([proposition de sprint](docs/architecture/sprint-proposal.md)).
 - **Interroger le tableau** dans n'importe quelle langue : tous les tickets, éléments de feuille de route, idées et changements fusionnés liés, classés par le sens avec un modèle d'embeddings local d'abord, et la vérification d'une fonctionnalité prévue contre ce qui existe déjà, sur le bureau, un serveur d'équipe et le téléphone ([interroger le tableau](docs/architecture/board-ask.md)).
 - **Où tournent les longues suites** : avant une revue QA complète, l'app décide sans modèle, d'après le CPU, la RAM, le GPU et la VRAM libres et la charge mesurée de la suite : ici, sur la CI de la forge depuis la branche de la tâche poussée sans PR (GitHub Actions, Azure Pipelines, GitLab CI, Bitbucket Pipelines, Jenkins), ou sur le serveur WorkPilot, jamais une suite sautée ; les tests touchés passent d'abord, une carte peut l'emporter sur le choix du projet, la fusion attend la CI, et après une fusion les autres cartes vertes reprennent la nouvelle base et repartent ([placement des tests](docs/architecture/test-placement.md), [reprise de la base](docs/architecture/suite-base-refresh.md)).
 - **Niveaux d'approbation** N0 à N3 sur chaque pull request, lus sans modèle (type, couches, chemins sensibles, taille, CI, revue croisée) : N0 et N1 fusionnent seules une fois vertes, N2 et N3 attendent une personne ; en observation tant que le projet ne les applique pas, et la section `approvals` de `workpilot.policy.yaml` ne peut que les durcir. Les PR Dependabot et Renovate passent par une **voie express**, sans tâche ni modèle ([niveaux d'approbation](docs/architecture/approval-tiers.md), [voie express](docs/architecture/express-lane.md)).
@@ -315,7 +339,7 @@ La liste complète, avec chaque détail, est dans **[docs/FEATURES.md](docs/FEAT
 - Sur un serveur d'équipe, un rapport d'usage quotidien par e-mail, à 9 h par défaut (heure à la minute, n'importe quel fuseau, les jours et jusqu'à 20 adresses que chaque organisation choisit, en français ou en anglais, avec ou sans noms, rapports hebdomadaire et mensuel en plus) : chaque chiffre face à la veille et à la moyenne des 7 jours, les plus gros consommateurs, fournisseurs et modèles, les causes des échecs et les alertes de budget à 80 % et 100 % (celui de l'organisation, et des budgets mensuels par personne, groupe ou projet qui peuvent bloquer leurs runs) ; envoyé une seule fois, même après un redémarrage, et lisible dans l'app sans SMTP ([ce qu'il contient](docs/server-usage-data.md#le-rapport-par-e-mail)).
 
 **Apparence**
-- Une seule charte graphique dans tous les modules, qui suit le thème actif : 7 thèmes de couleur en clair et en sombre plus un éditeur de thème, interface complète en anglais et en français.
+- Une seule charte graphique dans tous les modules, qui suit le thème actif : 7 thèmes de couleur en clair et en sombre plus un éditeur de thème, interface complète en anglais et en français ; les dates, les heures et les calendriers suivent la langue de l'app (28/11/2026 et 14:30 en français, 11/28/2026 et 02:30 PM en anglais), et non la région du système.
 - Un menu léger : un rail d'espaces avec un seul panneau à la fois, arrangé par chacun (glisser une page sur un autre espace, réordonner les épingles, ou « Personnaliser le menu » au clavier) et redimensionnable à la souris, « Mon menu » pour les pages épinglées et récentes, quatre hubs dans la Boîte à outils, les pages bêta dans un **Labo**, une proposition de masquer les pages inutilisées depuis 30 jours, les outils CLI dans une pastille ; la palette de commandes (Ctrl+K ou `/`) trouve chaque page par son nom, son groupe ou un mot-clé.
 - Un assistant de premier lancement qui configure n'importe quel provider d'IA et dit honnêtement lesquels sont connectés.
 
@@ -384,7 +408,7 @@ Référence complète : [docs/CLI-USAGE.md](docs/CLI-USAGE.md) (en anglais).
 
 ## Sécurité
 
-1. **Bac à sable du système** : les commandes des agents tournent sous bubblewrap (Linux) ou Seatbelt (macOS), et la carte indique quand une tâche tourne sans bac à sable. En option, coupée par défaut (Paramètres > Sandbox) : une **microVM Docker Sandboxes par tâche**, avec son noyau et son moteur Docker, seul le worktree monté et le réseau fermé hors de l'allowlist ; c'est aussi ce qui isole les commandes sous Windows 11.
+1. **Bac à sable du système** : les commandes des agents tournent sous bubblewrap (Linux) ou Seatbelt (macOS), et la carte indique quand une tâche tourne sans bac à sable. En option, coupée par défaut (Paramètres > Sandbox) : une **microVM Docker Sandboxes par tâche**, avec son noyau et son moteur Docker, seul le worktree monté, le réseau fermé hors de l'allowlist de la tâche, une commande arrêtée au délai arrêtée aussi dans la VM, et sbx lancé sans les identifiants de l'hôte ; c'est aussi ce qui isole les commandes sous Windows 11.
 2. **Restrictions du système de fichiers** : les opérations restent dans le dossier du projet.
 3. **Liste blanche dynamique de commandes** : seules les commandes de la stack détectée sont autorisées.
 4. **Instantanés et score de confiance** : avant chaque session d'agent, le worktree de la tâche est enregistré comme un commit git caché ; chaque session démarre avec un score de confiance de 100 que les anomalies font baisser, et sous un seuil la tâche se met en pause, ou la session s'arrête et son instantané est restauré. Le mode restreint et les limites par session sont dans Paramètres > Sandbox ; un instantané se restaure depuis la carte.

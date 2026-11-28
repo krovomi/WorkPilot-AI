@@ -178,6 +178,8 @@ def test_a_strange_sprint_is_refused():
         {"name": "S", "startDate": "2026-12-10", "endDate": "2026-12-01"},
         {"name": "S", "id": "../../etc"},
         {"name": "S", "goal": "x" * 501},
+        {"name": "S", "capacity": 0},
+        {"name": "S", "capacity": 1000},
     ):
         with pytest.raises(ValidationError):
             SprintDraft(**bad)
@@ -206,6 +208,27 @@ async def test_a_malformed_file_or_a_link_in_the_clone_is_not_followed(tmp_path)
     assert outside.read_text(encoding="utf-8") == "keep"
 
 
+async def test_a_sprint_keeps_its_capacity_until_it_is_cleared(tmp_path):
+    """A rename leaves the capacity alone; null gives the sprint back to the velocity."""
+    from shared_board.sprints import SprintDraft, save_sprint
+
+    scope, clone = await _member(tmp_path)
+    shown = await save_sprint(SprintDraft(name="S1", capacity=21), _request(), scope)
+    sprint_id = shown["sprints"][0]["id"]
+    assert _stored(clone)[0]["capacity"] == 21
+
+    await save_sprint(SprintDraft(id=sprint_id, name="S1b"), _request(), scope)
+    assert _stored(clone)[0]["capacity"] == 21
+    await save_sprint(
+        SprintDraft(id=sprint_id, name="S1b", capacity=18), _request(), scope
+    )
+    assert _stored(clone)[0]["capacity"] == 18
+    await save_sprint(
+        SprintDraft(id=sprint_id, name="S1b", capacity=None), _request(), scope
+    )
+    assert "capacity" not in _stored(clone)[0]
+
+
 async def test_a_card_gets_its_sprint_even_while_it_runs(tmp_path, monkeypatch):
     """The sprint is the board's: a run does not read it, so it is not refused (409)."""
     from server.services import run_manager
@@ -226,6 +249,16 @@ async def test_a_card_gets_its_sprint_even_while_it_runs(tmp_path, monkeypatch):
             card_id, CardSettings(sprintId="sp-0123abcd"), _request(), member, db
         )
     assert _metadata(clone, card_id)["sprintId"] == "sp-0123abcd"
+    # A card carried over from a closed sprint says which one, also while it runs.
+    async with await _db() as db:
+        await update_card_settings(
+            card_id,
+            CardSettings(sprintId="sp-0123abcd", carriedFrom="sp-89abcdef"),
+            _request(),
+            member,
+            db,
+        )
+    assert _metadata(clone, card_id)["carriedFrom"] == "sp-89abcdef"
     async with await _db() as db:
         with pytest.raises(HTTPException) as running:
             await update_card_settings(
@@ -239,6 +272,8 @@ async def test_a_card_gets_its_sprint_even_while_it_runs(tmp_path, monkeypatch):
     assert running.value.status_code == 409
     with pytest.raises(ValidationError):
         CardSettings(sprintId="sprint-1")
+    with pytest.raises(ValidationError):
+        CardSettings(carriedFrom="../sp-1")
 
 
 async def test_a_sprint_changes_only_from_the_state_that_allows_it(

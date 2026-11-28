@@ -6,9 +6,11 @@ import {
 	cleanSprintDraft,
 	orderedSprints,
 	readSprints,
+	sprintCapacity,
 	sprintProgress,
 	taskPoints,
 	velocity,
+	velocityHistory,
 } from "../sprints";
 
 function sprint(overrides: Partial<Sprint>): Sprint {
@@ -124,5 +126,42 @@ describe("edge cases of the stored sprints", () => {
 		];
 		expect(orderedSprints(list).map((s) => s.id)).toEqual(["sp-p2", "sp-p1", "sp-c2", "sp-c1", "sp-c3", "sp-c4"]);
 		expect(velocity(list)).toBe(4);
+	});
+});
+
+describe("sprint capacity", () => {
+	const closed = (id: string, closedAt: string, donePoints: number) =>
+		sprint({ id, state: "closed", closedAt, report: { done: 1, donePoints, carried: 0, carriedPoints: 0, carriedTo: null } });
+
+	it("keeps a capacity of whole points, clears it with null, and refuses anything else", () => {
+		expect(cleanSprintDraft({ name: "S", capacity: 21 })).toEqual({ name: "S", capacity: 21 });
+		expect(cleanSprintDraft({ name: "S", capacity: null })).toEqual({ name: "S", capacity: null });
+		for (const capacity of [0, -3, 1000, 2.5, "12", Number.NaN]) {
+			expect(cleanSprintDraft({ name: "S", capacity })).toBeNull();
+		}
+		const [read] = readSprints([{ ...sprint({}), capacity: 18 }, { ...sprint({ id: "sp-00000002" }), capacity: null }]);
+		expect(read.capacity).toBe(18);
+		expect(readSprints([{ ...sprint({ id: "sp-00000002" }), capacity: null }])[0]).not.toHaveProperty("capacity");
+	});
+
+	it("lists the last three closed sprints oldest first", () => {
+		const list = [
+			closed("sp-00000001", "2026-10-01", 10),
+			closed("sp-00000002", "2026-10-15", 20),
+			closed("sp-00000003", "2026-11-01", 30),
+			closed("sp-00000004", "2026-11-15", 40),
+			sprint({ id: "sp-00000005" }),
+		];
+		expect(velocityHistory(list).map((item) => item.report.donePoints)).toEqual([20, 30, 40]);
+		expect(velocity(list)).toBe(30);
+	});
+
+	it("takes the sprint's own capacity, else the velocity, else the first-sprint target", () => {
+		const history = [closed("sp-00000009", "2026-11-01", 24)];
+		expect(sprintCapacity({ capacity: 18 }, history)).toEqual({ points: 18, source: "set", velocity: 24 });
+		expect(sprintCapacity({}, history)).toEqual({ points: 24, source: "velocity", velocity: 24 });
+		expect(sprintCapacity({}, [])).toEqual({ points: 20, source: "default", velocity: null });
+		// A velocity of 0 (nothing done) is no capacity: the target stands.
+		expect(sprintCapacity({}, [closed("sp-00000009", "2026-11-01", 0)]).source).toBe("default");
 	});
 });

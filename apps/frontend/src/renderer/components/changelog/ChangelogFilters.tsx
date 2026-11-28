@@ -18,6 +18,7 @@ import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Checkbox } from "../ui/checkbox";
+import { DateField } from "../ui/date-fields";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
@@ -249,12 +250,10 @@ export function ChangelogFilters({
 									<Label className="text-xs">
 										{t("changelog:gitHistory.dateLabel")}
 									</Label>
-									<Input
-										type="date"
+									<DateField
+										aria-label={t("changelog:gitHistory.dateLabel")}
 										value={gitHistorySinceDate}
-										onChange={(e) =>
-											onGitHistorySinceDateChange(e.target.value)
-										}
+										onValueChange={onGitHistorySinceDateChange}
 									/>
 								</div>
 							)}

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useGitRewriteStore } from "../../stores/git-rewrite-store";
 import { CharterButton, Chip, Chips, Notice, Panel, Section } from "../charter";
+import { formatAppMonth } from "../../lib/date-format";
 
 /** Local branches to tidy, and what the surgeon did month by month (#360). */
 export function GitBranchesPanel({ projectPath }: { readonly projectPath: string }): React.ReactElement {
@@ -106,7 +107,7 @@ export function GitBranchesPanel({ projectPath }: { readonly projectPath: string
 						<tbody>
 							{months.map((m) => (
 								<tr key={m.month}>
-									<td className="wp-mono py-0.5">{m.month}</td>
+									<td className="wp-mono py-0.5">{formatAppMonth(m.month, "short")}</td>
 									<td>{m.runs}</td>
 									<td>{m.squash}</td>
 									<td>{m.reword}</td>

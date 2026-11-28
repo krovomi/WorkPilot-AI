@@ -9,6 +9,7 @@
  * whichever provider the board runs.
  */
 import type { FlakyStack, FlakyTest } from "../../../shared/types/flaky-tests";
+import { formatAppDate } from "../../lib/date-format";
 
 type T = (key: string, opts?: Record<string, unknown>) => string;
 
@@ -60,7 +61,7 @@ function diagnosis(test: FlakyTest, t: T): string[] {
 	}
 	const history = test.history;
 	if (history?.firstSeen) {
-		lines.push(`- ${t("history.firstSeen", { date: history.firstSeen.slice(0, 10) })}`);
+		lines.push(`- ${t("history.firstSeen", { date: formatAppDate(history.firstSeen) })}`);
 		lines.push(`- ${t(`history.trend.${history.trend}`)}`);
 	}
 	if (history?.systems.length) lines.push(`- ${t("history.systems", { systems: history.systems.join(", ") })}`);

@@ -159,11 +159,20 @@ PLAIN_KEYS = (
     "flaggedAt",
     "area",
     "sprintId",
+    "carriedFrom",
     "labels",
 )
 #: Keys only the board reads (lanes, flag, sprint): a run does not, so they may change during one.
 BOARD_ONLY_KEYS = frozenset(
-    {"area", "sprintId", "labels", "flagged", "flaggedReason", "flaggedAt"}
+    {
+        "area",
+        "sprintId",
+        "carriedFrom",
+        "labels",
+        "flagged",
+        "flaggedReason",
+        "flaggedAt",
+    }
 )
 
 
@@ -204,6 +213,8 @@ class CardSettings(BaseModel):
     flaggedAt: str | None = Field(default=None, pattern=INSTANT_PATTERN)
     area: str | None = Field(default=None, max_length=80, pattern=AREA_PATTERN)
     sprintId: str | None = Field(default=None, pattern=r"^sp-[0-9a-f]{8}$")
+    #: The closed sprint that carried the unfinished card into ``sprintId``.
+    carriedFrom: str | None = Field(default=None, pattern=r"^sp-[0-9a-f]{8}$")
     labels: list[Label] | None = Field(default=None, max_length=10)
 
     @field_validator("labels")
@@ -333,7 +344,7 @@ def read_settings(root: Path, directory: Path) -> dict[str, Any]:
             key: metadata.get(key)
             for key in PLAIN_KEYS
             if key.startswith(("abandoned", "flagged"))
-            or key in ("area", "sprintId", "labels")
+            or key in ("area", "sprintId", "carriedFrom", "labels")
         },
         "goal": None,
         "goalError": None,

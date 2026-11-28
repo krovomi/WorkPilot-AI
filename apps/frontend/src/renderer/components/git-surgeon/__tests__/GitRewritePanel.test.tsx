@@ -125,7 +125,7 @@ describe("GitBranchesPanel", () => {
 		const box = await screen.findByRole("checkbox", { name: "Choisir done" });
 		expect(screen.queryByRole("checkbox", { name: "Choisir feature" })).toBeNull();
 		expect(screen.getByText("→ feat/done")).toBeInTheDocument();
-		expect(screen.getByText("2026-11")).toBeInTheDocument();
+		expect(screen.getByText("nov. 2026")).toBeInTheDocument();
 		fireEvent.click(box);
 		fireEvent.click(screen.getByRole("button", { name: /Supprimer 1 branche fusionnée/ }));
 		await waitFor(() => expect(api.deleteMergedBranches).toHaveBeenCalledWith({ projectPath: "/p", names: ["done"] }));

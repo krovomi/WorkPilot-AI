@@ -1,7 +1,8 @@
 /**
  * The dialogs of the Kanban's sprints: creating or editing one (name, goal,
- * days) and closing the active one (what it did, where its unfinished cards
- * go). Opened from the toolbar's « Sprints » menu (SprintMenu).
+ * days; a new one opens its planning view) and closing the active one (what
+ * it did, where its unfinished cards go). Opened from the toolbar's
+ * « Sprints » menu (SprintMenu) and the board's sprint banner.
  *
  * Design: docs/architecture/kanban-sprints.md.
  */
@@ -11,10 +12,12 @@ import type { Sprint } from "../../../shared/types";
 import { cleanSprintDraft, MAX_SPRINT_GOAL, MAX_SPRINT_NAME, orderedSprints } from "../../../shared/utils/sprints";
 import { toast } from "../../hooks/use-toast";
 import { cn } from "../../lib/utils";
+import { useSprintProposalStore } from "../../stores/sprint-proposal-store";
 import { type SprintOutcome, sprintReport, useSprintStore } from "../../stores/sprint-store";
 import { useTaskStore } from "../../stores/task-store";
 import { Button } from "../ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../ui/dialog";
+import { DateField } from "../ui/date-fields";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Textarea } from "../ui/textarea";
@@ -46,6 +49,7 @@ export function SprintEditDialog({ sprint, open, onOpenChange }: SprintEditDialo
 	const { t } = useTranslation(["tasks", "common"]);
 	const ids = useId();
 	const save = useSprintStore((s) => s.save);
+	const openPlanning = useSprintStore((s) => s.openPlanning);
 	const failed = useSprintFailure();
 	const [name, setName] = useState(sprint?.name ?? "");
 	const [goal, setGoal] = useState(sprint?.goal ?? "");
@@ -58,9 +62,17 @@ export function SprintEditDialog({ sprint, open, onOpenChange }: SprintEditDialo
 	const submit = async () => {
 		if (!draft || saving) return;
 		setSaving(true);
+		const before = new Set(useSprintStore.getState().sprints.map((item) => item.id));
 		const outcome = await save(draft);
 		setSaving(false);
-		if (failed(outcome)) onOpenChange(false);
+		if (!failed(outcome)) return;
+		onOpenChange(false);
+		// A new sprint is empty: its planning view is the next step, on the proposal's settings.
+		const created = sprint ? undefined : useSprintStore.getState().sprints.find((item) => !before.has(item.id));
+		if (created) {
+			useSprintProposalStore.getState().openSettings(created.id);
+			openPlanning(created.id);
+		}
 	};
 
 	return (
@@ -102,11 +114,11 @@ export function SprintEditDialog({ sprint, open, onOpenChange }: SprintEditDialo
 					<div className="grid grid-cols-2 gap-3">
 						<div className="space-y-1.5">
 							<Label htmlFor={`${ids}-start`}>{t("tasks:kanban.sprints.startDate")}</Label>
-							<Input id={`${ids}-start`} type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
+							<DateField id={`${ids}-start`} value={startDate} onValueChange={setStartDate} />
 						</div>
 						<div className="space-y-1.5">
 							<Label htmlFor={`${ids}-end`}>{t("tasks:kanban.sprints.endDate")}</Label>
-							<Input id={`${ids}-end`} type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
+							<DateField id={`${ids}-end`} value={endDate} onValueChange={setEndDate} />
 						</div>
 					</div>
 					{endsTooSoon && <p className="text-xs text-destructive">{t("tasks:kanban.sprints.endBeforeStart")}</p>}

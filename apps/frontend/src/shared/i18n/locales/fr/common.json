@@ -1845,5 +1845,20 @@
 		"openPr": "Ouvrir la PR",
 		"prCreated": "Pull request créée",
 		"prFailed": "La pull request n'a pas pu être créée."
+	},
+	"dateField": {
+		"placeholder": "jj/mm/aaaa",
+		"timePlaceholder": "hh:mm",
+		"monthPlaceholder": "Choisir un mois",
+		"openCalendar": "Ouvrir le calendrier",
+		"openTimes": "Afficher les heures",
+		"previousMonth": "Mois précédent",
+		"nextMonth": "Mois suivant",
+		"previousYear": "Année précédente",
+		"nextYear": "Année suivante",
+		"today": "Aujourd'hui",
+		"thisMonth": "Ce mois-ci",
+		"clear": "Effacer",
+		"invalid": "Date non valide"
 	}
 }

@@ -38,7 +38,19 @@ une carte non estimée compte 0 et le menu dit combien il y en a. Aucune durée 
 Au démarrage, le sprint garde ce qu'il contient (`committed` : cartes et points), pour le burndown
 du lot 6. À la fin, il garde son bilan (`report` : cartes et points terminés, cartes et points
 reportés, et où : un sprint planifié ou le backlog). La vélocité est la moyenne des points terminés
-par les trois derniers sprints terminés (`velocity`).
+par les trois derniers sprints terminés (`velocity`, `velocityHistory`).
+
+**Capacité.** Un sprint peut garder une capacité en points (`capacity`, 1 à 999), choisie par
+l'équipe quand elle est moins disponible ou pour un premier sprint. Sans elle, la capacité est la
+vélocité ; sans vélocité, une cible de 20 points (`sprintCapacity`, `DEFAULT_TARGET_POINTS`).
+Un brouillon qui ne la nomme pas la garde ; `null` l'efface (retour à la vélocité), des deux côtés.
+
+**Report.** Quand un sprint se termine, ses cartes non terminées envoyées vers un sprint planifié
+gardent `metadata.carriedFrom` (l'id du sprint terminé, clé du tableau comme `sprintId`). La vue de
+planification ne les dit « reportées » que si ce sprint terminé nomme bien, dans son bilan, le
+sprint où la carte se trouve (`carriedFromSprint`) : une carte déplacée depuis par le menu ou un
+couloir perd la marque sans que ces chemins aient à effacer la clé ; un déplacement par la vue
+l'efface.
 
 ## Où vivent les sprints
 
@@ -79,7 +91,35 @@ ou d'appeler le serveur, qui les revérifie.
   (regroupement « Sprint », [kanban-swimlanes.md](kanban-swimlanes.md)) ; les deux s'annulent par
   Ctrl+Z (`applyCardChoice`).
 
+- **Le bandeau du sprint** (`kanban/SprintBanner.tsx`, rendu par `BoardLanes` au-dessus de toutes
+  les dispositions) nomme le sprint dont parle le tableau : celui du filtre, sinon le sprint en
+  cours (`focusedSprint`, `lib/sprint-planning.ts`). Il donne ses dates, les jours de calendrier
+  qui restent jusqu'à son dernier jour (un compte de jours, jamais une estimation du travail), ce
+  qu'il contient et ce qui est fait, puis l'étape suivante : n'afficher que ses cartes, le
+  planifier, le démarrer ou le terminer. Sans sprint en cours ni filtré, rien ne s'affiche. Avant
+  lui, un sprint créé et démarré n'apparaissait que dans le menu : le tableau n'en disait rien.
+- **La vue de planification** (`kanban/SprintPlanningDialog.tsx`, côtés dans
+  `kanban/SprintPlanningPane.tsx`) met le backlog (cartes sans sprint, ni terminées, ni
+  abandonnées, ni archivées, de la plus urgente à la plus ancienne) à côté des cartes du sprint.
+  Au-dessus, la jauge de capacité (`kanban/SprintCapacity.tsx`) : les points du sprint, la ligne
+  de capacité, les points terminés des derniers sprints, et un réglage par pas d'un dixième de la
+  vélocité (affiché en % de la vélocité), ou par point pour une cible. Une carte passe de l'autre
+  côté par sa flèche, en cochant plusieurs cartes puis « Ajouter au sprint » ou « Renvoyer au
+  backlog », en la glissant (les cartes cochées partent ensemble ; glisser-déposer natif, type
+  `application/x-workpilot-planning`), ou au clavier (→ depuis le backlog, ← depuis le sprint, sur
+  le titre). Le dernier déplacement s'annule (« Annuler », Ctrl+Z). Le backlog a une recherche et
+  des filtres rapides (urgentes ou hautes, bugs, non estimées) ; une carte sans points propose
+  « Estimer » (l'estimation intelligente de la carte, qui garde son score). Côté sprint, une carte
+  reportée est marquée, et une carte qui attend (`blockedBy`) une carte ni terminée ni dans le
+  sprint le dit (`waitingOn`) ; celles de ces cartes encore au backlog s'ajoutent d'un clic
+  (`missingBlockers`). Un sprint planifié démarre depuis la vue. Elle s'ouvre depuis le bandeau,
+  depuis le bouton « Planifier » de chaque sprint ouvert du menu, et d'elle-même après la création
+  d'un sprint. Une seule est ouverte à la fois (`planningId` du store), jamais sur un sprint
+  terminé. Les déplacements passent par `assign` du store, qui refuse un sprint terminé ou
+  inconnu ; les arguments sont revérifiés par le main comme pour le menu d'une carte. Un lecteur
+  d'un projet du serveur voit le plan sans cases, flèches, réglage ni démarrage.
+
 ## Ce qui reste pour les lots suivants
 
-La vue de planification (backlog et sprints côte à côte), « proposer le sprint » d'après la
-vélocité, le burndown et le rapport de sprint (lot 6) lisent ce modèle sans le changer.
+« Proposer le sprint » (l'IA remplit le sprint jusqu'à sa capacité, maquette du 28 novembre 2026)
+s'appuie sur la capacité, les reports et les dépendances ci-dessus.

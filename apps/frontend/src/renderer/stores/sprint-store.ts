@@ -4,6 +4,9 @@
  * project) and answers every change with the project's sprints as they now
  * are; this store holds that answer for the board, its menus and lanes.
  *
+ * Cards join a sprint from their menu, its lane or its planning view
+ * (`assign`); the planning view open on the board is `planningId`.
+ *
  * Starting a sprint records what it holds; closing it counts what was done,
  * moves the unfinished cards to a planned sprint or back to the backlog,
  * then records the report. Deleting a planned sprint sends its cards back to
@@ -30,6 +33,12 @@ interface SprintState {
 	/** Close the active sprint; its unfinished cards go to `carryTo` (a planned sprint) or the backlog (null). */
 	complete: (sprintId: string, carryTo: string | null) => Promise<SprintOutcome>;
 	remove: (sprintId: string) => Promise<SprintOutcome>;
+	/** Puts cards in a sprint, or back in the backlog (null). */
+	assign: (taskIds: readonly string[], sprintId: string | null) => Promise<SprintOutcome>;
+	/** The sprint whose planning view is open, if any. */
+	planningId: string | null;
+	openPlanning: (sprintId: string) => void;
+	closePlanning: () => void;
 }
 
 function api() {
@@ -40,11 +49,15 @@ function tasksOf(sprintId: string): Task[] {
 	return useTaskStore.getState().tasks.filter((task) => task.metadata?.sprintId === sprintId);
 }
 
-/** Moves cards to another sprint (or none); resolves how many could not be saved. */
-async function moveCards(tasks: readonly Task[], sprintId: string | undefined): Promise<number> {
+/**
+ * Moves cards to another sprint (or none); resolves how many could not be
+ * saved. `carriedFrom` names the closing sprint that carries them; a person's
+ * own move leaves it out, which clears it.
+ */
+async function moveCards(tasks: readonly Task[], sprintId: string | undefined, carriedFrom?: string): Promise<number> {
 	let failed = 0;
 	for (const task of tasks) {
-		if (!(await persistUpdateTask(task.id, { metadata: { sprintId } }))) failed++;
+		if (!(await persistUpdateTask(task.id, { metadata: { sprintId, carriedFrom } }))) failed++;
 	}
 	return failed;
 }
@@ -84,9 +97,10 @@ export const useSprintStore = create<SprintState>((set, get) => {
 		projectId: null,
 		sprints: [],
 		loading: false,
+		planningId: null,
 
 		load: async (projectId) => {
-			if (get().projectId !== projectId) set({ projectId, sprints: [] });
+			if (get().projectId !== projectId) set({ projectId, sprints: [], planningId: null });
 			set({ loading: true });
 			try {
 				const result = await api()?.listSprints?.(projectId);
@@ -113,7 +127,7 @@ export const useSprintStore = create<SprintState>((set, get) => {
 			const tasks = useTaskStore.getState().tasks;
 			const report = sprintReport(tasks, sprintId, carryTo);
 			const unfinished = tasksOf(sprintId).filter((task) => !isTaskDone(task));
-			const failedCards = await moveCards(unfinished, carryTo ?? undefined);
+			const failedCards = await moveCards(unfinished, carryTo ?? undefined, carryTo ? sprintId : undefined);
 			if (failedCards > 0) return { ok: false, error: "cards_not_moved", failedCards };
 			return answer((projectId) => api()?.completeSprint?.(projectId, sprintId, report));
 		},
@@ -123,5 +137,17 @@ export const useSprintStore = create<SprintState>((set, get) => {
 			if (failedCards > 0) return { ok: false, error: "cards_not_moved", failedCards };
 			return answer((projectId) => api()?.deleteSprint?.(projectId, sprintId));
 		},
+
+		assign: async (taskIds, sprintId) => {
+			const wanted = new Set(taskIds);
+			const sprint = sprintId ? get().sprints.find((item) => item.id === sprintId) : undefined;
+			if (sprintId && (!sprint || sprint.state === "closed")) return { ok: false, error: "sprint_closed" };
+			const cards = useTaskStore.getState().tasks.filter((task) => wanted.has(task.id));
+			const failedCards = await moveCards(cards, sprintId ?? undefined);
+			return failedCards > 0 ? { ok: false, error: "cards_not_moved", failedCards } : { ok: true };
+		},
+
+		openPlanning: (sprintId) => set({ planningId: sprintId }),
+		closePlanning: () => set({ planningId: null }),
 	};
 });

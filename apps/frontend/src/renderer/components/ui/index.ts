@@ -4,6 +4,7 @@ export * from "./button";
 export * from "./card";
 export * from "./collapsible";
 export * from "./combobox";
+export * from "./date-fields";
 export * from "./dialog";
 export * from "./input";
 export * from "./label";

@@ -25,6 +25,14 @@ class FakeSbx:
         self.vms: set[str] = set()
         self.fail: dict[str, str] = {}
         self.blocked: list[dict] = []
+        #: What sbx's global policy allows, as `sbx policy ls --json` lists it.
+        self.global_allow = [
+            "files.example.net:443",
+            "registry.npmjs.org:443",
+            "**.docker.com:443",
+            "example.com:443",
+            "api.openai.com:443",
+        ]
 
     def __call__(self, args, *, timeout=60):
         self.calls.append(list(args))
@@ -38,6 +46,15 @@ class FakeSbx:
             self.vms.add(args[args.index("--name") + 1])
         elif verb == "rm":
             self.vms.discard(args[-1])
+        elif verb == "policy" and args[1] == "ls":
+            out = json.dumps(
+                {
+                    "rules": [
+                        {"scope": "global", "resources": self.global_allow},
+                        {"scope": "workpilot-x", "resources": ["mine.example:443"]},
+                    ]
+                }
+            )
         elif verb == "policy" and args[1] == "log":
             out = json.dumps(
                 {"updated_at": "now", "allowed": [], "blocked": self.blocked}
@@ -223,11 +240,89 @@ def test_a_missing_vm_is_created_closed_then_opened_to_the_allowlist(sbx, worktr
     assert create[2] == str(worktree)
     for flag, value in (("--name", vm.name), ("--memory", "4g"), ("--cpus", "2")):
         assert create[create.index(flag) + 1] == value
-    assert "--deny-network" in create
+    # Closed at birth: the flag takes the hosts it denies.
+    assert create[create.index("--deny-network") + 1] == "**"
+    assert create[create.index("--deny-network") + 2] == "--no-progress"
+    deny = next(c for c in sbx.calls if c[:3] == ["policy", "deny", "network"])
+    assert deny[3:5] == ["--sandbox", vm.name]
+    # sbx's global hosts the task does not need are denied for this VM; a
+    # global wildcard covering one of the task's hosts stays open.
+    assert set(deny[5].split(",")) == {
+        "files.example.net:443",
+        "example.com:443",
+        "api.openai.com:443",
+    }
     allow = next(c for c in sbx.calls if c[:3] == ["policy", "allow", "network"])
     assert allow[3:5] == ["--sandbox", vm.name]
     assert {"registry.npmjs.org:443"} <= set(allow[5].split(","))
+    # Opened only once its own rules are in place.
+    last = sbx.calls[-1]
+    assert last[:3] == ["policy", "rm", "network"]
+    assert last[last.index("--resource") + 1] == "**" and "--force" in last
+    assert sbx.calls.index(allow) < len(sbx.calls) - 1
     assert any(c[:2] == ["exec", vm.name] and "safe.directory" in c for c in sbx.calls)
+
+
+def test_a_global_policy_allowing_every_host_is_refused(sbx, worktree):
+    sbx.global_allow = ["**"]
+    with pytest.raises(microvm.MicrovmError, match="every host"):
+        microvm.ensure_vm(_vm(worktree))
+
+
+@pytest.mark.parametrize("stdout", ["not json", '{"rules": "x"}'])
+def test_an_unreadable_global_policy(monkeypatch, stdout):
+    monkeypatch.setattr(
+        microvm,
+        "run_sbx",
+        lambda args, timeout=60: subprocess.CompletedProcess(args, 0, stdout, ""),
+    )
+    if stdout == "not json":
+        with pytest.raises(microvm.MicrovmError, match="JSON"):
+            microvm.global_allowed()
+    else:
+        assert microvm.global_allowed() == []
+
+
+@pytest.mark.parametrize(
+    ("first", "second", "expected"),
+    [
+        ("**.docker.com:443", "registry.docker.com:443", True),
+        ("**.docker.com:443", "docker.com:443", True),
+        ("*.b.com:443", "a.b.com:443", True),
+        ("a.b.com:443", "*.b.com:443", True),
+        ("pypi.org:443", "pypi.org:80", False),
+        ("pypi.org", "pypi.org:443", True),
+        ("evil-docker.com:443", "**.docker.com:443", False),
+        ("example.com:443", "example.org:443", False),
+    ],
+)
+def test_rules_overlap_as_sbx_matches_them(first, second, expected):
+    assert microvm._overlaps(first, second) is expected
+
+
+def test_a_vm_made_before_gets_the_global_hosts_denied(sbx, worktree):
+    vm = _vm(worktree)
+    sbx.vms.add(vm.name)
+    state = {"fingerprint": vm.fingerprint(), "network": list(vm.network)}
+    microvm._write_state(vm.name, state)
+    assert microvm.ensure_vm(vm) is False
+    assert sbx.verbs() == ["ls", "policy ls", "policy deny"]
+
+
+def test_a_denied_host_the_task_comes_to_need_is_lifted(sbx, worktree):
+    vm = _vm(worktree)
+    microvm.ensure_vm(vm)
+    wider = microvm.TaskVm(
+        vm.name,
+        vm.mounts,
+        vm.resources,
+        (*vm.network, "files.example.net:443"),
+        vm.worktree,
+    )
+    sbx.calls.clear()
+    microvm.ensure_vm(wider)
+    assert sbx.verbs() == ["ls", "policy ls", "policy rm", "policy allow"]
+    assert sbx.calls[2][-1] == "files.example.net:443"
 
 
 def test_the_same_vm_is_reused_and_a_changed_one_created_again(sbx, worktree):
@@ -235,7 +330,7 @@ def test_the_same_vm_is_reused_and_a_changed_one_created_again(sbx, worktree):
     microvm.ensure_vm(vm)
     sbx.calls.clear()
     assert microvm.ensure_vm(vm) is False
-    assert sbx.verbs() == ["ls"]
+    assert sbx.verbs() == ["ls", "policy ls"]
     changed = microvm.TaskVm(
         vm.name, vm.mounts[:1], vm.resources, vm.network, vm.worktree
     )
@@ -271,7 +366,9 @@ def test_a_command_runs_in_the_vm_without_the_hosts_secrets(sbx, worktree):
         microvm.vm_path(worktree / "src"),
     ]
     assert "LANG=C.UTF-8" in argv and not any("sk-secret" in a for a in argv)
-    assert argv[-4:] == [vm.name, "/bin/sh", "-c", "npm test"]
+    at = argv.index(vm.name)
+    assert argv[at + 1 : at + 6] == ["setsid", "-w", "sh", "-c", microvm.RUN_SCRIPT]
+    assert argv[-3:] == ["/bin/sh", "-c", "npm test"]
     outside = vm.exec_argv(["true"], {}, Path("/etc"))
     assert outside[4] == microvm.vm_path(worktree)
     assert "-i" not in argv
@@ -457,11 +554,12 @@ def test_network_rules_are_added_to_a_running_vm_never_recreated(sbx, worktree):
     )
     sbx.calls.clear()
     assert microvm.ensure_vm(wider) is False
-    assert sbx.verbs() == ["ls", "policy allow"]
+    # Allowed by the global policy, so its deny is lifted, then allowed.
+    assert sbx.verbs() == ["ls", "policy ls", "policy rm", "policy allow"]
     assert sbx.calls[-1][-1] == "api.openai.com:443"
     sbx.calls.clear()
     assert microvm.ensure_vm(wider) is False
-    assert sbx.verbs() == ["ls"]
+    assert sbx.verbs() == ["ls", "policy ls"]
 
 
 def test_an_agent_cli_is_installed_once(sbx, worktree):
@@ -489,6 +587,14 @@ def test_a_failed_install_says_so(sbx, worktree):
     [
         ('[{"service": "anthropic"}, {"service": "openai"}]', {"anthropic", "openai"}),
         ('{"secrets": [{"name": "OpenAI"}]}', {"openai"}),
+        (
+            # sbx 0.54.1 on Windows: names only, the value never listed.
+            '{"secrets": [{"scope": "global", "type": "service", "name": "anthropic",'
+            ' "secret": "(stored)"}, {"type": "custom", "name": "openai"}],'
+            ' "custom_secrets": [], "shadowed_services": [], "env_only_count": 0}',
+            {"anthropic"},
+        ),
+        ('{"secrets": [], "custom_secrets": []}', set()),
         ('["mistral", "unknown"]', {"mistral"}),
         (
             "SERVICE   SCOPE\nanthropic global\ngithub    my-vm\n",
@@ -528,3 +634,65 @@ def test_the_vm_gets_placeholders_never_a_name_it_could_abuse(sbx, worktree):
     for bad in ({"LD_PRELOAD=x": "1"}, {"lower": "1"}, {"OK": "a\nb"}):
         with pytest.raises(microvm.MicrovmError):
             vm.exec_argv(["opencode"], {}, None, vm_env=bad)
+
+
+# ── Stopping a command in the VM ─────────────────────────────────────────
+
+
+def test_a_stopped_command_is_ended_inside_the_vm(sbx, worktree, monkeypatch):
+    vm = _vm(worktree)
+    argv = vm.exec_argv(["sleep", "300"], {}, None)
+    run_file = microvm.run_file_of(argv)
+    assert run_file is not None and run_file.startswith("/tmp/workpilot-run-")
+    assert microvm.run_file_of(vm.exec_argv(["true"], {}, None)) != run_file
+    ran = []
+    monkeypatch.setattr(
+        microvm.subprocess, "run", lambda argv, **kw: ran.append((argv, kw))
+    )
+    microvm.stop_run(vm, argv)
+    ((stop, options),) = ran
+    assert stop[:4] == ["/opt/sbx", "--no-input", "exec", vm.name]
+    assert stop[-1] == run_file and 'kill -TERM -- "-$p"' in stop[-2]
+    assert options["stdin"] is microvm.subprocess.DEVNULL
+
+
+def test_only_a_run_file_of_ours_is_stopped(sbx, worktree, monkeypatch):
+    vm = _vm(worktree)
+    ran = []
+    monkeypatch.setattr(microvm.subprocess, "run", lambda argv, **kw: ran.append(argv))
+    microvm.stop_run(vm, ["sbx", "exec", vm.name, "sh", "-c", "x"])
+    forged = [microvm.RUN_SCRIPT, "/etc/passwd", "true"]
+    microvm.stop_run(vm, forged)
+    assert ran == []
+
+
+def test_a_failed_stop_is_not_an_error(sbx, worktree, monkeypatch):
+    vm = _vm(worktree)
+
+    def boom(argv, **kw):
+        raise OSError("gone")
+
+    monkeypatch.setattr(microvm.subprocess, "run", boom)
+    microvm.stop_run(vm, vm.exec_argv(["true"], {}, None))
+
+
+def test_the_session_stops_in_the_vm_only_when_there_is_one(monkeypatch, worktree):
+
+    stopped = []
+    monkeypatch.setattr(os_sandbox, "stop_run", lambda vm, argv: stopped.append(argv))
+    on_host = os_sandbox.SessionSandbox(ISOLATED, "bwrap", None, object())
+    on_host.stop(["x"])
+    in_vm = os_sandbox.SessionSandbox(ISOLATED, "microvm", None, object(), vm=_VmStub())
+    in_vm.stop(["y"])
+    assert stopped == [["y"]]
+
+
+class _VmStub:
+    name = "workpilot-x"
+
+
+def test_sbx_gets_no_credential_of_the_host():
+    env = microvm.sbx_env(
+        {"PATH": "/bin", "GH_TOKEN": "x", "ANTHROPIC_API_KEY": "y", "HOME": "/h"}
+    )
+    assert env == {"PATH": "/bin", "HOME": "/h", "SBX_NO_TELEMETRY": "1"}

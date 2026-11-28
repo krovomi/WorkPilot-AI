@@ -1,4 +1,4 @@
-import { dateLocale, formatDate } from "../ui/format";
+import { dateLocale, formatDate, formatDay } from "../ui/format";
 
 describe("dateLocale", () => {
 	it("writes French dates the French way and everything else the US way", () => {
@@ -23,5 +23,16 @@ describe("formatDate", () => {
 	it("gives nothing for a missing or broken date", () => {
 		expect(formatDate(null, "fr")).toBe("");
 		expect(formatDate("not a date", "en")).toBe("");
+	});
+});
+
+describe("formatDay", () => {
+	it("writes a server day the way the app's language does, on that very day", () => {
+		expect(formatDay("2026-11-28", "fr")).toBe("28/11/2026");
+		expect(formatDay("2026-11-28", "en")).toBe("11/28/2026");
+	});
+
+	it("leaves anything that is not a day as it was", () => {
+		expect(formatDay("2026-11", "fr")).toBe("2026-11");
 	});
 });

@@ -10,6 +10,7 @@ import type {
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Textarea } from "../ui/textarea";
+import { formatAppMonth } from "../../lib/date-format";
 
 const AXES: BestOfNArbiterAxis[] = [
 	"correctness",
@@ -254,7 +255,7 @@ export function BestOfNArbiterPanel({ taskId, state, busy, call }: BestOfNArbite
 						metrics.map((month) => (
 							<li key={month.month}>
 								{t("tasks:bestOfN.arbiter.metricsLine", {
-									month: month.month,
+									month: formatAppMonth(month.month),
 									count: month.arbitrations,
 									percent: month.followedPercent,
 									merges: month.merges,

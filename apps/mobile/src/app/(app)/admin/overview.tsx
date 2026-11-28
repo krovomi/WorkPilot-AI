@@ -13,7 +13,7 @@ import { useLoad } from "../../../hooks/useLoad";
 import { phaseLabel } from "../../../i18n/labels";
 import { count, Figures, StatTile } from "../../../insights/Figures";
 import { ErrorBanner, Loading, Section } from "../../../ui/components";
-import { formatDate } from "../../../ui/format";
+import { formatDate, formatDay } from "../../../ui/format";
 import { RADIUS, SPACE, TYPE, useTheme } from "../../../ui/theme";
 
 export default function AdminOverviewScreen() {
@@ -73,7 +73,7 @@ export default function AdminOverviewScreen() {
 									key={day.date}
 									style={styles.day}
 									accessible
-									accessibilityLabel={t("admin.overview.dayRuns", { date: day.date, count: day.count })}
+									accessibilityLabel={t("admin.overview.dayRuns", { date: formatDay(day.date, lang), count: day.count })}
 								>
 									<View style={styles.barTrack}>
 										<View

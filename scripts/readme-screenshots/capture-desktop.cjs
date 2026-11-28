@@ -64,8 +64,13 @@ function waitForPreview(deadline = Date.now() + 60_000) {
 async function openApp(browser) {
 	const page = await browser.newPage({
 		viewport: VIEWPORT,
-		colorScheme: "dark",
+		colorScheme: process.env.COLOR_SCHEME || "dark",
 	});
+	if (process.env.COLOR_SCHEME === "light") {
+		await page.addInitScript(() => {
+			window.__DEMO_THEME__ = "light";
+		});
+	}
 	await page.addInitScript({ path: path.join(__dirname, "preview-init.js") });
 	await page.addInitScript({ path: path.join(__dirname, "demo-data.js") });
 	page.on("pageerror", (e) =>
@@ -183,6 +188,17 @@ const SHOTS = {
 		await page.getByRole("button", { name: "Reports" }).first().click();
 		await page.waitForTimeout(1500);
 	},
+	// The planning view of a sprint, then « Proposer le sprint » in it (docs/architecture/sprint-proposal.md).
+	"sprint-planning": (page) => openSprintPlanning(page),
+	"sprint-proposal": async (page) => {
+		await openSprintPlanning(page);
+		await page.getByTestId("sprint-proposal-open").click();
+		await page.waitForTimeout(400);
+		await page.getByRole("button", { name: "Propose", exact: true }).click();
+		await page.getByTestId("sprint-proposal-ready").waitFor();
+		await page.getByRole("button", { name: "Why these cards" }).click();
+		await page.waitForTimeout(800);
+	},
 	"task-detail": async (page) => {
 		await page.getByText("One-page checkout", { exact: true }).first().click();
 		await page.waitForTimeout(1500);
@@ -240,6 +256,20 @@ const SHOTS = {
 		await page.waitForTimeout(1500);
 	},
 };
+
+/** Opens the planning view of Sprint 13 from the « Sprints » menu. */
+async function openSprintPlanning(page) {
+	await page.waitForTimeout(2000);
+	await page.getByRole("button", { name: "Sprints", exact: true }).first().click();
+	await page.waitForTimeout(500);
+	await page
+		.locator('[data-sprint="sp-0000000d"]')
+		.getByRole("button", { name: "Plan", exact: true })
+		.first()
+		.click();
+	await page.getByTestId("sprint-planning").waitFor();
+	await page.waitForTimeout(1200);
+}
 
 /** Shows the demo board with saved lane preferences (`stores/kanban-lanes-store.ts`). */
 async function withBoardLayout(page, preferences) {

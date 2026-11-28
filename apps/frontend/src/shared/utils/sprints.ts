@@ -13,6 +13,12 @@ export const SPRINT_ID_PATTERN = /^sp-[0-9a-f]{8}$/;
 export const MAX_SPRINT_NAME = 80;
 export const MAX_SPRINT_GOAL = 500;
 export const MAX_SPRINTS = 200;
+/** The most points a sprint's capacity may be set to. */
+export const MAX_CAPACITY = 999;
+/** The capacity offered to a team with no closed sprint yet, until it sets one. */
+export const DEFAULT_TARGET_POINTS = 20;
+/** Closed sprints the velocity averages. */
+export const VELOCITY_SPRINTS = 3;
 const DAY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const STATES: readonly SprintState[] = ["planned", "active", "closed"];
 
@@ -69,6 +75,14 @@ export function cleanSprintDraft(raw: unknown): SprintDraft | null {
 		draft[key] = clean;
 	}
 	if (draft.startDate && draft.endDate && draft.endDate < draft.startDate) return null;
+	if (value.capacity === null) draft.capacity = null;
+	else if (value.capacity !== undefined) {
+		const capacity = value.capacity;
+		if (typeof capacity !== "number" || !Number.isInteger(capacity) || capacity < 1 || capacity > MAX_CAPACITY) {
+			return null;
+		}
+		draft.capacity = capacity;
+	}
 	return draft;
 }
 
@@ -91,12 +105,14 @@ export function readSprints(raw: unknown): Sprint[] {
 		if (!draft?.id || seen.has(draft.id) || !STATES.includes(value.state as SprintState)) continue;
 		if (typeof value.createdAt !== "string") continue;
 		seen.add(draft.id);
+		const { capacity, ...fields } = draft;
 		const sprint: Sprint = {
-			...draft,
+			...fields,
 			id: draft.id,
 			state: value.state as SprintState,
 			createdAt: value.createdAt,
 		};
+		if (typeof capacity === "number") sprint.capacity = capacity;
 		for (const key of ["startedAt", "closedAt"] as const) {
 			if (typeof value[key] === "string") sprint[key] = value[key] as string;
 		}
@@ -172,12 +188,37 @@ export function orderedSprints(sprints: readonly Sprint[]): Sprint[] {
 	});
 }
 
-/** Average points done by the last closed sprints (up to three), or null without any. */
-export function velocity(sprints: readonly Sprint[]): number | null {
-	const closed = sprints
+/** The last closed sprints with a report (up to {@link VELOCITY_SPRINTS}), oldest first: what the velocity averages. */
+export function velocityHistory(sprints: readonly Sprint[]): Array<Sprint & { report: SprintReport }> {
+	return sprints
 		.filter((sprint): sprint is Sprint & { report: SprintReport } => sprint.state === "closed" && !!sprint.report)
 		.sort((a, b) => (b.closedAt ?? "").localeCompare(a.closedAt ?? ""))
-		.slice(0, 3);
+		.slice(0, VELOCITY_SPRINTS)
+		.reverse();
+}
+
+/** Average points done by the last closed sprints (up to three), or null without any. */
+export function velocity(sprints: readonly Sprint[]): number | null {
+	const closed = velocityHistory(sprints);
 	if (closed.length === 0) return null;
 	return Math.round(closed.reduce((sum, sprint) => sum + sprint.report.donePoints, 0) / closed.length);
+}
+
+export interface SprintCapacity {
+	/** The points the sprint can take. */
+	points: number;
+	/** Where they come from: set on the sprint, the velocity, or the first-sprint default. */
+	source: "set" | "velocity" | "default";
+	/** The velocity of the last sprints, null before the first one closes. */
+	velocity: number | null;
+}
+
+/** How many points a sprint can take: its own capacity, else the velocity, else {@link DEFAULT_TARGET_POINTS}. */
+export function sprintCapacity(sprint: Pick<Sprint, "capacity">, sprints: readonly Sprint[]): SprintCapacity {
+	const speed = velocity(sprints);
+	if (typeof sprint.capacity === "number" && sprint.capacity > 0) {
+		return { points: sprint.capacity, source: "set", velocity: speed };
+	}
+	if (speed !== null && speed > 0) return { points: speed, source: "velocity", velocity: speed };
+	return { points: DEFAULT_TARGET_POINTS, source: "default", velocity: speed };
 }

@@ -140,6 +140,6 @@ describe("BestOfNArbiterPanel", () => {
 		});
 		render(<BestOfNArbiterPanel taskId="001-login" state={stateWith(verdict)} busy={false} call={call} />);
 		fireEvent.click(screen.getByRole("button", { name: "Track record" }));
-		expect(await screen.findByText("2026-11: 4 arbitrated, followed 75%, 1 merges proposed")).toBeInTheDocument();
+		expect(await screen.findByText("November 2026: 4 arbitrated, followed 75%, 1 merges proposed")).toBeInTheDocument();
 	});
 });

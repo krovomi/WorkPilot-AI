@@ -104,14 +104,17 @@ beforeEach(async () => {
 	await i18n.changeLanguage("fr");
 });
 
-afterEach(cleanup);
+afterEach(() => {
+	cleanup();
+	vi.useRealTimers();
+});
 
 describe("ComplianceReportView", () => {
 	it("lists the project's frameworks, its skipped files and its saved reports", async () => {
 		render(<ComplianceReportView projectPath="/repo" />);
 		expect(await screen.findByText("ISO/IEC 27001")).toBeInTheDocument();
 		expect(screen.getByText(/broken\.yaml/)).toBeInTheDocument();
-		expect(screen.getByText("2026-09")).toBeInTheDocument();
+		expect(screen.getByText("sept. 2026")).toBeInTheDocument();
 		expect(screen.getByText("40 % couverts · 3 écart(s)")).toBeInTheDocument();
 		expect(api.getComplianceFrameworks).toHaveBeenCalledWith("/repo");
 	});
@@ -120,9 +123,15 @@ describe("ComplianceReportView", () => {
 		api.runComplianceScan.mockResolvedValue(REPORT);
 		render(<ComplianceReportView projectPath="/repo" />);
 		await screen.findByText("ISO/IEC 27001");
-		fireEvent.change(screen.getByLabelText("Mois"), { target: { value: "2026-10" } });
+		// The month picker opens on this year and refuses months to come: fix "now".
+		vi.useFakeTimers({ toFake: ["Date"] });
+		vi.setSystemTime(new Date(2026, 10, 15));
+		fireEvent.click(screen.getByLabelText("Mois"));
+		expect(screen.getByRole("button", { name: "décembre 2026" })).toBeDisabled();
+		fireEvent.click(screen.getByRole("button", { name: "octobre 2026" }));
+		expect(screen.getByLabelText("Mois")).toHaveTextContent("octobre 2026");
 		fireEvent.click(screen.getByRole("button", { name: /Collecter les preuves/ }));
-		await screen.findByText("SOC 2 · 2026-10");
+		await screen.findByText("SOC 2 · octobre 2026");
 		expect(api.runComplianceScan).toHaveBeenCalledWith({ projectPath: "/repo", framework: "soc2", period: "2026-10", save: false });
 		expect(screen.getByText(/1 contrôles couverts sur 2 \(50 %\), 1 écart\(s\), 1 sans preuve/)).toBeInTheDocument();
 		expect(screen.getByText("Risques : CC7.4.")).toBeInTheDocument();
@@ -150,7 +159,7 @@ describe("ComplianceReportView", () => {
 		const request = api.exportComplianceReport.mock.calls[0][0];
 		expect(request.format).toBe("pdf");
 		expect(request.language).toBe("fr");
-		expect(request.document.title).toBe("Rapport de conformité : SOC 2, 2026-10");
+		expect(request.document.title).toBe("Rapport de conformité : SOC 2, octobre 2026");
 		const [controls, gaps, evidence] = request.document.tables;
 		expect(controls.rows[1]).toEqual(["CC7.4", "Réponse aux incidents de sécurité", "Manquant", "—", "0"]);
 		expect(gaps.rows[0][3]).toBe("Écrire une procédure.");
@@ -160,8 +169,8 @@ describe("ComplianceReportView", () => {
 	it("opens a saved report", async () => {
 		api.loadComplianceReport.mockResolvedValue(REPORT);
 		render(<ComplianceReportView projectPath="/repo" />);
-		fireEvent.click(await screen.findByText("2026-09"));
-		await screen.findByText("SOC 2 · 2026-10");
+		fireEvent.click(await screen.findByText("sept. 2026"));
+		await screen.findByText("SOC 2 · octobre 2026");
 		expect(api.loadComplianceReport).toHaveBeenCalledWith("/repo", "soc2-2026-09.json");
 	});
 });

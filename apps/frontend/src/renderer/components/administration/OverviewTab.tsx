@@ -11,7 +11,7 @@ import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Card, CardContent } from "@/components/ui";
 import { useAdminStore } from "@/stores/admin-store";
-import { formatAppDateTime } from "@/lib/date-format";
+import { formatAppDateTime, formatAppDay } from "@/lib/date-format";
 
 function StatCard({
 	icon: Icon,
@@ -76,10 +76,10 @@ function RunsByDay({
 						<div
 							className="w-full bg-primary/70 rounded-t min-h-[2px]"
 							style={{ height: `${(point.count / max) * 100}%` }}
-							title={`${point.date}: ${point.count}`}
+							title={`${formatAppDay(point.date)}: ${point.count}`}
 						/>
 						<span className="text-3xs text-muted-foreground">
-							{point.date.slice(5)}
+							{formatAppDay(point.date, { day: "2-digit", month: "2-digit" })}
 						</span>
 					</div>
 				))}
