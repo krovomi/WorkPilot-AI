@@ -38,6 +38,7 @@ applications mobiles pour un projet.
 | Réglages | `src/app/(app)/settings.tsx` | `GET /auth/me/session` (« Ma session », `src/auth/SessionSection.tsx`), `POST /auth/switch-org`, `POST /auth/logout`, `PUT /users/me/preferences` (le thème, `src/ui/ThemeSection.tsx`) |
 | Administration | `src/app/(app)/admin/` | `/admin/members`, `/auth/invitations`, `/admin/groups` (membres et projets), `/admin/roles` et `/admin/permissions` (`src/admin/api.ts`) |
 | Mes jetons sur le serveur | `src/app/(app)/tokens.tsx` | `GET`, `PUT /users/me/secrets`, `DELETE /users/me/secrets/{kind}` |
+| Mes comptes IA | `src/app/(app)/ai-accounts.tsx` | `GET`, `POST /users/me/ai-accounts`, `PATCH`/`DELETE .../{id}`, `PUT .../defaults/{provider}` (voir « Contexte, jetons personnels… ») |
 
 Les actions d'une carte sont celles de l'app de bureau sur une carte du serveur
 (`main/server-board-actions.ts`), avec la même correspondance (`src/board/actions.ts`) :
@@ -217,6 +218,15 @@ Les deux demandent `insight.read` ; reconstruire l'index, `agent.execute`.
 Les jetons personnels (GitHub, GitLab, Azure DevOps, Jira, Linear) sont ceux que le serveur garde
 chiffrés pour les appels de la personne, par exemple ceux du relais GitHub et GitLab. Le téléphone
 envoie un jeton une fois et ne le relit jamais : le serveur ne dit que lesquels sont enregistrés.
+
+Les comptes IA de la personne suivent la même règle ([ai-accounts.md](ai-accounts.md)) :
+plusieurs clés par fournisseur, une par défaut, que ses runs utilisent à la place de celle du
+serveur. L'écran (Réglages → Mes comptes IA, si le rôle a `settings.account.read`) montre chaque
+fournisseur qui a des comptes, le défaut coché parmi eux et « Le compte du serveur » (aucun défaut) ;
+un appui change le défaut. Avec `settings.account.write`, il ajoute un compte (fournisseur, nom, clé ;
+pour Claude, un jeton de `claude setup-token`), le renomme, remplace sa clé ou le supprime après
+confirmation ; sinon il reste en lecture seule. Aucune clé n'est relue : seulement la date où elle a
+été enregistrée.
 
 La connexion Microsoft Entra utilise l'enregistrement d'application du serveur (`GET /auth/config`
 donne son tenant et son client). Le navigateur du système ouvre la page de Microsoft, l'app reçoit un
