@@ -461,6 +461,62 @@
 		};
 		task.statusHistory = [move(null, "backlog", 14), ...(extra.history || [])];
 	}
+	// The backlog « Proposer le sprint » fills Sprint 13 from (docs/architecture/sprint-proposal.md).
+	[
+		["t-20", "020-apple-pay", "Apple Pay at checkout", "feature", "high", ["checkout", "payments"], 5, ["t-21"], 11],
+		["t-21", "021-stripe-webhooks", "Retry failed Stripe webhooks", "feature", "medium", ["payments"], 2, [], 13],
+		["t-22", "022-cart-sign-in", "The cart loses its items after sign-in", "bug_fix", "urgent", ["checkout"], 3, [], 3],
+		["t-23", "023-payment-audit", "Audit log of payments", "security", "medium", ["payments"], 3, [], 8],
+		["t-24", "024-order-history", "Paginate the order history", "performance", "medium", ["account"], 5, [], 6],
+		["t-25", "025-german-funnel", "German translation of the checkout", "feature", "low", ["i18n"], 8, [], 20],
+		["t-26", "026-wishlist", "Persistent wishlist", "feature", "low", ["account"], 0, [], 2],
+	].forEach(([id, specId, title, category, priority, labels, points, blockedBy, age]) => {
+		tasks.push({
+			projectId: PROJECT,
+			id,
+			specId,
+			title,
+			description: title,
+			status: "backlog",
+			subtasks: [],
+			logs: [],
+			metadata: {
+				category,
+				priority,
+				labels,
+				...(points > 0 && { smartEstimate: estimate(points) }),
+				...(blockedBy.length > 0 && { blockedBy }),
+			},
+			statusHistory: [move(null, "backlog", age)],
+			createdAt: ago(age * day),
+			updatedAt: ago(age * day),
+		});
+	});
+	// What « Proposer le sprint » answers for Sprint 13 in the preview (main/sprint-proposal/).
+	const proposal = {
+		sprintId: SPRINT_NEXT,
+		capacity: 22,
+		committed: 8,
+		picks: [
+			{ taskId: "t-22", points: 3, reason: "urgent", note: "Urgent bug that blocks paying customers" },
+			{ taskId: "t-21", points: 2, reason: "dependency", dependencyOf: "t-20" },
+			{ taskId: "t-20", points: 5, reason: "goal", note: "The heart of paying online" },
+			{ taskId: "t-23", points: 3, reason: "goal", note: "Payments need a trail before the sale" },
+		],
+		points: 13,
+		below: [
+			{ taskId: "t-24", points: 5, total: 26 },
+			{ taskId: "t-02", points: 5, total: 26 },
+		],
+		unestimated: ["t-26"],
+		blocked: [],
+		goal: "Pay online end to end",
+		summary:
+			"The urgent cart bug first, since it loses paying customers. Then Apple Pay with the webhook retries it needs, and the payment audit log: together they make paying online complete for the sale. 21 of 22 points.",
+		mode: "ai",
+		variant: "balanced",
+	};
+
 	// Earlier finished work, for the cycle time, the throughput and the flow.
 	const DONE_BEFORE = [
 		["004-guest-cart", "Keep the guest cart after sign-in", 26, 22],
@@ -994,6 +1050,10 @@
 		}),
 		getRoadmap: ok(roadmap),
 		listSprints: ok(sprints),
+		proposeSprint: async () => {
+			await new Promise((resolve) => setTimeout(resolve, 600));
+			return { success: true, data: proposal };
+		},
 		// A namespace, not a method: the preview's catch-all answers only methods.
 		serverUsage: { notePageVisit: () => undefined },
 		getIdeation: ok(ideation),
@@ -1169,6 +1229,8 @@
 					data: {
 						...r.data,
 						selectedProvider: "anthropic",
+						// COLOR_SCHEME=light in capture-desktop.cjs: the light theme.
+						...(window.__DEMO_THEME__ && { theme: window.__DEMO_THEME__ }),
 						globalOpenAIApiKey: "••••••••",
 						globalMistralApiKey: "••••••••",
 						testResult_anthropic: tested,

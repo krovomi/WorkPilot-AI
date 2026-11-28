@@ -101,6 +101,27 @@ Step-by-step installation, provider setup, Windows notes and troubleshooting: [d
 
 **Plan and propose a sprint** ([planning](docs/architecture/kanban-sprints.md), [proposal](docs/architecture/sprint-proposal.md)): « Plan » puts the backlog and the sprint side by side, with a capacity gauge in points against the velocity of the last 3 sprints (team availability in %, a 20-point target for a first sprint). Drag tasks across or press → / ←, undo the last move, filter the backlog (urgent, bugs, not estimated) and « Estimate » a task without points; carried-over tasks and tasks waiting on one left in the backlog are marked. **Propose the sprint** fills it up to its capacity: the rules rank the backlog and add a task's blockers first, the selected provider's model composes the sprint and gives a reason per task, and the best tasks that don't fit stay below the line. Variants: Balanced, More careful (80 %), Bugs first, Around the goal; a goal is suggested when the sprint has none. Nothing moves until you add the tasks, and it works without a model too. The model only reads a task's title, the start of its description, priority, type, points, labels and dependencies, never who works on it.
 
+<table>
+<tr>
+<td width="50%" valign="top">
+
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset=".github/assets/showcase/sprint-planning-light.png">
+  <img alt="Plan a sprint: the capacity gauge against the velocity of the last 3 sprints, the backlog and the sprint side by side" src=".github/assets/showcase/sprint-planning.png">
+</picture>
+
+</td>
+<td width="50%" valign="top">
+
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset=".github/assets/showcase/sprint-proposal-light.png">
+  <img alt="Propose the sprint: the cards offered in dashed violet with their reason, the capacity line and what falls below it" src=".github/assets/showcase/sprint-proposal.png">
+</picture>
+
+</td>
+</tr>
+</table>
+
 **Ask the board** ([board ask](docs/architecture/board-ask.md)): ask a question in any language (« has the CSV export already been done? ») and get every related ticket, with the roadmap, the ideas and the merged changes, found by words and by meaning (a local embeddings model first) and judged by the selected provider's model; « Check an idea » says whether a planned feature is already on the board. It answers on a local board, on a team server's board from the desktop, and from the phone.
 
 <table>

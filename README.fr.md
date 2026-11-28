@@ -103,6 +103,27 @@ Installation pas à pas, configuration des providers, notes Windows et dépannag
 
 **Planifier et proposer un sprint** ([planification](docs/architecture/kanban-sprints.md), [proposition](docs/architecture/sprint-proposal.md)) : « Planifier » met le backlog et le sprint côte à côte, avec une jauge de capacité en points face à la vélocité des 3 derniers sprints (disponibilité de l'équipe en %, une cible de 20 points pour un premier sprint). Glissez les tâches d'un côté à l'autre ou appuyez sur → / ←, annulez le dernier déplacement, filtrez le backlog (urgentes, bugs, non estimées) et « Estimez » une tâche sans points ; les tâches reportées et celles qui attendent une tâche restée au backlog sont signalées. **Proposer le sprint** le remplit jusqu'à sa capacité : les règles classent le backlog et ajoutent d'abord ce qu'une tâche attend, le modèle du provider choisi compose le sprint et donne une raison par tâche, et les meilleures tâches qui ne tiennent pas restent sous la ligne. Variantes : Équilibré, Plus prudent (80 %), Bugs d'abord, Autour du but ; un but est suggéré quand le sprint n'en a pas. Rien ne bouge avant que vous ajoutiez les tâches, et cela marche aussi sans modèle. Le modèle ne lit que le titre d'une tâche, le début de sa description, sa priorité, son type, ses points, ses étiquettes et ses dépendances, jamais qui travaille dessus.
 
+<table>
+<tr>
+<td width="50%" valign="top">
+
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset=".github/assets/showcase/sprint-planning-light.png">
+  <img alt="Planifier un sprint : la jauge de capacité face à la vélocité des 3 derniers sprints, le backlog et le sprint côte à côte" src=".github/assets/showcase/sprint-planning.png">
+</picture>
+
+</td>
+<td width="50%" valign="top">
+
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset=".github/assets/showcase/sprint-proposal-light.png">
+  <img alt="Proposer le sprint : les tâches proposées en pointillés violets avec leur raison, la ligne de capacité et ce qui passe dessous" src=".github/assets/showcase/sprint-proposal.png">
+</picture>
+
+</td>
+</tr>
+</table>
+
 **Interroger le tableau** ([interroger le tableau](docs/architecture/board-ask.md)) : posez une question dans n'importe quelle langue (« l'export CSV a-t-il déjà été fait ? ») et obtenez tous les tickets liés, avec la feuille de route, les idées et les changements fusionnés, trouvés par les mots et par le sens (un modèle d'embeddings local d'abord) et jugés par le modèle du provider choisi ; « Vérifier une idée » dit si une fonctionnalité prévue est déjà sur le tableau. Il répond sur un tableau local, sur celui d'un serveur d'équipe depuis le bureau, et depuis le téléphone.
 
 <table>

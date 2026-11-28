@@ -1,19 +1,19 @@
-From 220cc87f7d5a36865d979beac85b0f33986237d9 Mon Sep 17 00:00:00 2001
+From 3cf59ab21d8e23dc13536d2b1f60696313d933ce Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Sat, 28 Nov 2026 14:44:57 +0000
 Subject: [PATCH] docs(wiki): plan a sprint and propose it (capacity, Propose
  the sprint)
 
 ---
- User-Interface.fr.md | 12 ++++++++++++
- User-Interface.md    | 12 ++++++++++++
- 2 files changed, 24 insertions(+)
+ User-Interface.fr.md | 14 ++++++++++++++
+ User-Interface.md    | 14 ++++++++++++++
+ 2 files changed, 28 insertions(+)
 
 diff --git a/User-Interface.fr.md b/User-Interface.fr.md
-index 8a244e6..0891574 100644
+index 8a244e6..b37e380 100644
 --- a/User-Interface.fr.md
 +++ b/User-Interface.fr.md
-@@ -84,6 +84,18 @@ Une tâche trop grosse pour une petite PR se découpe d'elle-même après la pla
+@@ -84,6 +84,20 @@ Une tâche trop grosse pour une petite PR se découpe d'elle-même après la pla
  
  ![Rapports](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/screenshots/kanban-reports.png)
  
@@ -29,14 +29,16 @@ index 8a244e6..0891574 100644
 +
 +Conception : [kanban-sprints.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/kanban-sprints.md), [sprint-proposal.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/sprint-proposal.md).
 +
++![Proposer le sprint : les tâches proposées en pointillés violets avec leur raison, la ligne de capacité et ce qui passe dessous](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/screenshots/sprint-proposal.png)
++
  ### Travailler vite sur le tableau
  
  - **Couleurs des cartes** : chaque carte prend la couleur de son type (14 types en 5 familles : fonctionnalité, correction, refactorisation, sécurité…), lu depuis son genre, sa catégorie, sa sévérité et son origine, sans rien à remplir ; un aperçu s'ouvre après 700 ms de survol. Une carte terminée montre le temps des agents, les tokens et le coût, qui l'a créée et qui l'a lancée.
 diff --git a/User-Interface.md b/User-Interface.md
-index 6057e14..0b93f60 100644
+index 6057e14..59654f1 100644
 --- a/User-Interface.md
 +++ b/User-Interface.md
-@@ -79,6 +79,18 @@ A task too big for one small PR splits itself after planning into « Part k/N »
+@@ -79,6 +79,20 @@ A task too big for one small PR splits itself after planning into « Part k/N »
  
  ![Reports](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/screenshots/kanban-reports.png)
  
@@ -51,6 +53,8 @@ index 6057e14..0b93f60 100644
 +- **Privacy**: the model only reads a task's title, the start of its description, its priority, type, points, labels and dependencies, never who works on it.
 +
 +Design: [kanban-sprints.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/kanban-sprints.md), [sprint-proposal.md](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/sprint-proposal.md).
++
++![Propose the sprint: the cards offered in dashed violet with their reason, the capacity line and what falls below it](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/screenshots/sprint-proposal.png)
 +
  ### Working fast on the board
  
