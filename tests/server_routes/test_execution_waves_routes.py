@@ -234,15 +234,17 @@ async def test_steps_respect_the_parallelism_and_stop_leaves_cards_running(
     for name in ("001-a", "002-b", "003-c"):
         (clone / f"hold-{name}").unlink()
 
+    def status(name: str) -> str | None:
+        plan = clone / ".workpilot" / "specs" / name / "implementation_plan.json"
+        try:
+            return json.loads(plan.read_text(encoding="utf-8"))["status"]
+        except json.JSONDecodeError:
+            # The run is still writing it: read it again on the next poll.
+            return None
+
     async def both_done():
         return len(calls(world)) == 2 and all(
-            json.loads(
-                (
-                    clone / ".workpilot" / "specs" / n / "implementation_plan.json"
-                ).read_text(encoding="utf-8")
-            )["status"]
-            == "done"
-            for n in ("001-a", "002-b")
+            status(n) == "done" for n in ("001-a", "002-b")
         )
 
     await until(both_done, "the cards it started finished")

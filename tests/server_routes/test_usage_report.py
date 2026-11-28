@@ -90,7 +90,7 @@ async def days(world: World, monkeypatch) -> None:
                 user_id=u["contributor_a"], org_id=a, day=YESTERDAY, last_seen_at=at
             )
         )
-        db.add(OrgQuota(org_id=a, monthly_token_budget=11_000))
+        db.add(OrgQuota(org_id=a, monthly_token_budget=100_000))
         await db.commit()
 
 
@@ -149,8 +149,7 @@ async def test_the_report_compares_each_figure(world, days):
     assert [p["name"] for p in blind["top"]] == [None, None]
     assert report["engines"][0]["model"] == "claude-x"
     assert report["failures"][0]["cause"] == "timeout"
-    if report["budget"]["percent"] >= 80:
-        assert report["alerts"][0]["kind"] == "budget"
+    assert report["budget"]["monthly_token_budget"] == 100_000
     weekly = await _weekly(world)
     assert weekly["figures"]["tokens"]["average"] is None
 

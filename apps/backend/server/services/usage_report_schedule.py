@@ -10,6 +10,9 @@ lets only one claim through: never two sends of the same report, even after
 a restart. A server that was down at the hour sends it when it comes back the
 same day.
 
+Each tick also raises the budget alerts this month's use has reached
+(``services/usage_budgets.py``), sent to the same recipients.
+
 Without SMTP, nothing is sent and the claim says ``no_smtp``; the report stays
 readable in the app (``GET /admin/usage/report``). Each claim is audited
 (``usage.report.sent``) with its kind, period, outcome and how many addresses
@@ -27,7 +30,13 @@ from datetime import UTC, date, datetime
 from server.config import get_settings
 from server.db.engine import get_session_factory
 from server.db.models import Organization, OrgMember, Role, UsageReportSend, User
-from server.services import email, report_settings, usage_digest, usage_digest_mail
+from server.services import (
+    email,
+    report_settings,
+    usage_budgets,
+    usage_digest,
+    usage_digest_mail,
+)
 from server.services.audit import record
 from server.services.report_settings import ReportSettings
 from server.services.usage_digest import Kind, Period
@@ -160,12 +169,12 @@ async def tick(now: datetime | None = None) -> list[dict]:
     async with factory() as db:
         orgs = (
             await db.execute(
-                select(Organization.id, Organization.settings).where(
+                select(Organization.id, Organization.name, Organization.settings).where(
                     Organization.is_active.is_(True)
                 )
             )
         ).all()
-        for org_id, raw in orgs:
+        for org_id, name, raw in orgs:
             settings = report_settings.of(raw)
             for period in due(settings, now.astimezone(settings.zone)):
                 if not await _claim(db, org_id, period):
@@ -173,6 +182,8 @@ async def tick(now: datetime | None = None) -> list[dict]:
                 status, count = await deliver(db, org_id, settings, period)
                 await _settle(db, org_id, period, status, count)
                 done.append({"org_id": org_id, "kind": period.kind, "status": status})
+            to = await recipients_of(db, org_id, settings)
+            await usage_budgets.check(db, org_id, name, settings, to, now)
     return done
 
 

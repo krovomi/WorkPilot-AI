@@ -57,6 +57,12 @@ TEXT = {
         "failure_counts": "{runs} runs, {jobs} jobs",
         "alerts": "Alertes",
         "alert_budget": "{percent} % du budget mensuel de tokens est consommé (seuil de {threshold} %).",
+        "alert_scope": "{target} : {percent} % de son budget mensuel de tokens (seuil de {threshold} %).",
+        "targets": {
+            "person": "Une personne",
+            "group": "Groupe {name}",
+            "project": "Projet {name}",
+        },
         "none": "Rien à signaler.",
         "footer": "Envoyé par le serveur WorkPilot de votre équipe. Les destinataires se règlent dans Administration, Usage, Rapport.",
     },
@@ -107,6 +113,12 @@ TEXT = {
         "failure_counts": "{runs} runs, {jobs} jobs",
         "alerts": "Alerts",
         "alert_budget": "{percent} % of the monthly token budget is used (threshold {threshold} %).",
+        "alert_scope": "{target}: {percent} % of its monthly token budget (threshold {threshold} %).",
+        "targets": {
+            "person": "A person",
+            "group": "Group {name}",
+            "project": "Project {name}",
+        },
         "none": "Nothing to report.",
         "footer": "Sent by your team's WorkPilot server. Recipients are set in Administration, Usage, Report.",
     },
@@ -192,13 +204,26 @@ def lines(report: dict, language: str) -> dict:
         + words["failure_counts"].format(runs=f["runs"], jobs=f["jobs"])
         for f in report["failures"]
     ]
-    alerts = [
-        words["alert_budget"].format(
-            percent=_number(a["percent"], language, 1), threshold=a["threshold"]
-        )
-        for a in report["alerts"]
-        if a["kind"] == "budget"
-    ]
+    alerts = []
+    for a in report["alerts"]:
+        if a["kind"] not in ("budget", "budget_scope"):
+            continue
+        percent = _number(a["percent"], language, 1)
+        if a["kind"] == "budget":
+            alerts.append(
+                words["alert_budget"].format(percent=percent, threshold=a["threshold"])
+            )
+        else:
+            target = (
+                a["name"]
+                if a["scope"] == "person" and a["name"]
+                else words["targets"][a["scope"]].format(name=a["name"])
+            )
+            alerts.append(
+                words["alert_scope"].format(
+                    target=target, percent=percent, threshold=a["threshold"]
+                )
+            )
     return {
         "subject": words["subject"][kind].format(**where),
         "intro": words["intro"][kind].format(**where),
