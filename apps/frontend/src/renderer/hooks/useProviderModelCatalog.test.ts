@@ -200,3 +200,30 @@ it("keeps Copilot to the models this account's list serves", async () => {
 	await waitFor(() => expect(result.current.source).toBe("live"));
 	expect(result.current.models.map((m) => m.value)).toEqual(["gpt-5.5"]);
 });
+
+it("reads a cached CLI list like a live one", async () => {
+	const listed = [
+		{ value: "default", label: "Antigravity default" },
+		{ value: "gemini-3.1-pro", label: "Gemini 3.1 Pro" },
+	];
+	vi.stubGlobal("fetch", vi.fn().mockResolvedValue(catalogResponse("cache", listed)));
+	const { result } = renderHook(() => useProviderModelCatalog("antigravity"));
+	await waitFor(() => expect(result.current.source).toBe("cache"));
+	expect(result.current.models.map((m) => m.value)).toEqual(["default", "gemini-3.1-pro"]);
+});
+
+it("completes Copilot's public-registry list with the shipped one", async () => {
+	vi.stubGlobal(
+		"fetch",
+		vi
+			.fn()
+			.mockResolvedValue(catalogResponse("registry", [{ value: "gpt-9", label: "GPT-9" }])),
+	);
+	const { result } = renderHook(() => useProviderModelCatalog("copilot"));
+	// The previous test left Copilot's catalogue fresh in the shared cache.
+	act(() => result.current.refresh());
+	await waitFor(() => expect(result.current.source).toBe("registry"));
+	const values = result.current.models.map((m) => m.value);
+	expect(values[0]).toBe("gpt-9");
+	expect(values.length).toBeGreaterThan(1);
+});

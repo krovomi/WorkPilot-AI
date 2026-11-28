@@ -12,7 +12,7 @@ import {
 	sortClaudeCatalog,
 } from "../../shared/constants/models";
 import { dedupeLocalCatalog } from "../../shared/utils/local-models";
-import { getProvider } from "../../shared/services/providerRegistry";
+import { providerRegistry } from "../../shared/services/providerRegistry";
 import { localBackendFetch } from "../lib/local-backend";
 
 /**
@@ -97,6 +97,13 @@ const AGENT_CLIS = new Set(["opencode", "pi", "antigravity", "gemini-cli"]);
  * `model_not_available_for_integrator`, a CLI `unknown model`).
  */
 const ACCOUNT_SCOPED = new Set(["copilot", ...AGENT_CLIS]);
+/** The list each CLI ships with, offered when the CLI cannot be asked. */
+const CLI_SHIPPED = new Map(
+	providerRegistry
+		.getAllProviders()
+		.filter((p) => AGENT_CLIS.has(p.name))
+		.map((p) => [p.name, p.models]),
+);
 
 function prepareModels(
 	provider: string,
@@ -115,9 +122,7 @@ function prepareModels(
 					},
 				];
 	}
-	const fallback = AGENT_CLIS.has(provider)
-		? [...(getProvider(provider)?.models ?? [])]
-		: getModelsForProvider(provider);
+	const fallback = CLI_SHIPPED.get(provider) ?? getModelsForProvider(provider);
 	if (
 		ACCOUNT_SCOPED.has(provider) &&
 		live.length &&

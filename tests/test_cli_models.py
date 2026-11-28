@@ -34,6 +34,8 @@ PI_OUTPUT = """provider   model               context  max-out  thinking  images
 anthropic  claude-opus-5-5     1M       128K     yes       yes
 openai     gpt-5.5             400K     128K     yes       yes
 google     gemini-3.1-pro      1M       64K      yes       yes
+openai     gpt-5.5             400K     128K     yes       yes
+
 """
 
 
@@ -64,7 +66,7 @@ def test_pi_table_columns_become_provider_model_ids():
 
 
 def test_slugs_skip_headers_options_and_repeats():
-    output = "MODEL  DESCRIPTION\ngemini-3.1-pro  Best\n-x\ngemini-3.1-pro\nclaude-sonnet-5-5\n"
+    output = "MODEL  DESCRIPTION\n\ngemini-3.1-pro  Best\n-x\ngemini-3.1-pro\nclaude-sonnet-5-5\n"
     assert cli_models.parse_slugs(output) == ["gemini-3.1-pro", "claude-sonnet-5-5"]
 
 
