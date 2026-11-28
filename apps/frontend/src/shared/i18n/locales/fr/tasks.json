@@ -3,6 +3,7 @@
 		"title_one": "{{count}} tâche a été interrompue",
 		"title_other": "{{count}} tâches ont été interrompues",
 		"description": "WorkPilot s'est arrêté pendant qu'elles tournaient. Choisis celles à reprendre : chacune repart de la dernière étape terminée.",
+		"descriptionServer": "WorkPilot ou le serveur de l'équipe s'est arrêté pendant qu'elles tournaient. Choisis celles à reprendre : chacune repart de la dernière étape terminée.",
 		"selectedCount_one": "{{count}} sur {{total}} sélectionnée",
 		"selectedCount_other": "{{count}} sur {{total}} sélectionnées",
 		"selectAll": "Tout sélectionner",
@@ -23,13 +24,16 @@
 			"qa_fixing": "Reprendra les corrections QA."
 		},
 		"stoppedByYou": "Décochée car c'est toi qui l'as arrêtée. {{where}}",
+		"startedBy": "Lancée par {{name}} : décochée, c'est son run.",
 		"origin": {
 			"app_exit": "Fermeture de l'app",
 			"app_exitWithTime": "Fermeture de l'app · {{ago}}",
 			"crash": "Arrêt inattendu",
 			"crashWithTime": "Arrêt inattendu · {{ago}}",
 			"stopped_by_you": "Arrêtée par toi",
-			"stopped_by_youWithTime": "Arrêtée par toi · {{ago}}"
+			"stopped_by_youWithTime": "Arrêtée par toi · {{ago}}",
+			"server_restart": "Redémarrage du serveur",
+			"server_restartWithTime": "Redémarrage du serveur · {{ago}}"
 		},
 		"ago": {
 			"now": "à l'instant",

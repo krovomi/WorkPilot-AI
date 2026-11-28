@@ -71,7 +71,10 @@ import {
 	configureToolsFromSettings,
 	preWarmToolCache,
 } from "./cli-tool-manager";
-import { offerInterruptedTasksAtLaunch } from "./ipc-handlers/task/interrupted-prompt";
+import {
+	offerInterruptedTasksAtLaunch,
+	offerServerInterruptedTasks,
+} from "./ipc-handlers/task/interrupted-prompt";
 import { pauseRunningTasksForShutdown } from "./ipc-handlers/task/interrupted-runs";
 import { getSourceEnvPath } from "./ipc-handlers/settings-handlers";
 import { stopAllPrFollowups } from "./ipc-handlers/task/pr-followup-handlers";
@@ -79,7 +82,7 @@ import { stopSplitMergeWatch } from "./ipc-handlers/task/split-merge-watch";
 import { stopMergedWatch } from "./worktree-purge/merged-watch";
 import { initializeUsageMonitorForwarding } from "./ipc-handlers/terminal-handlers";
 import { setupIpcHandlers } from "./ipc-setup";
-import { loadPersistedState, restoreSession } from "./server-connection";
+import { loadPersistedState, onServerSignedIn, restoreSession } from "./server-connection";
 import {
 	enforceWebviewPreferences,
 	isPermissionGranted,
@@ -1095,6 +1098,12 @@ function resumeInterruptedTasksWhenReady(): void {
 	} else {
 		run();
 	}
+	// Server mode: the runs the team server stopped, once a session is signed in.
+	onServerSignedIn(() => {
+		offerServerInterruptedTasks(manager, () => mainWindow).catch((error) => {
+			appLog.warn("[main] Could not offer the server's interrupted runs:", error);
+		});
+	});
 }
 
 // Initialize profile manager and handle migrated profiles

@@ -21,8 +21,10 @@ export function normalizeInterruptedLaunchPolicy(value: unknown): InterruptedLau
  * `crash`: the app stopped without closing (crash, forced kill, OS shutdown).
  * `stopped_by_you`: « Arrêter tous les agents » or « stop » to the voice
  * assistant — listed, but not selected by default.
+ * `server_restart`: a server-mode card whose run the team server stopped
+ * (restarted) while it was queued or running.
  */
-export type InterruptionOrigin = "app_exit" | "crash" | "stopped_by_you";
+export type InterruptionOrigin = "app_exit" | "crash" | "stopped_by_you" | "server_restart";
 
 /** Why a resume would fail right away, checked before offering it. */
 export type InterruptedTaskBlocker = "claude_auth" | "spec_missing";
@@ -48,6 +50,13 @@ export interface InterruptedTask {
 	blocker: InterruptedTaskBlocker | null;
 	/** Ticked when the dialog opens: interrupted by the app, nothing blocking. */
 	selectedByDefault: boolean;
+	/**
+	 * A card of a server project: the server resumes it and queues it behind
+	 * its own limit, so the project's « En cours » limit does not apply.
+	 */
+	onServer?: boolean;
+	/** On the server, a teammate's run that a project owner sees: who started it. */
+	startedByName?: string | null;
 }
 
 /** Main → renderer, once per launch. `resumed`: the « Tout reprendre » policy ran. */

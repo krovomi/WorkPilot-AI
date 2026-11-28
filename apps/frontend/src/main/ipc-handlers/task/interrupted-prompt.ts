@@ -25,6 +25,12 @@ import {
 	writePauseState,
 } from "./pause-state-utils";
 import { interruptionOrigin } from "./interrupted-origin";
+import {
+	collectServerInterruptedTasks,
+	isServerInterruptedTask,
+	resumeServerInterrupted,
+	setServerInterruptedAside,
+} from "./interrupted-server";
 import { allSpecDirs, currentPausePhase, getSpecPaths, resumePausedTask } from "./resume-task";
 
 /**
@@ -53,6 +59,11 @@ import { allSpecDirs, currentPausePhase, getSpecPaths, resumePausedTask } from "
  * the backend re-enters the phase from the spec directory and reopens the
  * subtask the dead process was on. The project's « En cours » limit is kept:
  * past it, a build waits here and starts when a slot frees up.
+ *
+ * In server mode the same dialog also lists the runs the team server stopped
+ * (interrupted-server.ts): they arrive once the session is signed in, at
+ * launch or later (`offerServerInterruptedTasks`), and the server resumes them
+ * behind its own limit.
  */
 
 /** The Kanban's own default for « En cours » (KanbanBoard). */
@@ -237,15 +248,19 @@ async function drainSlots(agentManager: AgentManager, projectId: string): Promis
 /**
  * Resume these builds, within each project's « En cours » limit. A build in
  * `in_progress` past the limit waits for a slot; one in AI review (QA) does
- * not take one, as on the board.
+ * not take one, as on the board. A server card is resumed by the server.
  */
 export async function resumeInterrupted(
 	agentManager: AgentManager,
 	items: InterruptedTask[],
 ): Promise<InterruptedResumeResult> {
-	const result: InterruptedResumeResult = { resumed: [], waiting: [], failed: [] };
+	const onServer = items.filter((item) => isServerInterruptedTask(item.taskId));
+	const result: InterruptedResumeResult = onServer.length
+		? await resumeServerInterrupted(onServer.map((item) => item.taskId))
+		: { resumed: [], waiting: [], failed: [] };
 	const used = new Map<string, number>();
 	for (const item of items) {
+		if (onServer.includes(item)) continue;
 		const task = projectStore.getTasks(item.projectId).find((t) => t.id === item.taskId);
 		if (task?.status === "in_progress") {
 			const running = used.get(item.projectId) ?? inProgressRunning(item.projectId, agentManager);
@@ -269,8 +284,13 @@ export async function resumeInterrupted(
 
 /** « Plus tard »: each keeps its pause and its Reprendre, and is not offered again. */
 export function deferInterrupted(items: InterruptedTask[]): void {
+	const onServer = items.filter((item) => isServerInterruptedTask(item.taskId));
+	if (onServer.length > 0) {
+		void setServerInterruptedAside(onServer.map((item) => item.taskId));
+	}
 	const at = new Date().toISOString();
 	for (const item of items) {
+		if (onServer.includes(item)) continue;
 		const project = projectStore.getProjects().find((p) => p.id === item.projectId);
 		const task = project
 			? projectStore.getTasks(project.id).find((t) => t.id === item.taskId)
@@ -282,16 +302,19 @@ export function deferInterrupted(items: InterruptedTask[]): void {
 }
 
 /**
- * At launch, once the window has loaded: apply Settings › Agents to the
- * builds the last exit interrupted. Returns what was offered or resumed.
+ * Apply Settings › Agents to these interrupted tasks: offer them (next to any
+ * still unanswered), resume them, or leave them. Returns what was offered or
+ * resumed.
  */
-export async function offerInterruptedTasksAtLaunch(
+async function offerTasks(
 	agentManager: AgentManager,
 	getMainWindow: () => BrowserWindow | null,
+	found: InterruptedTask[],
 ): Promise<InterruptedTasksOffer | null> {
-	const policy = normalizeInterruptedLaunchPolicy(readSettingsFile()?.interruptedTasksOnLaunch);
-	const tasks = collectInterruptedTasks(agentManager);
+	const known = new Set(offered.map((t) => t.taskId));
+	const tasks = found.filter((t) => !known.has(t.taskId));
 	if (tasks.length === 0) return null;
+	const policy = normalizeInterruptedLaunchPolicy(readSettingsFile()?.interruptedTasksOnLaunch);
 	appLog.info(`[interrupted-prompt] ${tasks.length} interrupted task(s) found, policy ${policy}`);
 	if (policy === "never") return null;
 	if (policy === "always") {
@@ -306,10 +329,37 @@ export async function offerInterruptedTasksAtLaunch(
 		safeSendToRenderer(getMainWindow, IPC_CHANNELS.TASK_INTERRUPTED_OFFER, offer);
 		return offer;
 	}
-	offered = tasks;
-	const offer: InterruptedTasksOffer = { mode: "ask", tasks };
+	offered = [...offered, ...tasks];
+	const offer: InterruptedTasksOffer = { mode: "ask", tasks: offered };
 	safeSendToRenderer(getMainWindow, IPC_CHANNELS.TASK_INTERRUPTED_OFFER, offer);
 	return offer;
+}
+
+/**
+ * At launch, once the window has loaded: apply Settings › Agents to the
+ * builds the last exit interrupted, and to the server's when the session is
+ * already signed in. Returns what was offered or resumed.
+ */
+export async function offerInterruptedTasksAtLaunch(
+	agentManager: AgentManager,
+	getMainWindow: () => BrowserWindow | null,
+): Promise<InterruptedTasksOffer | null> {
+	const tasks = [
+		...collectInterruptedTasks(agentManager),
+		...(await collectServerInterruptedTasks()),
+	];
+	return offerTasks(agentManager, getMainWindow, tasks);
+}
+
+/**
+ * Once a server session is signed in (restored at launch, or a sign-in): the
+ * runs the team server stopped, offered as the launch offers the local ones.
+ */
+export async function offerServerInterruptedTasks(
+	agentManager: AgentManager,
+	getMainWindow: () => BrowserWindow | null,
+): Promise<InterruptedTasksOffer | null> {
+	return offerTasks(agentManager, getMainWindow, await collectServerInterruptedTasks());
 }
 
 /** The renderer's answer, revalidated: only ids this launch offered count. */

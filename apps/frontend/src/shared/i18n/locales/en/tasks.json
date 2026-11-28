@@ -3,6 +3,7 @@
 		"title_one": "{{count}} task was interrupted",
 		"title_other": "{{count}} tasks were interrupted",
 		"description": "WorkPilot stopped while they were running. Pick the ones to resume: each one picks up from its last finished step.",
+		"descriptionServer": "WorkPilot or the team server stopped while they were running. Pick the ones to resume: each one picks up from its last finished step.",
 		"selectedCount_one": "{{count}} of {{total}} selected",
 		"selectedCount_other": "{{count}} of {{total}} selected",
 		"selectAll": "Select all",
@@ -23,13 +24,16 @@
 			"qa_fixing": "Resumes the QA fixes."
 		},
 		"stoppedByYou": "Unticked because you stopped it. {{where}}",
+		"startedBy": "Started by {{name}}: unticked, it is their run.",
 		"origin": {
 			"app_exit": "App closed",
 			"app_exitWithTime": "App closed · {{ago}}",
 			"crash": "Unexpected stop",
 			"crashWithTime": "Unexpected stop · {{ago}}",
 			"stopped_by_you": "Stopped by you",
-			"stopped_by_youWithTime": "Stopped by you · {{ago}}"
+			"stopped_by_youWithTime": "Stopped by you · {{ago}}",
+			"server_restart": "Server restarted",
+			"server_restartWithTime": "Server restarted · {{ago}}"
 		},
 		"ago": {
 			"now": "just now",
