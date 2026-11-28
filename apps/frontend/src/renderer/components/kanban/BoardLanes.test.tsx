@@ -239,9 +239,11 @@ describe("BoardLanes as a list", () => {
 			[{ ...card("a", { priority: "high" }), createdAt: day(-4) } as unknown as Task],
 			[finished, { ...card("x"), metadata: { abandoned: true, abandonedAt: day(-1) } } as unknown as Task],
 		);
-		expect(screen.getByTestId("kanban-timeline")).toBeInTheDocument();
-		expect(screen.getByText("Sprint 12")).toBeInTheDocument();
-		expect(screen.getByText("Sprint 13")).toBeInTheDocument();
+		const timeline = screen.getByTestId("kanban-timeline");
+		expect(within(timeline).getByText("Sprint 12")).toBeInTheDocument();
+		expect(within(timeline).getByText("Sprint 13")).toBeInTheDocument();
+		// The active sprint is named above the board too.
+		expect(within(screen.getByTestId("kanban-sprint-banner")).getByText("Sprint 12")).toBeInTheDocument();
 		const high = screen.getByRole("region", { name: "High" });
 		expect(within(high).getByRole("img", { name: /^Planning: since .+, still running$/ })).toBeInTheDocument();
 		expect(within(high).getByRole("img", { name: /^Done: .+ to .+$/ })).toBeInTheDocument();

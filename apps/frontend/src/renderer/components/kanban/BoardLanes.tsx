@@ -24,6 +24,8 @@ import { useSprintStore } from "../../stores/sprint-store";
 import { useTaskStore } from "../../stores/task-store";
 import { BoardList, type ListSection } from "./BoardList";
 import { BoardTimeline } from "./BoardTimeline";
+import { SprintBanner } from "./SprintBanner";
+import { SprintPlanningDialog } from "./SprintPlanningDialog";
 
 const NO_TASKS: Task[] = [];
 const NO_KEYS: string[] = [];
@@ -120,7 +122,21 @@ function useLaneLabel(grouping: LaneGrouping) {
 	};
 }
 
-export function BoardLanes({ projectId, columnOrder, tasksByStatus, renderColumn, onOpenTask }: BoardLanesProps) {
+/**
+ * The board under its toolbar: the sprint banner, the cards in the chosen
+ * layout and grouping, and the sprint planning view when one is open.
+ */
+export function BoardLanes(props: BoardLanesProps) {
+	return (
+		<>
+			<SprintBanner />
+			<LanesBody {...props} />
+			<SprintPlanningDialog />
+		</>
+	);
+}
+
+function LanesBody({ projectId, columnOrder, tasksByStatus, renderColumn, onOpenTask }: BoardLanesProps) {
 	const { t } = useTranslation(["tasks"]);
 	const loadForProject = useKanbanLanesStore((s) => s.loadForProject);
 	const grouping = useKanbanLanesStore((s) => s.grouping);
