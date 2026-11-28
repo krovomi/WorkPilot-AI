@@ -45,6 +45,7 @@ export default function SignedInLayout() {
 				<Stack.Screen name="projects/[projectId]/chat" options={{ title: t("chat.title") }} />
 				<Stack.Screen name="projects/[projectId]/leaderboard" options={{ title: t("leaderboard.title") }} />
 				<Stack.Screen name="tokens" options={{ title: t("tokens.title") }} />
+				<Stack.Screen name="ai-accounts" options={{ title: t("aiAccounts.title") }} />
 				<Stack.Screen name="my-usage" options={{ title: t("myUsage.title") }} />
 				<Stack.Screen name="admin/index" options={{ title: t("admin.title") }} />
 				<Stack.Screen name="admin/overview" options={{ title: t("admin.overview.title") }} />
