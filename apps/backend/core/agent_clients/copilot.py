@@ -877,6 +877,8 @@ class CopilotAgentClient(McpBridgeMixin, AgentClient):
         import shutil
         import subprocess
 
+        from foundation.copilot_gh_env import copilot_gh_env
+
         # Prefer GITHUB_CLI_PATH set by the Electron frontend (handles Windows where
         # the subprocess PATH may not include the user's `gh` installation).
         gh_exe = os.environ.get("GITHUB_CLI_PATH") or shutil.which("gh")
@@ -893,6 +895,7 @@ class CopilotAgentClient(McpBridgeMixin, AgentClient):
                 capture_output=True,
                 text=True,
                 timeout=10,
+                env=copilot_gh_env(),
             )
             token = result.stdout.strip()
             if result.returncode == 0 and token:
@@ -905,6 +908,7 @@ class CopilotAgentClient(McpBridgeMixin, AgentClient):
                         capture_output=True,
                         text=True,
                         timeout=10,
+                        env=copilot_gh_env(),
                     )
                     status_output = (
                         status_result.stdout + status_result.stderr

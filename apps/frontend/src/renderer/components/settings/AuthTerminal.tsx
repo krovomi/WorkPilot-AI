@@ -35,6 +35,8 @@ interface AuthTerminalProps {
 	 * CLI (OpenCode, pi…): the terminal then runs without CLAUDE_CONFIG_DIR.
 	 */
 	readonly loginCommand?: string;
+	/** Variables of the terminal running `loginCommand` (a CLI account's own folder). */
+	readonly env?: Readonly<Record<string, string>>;
 	/** Instruction box title and steps shown above that command. */
 	readonly instructions?: { readonly title: string; readonly steps: readonly string[] };
 }
@@ -52,6 +54,7 @@ export function AuthTerminal({
 	onAuthSuccess,
 	onAuthError,
 	loginCommand,
+	env,
 	instructions,
 }: AuthTerminalProps) {
 	const { t } = useTranslation("common");
@@ -165,7 +168,7 @@ export function AuthTerminal({
 					cols,
 					rows,
 					skipOAuthToken: true, // Don't inject existing token for auth terminals
-					env: loginCommand ? undefined : { CLAUDE_CONFIG_DIR: configDir },
+					env: loginCommand ? env && { ...env } : { CLAUDE_CONFIG_DIR: configDir },
 				});
 
 				if (!result.success) {
@@ -280,7 +283,7 @@ export function AuthTerminal({
 
 		createTerminal();
 		// eslint-disable-next-line react-hooks/exhaustive-deps -- configDir is stable for auth terminal lifecycle
-	}, [terminalId, onAuthError, configDir, t, loginCommand, instructions]);
+	}, [terminalId, onAuthError, configDir, t, loginCommand, instructions, env]);
 
 	// Setup terminal event listeners
 	useEffect(() => {

@@ -75,7 +75,7 @@ describe("AiAccountStore", () => {
 	});
 
 	it("refuses an unknown provider, a missing name or key, and a key with spaces", () => {
-		expect(() => store.save({ provider: "copilot", name: "x", apiKey: KEY })).toThrow("Invalid provider");
+		expect(() => store.save({ provider: "anthropic", name: "x", apiKey: KEY })).toThrow("Invalid provider");
 		expect(() => store.save({ provider: "openai", name: "  ", apiKey: KEY })).toThrow("A name is required");
 		expect(() => store.save({ provider: "openai", name: "x" })).toThrow("A key is required");
 		expect(() => store.save({ provider: "openai", name: "x", apiKey: "sk 1" })).toThrow("Invalid key");
@@ -107,7 +107,7 @@ describe("AiAccountStore", () => {
 		const openai = store.save({ provider: "openai", name: "A", apiKey: KEY });
 		const mistral = store.save({ provider: "mistral", name: "B", apiKey: KEY });
 		expect(() => store.setDefault("openai", mistral.id)).toThrow("Account not found");
-		expect(() => store.setDefault("copilot", openai.id)).toThrow("Invalid provider");
+		expect(() => store.setDefault("anthropic", openai.id)).toThrow("Invalid provider");
 		store.setDefault("openai", openai.id);
 		expect(store.defaults()).toEqual({ openai: openai.id });
 		expect(store.defaultOf("openai")).toEqual({ account: store.get(openai.id), apiKey: KEY });

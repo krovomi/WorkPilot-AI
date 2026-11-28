@@ -3,7 +3,7 @@
  * in and whether it answers, then the automatic failover between them.
  */
 import { ProviderService } from "@shared/services/providerService";
-import { accountProviderOf } from "@shared/types/ai-accounts";
+import { accountProviderOf, loginProviderOf } from "@shared/types/ai-accounts";
 import type { AppSettings } from "@shared/types/settings";
 import { type CanonicalProvider, getStaticProviders } from "@shared/utils/providers";
 import { AlertCircle, ArrowDownUp, Plug } from "lucide-react";
@@ -152,9 +152,13 @@ export function CleanProviderSection({
 					defaultName: claudeProfiles.length > 1 ? active?.name : undefined,
 				};
 			}
-			const accountProvider = accountProviderOf(providerId) ?? providerId;
-			const hasMainKey = aiAccounts.mainKeys.includes(accountProvider);
-			const count = aiAccountsOf(aiAccounts.accounts, accountProvider).length + (hasMainKey ? 1 : 0);
+			const accountProvider = accountProviderOf(providerId);
+			const loginProvider = loginProviderOf(providerId);
+			const hasMainKey = accountProvider !== undefined && aiAccounts.mainKeys.includes(accountProvider);
+			const count =
+				(accountProvider ? aiAccountsOf(aiAccounts.accounts, accountProvider).length : 0) +
+				(hasMainKey ? 1 : 0) +
+				(loginProvider ? aiAccountsOf(aiAccounts.accounts, loginProvider).length : 0);
 			return {
 				count,
 				defaultName: defaultName ?? (count > 1 && hasMainKey ? t("aiAccounts.accounts.mainKey") : undefined),
@@ -172,7 +176,10 @@ export function CleanProviderSection({
 		() =>
 			staticProviders.map((provider) => {
 				const accountProvider = accountProviderOf(provider.name);
-				const defaultAccount = accountProvider ? defaultAiAccountOf(aiAccounts, accountProvider) : undefined;
+				const loginProvider = loginProviderOf(provider.name);
+				const defaultAccount =
+					(accountProvider ? defaultAiAccountOf(aiAccounts, accountProvider) : undefined) ??
+					(loginProvider ? defaultAiAccountOf(aiAccounts, loginProvider) : undefined);
 				// A default account is a sign-in of its own, even with no key on the provider's page.
 				const connected = providerStatus[provider.name] === true || defaultAccount !== undefined;
 				const test = testResults.get(provider.name);

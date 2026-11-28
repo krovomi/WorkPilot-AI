@@ -96,6 +96,8 @@ def _github_token() -> str:
     import shutil
     import subprocess
 
+    from foundation.copilot_gh_env import copilot_gh_env
+
     token = os.environ.get("GITHUB_TOKEN", "")
     if token:
         return token
@@ -108,6 +110,7 @@ def _github_token() -> str:
             capture_output=True,
             text=True,
             timeout=10,
+            env=copilot_gh_env(),
         )
     except (OSError, subprocess.SubprocessError) as error:
         logger.info("[copilot_models] `gh auth token` failed: %s", error)

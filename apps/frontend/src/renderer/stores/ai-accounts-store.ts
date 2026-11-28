@@ -7,6 +7,7 @@
 import { create } from "zustand";
 import type {
 	AiAccountInput,
+	AiAccountSignIn,
 	AiAccountsSnapshot,
 	AiAccountTestResult,
 	AiAccountView,
@@ -22,6 +23,8 @@ interface AiAccountsState extends AiAccountsSnapshot {
 	test: (id: string) => Promise<AiAccountTestResult>;
 	/** `id` null goes back to the provider's main key; answers a reason when refused. */
 	setDefault: (provider: string, id: string | null) => Promise<string | null>;
+	/** A CLI account's sign-in terminal, or a short reason it was refused. */
+	signIn: (id: string) => Promise<{ plan?: AiAccountSignIn; error?: string }>;
 }
 
 export const useAiAccountsStore = create<AiAccountsState>((set, get) => ({
@@ -61,6 +64,10 @@ export const useAiAccountsStore = create<AiAccountsState>((set, get) => ({
 		const result = await globalThis.electronAPI.setDefaultAiAccount(provider, id);
 		await get().load();
 		return result.success ? null : (result.error ?? null);
+	},
+	signIn: async (id) => {
+		const result = await globalThis.electronAPI.signInAiAccount(id);
+		return result.success && result.data ? { plan: result.data } : { error: result.error };
 	},
 }));
 
