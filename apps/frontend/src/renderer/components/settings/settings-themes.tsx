@@ -1,4 +1,5 @@
 import {
+	BarChart3,
 	Bell,
 	Bot,
 	Braces,
@@ -123,6 +124,7 @@ export function createSettingsThemes(t: Translate): Record<SettingsTheme, Settin
 					type: "app",
 				},
 				{ id: "server-session", icon: UserCheck, label: t("settings:serverSession.navLabel"), type: "app" },
+				{ id: "server-my-usage", icon: BarChart3, label: t("settings:myUsage.navLabel"), type: "app" },
 				{ id: "server-tokens", icon: KeyRound, label: t("settings:serverTokens.navLabel"), type: "app" },
 				{ id: "server-mcp", icon: Plug, label: t("settings:serverMcp.navLabel"), type: "app" },
 				{ id: "server-needs-you", icon: Bell, label: t("settings:serverNeedsYou.navLabel"), type: "app" },

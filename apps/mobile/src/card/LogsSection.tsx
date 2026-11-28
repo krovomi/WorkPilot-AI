@@ -1,14 +1,15 @@
 /**
  * The card's build log, phase by phase, as the server keeps it. The phase that
  * runs (or the last one that wrote) is open; its latest lines show, and the
- * screen reads them again while the agents work.
+ * screen reads them again while the agents work. The whole log, filtered and
+ * followed live, is a screen of its own (`cards/[cardId]/logs`).
  */
 
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import type { LogPhase, TaskLogs, TaskPhaseLog } from "../api/types";
-import { Section } from "../ui/components";
+import { Button, Section } from "../ui/components";
 import { RADIUS, SPACE, type Theme, useTheme } from "../ui/theme";
 import { mono } from "./LongText";
 
@@ -23,7 +24,7 @@ export function defaultLogPhase(logs: TaskLogs): LogPhase | null {
 	return [...LOG_PHASES].reverse().find((p) => (logs.phases[p]?.entries.length ?? 0) > 0) ?? null;
 }
 
-export function LogsSection({ logs }: { logs: TaskLogs | null }) {
+export function LogsSection({ logs, onOpen }: { logs: TaskLogs | null; onOpen?: () => void }) {
 	const { t } = useTranslation();
 	const theme = useTheme();
 	const [chosen, setChosen] = useState<LogPhase | null>(null);
@@ -52,6 +53,7 @@ export function LogsSection({ logs }: { logs: TaskLogs | null }) {
 				);
 			})}
 			{logs.truncated ? <Text style={{ color: theme.textFaint }}>{t("card.logsTruncated")}</Text> : null}
+			{open !== null && onOpen ? <Button label={t("cardLog.open")} icon="maximize-2" variant="ghost" onPress={onOpen} /> : null}
 		</Section>
 	);
 }
@@ -91,7 +93,7 @@ function statusColor(theme: Theme, status: TaskPhaseLog["status"]) {
 	}
 }
 
-function entryColor(theme: Theme, type: string) {
+export function entryColor(theme: Theme, type: string) {
 	if (type === "error") return theme.danger;
 	if (type === "success") return theme.success;
 	if (type.startsWith("tool")) return theme.textMuted;

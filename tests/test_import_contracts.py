@@ -152,8 +152,10 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # Regression Guardian. The QA loop hands it to the scanner, which never
     # imports it back.
     "security_reach": {"regression_guardian", "security"},
-    # Server mode is mounted by provider_api; it reaches nothing back.
-    "server": set(),
+    # Server mode is mounted by provider_api; it reaches nothing back, but
+    # the GenAI spans' tracer, a leaf, so its request spans share the
+    # agents' exporter (server/telemetry.py).
+    "server": {"genai_trace"},
     # Model and provider per phase: the catalogue, the provider chosen in the
     # UI, the complexity router, and the carbon and cost budgets' degraded
     # modes (carbon_profiler.budget, cost_budget step a flagship down).

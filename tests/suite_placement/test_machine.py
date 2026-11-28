@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 from test_placement import machine as machine_module
@@ -36,10 +37,12 @@ def test_another_build_is_counted_but_not_this_one(monkeypatch, tmp_path):
     fake_backend = tmp_path / "backend"
     fake_backend.mkdir()
     entry = fake_backend / "run.py"
-    entry.write_text("import time\ntime.sleep(30)\n", encoding="utf-8")
+    # Killed below once counted: it only has to outlive the wait on a slow runner.
+    entry.write_text("import time\ntime.sleep(600)\n", encoding="utf-8")
     monkeypatch.setattr(machine_module, "_BACKEND_DIR", fake_backend.resolve())
     before = machine_module.count_builds()
     child = subprocess.Popen([sys.executable, str(entry), "--spec", "002"])
+    began = time.monotonic()
     try:
         for _ in range(50):
             if machine_module.count_builds() == before + 1:
@@ -47,10 +50,53 @@ def test_another_build_is_counted_but_not_this_one(monkeypatch, tmp_path):
             subprocess.run(
                 [sys.executable, "-c", "import time; time.sleep(0.05)"], check=True
             )
-        assert machine_module.count_builds() == before + 1
+        waited = time.monotonic() - began
+        assert machine_module.count_builds() == before + 1, (
+            f"after {waited:.1f} s, child exit code {child.poll()}\n"
+            f"{_seen(child.pid)}\n{_what_runs(entry)}"
+        )
     finally:
         child.kill()
         child.wait()
+
+
+def _seen(pid: int) -> str:
+    """What count_builds saw of the child and its own children, for the message."""
+    import psutil
+
+    lines = [f"backend dir: {machine_module._BACKEND_DIR}"]
+    try:
+        root = psutil.Process(pid)
+        tree = [root, *root.children(recursive=True)]
+    except psutil.Error as error:
+        return f"child {pid} is gone: {error!r}"
+    for process in tree:
+        try:
+            cmdline = process.cmdline()
+        except psutil.Error as error:
+            lines.append(f"{process.pid}: cmdline refused: {error!r}")
+            continue
+        resolved = []
+        for arg in cmdline[1:3]:
+            try:
+                resolved.append(str(Path(arg).resolve()))
+            except OSError as error:
+                resolved.append(repr(error))
+        build = machine_module._is_build(cmdline)
+        lines.append(f"{process.pid}: {cmdline} -> {resolved}, build={build}")
+    return "\n".join(lines)
+
+
+def _what_runs(entry: Path) -> str:
+    """The command lines that name the entry point, to say why none was counted."""
+    import psutil
+
+    seen = []
+    for process in psutil.process_iter(["pid", "ppid", "cmdline"]):
+        cmdline = process.info.get("cmdline") or []
+        if any(entry.name in str(arg) for arg in cmdline):
+            seen.append(f"{process.info['pid']}<{process.info['ppid']}: {cmdline}")
+    return f"backend dir {machine_module._BACKEND_DIR}; seen: {seen}"
 
 
 def _smi(monkeypatch, stdout: str, returncode: int = 0) -> None:

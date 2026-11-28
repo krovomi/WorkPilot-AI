@@ -17,9 +17,11 @@ from datetime import UTC, date, datetime
 
 from sqlalchemy import (
     JSON,
+    BigInteger,
     Boolean,
     Date,
     DateTime,
+    Float,
     ForeignKey,
     Index,
     Integer,
@@ -1202,3 +1204,95 @@ class PageVisit(Base):
     client: Mapped[str] = mapped_column(String(10))
     page: Mapped[str] = mapped_column(String(60))
     count: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class UsageReportSend(Base):
+    """One usage report an organization was due, claimed once.
+
+    The scheduler (``services/usage_report_schedule.py``) inserts the row
+    before it sends: the unique key on the organization, the kind and the
+    period makes a second send of the same report impossible, even after a
+    restart or with two server processes. ``status`` says what happened
+    (``sent``, ``failed``, ``no_smtp``, ``no_recipient``); only how many
+    addresses it went to is kept, never which.
+    """
+
+    __tablename__ = "usage_report_sends"
+    __table_args__ = (
+        UniqueConstraint("org_id", "kind", "period", name="uq_usage_report_send"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    org_id: Mapped[str] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE")
+    )
+    #: ``daily``, ``weekly`` or ``monthly``.
+    kind: Mapped[str] = mapped_column(String(10))
+    #: The first day the report covers (``YYYY-MM-DD``).
+    period: Mapped[date] = mapped_column(Date)
+    status: Mapped[str] = mapped_column(String(20), default="claimed")
+    recipients: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )
+
+
+class UsageBudget(Base):
+    """A monthly token budget for one person, group or project.
+
+    ``target_id`` is the user's, group's or project's id, within ``org_id``;
+    a target that no longer exists drops its budget the next time the budgets
+    are read (``services/usage_budgets.py``), and erasing an account drops
+    its budget at once. ``block`` refuses new runs and jobs once the budget
+    is spent, as the organization's own budget does with its hard stop.
+    """
+
+    __tablename__ = "usage_budgets"
+    __table_args__ = (
+        UniqueConstraint("org_id", "scope", "target_id", name="uq_usage_budget"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    org_id: Mapped[str] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), index=True
+    )
+    #: ``person``, ``group`` or ``project``.
+    scope: Mapped[str] = mapped_column(String(10))
+    target_id: Mapped[str] = mapped_column(String(36))
+    monthly_tokens: Mapped[int] = mapped_column(BigInteger)
+    block: Mapped[bool] = mapped_column(Boolean, default=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, onupdate=_utcnow
+    )
+
+
+class UsageBudgetAlert(Base):
+    """A budget that passed one of its alert thresholds, once per month.
+
+    ``budget_key`` is the budget's id, or ``org`` for the organization's own
+    monthly budget; the unique key lets one alert through per budget, month
+    and threshold (80 or 100), however many servers check.
+    """
+
+    __tablename__ = "usage_budget_alerts"
+    __table_args__ = (
+        UniqueConstraint(
+            "org_id", "budget_key", "month", "threshold", name="uq_usage_budget_alert"
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    org_id: Mapped[str] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), index=True
+    )
+    budget_key: Mapped[str] = mapped_column(String(36))
+    scope: Mapped[str] = mapped_column(String(10))
+    #: The first day of the month the alert counts in.
+    month: Mapped[date] = mapped_column(Date)
+    threshold: Mapped[int] = mapped_column(Integer)
+    percent: Mapped[float] = mapped_column(Float)
+    #: How many addresses the alert email went to (0 without SMTP).
+    recipients: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )

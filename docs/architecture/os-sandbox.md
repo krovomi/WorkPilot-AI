@@ -131,7 +131,7 @@ création ; une VM créée pour d'autres montages ou une autre allowlist est sup
 
 | Ce que la VM voit | Comment |
 |---|---|
-| Le worktree, la spec, le dépôt git où il commite, `WORKPILOT_WRITE_ROOTS` | montés en lecture-écriture, le worktree en premier (dossier par défaut de `sbx exec`) ; au même chemin sous macOS et Linux, sous `/mnt/<lecteur>/…` sous Windows |
+| Le worktree, la spec, le dépôt git où il commite, `WORKPILOT_WRITE_ROOTS` | montés en lecture-écriture, le worktree en premier (dossier par défaut de `sbx exec`) ; au même chemin sous macOS et Linux, sous `/<lecteur>/…` sous Windows (`C:\Users\…` → `/c/Users/…`). Le worktree est donné sans cible (sbx 0.54 en refuse une pour le premier montage : « primary workspace is mounted at its host path ») ; les autres avec une cible explicite au même endroit. Un chemin réseau (UNC) n'est pas monté : la VM n'est pas créée et le bac à sable de l'OS prend le relais |
 | `.git/hooks`, `.git/config`, la configuration de sécurité | remontés en lecture seule par-dessus |
 | `.workpilot/.env` et les autres chemins masqués à l'intérieur des montages | couverts par un fichier ou un dossier vide, en lecture seule |
 | Le dossier personnel, ses identifiants, les caches de paquets de l'hôte | jamais montés : la VM a les siens |
@@ -158,12 +158,16 @@ lance `sbx version` et `sbx ls --json` ; la vraie preuve est la création.
 chez Docker. Un compte Docker reste exigé par `sbx login` : c'est pourquoi l'option est coupée par
 défaut.
 
+Une commande lancée dans la VM n'a pas de stdin (`DEVNULL`) : sbx attend sur un tube ouvert que la commande ne lit pas. Celle qui lit son stdin le demande (`wrap(…, stdin=True)`, qui ajoute `sbx exec -i`).
+
+Vérifié sous Windows 11 avec sbx 0.54.1 : création (55 s la première fois, image comprise, puis 7 s), git dans le worktree par le pointeur réécrit, écriture du worktree vue par l'hôte, `.git` en lecture seule refusé à l'écriture, codes de sortie (3 donne 3, commande inconnue 127), `-e`, `-w`, `--memory` et `--cpus`. Restent à vérifier : le réseau (`--deny-network` puis règles par VM, champs de `policy log`), `host.docker.internal`, et la commande tuée au délai.
+
 Limites connues : sous Windows, les dépendances installées dans la VM sont des binaires Linux (un
 `node_modules` installé par l'hôte n'y tourne pas toujours, et inversement) ; une commande arrêtée
 par le délai l'est côté hôte (`sbx exec`), son processus dans la VM n'est pas encore tué ; sbx
 exige Windows 11 avec la plateforme d'hyperviseur, macOS 14 sur Apple silicon ou Ubuntu 24.04 avec
-KVM. Les CLI d'agents dans la VM, les secrets par le proxy de sbx et la purge avec le worktree sont
-le lot C2.
+KVM. Les CLI d'agents dans la VM et les secrets par le proxy de sbx sont le lot C2 ; la purge avec
+le worktree et l'état de sbx dans Paramètres > Sandbox y sont déjà.
 
 ## Le garde-fou : la carte le dit au lancement
 

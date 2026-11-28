@@ -6,7 +6,17 @@ import type { Task } from "../../../shared/types";
 import { MAX_STEERING_CHARS } from "../../../shared/utils/steering";
 import { formatAppDateTime } from "@/lib/date-format";
 import { Button } from "../ui/button";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "../ui/select";
 import { Textarea } from "../ui/textarea";
+
+/** Radix refuses an empty item value: "the next session" is this sentinel. */
+const NEXT_SESSION = "__next__";
 
 /** How often the queue is read again while the panel is open: deliveries arrive. */
 const REFRESH_MS = 10_000;
@@ -119,19 +129,27 @@ export function TaskSteeringPanel({ task }: { readonly task: Task }) {
 				aria-label={t("tasks:steering.placeholder")}
 			/>
 			<div className="flex items-center justify-between gap-2">
-				<select
-					className="h-8 rounded-md border border-border bg-background px-2 text-xs"
-					value={target}
-					onChange={(event) => setTarget(event.target.value)}
-					aria-label={t("tasks:steering.target")}
+				<Select
+					value={target || NEXT_SESSION}
+					onValueChange={(next) => setTarget(next === NEXT_SESSION ? "" : next)}
 				>
-					<option value="">{t("tasks:steering.nextSession")}</option>
-					{open.map((subtask) => (
-						<option key={subtask.id} value={subtask.id}>
-							{subtask.title || subtask.id}
-						</option>
-					))}
-				</select>
+					<SelectTrigger
+						className="h-8 w-auto max-w-72 gap-2 rounded-md text-xs"
+						aria-label={t("tasks:steering.target")}
+					>
+						<SelectValue />
+					</SelectTrigger>
+					<SelectContent>
+						<SelectItem value={NEXT_SESSION} className="text-xs">
+							{t("tasks:steering.nextSession")}
+						</SelectItem>
+						{open.map((subtask) => (
+							<SelectItem key={subtask.id} value={subtask.id} className="text-xs">
+								{subtask.title || subtask.id}
+							</SelectItem>
+						))}
+					</SelectContent>
+				</Select>
 				<Button size="sm" disabled={busy || !text.trim()} onClick={() => void send()}>
 					<Send className="h-3 w-3 mr-1" aria-hidden />
 					{t("tasks:steering.send")}

@@ -161,7 +161,7 @@ class ProjectJobs:
             from server.services.quotas import enforce_run_quota
 
             async with get_session_factory()() as db:
-                await enforce_run_quota(db, org_id)
+                await enforce_run_quota(db, org_id, user_id, project_id)
         if key in self._running:
             raise RunManagerError("A job is already running for this feature")
 

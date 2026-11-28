@@ -33,6 +33,8 @@ import type { Leaderboard, LeaderboardPeriod, LeaderboardScope, ReplayShare } fr
 import type { Channel, ChannelSettings, Moment, NeedsYouOverview, TestResult } from "../needs-you/types";
 import type { Memory } from "../context/index-file";
 import type { AskAnswer } from "../board-ask/types";
+import type { MyUsage, UsageNotice } from "../usage/types";
+import { decided, type MemoryDecision, type MemoryLifecycle } from "../context/lifecycle";
 import type { EngineOption, SettingsPayload } from "../new-card/engine";
 import type { AnalysisKind, CostSummary, DashboardSnapshot, WorkSession } from "../insights/types";
 import type {
@@ -208,12 +210,31 @@ export function api(client: ServerClient) {
 			client.request<{ cancelled: boolean }>("POST", featurePath("analyses", `/${kind}/jobs/${enc(jobId)}/cancel`, projectId)),
 		memories: async (projectId: string, query: string) => {
 			const q = query.trim();
-			const found = await client.request<{ available: boolean; memories?: Memory[]; results?: Memory[] }>(
+			type Row = Omit<Memory, "id"> & { id?: string; path?: string };
+			const found = await client.request<{ available: boolean; memories?: Row[]; results?: Row[] }>(
 				"GET",
 				featurePath("context", "/memories", projectId, `&limit=50${q ? `&query=${enc(q)}` : ""}`),
 			);
-			return { available: found.available, memories: (q ? found.results : found.memories) ?? [] };
+			// A search result is named by its vault path, as a listed memory by its id.
+			const rows = (q ? found.results : found.memories) ?? [];
+			return {
+				available: found.available,
+				memories: rows.map(({ path, ...m }): Memory => ({ ...m, id: m.id ?? path ?? "" })),
+			};
 		},
+		/** The memory's trash, its pins and how long a forgotten one stays. */
+		memoryLifecycle: (projectId: string) =>
+			client.request<MemoryLifecycle>("GET", featurePath("context", "/memory/lifecycle", projectId, "&limit=1")),
+		forgetMemory: async (projectId: string, id: string, reason: string) =>
+			decided(
+				await client.request<MemoryDecision>("POST", featurePath("context", "/memory/forget", projectId), { id, reason }),
+			),
+		restoreMemory: async (projectId: string, id: string) =>
+			decided(await client.request<MemoryDecision>("POST", featurePath("context", "/memory/restore", projectId), { id })),
+		pinMemory: async (projectId: string, id: string, pinned: boolean) =>
+			decided(
+				await client.request<MemoryDecision>("POST", featurePath("context", "/memory/pin", projectId), { id, pinned }),
+			),
 		/** The policy of the project, its waiting calls and its agents, as the server reads them. */
 		governance: (projectId: string) =>
 			client.request<GovernanceReport>("GET", featurePath("governance", "", projectId)),
@@ -280,6 +301,16 @@ export function api(client: ServerClient) {
 		revokeReplayShare: (projectId: string, shareId: string) =>
 			client.request<{ revoked: boolean }>("DELETE", featurePath("replay-shares", `/${enc(shareId)}`, projectId)),
 		streamInfo: () => client.request<{ url: string | null }>("GET", "/api/board/stream"),
+		/** What the organization's administrators see of the person, for these UTC days. */
+		myUsage: (start: string, end: string) =>
+			client.request<MyUsage>("GET", `/users/me/usage?start=${enc(start)}&end=${enc(end)}`),
+		/** Everything the server keeps about the person's usage, as JSON text. */
+		exportMyUsage: async () =>
+			JSON.stringify(await client.request<unknown>("GET", "/users/me/usage/export"), null, 2),
+		/** What is measured, and whether the person still has to be told. */
+		usageNotice: () => client.request<UsageNotice>("GET", "/users/me/usage-notice"),
+		/** The person read the notice; the server records it. */
+		markUsageNoticeSeen: () => client.request<UsageNotice>("POST", "/users/me/usage-notice"),
 		/** Whether the person's organization counts which screens they open. */
 		pageActivity: () => client.request<{ enabled: boolean }>("GET", "/users/me/page-activity"),
 		/** Today's opens per screen (`usage/pages.ts` names only). */
