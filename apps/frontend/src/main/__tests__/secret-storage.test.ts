@@ -29,7 +29,7 @@ vi.mock("../platform", async (importOriginal) => ({
 }));
 
 // Not WSL, wherever the suite runs: the DPAPI fallback has its own tests.
-vi.mock("../open-external", () => ({ detectWsl: () => false }));
+vi.mock("../platform/wsl", () => ({ detectWsl: () => false }));
 
 const fake = sharedFakeSafeStorage();
 type SecretStorage = typeof import("../secret-storage");

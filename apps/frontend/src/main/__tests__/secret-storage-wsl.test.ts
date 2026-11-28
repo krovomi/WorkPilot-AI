@@ -29,7 +29,7 @@ vi.mock("../platform", async (importOriginal) => ({
 	isLinux: () => true,
 }));
 
-vi.mock("../open-external", () => ({ detectWsl: () => true }));
+vi.mock("../platform/wsl", () => ({ detectWsl: () => true }));
 
 const dpapi = vi.hoisted(() => ({
 	key: null as Buffer | null,
