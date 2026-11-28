@@ -2,7 +2,7 @@
 
 Deleting the ``users`` row does most of it through the foreign keys: what is
 only theirs goes with it (sign-ins, sessions, devices, secrets, preferences,
-memberships: ``CASCADE``), and what the organization counts keeps its numbers
+memberships, AI accounts: ``CASCADE``), and what the organization counts keeps its numbers
 without a name (usage, presence, page counts, runs, jobs, cards, audit
 entries: ``SET NULL``). Before that, :func:`erase` removes what would still
 point back to the person:
