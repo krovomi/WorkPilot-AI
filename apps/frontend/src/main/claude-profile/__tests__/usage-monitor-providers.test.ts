@@ -692,6 +692,42 @@ describe("Anthropic", () => {
 		});
 	});
 
+	it("reads the active account, not a fresh one that sorts first", async () => {
+		const fresh = { id: "fresh", name: "Fresh", email: "fresh@example.com", configDir: "/home/tester/.claude-fresh" };
+		world.claude.profiles = [fresh, work];
+		world.keychain.set(fresh.configDir, { token: "fresh-test-token", email: null });
+		world.keychain.set(work.configDir, { token: "oauth-test-token", email: null });
+		answer(OAUTH_USAGE, json({ five_hour: { utilization: 30 }, seven_day: { utilization: 60 } }));
+
+		expect(await monitor.getUsageForProvider("anthropic")).toMatchObject({
+			profileId: "work",
+			sessionPercent: 30,
+			weeklyPercent: 60,
+		});
+		expect(callsTo(OAUTH_USAGE)[0].headers).toMatchObject({ authorization: "Bearer oauth-test-token" });
+
+		world.claude.activeProfileId = null;
+		expect(await monitor.getUsageForProvider("anthropic")).toMatchObject({ profileId: "fresh" });
+	});
+
+	it("offers to reconnect when the active account's sign-in expired, rather than 'not measured'", async () => {
+		world.tokens.set(work.configDir, {
+			token: null,
+			wasRefreshed: false,
+			error: "Refresh token expired",
+			errorCode: "invalid_grant",
+		});
+
+		expect(await monitor.getUsageForProvider("anthropic")).toMatchObject({
+			profileId: "work",
+			profileName: "Work",
+			profileEmail: "work@example.com",
+			providerName: "anthropic",
+			needsReauthentication: true,
+		});
+		expect(callsTo(OAUTH_USAGE)).toHaveLength(0);
+	});
+
 	it("names the usage from the CLI when the API fails", async () => {
 		world.keychain.set(work.configDir, { token: "oauth-test-token", email: null });
 		answer(OAUTH_USAGE, json({ error: "server overloaded" }, 529));
@@ -715,8 +751,10 @@ describe("Anthropic", () => {
 		expect(await monitor.getUsageForProvider("anthropic")).toBe(last);
 		expect(warnings.join("\n")).toContain("fetchUsage returned null");
 
+		// An account that never signed in has no credential yet: nothing to reconnect.
 		(monitor as unknown as { currentUsage: null }).currentUsage = null;
 		world.keychain.clear();
+		world.claude.profiles = [{ ...work, email: undefined }];
 		expect(await monitor.getUsageForProvider("anthropic")).toMatchObject({
 			profileId: "anthropic",
 			profileName: "Anthropic",
