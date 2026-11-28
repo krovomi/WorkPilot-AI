@@ -211,7 +211,7 @@
 		},
 		"incomplete": {
 			"title": "Task Incomplete",
-			"description": "This task has a spec and implementation plan but never completed any subtasks ({{completed}}/{{total}}). The process likely crashed during spec creation. Click Resume to continue implementation.",
+			"description": "This task has an implementation plan, but its build stopped before finishing any subtask. Click Resume to continue the implementation.",
 			"button": "Resume Task"
 		}
 	},

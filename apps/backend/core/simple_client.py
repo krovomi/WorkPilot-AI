@@ -33,6 +33,7 @@ from agents.tools_pkg import (
     get_default_thinking_level,
     hooked_grants,
     mcp_tools_for_servers,
+    restrict_builtin_tools,
     setting_sources_for,
     undeclared_builtin_tools,
 )
@@ -193,6 +194,8 @@ def create_simple_client(
     # no tool at all.
     if denied := undeclared_builtin_tools(agent_type):
         options_kwargs["disallowed_tools"] = denied
+    # Only the declared built-ins exist for the model (a summarizer: none).
+    restrict_builtin_tools(options_kwargs, agent_type)
 
     # Only add max_thinking_tokens if not None (Haiku doesn't support extended thinking)
     if max_thinking_tokens is not None:

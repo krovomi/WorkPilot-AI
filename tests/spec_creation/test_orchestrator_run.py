@@ -146,12 +146,10 @@ async def test_a_new_spec_is_named_after_its_task_and_every_phase_writes_there(
     ):
         assert (orch.spec_dir / name).is_file(), name
 
-    # SIMPLE: quick spec, then validation, whose fixer wrote the missing
-    # context.json; the summaries of the earlier phases reached each session.
-    assert [call[0] for call in runner.calls] == [
-        "spec_quick.md",
-        "validation_fixer.md",
-    ]
+    # SIMPLE: quick spec, then validation, which writes the missing
+    # context.json itself (no fixer session); the summaries of the earlier
+    # phases reached the quick spec.
+    assert [call[0] for call in runner.calls] == ["spec_quick.md"]
     assert "summary of discovery" in runner.calls[0][1]
     assert "summary of requirements" in runner.calls[0][1]
     assert json.loads((orch.spec_dir / "review_state.json").read_text("utf-8"))[

@@ -210,8 +210,8 @@
 			"recovering": "Récupération en cours..."
 		},
 		"incomplete": {
-			"title": "Tâche Incomplète",
-			"description": "Cette tâche a une spécification et un plan d'implémentation mais n'a jamais complété aucune sous-tâche ({{completed}}/{{total}}). Le processus s'est probablement bloqué lors de la création de la spécification. Cliquez sur Reprendre pour continuer l'implémentation.",
+			"title": "Tâche incomplète",
+			"description": "Cette tâche a un plan d'implémentation, mais sa construction s'est arrêtée avant d'avoir terminé une seule sous-tâche. Cliquez sur Reprendre pour continuer l'implémentation.",
 			"button": "Reprendre la Tâche"
 		}
 	},

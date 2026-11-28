@@ -144,6 +144,7 @@ from agents.tools_pkg import (
     get_allowed_tools,
     get_required_mcp_servers,
     is_tools_available,
+    restrict_builtin_tools,
     setting_sources_for,
     undeclared_builtin_tools,
 )
@@ -836,17 +837,16 @@ def create_client(
     if agent_type in READ_ONLY_AGENT_TYPES and "permission_mode" not in options_kwargs:
         options_kwargs["permission_mode"] = "plan"
 
-    # What a type does not declare, it does not have. `allowed_tools` only
-    # auto-approves, and the settings file above allows Write, Edit and
-    # `Bash(*)` to every type, so until this line a declaration was a wish:
-    # a `pr_reviewer` reading a hostile diff could write and run commands.
-    # `disallowed_tools` removes the tool from the model's context and wins
-    # over allow rules, which is why the settings file can stay shared.
+    # What a type does not declare, it does not have: `allowed_tools` only
+    # auto-approves and the shared settings file allows Write, Edit, `Bash(*)`;
+    # `disallowed_tools` wins over allow rules. `tools` drops other built-ins.
     if denied := undeclared_builtin_tools(agent_type):
         options_kwargs["disallowed_tools"] = denied
-
     _add_effort(options_kwargs, model, max_thinking_tokens, agent_type)
-    native_code_mode(options_kwargs, settings_file, agent_type, spec_dir, project_dir)
+    code_mode = native_code_mode(
+        options_kwargs, settings_file, agent_type, spec_dir, project_dir
+    )
+    restrict_builtin_tools(options_kwargs, agent_type, extra=("REPL",) * code_mode)
 
     return ClaudeSDKClient(options=ClaudeAgentOptions(**options_kwargs))
 
