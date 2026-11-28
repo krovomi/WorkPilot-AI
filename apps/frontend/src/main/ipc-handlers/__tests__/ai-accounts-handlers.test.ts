@@ -153,5 +153,11 @@ describe("AI accounts IPC", () => {
 		expect(signInAiAccount("missing")).toEqual({ success: false, error: "Account not found" });
 		expect(setDefaultAiAccount("codex", id)).toEqual({ success: false, error: "This account is not signed in" });
 		expect(setDefaultAiAccount("codex", null)).toEqual({ success: true });
+
+		registerAiAccountsHandlers();
+		const signIn = vi
+			.mocked(ipcMain.handle)
+			.mock.calls.find(([channel]) => channel === IPC_CHANNELS.AI_ACCOUNTS_SIGN_IN)?.[1];
+		expect(signIn?.({} as never, id)).toMatchObject({ success: true, data: { command: "codex login" } });
 	});
 });

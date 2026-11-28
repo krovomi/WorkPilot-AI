@@ -153,6 +153,18 @@ describe("CLI accounts in the store", () => {
 		expect(existsSync(home)).toBe(false);
 		expect(store.defaults()).toEqual({});
 	});
+
+	it("refuses as the default a key account whose key is gone", () => {
+		mkdirSync(path.dirname(file), { recursive: true });
+		writeFileSync(
+			file,
+			JSON.stringify({
+				accounts: [{ id: "k", provider: "openai", name: "K", createdAt: "2026-11-28T00:00:00.000Z" }],
+				defaults: {},
+			}),
+		);
+		expect(() => store.setDefault("openai", "k")).toThrow("This account has no key");
+	});
 });
 
 describe("login-accounts", () => {

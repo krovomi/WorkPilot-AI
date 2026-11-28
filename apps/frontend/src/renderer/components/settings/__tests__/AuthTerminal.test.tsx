@@ -163,6 +163,16 @@ describe("AuthTerminal", () => {
 		expect(sent()).toHaveBeenCalledWith("auth-opencode-1", "opencode auth login");
 	});
 
+	it("gives a CLI account's sign-in its own folder variable only", async () => {
+		renderTerminal({
+			terminalId: "ai-account-login-codex-1",
+			loginCommand: "codex login",
+			env: { CODEX_HOME: "/accounts/codex/a" },
+		});
+		await ready();
+		expect(create.mock.calls[0][0].env).toEqual({ CODEX_HOME: "/accounts/codex/a" });
+	});
+
 	it("runs the Codex login at once and reports its success without inventing an address", async () => {
 		const { onAuthSuccess, onClose } = renderTerminal({ terminalId: "auth-codex-1" });
 		await ready();

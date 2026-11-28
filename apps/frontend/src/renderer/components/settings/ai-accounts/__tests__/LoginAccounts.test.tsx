@@ -189,4 +189,35 @@ describe("LoginAccounts", () => {
 		fireEvent.click(screen.getByRole("button", { name: "Delete Work" }));
 		expect(await screen.findByRole("alert")).toHaveTextContent("Account not found");
 	});
+
+	it("names an unknown CLI by its id, and keeps a blank name or a cancelled form from saving", async () => {
+		render(<LoginAccounts provider="other-cli" />);
+		expect(await screen.findByRole("heading", { name: "other-cli sign-ins" })).toBeInTheDocument();
+		fireEvent.click(screen.getByRole("button", { name: /Add an account/ }));
+		fireEvent.change(screen.getByLabelText("Name"), { target: { value: "   " } });
+		const form = screen.getByLabelText("Name").closest("form") as HTMLFormElement;
+		fireEvent.submit(form);
+		fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+		expect(screen.queryByLabelText("Name")).toBeNull();
+		expect(bridge.saveAiAccount).not.toHaveBeenCalled();
+	});
+
+	it("keeps a blank rename from saving, and gives a refusal without a reason a short one", async () => {
+		render(<LoginAccounts provider="copilot" />);
+		fireEvent.click(await screen.findByRole("button", { name: "Rename Work" }));
+		fireEvent.change(screen.getByLabelText("Name"), { target: { value: "  " } });
+		fireEvent.submit(screen.getByLabelText("Name").closest("form") as HTMLFormElement);
+		expect(bridge.saveAiAccount).not.toHaveBeenCalled();
+		fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+		bridge.saveAiAccount.mockResolvedValueOnce({ success: false } as never);
+		fireEvent.click(screen.getByRole("button", { name: /Add an account/ }));
+		fireEvent.change(screen.getByLabelText("Name"), { target: { value: "More" } });
+		fireEvent.click(screen.getByRole("button", { name: /Add and sign in/ }));
+		expect(await screen.findByRole("alert")).toHaveTextContent("The account could not be saved.");
+
+		bridge.signInAiAccount.mockRejectedValueOnce("down");
+		fireEvent.click(within(row("c2")).getByRole("button", { name: /Sign in/ }));
+		await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("The sign-in could not start."));
+	});
 });
