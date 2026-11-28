@@ -17,12 +17,9 @@ adresse : confirmer avec `grep -n "<nom>" KanbanBoard.tsx` avant d'éditer.
 | `ColumnBand.tsx` | ~200 | bandeau d'une colonne : icône, compteur, jauge, résumé (`lib/column-pulse.ts`), état vide ([conception](../../../../../../docs/architecture/kanban-columns.md)) |
 | `KanbanToolbar.tsx` | ~400 | barre d'outils au-dessus du tableau |
 | `BoardLanes.tsx` · `LaneGroupingMenu.tsx` | ~200 · ~140 | couloirs (swimlanes), logique dans `lib/kanban-lanes.ts` ([conception](../../../../../../docs/architecture/kanban-swimlanes.md)) |
-| `BoardLayoutToggle.tsx` · `BoardList.tsx` | ~50 · ~170 | Tableau / Liste, rendue par `BoardLanes` ; tri : `lib/kanban-list.ts` |
-| `BoardTimeline.tsx` | ~160 | frise ; barres : `lib/kanban-timeline.ts` |
-| `labels/` | — | étiquettes ; `shared/utils/task-labels.ts`, filtres : `lib/kanban-filter.ts` |
-| `../../../main/kanban-auto-archive.ts` | ~80 | archivage auto ; « Mes tâches » : `useBoardFilters` |
-| `SprintMenu.tsx` · `SprintBanner.tsx` | — | sprints ; `SprintPlanningDialog.tsx`, `stores/sprint-store.ts` |
-| `reports/` | — | rapports (burndown, vélocité…) ; `lib/kanban-reports.ts` |
+| `BoardList.tsx` · `BoardTimeline.tsx` | — | liste et frise (`lib/kanban-list.ts`, `lib/kanban-timeline.ts`) |
+| `labels/` · `reports/` | — | étiquettes (`lib/kanban-filter.ts`), rapports (`lib/kanban-reports.ts`) |
+| `Sprint*.tsx` | — | sprints, `stores/sprint-store.ts` ; archivage : `main/kanban-auto-archive.ts` |
 | `board-ask/` | — | « Interroger le tableau », réponse par `main/board-ask/` ([conception](../../../../../../docs/architecture/board-ask.md)) |
 | `QuickCommandBar.tsx` | ~430 | palette `/slash` — liste via le backend, exécution par le main sur une carte de revue (`main/quick-command/`, F182) |
 | `../RoadmapKanbanView.tsx` | ~350 | vue roadmap, tableau distinct |
@@ -57,12 +54,9 @@ Un statut n'a pas de colonne à lui : `getVisualColumn()` projette `error → fa
 `getBoardColumn`, `getVisualColumn`, `VALID_BULK_TRANSITIONS` (déplacements en masse) et `manualMoveTargets`
 (menus « Déplacer vers ») vivent dans `../../lib/kanban-columns.ts`.
 
-`IMPORT_ALLOWED_COLUMNS` restreint les cibles d'import (Azure DevOps / Jira) à
-`backlog`, `queue`, `in_progress`.
+`IMPORT_ALLOWED_COLUMNS` : l'import (Azure DevOps / Jira) ne vise que `backlog`, `queue`, `in_progress`.
 
 ## Carte de `KanbanBoard.tsx` et `KanbanColumn.tsx`
-
-Les composants de colonne vivent dans `kanban/KanbanColumn.tsx` depuis le lot L11.
 
 | Fichier · zone | Ligne ~ | Contenu |
 |---|---|---|
