@@ -5,7 +5,8 @@
  *
  * `WORKPILOT_AI_ACCOUNTS` is a JSON object from provider to account key: the
  * default account of each API-key provider that has one with a key (the one
- * `ai-account-key.ts` hands to the process), and `claude:<profile>` for the
+ * `ai-account-key.ts` hands to the process), the default signed-in account of
+ * each coding-agent CLI (`login-accounts.ts`), and `claude:<profile>` for the
  * Claude sign-in the process got. Ids only, never a key: they are opaque
  * labels the app made (`randomUUID`, a profile's slug).
  *
