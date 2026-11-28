@@ -79,10 +79,12 @@ Installation pas à pas, configuration des providers, notes Windows et dépannag
 
 ## Fonctionnement
 
+<a href=".github/assets/showcase/how-it-works.fr-light.png">
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset=".github/assets/showcase/how-it-works.fr-dark.png">
   <img alt="Fonctionnement : planifier (vous décrivez une tâche, spec, planificateur, vous validez), construire et contrôler (codeur, relecteur et correcteur QA jusqu'à l'accord de la QA), prouver et livrer (vérification, vous relisez le diff, fusion ou pull request)" src=".github/assets/showcase/how-it-works.fr-light.png" width="100%">
 </picture>
+</a>
 
 - **Isolé** : chaque tâche tourne dans son propre worktree git, votre branche reste intacte jusqu'au merge ; le worktree est supprimé une fois la pull request de la tâche fusionnée.
 - **Toujours relu** : les pages qui écrivent du code (studio de tests, Import Design, journal des modifications, pair programming, commandes rapides du Kanban) le déposent sur la branche d'une carte « Code généré » en Révision humaine ; il n'atteint votre projet que par une pull request que vous relisez ([code généré](docs/architecture/generated-review.md)).
@@ -107,18 +109,22 @@ Installation pas à pas, configuration des providers, notes Windows et dépannag
 <tr>
 <td width="50%" valign="top">
 
+<a href=".github/assets/showcase/interrupted-tasks.png">
 <picture>
   <source media="(prefers-color-scheme: light)" srcset=".github/assets/showcase/interrupted-tasks-light.png">
   <img alt="Au démarrage : les tâches interrompues, chacune avec son moteur, sa façon de s'arrêter et l'étape où elle repart, cochées par défaut" src=".github/assets/showcase/interrupted-tasks.png">
 </picture>
+</a>
 
 </td>
 <td width="50%" valign="top">
 
+<a href=".github/assets/showcase/interrupted-cards.png">
 <picture>
   <source media="(prefers-color-scheme: light)" srcset=".github/assets/showcase/interrupted-cards-light.png">
   <img alt="Le tableau : cartes Interrompue avec Reprendre, « 2 interrompues » sur le bandeau En cours et « 3 tâches interrompues · Reprendre… » dans la barre" src=".github/assets/showcase/interrupted-cards.png">
 </picture>
+</a>
 
 </td>
 </tr>
@@ -132,18 +138,22 @@ Installation pas à pas, configuration des providers, notes Windows et dépannag
 <tr>
 <td width="50%" valign="top">
 
+<a href=".github/assets/showcase/sprint-planning.png">
 <picture>
   <source media="(prefers-color-scheme: light)" srcset=".github/assets/showcase/sprint-planning-light.png">
   <img alt="Planifier un sprint : la jauge de capacité face à la vélocité des 3 derniers sprints, le backlog et le sprint côte à côte" src=".github/assets/showcase/sprint-planning.png">
 </picture>
+</a>
 
 </td>
 <td width="50%" valign="top">
 
+<a href=".github/assets/showcase/sprint-proposal.png">
 <picture>
   <source media="(prefers-color-scheme: light)" srcset=".github/assets/showcase/sprint-proposal-light.png">
   <img alt="Proposer le sprint : les tâches proposées en pointillés violets avec leur raison, la ligne de capacité et ce qui passe dessous" src=".github/assets/showcase/sprint-proposal.png">
 </picture>
+</a>
 
 </td>
 </tr>
@@ -182,7 +192,7 @@ Installation pas à pas, configuration des providers, notes Windows et dépannag
 <tr>
 <td width="50%" valign="top">
 
-**Détail d'une tâche** : le plan découpé en sous-tâches avec les fichiers que chacune touche, les logs, les fichiers modifiés, les preuves visuelles et l'émulateur.
+**Détail d'une tâche** : le plan découpé en sous-tâches avec les fichiers que chacune touche, la zone « Guider l'agent » pour orienter l'agent en cours, les logs, les fichiers modifiés, le graphe des modifications, les captures avant/après et l'émulateur.
 
 ![Détail d'une tâche et ses sous-tâches](.github/assets/showcase/task-detail.png)
 
@@ -270,9 +280,9 @@ Le code est ensuite rendu, comparé à la maquette et corrigé jusqu'à lui ress
 </td>
 <td valign="top">
 
-**Bac à sable** : un instantané du worktree de la tâche avant chaque session d'agent, restauré quand la surveillance des anomalies arrête une session ; mode d'écriture restreint et limites par session.
+**Bac à sable** : un instantané du worktree de la tâche avant chaque session d'agent, restauré quand la surveillance des anomalies arrête une session ; une microVM Docker par tâche en option ; mode d'écriture restreint et limites par session.
 
-![Réglages du bac à sable : instantanés et retour arrière, mode d'écriture, limites par session](.github/assets/showcase/sandbox.png)
+![Réglages du bac à sable : instantanés et retour arrière, microVM Docker par tâche, mode d'écriture](.github/assets/showcase/sandbox.png)
 
 </td>
 </tr>
@@ -393,10 +403,12 @@ Plusieurs comptes peuvent être enregistrés par provider : plusieurs clés pour
 
 Comment les pièces communiquent :
 
+<a href=".github/assets/showcase/architecture.fr-light.png">
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset=".github/assets/showcase/architecture.fr-dark.png">
   <img alt="Architecture : sur votre machine, l'application de bureau et le moteur Python travaillent sur votre dépôt git, un worktree par tâche ; le moteur parle aux fournisseurs d'IA, aux forges et outils de suivi et aux autres clients IA ; un serveur d'équipe optionnel partage le tableau avec l'application mobile" src=".github/assets/showcase/architecture.fr-light.png" width="100%">
 </picture>
+</a>
 
 Où elles vivent dans le dépôt :
 

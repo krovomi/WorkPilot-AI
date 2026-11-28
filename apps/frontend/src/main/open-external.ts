@@ -1,7 +1,11 @@
 import { type ChildProcess, spawn } from "node:child_process";
-import { readFileSync } from "node:fs";
 import { shell } from "electron";
 import { isLinux } from "./platform";
+import { detectWsl, readAutomountRoot } from "./platform/wsl";
+
+// Moved to platform/wsl.ts (secret-storage.ts needs them without this module's
+// Electron shell and its import-time detection); re-exported for callers.
+export { detectWsl, readAutomountRoot };
 
 /**
  * Ouvrir une URL dans le navigateur du système.
@@ -74,51 +78,6 @@ export interface OpenExternalDeps {
 	/** Chemin Linux → chemin que Windows sait ouvrir (`wslpath -w`). */
 	toWindowsPath: (linuxPath: string) => string | null;
 	spawnOpener: (command: string, args: string[]) => ChildProcess;
-}
-
-/** Ce processus est-il un Linux lancé sous WSL (1 ou 2) ? */
-export function detectWsl(
-	linux = isLinux(),
-	env: NodeJS.ProcessEnv = process.env,
-	readText: (file: string) => string = (file) => readFileSync(file, "utf8"),
-): boolean {
-	if (!linux) return false;
-	if (env.WSL_DISTRO_NAME || env.WSL_INTEROP) return true;
-	for (const probe of ["/proc/sys/kernel/osrelease", "/proc/version"]) {
-		try {
-			if (readText(probe).toLowerCase().includes("microsoft")) return true;
-		} catch {
-			// sonde absente : on essaie la suivante
-		}
-	}
-	return false;
-}
-
-/** `[automount] root` de `/etc/wsl.conf`, sinon `/mnt/`. */
-export function readAutomountRoot(
-	readText: (file: string) => string = (file) => readFileSync(file, "utf8"),
-): string {
-	let text: string;
-	try {
-		text = readText("/etc/wsl.conf");
-	} catch {
-		return "/mnt/";
-	}
-	let inAutomount = false;
-	for (const raw of text.split(/\r?\n/)) {
-		const line = raw.trim();
-		const section = /^\[(.+)\]$/.exec(line);
-		if (section) {
-			inAutomount = section[1].trim().toLowerCase() === "automount";
-			continue;
-		}
-		const entry = /^root\s*=\s*(.*)$/i.exec(line);
-		if (inAutomount && entry) {
-			const root = entry[1].trim().replace(/^["']|["']$/g, "");
-			if (root) return root.endsWith("/") ? root : `${root}/`;
-		}
-	}
-	return "/mnt/";
 }
 
 /**
