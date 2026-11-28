@@ -37,6 +37,8 @@ export interface Memory {
 	content: string;
 	session_number?: number | null;
 	score?: number;
+	/** Kept from the trash and from the oldest-first purge (`brain/lifecycle/store.py`). */
+	pinned?: boolean;
 }
 
 type Json = Record<string, unknown>;

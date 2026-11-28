@@ -202,8 +202,14 @@ describe("forge on GitLab", () => {
 			[`GET ${ENC}/merge_requests/3/changes`]: { changes: [{ new_path: "src/a.ts", diff: "+x" }, { old_path: "gone.ts" }] },
 			[`POST ${ENC}/merge_requests/3/notes`]: {},
 		});
+		second.routes["GET /api/features/forge/gitlab/reviews"] = {
+			reviews: { "3": JSON.stringify({ findings: [{ id: "g1", severity: "low", title: "Tidy the name", description: "" }] }) },
+		};
 		await openApp("/projects/p1/forge/pulls/3");
 		expect(await screen.findByText("gone.ts")).toBeTruthy();
+		// The server learns from feedback on GitHub reviews only.
+		expect(await screen.findByText("Tidy the name")).toBeTruthy();
+		expect(screen.queryByRole("button", { name: "Useful" })).toBeNull();
 		expect(screen.getByRole("button", { name: "Merge" })).toBeDisabled();
 		expect(screen.queryByText(/^Checks:/)).toBeNull();
 		await fireEvent.changeText(screen.getByLabelText("Your comment"), "LGTM");

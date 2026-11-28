@@ -1,6 +1,6 @@
 import type { ServerClient } from "../api/client";
 import { adminApi, byDomain, orgRoles, slugify } from "../admin/api";
-import { invitationRoles, visiblePages } from "../admin/pages";
+import { administers, invitationRoles, visiblePages } from "../admin/pages";
 import type { Permission, Role } from "../admin/types";
 
 function role(over: Partial<Role>): Role {
@@ -69,7 +69,16 @@ describe("administration routes", () => {
 
 describe("administration pages", () => {
 	it("follows each page's read permission", () => {
-		expect(visiblePages(() => true).map((p) => p.page)).toEqual(["members", "invitations", "groups", "roles"]);
+		expect(visiblePages(() => true).map((p) => p.page)).toEqual([
+			"overview",
+			"members",
+			"invitations",
+			"groups",
+			"roles",
+			"sessions",
+			"quotas",
+			"audit",
+		]);
 		expect(visiblePages((p) => p === "org.role.read").map((p) => p.page)).toEqual(["roles"]);
 		expect(visiblePages(() => false)).toEqual([]);
 	});
@@ -77,5 +86,13 @@ describe("administration pages", () => {
 	it("offers to invite a server administrator to a platform admin only", () => {
 		expect(invitationRoles(false)).toEqual(["member", "viewer"]);
 		expect(invitationRoles(true)).toEqual(["member", "viewer", "admin"]);
+	});
+});
+
+describe("the administration console's helpers", () => {
+	it("offers the administration for any administered page, never for the overview alone", () => {
+		expect(administers((p) => p === "analytics.read")).toBe(false);
+		expect(administers((p) => p === "audit.read")).toBe(true);
+		expect(administers(() => false)).toBe(false);
 	});
 });

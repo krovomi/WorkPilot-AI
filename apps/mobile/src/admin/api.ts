@@ -8,9 +8,25 @@
 import { useMemo } from "react";
 import type { ServerClient } from "../api/client";
 import { useSession } from "../auth/session";
-import type { CreatedInvitation, Group, Invitation, OrgMember, Permission, ProjectRole, Role } from "./types";
+import type {
+	AdminOverview,
+	AuditEntry,
+	CreatedInvitation,
+	Group,
+	Invitation,
+	MemberSession,
+	OrgMember,
+	Permission,
+	ProjectRole,
+	Quota,
+	QuotaChanges,
+	Role,
+} from "./types";
 
 const enc = encodeURIComponent;
+
+/** Lines of the audit read at a time. */
+export const AUDIT_PAGE = 50;
 
 export interface RoleChanges {
 	name?: string;
@@ -52,6 +68,18 @@ export function adminApi(client: ServerClient) {
 		updateRole: (id: string, changes: RoleChanges) =>
 			client.request<Role>("PATCH", `/admin/roles/${enc(id)}`, changes),
 		deleteRole: (id: string) => client.request("DELETE", `/admin/roles/${enc(id)}`),
+
+		overview: () => client.request<AdminOverview>("GET", "/admin/overview"),
+		quotas: () => client.request<Quota>("GET", "/admin/quotas"),
+		setQuotas: (changes: QuotaChanges) => client.request<Quota>("PUT", "/admin/quotas", changes),
+		audit: ({ action, limit }: { action?: string; limit: number }) => {
+			const query = new URLSearchParams({ limit: String(limit) });
+			if (action) query.set("action", action);
+			return client.request<AuditEntry[]>("GET", `/admin/audit?${query}`);
+		},
+		sessions: () => client.request<MemberSession[]>("GET", "/admin/sessions"),
+		revokeSessions: (userId: string) =>
+			client.request<{ revoked: number }>("DELETE", `/admin/sessions/${enc(userId)}`),
 	};
 }
 

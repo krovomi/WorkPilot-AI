@@ -12,6 +12,7 @@ import {
 } from "../../../shared/utils/approval-tiers";
 import { cn } from "@/lib/utils";
 import { SettingsSection } from "./SettingsSection";
+import { ExpressLaneSettings } from "./ExpressLaneSettings";
 
 const K = "sections.approvals";
 const TIERS = ["N0", "N1", "N2", "N3"] as const;
@@ -152,6 +153,7 @@ export function ApprovalTiersSettings({ settings, onSettingsChange }: ApprovalTi
 					<Info className="mt-0.5 h-4 w-4 shrink-0" />
 					{t(`${K}.policyNote`)}
 				</p>
+				<ExpressLaneSettings settings={settings} onSettingsChange={onSettingsChange} />
 			</div>
 		</SettingsSection>
 	);
