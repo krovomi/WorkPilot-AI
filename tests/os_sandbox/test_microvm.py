@@ -657,7 +657,11 @@ def test_a_stopped_command_is_ended_inside_the_vm(sbx, worktree, monkeypatch):
     microvm.stop_run(vm, argv)
     ((stop, options),) = ran
     assert stop[:4] == ["/opt/sbx", "--no-input", "exec", vm.name]
-    assert stop[-1] == run_file and 'kill -TERM -- "-$p"' in stop[-2]
+    assert (
+        stop[-1] == run_file
+        and 'kill -TERM "-$p"' in stop[-2]
+        and " -- " not in stop[-2]
+    )
     assert options["stdin"] is microvm.subprocess.DEVNULL
 
 

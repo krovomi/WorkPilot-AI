@@ -179,7 +179,7 @@ l'environnement de la commande `sbx` ; chaque commande que WorkPilot y lance le 
 démarre dans sa propre session (`setsid -w sh -c 'echo $$ > <fichier>; exec "$@"'`, `RUN_SCRIPT`)
 et note son groupe de processus dans `/tmp/workpilot-run-<id>.pid` ; au délai ou à l'annulation,
 `SessionSandbox.stop(argv)` (`stop_run`) envoie TERM puis KILL à ce groupe par un second
-`sbx exec`. `run_command` et les CLI d'agents l'appellent après avoir arrêté le processus hôte.
+`sbx exec` (`kill -TERM "-<groupe>"` : le `/bin/sh` de la VM est dash, dont `kill` refuse `--`). `run_command` et les CLI d'agents l'appellent après avoir arrêté le processus hôte.
 
 Une commande lancée dans la VM n'a pas de stdin (`DEVNULL`) : sbx attend sur un tube ouvert que la commande ne lit pas. Celle qui lit son stdin le demande (`wrap(…, stdin=True)`, qui ajoute `sbx exec -i`).
 
