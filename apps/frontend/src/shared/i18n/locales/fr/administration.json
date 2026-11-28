@@ -188,7 +188,9 @@
 		},
 		"panes": {
 			"dashboard": "Chiffres",
-			"settings": "Collecte et conservation"
+			"settings": "Collecte et conservation",
+			"report": "Rapport",
+			"budgets": "Budgets"
 		},
 		"dashboard": {
 			"period": "Période",
@@ -297,6 +299,130 @@
 				"button": "Effacer le compte",
 				"done": "Le compte a été effacé. Ses totaux comptent désormais pour un compte effacé."
 			}
+		},
+		"report": {
+			"description": "Un résumé de l'usage de l'organisation, envoyé par e-mail. Il porte des chiffres, jamais un prompt, du code, un texte saisi ni un nom de fichier.",
+			"noSmtp": "Ce serveur ne peut pas envoyer d'e-mail (SMTP n'est pas configuré) : le rapport ne se lit qu'ici.",
+			"enabled": "Envoyer le rapport quotidien",
+			"when": "Quand",
+			"time": "Heure",
+			"timezone": "Fuseau horaire",
+			"invalidTime": "Une heure au format HH:MM et un fuseau comme Europe/Paris.",
+			"days": "Jours",
+			"weekdays": {
+				"0": "lun.",
+				"1": "mar.",
+				"2": "mer.",
+				"3": "jeu.",
+				"4": "ven.",
+				"5": "sam.",
+				"6": "dim."
+			},
+			"noDay": "Choisissez au moins un jour.",
+			"weekly": "Aussi le rapport de la semaine passée, chaque lundi",
+			"monthly": "Aussi le rapport du mois passé, le premier du mois",
+			"content": "Contenu",
+			"language": "Langue",
+			"languages": {
+				"fr": "Français",
+				"en": "Anglais"
+			},
+			"names": "Nommer les personnes dans le rapport",
+			"namesHint": "Désactivé, le rapport ne donne que des totaux et ne nomme personne.",
+			"recipients": "Destinataires",
+			"recipientsHint": "Une adresse par ligne, {{max}} au plus.",
+			"defaultRecipients": "Laissé vide, le rapport va aux membres dont le rôle lit l'usage : {{list}}.",
+			"noReader": "personne pour l'instant",
+			"invalidRecipients": "Vérifiez les adresses : une par ligne, {{max}} au plus.",
+			"outside": "{{address}} n'est pas membre de cette organisation : le rapport en sortira.",
+			"lastSends": "Derniers envois",
+			"noSends": "Rien n'a encore été envoyé.",
+			"sentAt": "Quand",
+			"kind": "Rapport",
+			"status": "Résultat",
+			"recipientCount": "Destinataires",
+			"kinds": {
+				"daily": "Quotidien",
+				"weekly": "Hebdomadaire",
+				"monthly": "Mensuel"
+			},
+			"statuses": {
+				"sent": "Envoyé",
+				"failed": "Échec",
+				"no_smtp": "Pas de SMTP",
+				"no_recipient": "Aucun destinataire"
+			},
+			"sendNow": "Envoyer maintenant",
+			"sendNowHint": "Envoie tout de suite le dernier rapport quotidien à ses destinataires ; l'envoi prévu part quand même à son heure.",
+			"sent_one": "Envoyé à {{count}} adresse.",
+			"sent_other": "Envoyé à {{count}} adresses.",
+			"notSent": "Non envoyé : {{status}}.",
+			"preview": {
+				"title": "Aperçu",
+				"hint": "Le rapport tel que l'e-mail le porte.",
+				"day": "Période qui contient le",
+				"show": "Afficher",
+				"period": "Du {{start}} au {{end}}",
+				"figure": "Indicateur",
+				"value": "Cette période",
+				"previous": "Période d'avant",
+				"average": "Moyenne sur 7 jours",
+				"figures": {
+					"tokens": "Tokens",
+					"cost_usd": "Coût",
+					"active": "Personnes actives",
+					"new_members": "Nouveaux membres",
+					"runs": "Runs",
+					"succeeded": "Réussis",
+					"failed": "Échoués",
+					"success_rate": "Taux de réussite",
+					"merged": "Tâches fusionnées",
+					"cost_per_task_usd": "Coût par tâche livrée"
+				},
+				"dormant_one": "{{count}} membre absent depuis un moment.",
+				"dormant_other": "{{count}} membres absents depuis un moment.",
+				"top": "Qui a le plus consommé",
+				"unnamed": "Non nommé",
+				"alerts": "Alertes de budget",
+				"budgetAlert": "Budget de l'organisation : {{percent}} consommé (alerte à {{threshold}} %).",
+				"scopeAlert": "{{scope}} {{name}} : {{percent}} consommé (alerte à {{threshold}} %)."
+			}
+		},
+		"budgets": {
+			"description": "Budgets mensuels de tokens pour une personne, un groupe ou un projet. Ceux qui lisent l'usage reçoivent un e-mail à 80 % et à 100 % ; un budget bloquant refuse les nouveaux runs une fois épuisé, jusqu'au mois suivant.",
+			"organization": "Budget de l'organisation",
+			"organizationHint": "{{used}} sur {{limit}} tokens ce mois-ci ({{percent}}), réglé dans Quotas.",
+			"noOrganization": "Pas de budget d'organisation : il se règle dans Quotas.",
+			"list": "Budgets",
+			"empty": "Aucun budget pour l'instant.",
+			"scope": "Pour",
+			"name": "Nom",
+			"limit": "Tokens par mois",
+			"used": "Consommé ce mois-ci",
+			"block": "Bloque les nouveaux runs",
+			"yes": "Oui",
+			"no": "Non",
+			"unknown": "Inconnu",
+			"scopes": {
+				"person": "Personne",
+				"group": "Groupe",
+				"project": "Projet"
+			},
+			"remove": "Supprimer",
+			"removeLabel": "Supprimer le budget de {{name}}",
+			"set": "Ajouter ou modifier un budget",
+			"setHint": "Un budget réglé de nouveau pour la même personne, le même groupe ou le même projet le remplace.",
+			"target": "Qui",
+			"choose": "Choisir",
+			"tokens": "Tokens par mois",
+			"invalidTokens": "Un nombre entier de tokens, de 1 à 1 000 000 000 000.",
+			"blockToggle": "Refuser les nouveaux runs une fois épuisé",
+			"save": "Régler le budget",
+			"alerts": "Dernières alertes",
+			"noAlerts": "Aucune alerte pour l'instant.",
+			"month": "Mois",
+			"threshold": "Seuil",
+			"recipients": "Envoyée à"
 		}
 	}
 }

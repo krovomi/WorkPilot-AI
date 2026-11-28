@@ -1,15 +1,17 @@
 /**
  * Usage (`usage.read`): the figures of the organization (or, for a platform
- * administrator, of the whole deployment), and what the server collects and
- * how long it keeps it.
+ * administrator, of the whole deployment), what the server collects and how
+ * long it keeps it, the usage report sent by email, and the token budgets.
  */
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui";
+import { UsageBudgets } from "./usage/UsageBudgets";
 import { UsageDashboard } from "./usage/UsageDashboard";
+import { UsageReportSettings } from "./usage/UsageReportSettings";
 import { UsageSettings } from "./usage/UsageSettings";
 
-const PANES = ["dashboard", "settings"] as const;
+const PANES = ["dashboard", "report", "budgets", "settings"] as const;
 type Pane = (typeof PANES)[number];
 
 export function UsageTab() {
@@ -31,7 +33,10 @@ export function UsageTab() {
 					</Button>
 				))}
 			</div>
-			{pane === "dashboard" ? <UsageDashboard /> : <UsageSettings />}
+			{pane === "dashboard" && <UsageDashboard />}
+			{pane === "report" && <UsageReportSettings />}
+			{pane === "budgets" && <UsageBudgets />}
+			{pane === "settings" && <UsageSettings />}
 		</div>
 	);
 }
