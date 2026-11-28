@@ -28,7 +28,7 @@ describe("ProviderAccountsDialog", () => {
 		expect(supportsAccounts("gemini")).toBe(true);
 		expect(supportsAccounts("copilot")).toBe(true);
 		expect(supportsAccounts("gemini-cli")).toBe(true);
-		expect(supportsAccounts("windsurf")).toBe(false);
+		expect(supportsAccounts("ollama")).toBe(false);
 	});
 
 	it("shows Claude's profiles, an API-key provider's accounts or a note", () => {
@@ -45,8 +45,8 @@ describe("ProviderAccountsDialog", () => {
 		rerender(<ProviderAccountsDialog provider={{ id: "openai", name: "OpenAI" }} onOpenChange={onOpenChange} />);
 		expect(screen.getByText("api-key openai")).toBeInTheDocument();
 		expect(screen.getByText("login codex")).toBeInTheDocument();
-		rerender(<ProviderAccountsDialog provider={{ id: "windsurf", name: "Windsurf" }} onOpenChange={onOpenChange} />);
-		expect(screen.getByText(/Windsurf signs in through its own tool/)).toBeInTheDocument();
+		rerender(<ProviderAccountsDialog provider={{ id: "ollama", name: "Ollama" }} onOpenChange={onOpenChange} />);
+		expect(screen.getByText(/Ollama signs in through its own tool/)).toBeInTheDocument();
 		rerender(<ProviderAccountsDialog provider={null} onOpenChange={onOpenChange} />);
 		expect(screen.queryByRole("dialog")).toBeNull();
 	});

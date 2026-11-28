@@ -1964,7 +1964,6 @@
 			"toolChanged": "description modifiée",
 			"noDescription": "(aucune description)",
 			"removed": "Plus proposés : {{tools}}",
-			"loginChoice": "{{name}} (connexion {{cli}})",
 			"finding": {
 				"invisible": "caractères invisibles",
 				"private-use": "caractères à usage privé",
@@ -3364,7 +3363,13 @@
 				"stepRun": "Appuyez sur Entrée pour lancer la commande affichée.",
 				"stepFollow": "Suivez les étapes qu'elle affiche (une page du navigateur peut s'ouvrir).",
 				"stepClose": "Fermez ce terminal quand il indique que vous êtes connecté."
-			}
+			},
+			"keyId": "ID de clé d'accès",
+			"secretKey": "Clé d'accès secrète",
+			"secretPlaceholder": "Collez la clé d'accès secrète du compte",
+			"secretKeep": "Laisser vide pour garder le secret enregistré",
+			"region": "Région",
+			"testUnchecked": "Clé enregistrée. {{provider}} n'offre aucune vérification que WorkPilot puisse lancer avec elle : la première tâche dira si elle marche."
 		},
 		"spend": {
 			"month": "Ce mois-ci : {{cost}} · {{tokens}} tokens",
@@ -3379,6 +3384,7 @@
 			"invalid": "Saisis un montant en dollars, ou laisse vide pour aucun budget."
 		},
 		"pins": {
+			"loginChoice": "{{name}} (connexion {{cli}})",
 			"title": "Compte IA",
 			"projectDescription": "Le compte sur lequel chaque provider tourne pour les tâches de ce projet. Une carte peut en choisir un autre.",
 			"cardDescription": "Le compte sur lequel chaque provider de cette carte tourne. Laisser tel quel pour suivre le projet, ou le compte par défaut du provider.",

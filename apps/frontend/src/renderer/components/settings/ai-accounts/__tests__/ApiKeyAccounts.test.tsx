@@ -167,6 +167,60 @@ describe("ApiKeyAccounts", () => {
 		expect(await screen.findByText("Test failed: HTTP 401")).toBeInTheDocument();
 	});
 
+	it("adds an AWS account with its key pair and region, and says the key cannot be checked", async () => {
+		snapshot = { accounts: [], defaults: {}, mainKeys: [] };
+		bridge.testAiAccount.mockResolvedValueOnce({ success: true, data: { ok: true, unchecked: true } });
+		render(<ApiKeyAccounts provider="aws" providerName="AWS Bedrock" />);
+		await screen.findByText("No account yet.");
+		fireEvent.click(screen.getByRole("button", { name: "Add an account" }));
+		const submit = screen.getByRole("button", { name: "Add and test" });
+		fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Prod" } });
+		fireEvent.change(screen.getByLabelText("Access key ID"), { target: { value: "AKIATEST0000" } });
+		expect(submit).toBeDisabled();
+		const secret = screen.getByLabelText("Secret access key");
+		expect(secret).toHaveAttribute("type", "password");
+		fireEvent.change(secret, { target: { value: "secret-test-0000" } });
+		expect(screen.getByLabelText("Region")).toHaveAttribute("placeholder", "us-east-1");
+		fireEvent.change(screen.getByLabelText("Region"), { target: { value: " eu-west-3 " } });
+		fireEvent.click(submit);
+		await waitFor(() =>
+			expect(bridge.saveAiAccount).toHaveBeenCalledWith({
+				provider: "aws",
+				name: "Prod",
+				apiKey: "AKIATEST0000",
+				secretKey: "secret-test-0000",
+				region: "eu-west-3",
+			}),
+		);
+		expect(await screen.findByText(/AWS Bedrock offers no check WorkPilot can run/)).toBeInTheDocument();
+	});
+
+	it("edits an AWS account without sending its secret, and shows its region", async () => {
+		const prod = { ...PERSO, id: "w1", provider: "aws", name: "Prod", hasSecret: true, region: "eu-west-3" };
+		snapshot = { accounts: [prod], defaults: {}, mainKeys: [] };
+		render(<ApiKeyAccounts provider="aws" providerName="AWS Bedrock" />);
+		await screen.findByText("Prod");
+		expect(within(row("w1")).getByText(/eu-west-3/)).toBeInTheDocument();
+		fireEvent.click(screen.getByRole("button", { name: "Edit Prod" }));
+		expect(screen.getByLabelText("Secret access key")).toHaveAttribute(
+			"placeholder",
+			"Leave empty to keep the saved secret",
+		);
+		expect(screen.getByLabelText("Region")).toHaveValue("eu-west-3");
+		fireEvent.change(screen.getByLabelText("Region"), { target: { value: " " } });
+		fireEvent.click(screen.getByRole("button", { name: "Save" }));
+		await waitFor(() =>
+			expect(bridge.saveAiAccount).toHaveBeenCalledWith({
+				id: "w1",
+				provider: "aws",
+				name: "Prod",
+				apiKey: undefined,
+				secretKey: undefined,
+				region: undefined,
+			}),
+		);
+	});
+
 	it("deletes an account after confirmation, warning when it is the default", async () => {
 		snapshot = { ...snapshot, defaults: { openai: "a1" } };
 		confirmAction.mockResolvedValueOnce(false).mockResolvedValueOnce(true);

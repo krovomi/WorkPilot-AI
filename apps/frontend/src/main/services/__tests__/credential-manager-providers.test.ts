@@ -30,6 +30,12 @@ const store = vi.hoisted(() => ({
 	accountKeys: {} as Record<string, string>,
 	/** The CLIs' default accounts' folders (Settings → AI accounts). */
 	loginEnv: {} as Record<string, string>,
+	/** What each provider's default account adds (AWS pair, Cursor/Windsurf key). */
+	accountEnv: {} as Record<string, Record<string, string>>,
+}));
+
+vi.mock("../../ai-accounts/account-env", () => ({
+	defaultAccountEnv: (provider: string) => store.accountEnv[provider] ?? {},
 }));
 
 vi.mock("../../ai-accounts/login-accounts", () => ({ loginAccountEnv: () => store.loginEnv }));
@@ -109,6 +115,7 @@ beforeEach(() => {
 	store.writeSettingsError = null;
 	store.claudeManager = null;
 	store.accountKeys = {};
+	store.accountEnv = {};
 	home = mkdtempSync(join(tmpdir(), "cred-manager-"));
 	process.env.HOME = home;
 	process.env.USERPROFILE = home;
@@ -981,6 +988,22 @@ describe("environment for the Python backend", () => {
 			COPILOT_GH_CONFIG_DIR: "/accounts/copilot/a",
 		});
 		store.loginEnv = {};
+	});
+
+	it("adds the default account of AWS, Cursor or Windsurf, for the provider asked or selected", () => {
+		store.accountEnv = {
+			aws: { AWS_ACCESS_KEY_ID: "id", AWS_SECRET_ACCESS_KEY: "secret", AWS_DEFAULT_REGION: "eu-west-3" },
+			cursor: { CURSOR_API_KEY: "cursor-key" },
+		};
+		store.settings = { selectedProvider: "aws" };
+		const manager = new CredentialManager();
+		expect(manager.getEnvironmentVariables()).toMatchObject({
+			AWS_ACCESS_KEY_ID: "id",
+			AWS_SECRET_ACCESS_KEY: "secret",
+			AWS_DEFAULT_REGION: "eu-west-3",
+		});
+		expect(manager.getEnvironmentVariables(" Cursor ")).toMatchObject({ CURSOR_API_KEY: "cursor-key" });
+		expect(manager.getEnvironmentVariables("cursor")).not.toHaveProperty("AWS_SECRET_ACCESS_KEY");
 	});
 
 	it("takes a provider's key and base URL from a matching profile first", async () => {

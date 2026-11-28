@@ -30,6 +30,7 @@ import {
 import { loadBetterSqlite } from "./windsurf-sqlite";
 import { defaultAccountKey, settingsApiKey } from "../ai-accounts/ai-account-key";
 import { loginAccountEnv } from "../ai-accounts/login-accounts";
+import { defaultAccountEnv } from "../ai-accounts/account-env";
 
 const execFileAsync = promisify(execFile);
 
@@ -1393,10 +1394,10 @@ export class CredentialManager extends EventEmitter {
 	getEnvironmentVariables(providerOverride?: string): Record<string, string> {
 		// A blank choice is no choice: it must not hide settings.selectedProvider.
 		const requested = (providerOverride ?? "").trim().toLowerCase();
-		// The CLIs' default accounts (Settings → AI accounts): each CLI's own folder.
+		// Settings → AI accounts: each CLI's default folder, and the default AWS pair or Cursor/Windsurf key.
 		const env = { ...this.buildEnvironmentVariables(requested || undefined), ...loginAccountEnv() };
+		Object.assign(env, defaultAccountEnv(requested || env.SELECTED_LLM_PROVIDER));
 		if (!requested) return env;
-
 		const canonical = requested === "anthropic" ? "claude" : requested; // même fournisseur
 		// Le choix de la page est la réponse. La construction ci-dessus a pu
 		// retomber sur le credential actif (un profil OpenAI, un SSO Windsurf…)
@@ -1550,7 +1551,6 @@ export class CredentialManager extends EventEmitter {
 			// For SSO/OAuth type: no WINDSURF_API_KEY needed — backend discovers it
 			// from the running Windsurf IDE via state.vscdb
 
-			// Filtrer les valeurs vides
 			return Object.fromEntries(
 				Object.entries(env).filter(([_, value]) => value.trim() !== ""),
 			);
