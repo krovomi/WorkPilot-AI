@@ -10,7 +10,9 @@ point back to the person:
 - the address and browser of the audit entries they made;
 - their id and address wherever an audit payload names them (another
   administrator's "added X to the group"), replaced by :data:`ERASED`;
-- the invitations sent to their address.
+- the invitations sent to their address;
+- their address among the recipients an organization chose for its usage
+  report (``services/report_settings.py``).
 
 Files a project's clone holds (cards, memories) are the team's work, not
 usage data: they stay as they are.
@@ -18,7 +20,10 @@ usage data: they stay as they are.
 
 from __future__ import annotations
 
-from server.db.models import AuditLog, Invitation, User
+from dataclasses import replace
+
+from server.db.models import AuditLog, Invitation, Organization, User
+from server.services import report_settings
 from sqlalchemy import String, cast, delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -62,10 +67,24 @@ async def erase(db: AsyncSession, user: User) -> dict[str, int]:
     invitations = await db.execute(
         delete(Invitation).where(func.lower(Invitation.email) == user.email.lower())
     )
+    recipients = await _drop_recipient(db, user.email.lower())
     await db.delete(user)
     await db.flush()
     return {
         "audit_entries_cleared": cleared.rowcount or 0,
         "audit_payloads_scrubbed": scrubbed,
         "invitations_deleted": invitations.rowcount or 0,
+        "report_recipients_removed": recipients,
     }
+
+
+async def _drop_recipient(db: AsyncSession, address: str) -> int:
+    """Take ``address`` off every usage report's recipients; how many lists."""
+    removed = 0
+    for org in await db.scalars(select(Organization)):
+        settings = report_settings.of(org.settings)
+        if address in settings.recipients:
+            kept = tuple(a for a in settings.recipients if a != address)
+            report_settings.store(org, replace(settings, recipients=kept))
+            removed += 1
+    return removed

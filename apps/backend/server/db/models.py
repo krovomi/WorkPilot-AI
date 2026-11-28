@@ -1202,3 +1202,34 @@ class PageVisit(Base):
     client: Mapped[str] = mapped_column(String(10))
     page: Mapped[str] = mapped_column(String(60))
     count: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class UsageReportSend(Base):
+    """One usage report an organization was due, claimed once.
+
+    The scheduler (``services/usage_report_schedule.py``) inserts the row
+    before it sends: the unique key on the organization, the kind and the
+    period makes a second send of the same report impossible, even after a
+    restart or with two server processes. ``status`` says what happened
+    (``sent``, ``failed``, ``no_smtp``, ``no_recipient``); only how many
+    addresses it went to is kept, never which.
+    """
+
+    __tablename__ = "usage_report_sends"
+    __table_args__ = (
+        UniqueConstraint("org_id", "kind", "period", name="uq_usage_report_send"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    org_id: Mapped[str] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE")
+    )
+    #: ``daily``, ``weekly`` or ``monthly``.
+    kind: Mapped[str] = mapped_column(String(10))
+    #: The first day the report covers (``YYYY-MM-DD``).
+    period: Mapped[date] = mapped_column(Date)
+    status: Mapped[str] = mapped_column(String(20), default="claimed")
+    recipients: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )

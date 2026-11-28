@@ -304,22 +304,30 @@ def _run_periodic_jobs(app: FastAPI) -> None:
 
     Escalating a plan that waited too long for its approvals
     (``services/approval_escalation.py``), started only when it is on; and
-    erasing usage data past its retention (``services/usage_retention.py``).
+    erasing usage data past its retention (``services/usage_retention.py``);
+    and sending each organization's usage report when it is due
+    (``services/usage_report_schedule.py``).
     """
     inner = app.router.lifespan_context
 
     @asynccontextmanager
     async def lifespan(application: FastAPI) -> AsyncIterator[object]:
-        from server.services import approval_escalation, usage_retention
+        from server.services import (
+            approval_escalation,
+            usage_report_schedule,
+            usage_retention,
+        )
 
         async with inner(application) as state:
             approval_escalation.start(ready=_ensure_db_ready)
             usage_retention.start(ready=_ensure_db_ready)
+            usage_report_schedule.start(ready=_ensure_db_ready)
             try:
                 yield state
             finally:
                 await approval_escalation.stop()
                 await usage_retention.stop()
+                await usage_report_schedule.stop()
 
     app.router.lifespan_context = lifespan
 
@@ -420,6 +428,7 @@ def mount_server_mode(app: FastAPI) -> bool:
         ("server.routers.usage", "usage"),
         ("server.routers.usage_admin", "usage_admin"),
         ("server.routers.usage_self", "usage_self"),
+        ("server.routers.usage_report", "usage_report"),
         ("server.routers.needs_you", "needs-you"),
         ("server.routers.access_tokens", "access-tokens"),
         ("server.routers.admin", "admin"),
