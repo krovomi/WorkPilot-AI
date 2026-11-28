@@ -37,6 +37,25 @@ export interface BoardAskMatch {
 	archived?: boolean;
 }
 
+/**
+ * Whether the tickets are also ranked by meaning (an embeddings model):
+ * `auto` asks a model on this machine, else the chosen provider's embeddings
+ * API; `local` only the machine's; `off` none.
+ */
+export type BoardAskSemanticMode = "auto" | "local" | "off";
+
+export const BOARD_ASK_SEMANTIC_MODES: readonly BoardAskSemanticMode[] = ["auto", "local", "off"];
+
+/** The embeddings model that ranked the tickets, and how much of the board it read. */
+export interface BoardAskSemantic {
+	kind: "local" | "cloud";
+	provider: string;
+	model: string;
+	/** Tickets it has read; a large board is read over a few questions. */
+	indexed: number;
+	total: number;
+}
+
 export interface BoardAskResult {
 	/**
 	 * The model's answer, in the language of the question. `[1]`, `[2]`… cite
@@ -44,12 +63,17 @@ export interface BoardAskResult {
 	 */
 	answer: string;
 	matches: BoardAskMatch[];
-	/** `ai`: a model read the tickets; `keywords`: the keyword search alone answered. */
-	mode: "ai" | "keywords";
+	/**
+	 * `ai`: a model read the tickets; `semantic`: no model answered, the
+	 * tickets are ranked by meaning and keywords; `keywords`: by keywords alone.
+	 */
+	mode: "ai" | "semantic" | "keywords";
 	/** Tickets of the board that were searched. */
 	searched: number;
 	/** The words searched besides the question's own, when a model gave them. */
 	expandedTerms?: string[];
+	/** Set when an embeddings model ranked the tickets too. */
+	semantic?: BoardAskSemantic;
 }
 
 /** Bounds the main process holds the renderer to. */

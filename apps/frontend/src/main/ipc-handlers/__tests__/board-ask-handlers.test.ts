@@ -12,6 +12,9 @@ const state = vi.hoisted(() => ({
 	tasks: [] as unknown[],
 	server: new Set<string>(),
 	oneShot: vi.fn(),
+	semanticOptions: [] as unknown[],
+	semantic: vi.fn(),
+	mode: "auto",
 }));
 
 vi.mock("electron", () => ({
@@ -28,6 +31,13 @@ vi.mock("../../project-store", () => ({
 vi.mock("../../server-projects", () => ({ getServerProject: (id: unknown) => (state.server.has(id as string) ? {} : undefined) }));
 vi.mock("../../app-language", () => ({ getAppLanguage: () => "fr" }));
 vi.mock("../../oneshot-llm", () => ({ runOneShotLLM: state.oneShot }));
+vi.mock("../../board-ask/semantic-search", () => ({
+	readSemanticMode: () => state.mode,
+	createSemanticSearch: (options: { mode: string }) => {
+		state.semanticOptions.push(options);
+		return options.mode === "off" ? undefined : state.semantic;
+	},
+}));
 
 import { handleBoardAsk, parseBoardAskRequest, registerBoardAskHandlers } from "../board-ask-handlers";
 
@@ -47,6 +57,10 @@ beforeEach(() => {
 	state.server = new Set();
 	state.oneShot.mockReset();
 	state.oneShot.mockResolvedValue(null);
+	state.semanticOptions = [];
+	state.semantic.mockReset();
+	state.semantic.mockResolvedValue(null);
+	state.mode = "auto";
 });
 
 describe("parseBoardAskRequest", () => {
@@ -99,5 +113,34 @@ describe("handleBoardAsk", () => {
 			expect.objectContaining({ projectDir: "/projects/one", debugLabel: "BoardAskUnderstand" }),
 		);
 		expect(state.oneShot.mock.calls[0]?.[0]).not.toHaveProperty("provider");
+	});
+
+	it("ranks by meaning with the mode of the settings, in the project's folder", async () => {
+		state.mode = "local";
+		state.semantic.mockResolvedValue({
+			source: { kind: "local", provider: "ollama", model: "bge-m3" },
+			scores: [{ id: "t1", score: 0.8 }],
+			indexed: 1,
+			total: 1,
+		});
+		const result = await handleBoardAsk({ projectId: "p1", question: "exportación" });
+		expect(state.semanticOptions).toEqual([{ projectDir: "/projects/one", mode: "local" }]);
+		expect(result.success && result.data?.mode).toBe("semantic");
+		expect(result.success && result.data?.semantic).toEqual({
+			kind: "local",
+			provider: "ollama",
+			model: "bge-m3",
+			indexed: 1,
+			total: 1,
+		});
+	});
+
+	it("asks no embeddings model when it is turned off, or when the caller says so", async () => {
+		state.mode = "off";
+		const off = await handleBoardAsk({ projectId: "p1", question: "export csv" });
+		expect(off.success && off.data?.semantic).toBeUndefined();
+		const none = await handleBoardAsk({ projectId: "p1", question: "export csv" }, undefined, null);
+		expect(none.success && none.data?.mode).toBe("keywords");
+		expect(state.semantic).not.toHaveBeenCalled();
 	});
 });
