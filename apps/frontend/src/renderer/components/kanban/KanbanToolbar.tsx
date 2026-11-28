@@ -35,6 +35,7 @@ import { useShortcutsHelpStore } from "../../stores/shortcuts-help-store";
 import { toneClass } from "../charter";
 import { TeamRoomBar } from "../collaboration";
 import { useKanbanFilterStore } from "../../stores/kanban-filter-store";
+import { useCollaborationStore } from "../../stores/collaboration-store";
 import { useProjectStore } from "../../stores/project-store";
 import { useTaskStore } from "../../stores/task-store";
 import { Button } from "../ui/button";
@@ -143,6 +144,8 @@ export function KanbanToolbar({ projectPath, onOpenTask }: KanbanToolbarProps) {
 	const toggleLabel = useKanbanFilterStore((s) => s.toggleLabel);
 	const toggleQuick = useKanbanFilterStore((s) => s.toggleQuick);
 	const tasks = useTaskStore((s) => s.tasks);
+	// « Mes tâches »: on a server board, whose team room says who I am.
+	const signedIn = useCollaborationStore((s) => s.me !== null);
 	const setSortField = useKanbanFilterStore((s) => s.setSortField);
 	const toggleSortDirection = useKanbanFilterStore((s) => s.toggleSortDirection);
 	const clearFilters = useKanbanFilterStore((s) => s.clearFilters);
@@ -275,7 +278,7 @@ export function KanbanToolbar({ projectPath, onOpenTask }: KanbanToolbarProps) {
 					<div className="space-y-4 p-4">
 						{/* Jira's quick filters: one click, then the finer dimensions below */}
 						<FilterSection title={t("kanban.filter.quickLabel")} activeCount={filters.quick?.length}>
-							{QUICK_FILTERS.map((quick) => (
+							{[...QUICK_FILTERS, ...(signedIn && serverProject ? (["mine"] as const) : [])].map((quick) => (
 								<FilterChip
 									key={quick}
 									label={t(`kanban.filter.quick.${quick}`)}

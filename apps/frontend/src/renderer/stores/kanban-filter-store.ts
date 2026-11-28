@@ -1,6 +1,8 @@
+import { useMemo } from "react";
 import { create } from "zustand";
 import type { TaskCategory, TaskPriority } from "../../shared/types";
 import {
+	type BoardFilterContext,
 	DEFAULT_SORT,
 	EMPTY_FILTERS,
 	type KanbanFilters,
@@ -12,6 +14,7 @@ import {
 } from "../lib/kanban-filter";
 import type { LaneGrouping } from "../lib/kanban-lanes";
 import type { BoardLayout, ListSort } from "../lib/kanban-list";
+import { useCollaborationStore } from "./collaboration-store";
 import { useKanbanLanesStore } from "./kanban-lanes-store";
 
 // ============================================
@@ -405,3 +408,19 @@ export const useKanbanFilterStore = create<KanbanFilterState>((set, get) => {
 		},
 	};
 });
+
+/**
+ * The board's filters with what « Mes tâches » needs: the server cards whose
+ * claim is mine (the team room's locks, server mode). Same object while
+ * nothing changes, so the board's memo holds.
+ */
+export function useBoardFilters(): KanbanFilters & BoardFilterContext {
+	const filters = useKanbanFilterStore((s) => s.filters);
+	const locks = useCollaborationStore((s) => s.locks);
+	const me = useCollaborationStore((s) => s.me?.id);
+	return useMemo(() => {
+		if (!filters.quick?.includes("mine")) return filters;
+		const mine = Object.values(locks).filter((lock) => lock.userId === me);
+		return { ...filters, claimedByMe: new Set(mine.map((lock) => lock.taskId)) };
+	}, [filters, locks, me]);
+}

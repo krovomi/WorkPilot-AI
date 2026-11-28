@@ -78,7 +78,7 @@ import {
 	MIN_COLUMN_WIDTH,
 	useKanbanSettingsStore,
 } from "../stores/kanban-settings-store";
-import { useKanbanFilterStore } from "../stores/kanban-filter-store";
+import { useBoardFilters, useKanbanFilterStore } from "../stores/kanban-filter-store";
 import {
 	useProjectEnvStore,
 } from "../stores/project-env-store";
@@ -266,7 +266,7 @@ export function KanbanBoard({
 
 	// Kanban filter/sort state (search, source/category/priority filters, sort).
 	// Persisted per project in the kanban-filter-store.
-	const kanbanFilters = useKanbanFilterStore((state) => state.filters);
+	const kanbanFilters = useBoardFilters();
 	const kanbanSort = useKanbanFilterStore((state) => state.sort);
 	const loadKanbanFilters = useKanbanFilterStore(
 		(state) => state.loadForProject,

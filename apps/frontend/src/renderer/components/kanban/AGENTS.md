@@ -20,6 +20,7 @@ adresse : confirmer avec `grep -n "<nom>" KanbanBoard.tsx` avant d'éditer.
 | `BoardLayoutToggle.tsx` · `BoardList.tsx` | ~50 · ~170 | Tableau / Liste, rendue par `BoardLanes` ; tri : `lib/kanban-list.ts` |
 | `BoardTimeline.tsx` | ~160 | frise ; barres : `lib/kanban-timeline.ts` |
 | `labels/` | — | étiquettes ; `shared/utils/task-labels.ts`, filtres : `lib/kanban-filter.ts` |
+| `../../../main/kanban-auto-archive.ts` | ~80 | archivage auto ; « Mes tâches » : `useBoardFilters` |
 | `SprintMenu.tsx` · `SprintDialogs.tsx` | ~250 · ~200 | sprints ; `stores/sprint-store.ts`, `shared/utils/sprints.ts` |
 | `reports/` | — | rapports (burndown, vélocité…) ; `lib/kanban-reports.ts` |
 | `board-ask/` | — | « Interroger le tableau », réponse par `main/board-ask/` ([conception](../../../../../../docs/architecture/board-ask.md)) |

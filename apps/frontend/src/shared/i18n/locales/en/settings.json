@@ -3470,6 +3470,13 @@
 		"label": "Set aside cards whose PR was closed",
 		"description": "A card whose pull request was closed without a merge moves to Abandoned, with the reason « PR closed without merge ». Resume it to work on it again."
 	},
+	"kanbanAutoArchive": {
+		"label": "Archive finished cards",
+		"description": "A card done for longer than this is archived. « Show archived » on the Done column brings it back. Local projects only.",
+		"off": "Never",
+		"after_one": "After {{count}} day",
+		"after_other": "After {{count}} days"
+	},
 	"myUsage": {
 		"navLabel": "My usage",
 		"title": "My usage",

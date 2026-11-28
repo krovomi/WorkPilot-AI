@@ -141,6 +141,11 @@ describe("the labels and quick filters", () => {
 		expect(taskMatchesFilters(card({}, new Date(Number.NaN)), recent, now)).toBe(false);
 		expect(taskMatchesFilters(card({}, new Date()), recent)).toBe(true);
 
+		const mine = { ...EMPTY_FILTERS, quick: ["mine" as const] };
+		expect(taskMatchesFilters(card({}), { ...mine, claimedByMe: new Set(["c"]) }, now)).toBe(true);
+		expect(taskMatchesFilters(card({}), { ...mine, claimedByMe: new Set(["other"]) }, now)).toBe(false);
+		expect(taskMatchesFilters(card({}), mine, now)).toBe(false);
+
 		const both = { ...EMPTY_FILTERS, quick: ["flagged" as const, "recent" as const] };
 		expect(activeFilterCount(both)).toBe(2);
 		expect(hasActiveFilters({ ...EMPTY_FILTERS, quick: [] })).toBe(false);

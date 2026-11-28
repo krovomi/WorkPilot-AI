@@ -425,6 +425,8 @@ export interface AppSettings {
 	kanbanColumnSummary?: boolean;
 	// A card whose PR was closed without a merge goes to « Abandonnée » (default on)
 	kanbanAbandonClosedPrs?: boolean;
+	// Done cards archived after this many days: 0 (off, default), 7, 14 or 30
+	kanbanAutoArchiveDays?: number;
 	// « Interroger le tableau »: rank the tickets by meaning too (default auto)
 	boardAskSemantic?: "auto" | "local" | "off";
 	// « Interroger le tableau »: the sources read besides the cards (default all)

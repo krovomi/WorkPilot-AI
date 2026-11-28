@@ -378,7 +378,8 @@
 			"labelsLabel": "Étiquettes",
 			"quick": {
 				"flagged": "Bloquées",
-				"recent": "Modifiées cette semaine"
+				"recent": "Modifiées cette semaine",
+				"mine": "Mes tâches"
 			}
 		},
 		"sort": {

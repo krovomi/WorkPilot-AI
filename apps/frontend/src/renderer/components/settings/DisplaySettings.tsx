@@ -8,6 +8,7 @@ import {
 	UI_SCALE_STEP,
 } from "../../../shared/constants";
 import type { AppSettings } from "../../../shared/types";
+import { AUTO_ARCHIVE_CHOICES, autoArchiveDays } from "../../../shared/utils/task-auto-archive";
 import { cn } from "../../lib/utils";
 import { useSettingsStore } from "../../stores/settings-store";
 import { Label } from "../ui/label";
@@ -352,6 +353,31 @@ export function DisplaySettings({
 							onSettingsChange({ ...settings, kanbanAbandonClosedPrs: checked })
 						}
 					/>
+				</div>
+
+				{/* Done cards archived after a while (kanban-auto-archive.md) */}
+				<div className="flex items-center justify-between max-w-md gap-4">
+					<div className="space-y-1">
+						<Label htmlFor="kanbanAutoArchiveDays" className="text-sm font-medium text-foreground">
+							{t("kanbanAutoArchive.label")}
+						</Label>
+						<p className="text-sm text-muted-foreground">{t("kanbanAutoArchive.description")}</p>
+					</div>
+					<Select
+						value={String(autoArchiveDays(settings.kanbanAutoArchiveDays))}
+						onValueChange={(value) => onSettingsChange({ ...settings, kanbanAutoArchiveDays: Number(value) })}
+					>
+						<SelectTrigger id="kanbanAutoArchiveDays" className="w-40 shrink-0">
+							<SelectValue />
+						</SelectTrigger>
+						<SelectContent>
+							{AUTO_ARCHIVE_CHOICES.map((days) => (
+								<SelectItem key={days} value={String(days)}>
+									{days === 0 ? t("kanbanAutoArchive.off") : t("kanbanAutoArchive.after", { count: days })}
+								</SelectItem>
+							))}
+						</SelectContent>
+					</Select>
 				</div>
 			</div>
 		</SettingsSection>

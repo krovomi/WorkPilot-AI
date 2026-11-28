@@ -60,9 +60,17 @@ export interface KanbanFilters {
 	quick?: QuickFilter[];
 }
 
-/** Jira's quick filters: the cards flagged « Bloquée », and those changed in the last week. */
-export type QuickFilter = "flagged" | "recent";
+/**
+ * Jira's quick filters: the cards flagged « Bloquée », those changed in the
+ * last week and, on a server board, the cards my work holds (« Mes tâches »).
+ */
+export type QuickFilter = "flagged" | "recent" | "mine";
 export const QUICK_FILTERS: readonly QuickFilter[] = ["flagged", "recent"];
+
+/** What the filters need beyond the cards: the server cards claimed by me (server mode). */
+export interface BoardFilterContext {
+	claimedByMe?: ReadonlySet<string>;
+}
 /** How far back « Modifiées cette semaine » looks. */
 export const RECENT_DAYS = 7;
 
@@ -162,7 +170,7 @@ export function activeFilterCount(filters: KanbanFilters): number {
 /** Test whether a task satisfies every active filter dimension. */
 export function taskMatchesFilters(
 	task: Task,
-	filters: KanbanFilters,
+	filters: KanbanFilters & BoardFilterContext,
 	now = Date.now(),
 ): boolean {
 	if (filters.labels?.length) {
@@ -171,6 +179,7 @@ export function taskMatchesFilters(
 	}
 	const quick = filters.quick ?? [];
 	if (quick.includes("flagged") && !task.metadata?.flagged) return false;
+	if (quick.includes("mine") && !filters.claimedByMe?.has(task.id)) return false;
 	if (quick.includes("recent") && !(now - new Date(task.updatedAt).getTime() <= RECENT_DAYS * 86_400_000)) return false;
 	if (filters.group && splitGroupId(task) !== filters.group) return false;
 	if (filters.sprint) {
