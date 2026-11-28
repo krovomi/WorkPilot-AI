@@ -20,6 +20,17 @@ vi.mock("../ai-accounts/pinned-account-env", () => ({
 		applyPinnedAccount(...args),
 }));
 
+const applyPinnedLogin = vi.fn(
+	(env: Record<string, string>, provider: string, accountId: string | undefined) => {
+		if (!accountId) return false;
+		env[`${provider.toUpperCase()}_HOME`] = `home:${accountId}`;
+		return true;
+	},
+);
+vi.mock("../ai-accounts/login-accounts", () => ({
+	applyPinnedLogin: (...args: Parameters<typeof applyPinnedLogin>) => applyPinnedLogin(...args),
+}));
+
 import {
 	buildTaskProviderEnv,
 	planTaskProviders,
@@ -124,6 +135,34 @@ describe("pinned accounts", () => {
 		expect(env.MISTRAL_KEY).toBe("default");
 	});
 
+	it("points each CLI at its pinned sign-in, over the default folder every provider carries", () => {
+		const env = buildTaskProviderEnv(
+			{
+				providers: ["copilot", "mistral"],
+				startProvider: "copilot",
+				usesClaude: false,
+				accounts: { copilot: "work" },
+			},
+			() => ({ COPILOT_HOME: "default" }),
+		);
+		expect(env.COPILOT_HOME).toBe("home:work");
+	});
+
+	it("keeps OpenAI on its pinned key rather than a Codex sign-in", () => {
+		applyPinnedLogin.mockClear();
+		const env = buildTaskProviderEnv(
+			{
+				providers: ["openai"],
+				startProvider: "openai",
+				usesClaude: false,
+				accounts: { openai: "key", codex: "plan" },
+			},
+			() => ({}),
+		);
+		expect(env.OPENAI_KEY).toBe("pinned:key");
+		expect(applyPinnedLogin).not.toHaveBeenCalled();
+	});
+
 	it("takes the card's pin over the project's, the project's for the rest", () => {
 		expect(
 			taskAccountPins(
@@ -131,6 +170,13 @@ describe("pinned accounts", () => {
 				{ aiAccounts: { openai: "project", anthropic: "team" } },
 			),
 		).toEqual({ openai: "card", claude: "team" });
+		// A card's Codex sign-in replaces the project's OpenAI key, and the reverse.
+		expect(
+			taskAccountPins({ aiAccounts: { codex: "plan" } }, { aiAccounts: { openai: "key" } }),
+		).toEqual({ codex: "plan" });
+		expect(
+			taskAccountPins({ aiAccounts: { openai: "key" } }, { aiAccounts: { codex: "plan", copilot: "gh" } }),
+		).toEqual({ openai: "key", copilot: "gh" });
 		expect(taskAccountPins(undefined, undefined)).toBeUndefined();
 	});
 });

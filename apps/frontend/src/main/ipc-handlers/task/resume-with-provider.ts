@@ -2,6 +2,7 @@ import { existsSync, rmSync } from "node:fs";
 import path from "node:path";
 import type { IPCResult } from "../../../shared/types";
 import type { ThinkingLevel } from "../../../shared/types/settings";
+import { siblingPinKeys } from "../../../shared/utils/ai-account-pins";
 import {
 	applyEngineChange,
 	buildEngineMetadata,
@@ -43,7 +44,11 @@ export interface EngineChoice {
 	readonly accountPin?: { readonly key: string; readonly id: string };
 }
 
-/** The task's pins with `pin` set, keeping the other providers' pins. */
+/**
+ * The task's pins with `pin` set, keeping the other providers' pins. A pin of
+ * the same engine under another key is dropped: an OpenAI key pin would win
+ * over the Codex sign-in the failover moved to.
+ */
 export function withAccountPin(
 	existing: unknown,
 	pin: { readonly key: string; readonly id: string },
@@ -54,6 +59,7 @@ export function withAccountPin(
 			if (typeof value === "string") pins[key] = value;
 		}
 	}
+	for (const sibling of siblingPinKeys(pin.key)) delete pins[sibling];
 	pins[pin.key] = pin.id;
 	return pins;
 }

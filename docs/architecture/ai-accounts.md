@@ -2,9 +2,9 @@
 feature: Plusieurs comptes par provider IA
 summary: >-
   Plusieurs comptes par provider à clé API (OpenAI, Google, Mistral, DeepSeek, Grok, Meta,
-  OpenRouter, Hugging Face), clés chiffrées dans le main, un compte par défaut par provider donné
-  aux tâches ; Claude : ses profils OAuth ; Copilot, Codex CLI, Gemini CLI : un dossier par compte ;
-  bascule depuis la popin ; dépense et budget par compte ; en mode serveur, chacun les siens.
+  OpenRouter, Hugging Face, Cursor, Windsurf ; AWS : paire et région), clés chiffrées dans le main,
+  un défaut par provider donné aux tâches ; Claude : ses profils OAuth ; Copilot, Codex CLI,
+  Gemini CLI : un dossier par compte ; dépense et budget par compte ; en serveur, chacun les siens.
 ---
 
 # Plusieurs comptes par provider IA
@@ -48,7 +48,8 @@ Les alias (`gemini` → `google`) passent par `accountProviderOf` (`shared/types
 
 Un projet (`ProjectSettings.aiAccounts`) et une carte Kanban (`TaskMetadata.aiAccounts`, dans
 `task_metadata.json`) peuvent épingler un compte par provider : `{ provider: id }`, où le provider
-est celui des comptes (`google` pour `gemini`) ou `claude`, dont l'id est un profil OAuth. La carte
+est celui des comptes (`google` pour `gemini`), `claude`, dont l'id est un profil OAuth, ou un outil
+CLI (`copilot`, `codex`, `gemini-cli`), dont l'id est un compte de connexion. La carte
 prime, puis le projet, puis le compte par défaut (`shared/utils/ai-account-pins.ts`,
 `mergeAccountPins`). L'épingle n'est qu'un id : elle est nettoyée à la lecture (providers connus,
 id court et imprimable) et le main cherche le compte dans son propre magasin.
@@ -58,6 +59,14 @@ id court et imprimable) et le main cherche le compte dans son propre magasin.
   que le gestionnaire d'identifiants a choisi (`applyPinnedAccount`,
   `main/ai-accounts/pinned-account-env.ts`), sur l'adresse officielle du provider (l'URL d'un profil
   est retirée), seulement si le compte est bien de ce provider. OpenAI passe alors en clé API.
+- Compte d'un outil CLI : `buildTaskProviderEnv` pose, une fois l'environnement de chaque provider
+  réuni (chacun porte les dossiers par défaut de `loginAccountEnv`), la variable du backend de
+  l'outil sur le dossier du compte épinglé (`applyPinnedLogin`, `main/ai-accounts/login-accounts.ts`),
+  seulement si ce compte est de cet outil et connecté. OpenAI a deux épingles exclusives : `openai`
+  (une clé) ou `codex` (une connexion Codex CLI, qui passe la tâche en `OPENAI_AUTH_MODE=codex-cli`) ;
+  en choisir une retire l'autre (`withAccountPin`), l'épingle de la carte remplace les deux du projet
+  (`mergeAccountPins`), et une clé épinglée l'emporte sur une connexion qu'un fichier écrit à la main
+  garderait. Un compte de connexion n'a pas de dépense par appel : `servedAccountPins` l'ignore.
 - Claude : `pinnedClaudeProfileEnv` (`main/agent/pinned-claude-profile.ts`) remplace
   `getBestAvailableProfileEnv` pour la tâche ; le jeton rafraîchi avant le lancement et le profil
   marqué « en cours » sont ceux du profil épinglé. Le profil actif de l'app ne change pas.
@@ -68,7 +77,9 @@ id court et imprimable) et le main cherche le compte dans son propre magasin.
   tâche prend celui-ci une fois (`main/agent/claude-swap-pins.ts`), sans réécrire le fichier.
 - L'interface : `AiAccountPinsEditor` (`renderer/components/ai-account-pins/`), dans le groupe Agent
   des paramètres du projet et sous le moteur de la carte (création et modification). Une ligne par
-  provider qui a un choix : un compte à clé, ou plus d'un profil Claude.
+  provider qui a un choix : un compte à clé, un compte CLI connecté (la ligne d'OpenAI liste ses
+  clés puis ses connexions Codex CLI ; Copilot et Gemini CLI ont la leur), ou plus d'un profil
+  Claude. Sans défaut, une ligne d'outil CLI hérite de « connexion de cet ordinateur ».
 
 
 ## L'interface
@@ -211,15 +222,37 @@ première d'un provider devient son défaut, une par défaut au plus.
 - **RGPD** : supprimer le compte de la personne supprime ses comptes IA (`CASCADE`,
   `account_erasure.py`).
 
+## AWS, Cursor et Windsurf
+
+Leur clé ne passe pas par `defaultAccountKey` : `credential-manager.ts` ne leur connaît pas de
+branche dans sa recherche de clé. `main/ai-accounts/account-env.ts` (`defaultAccountEnv`) ajoute
+donc lui-même, après le reste de l'environnement, ce que donne leur compte par défaut :
+
+| Provider | Variables | Lues par |
+|---|---|---|
+| AWS (Bedrock) | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION` | `provider_api.py`, le SDK AWS |
+| Cursor | `CURSOR_API_KEY` | `provider_api.py` |
+| Windsurf | `WINDSURF_API_KEY` | `provider_api.py` |
+
+Un compte AWS est une paire (`KEY_PAIR_PROVIDERS`) : l'identifiant de clé dans `apiKey`, le secret
+dans `secretKey`, chiffré pareil, et une région vérifiée (`isAwsRegion`, `us-east-1` par défaut).
+La vue n'en montre que `hasSecret` et la région ; `hasKey` n'est vrai qu'avec les deux moitiés, et
+un compte sans secret ne devient pas le défaut. Le handler chiffre d'avance les deux valeurs
+tapées (`prepareSecrets`). Le test d'un de ces comptes répond `unchecked` sans rien appeler : AWS
+signe ses requêtes et Cursor ou Windsurf n'ont pas de point d'accès que la clé seule permet
+d'interroger ; l'interface dit que la première tâche le dira. Le mode serveur garde sa propre liste
+de providers (`server/services/ai_accounts.py`), sans ces trois-là pour l'instant.
+
 ## Pas encore
 
-Windsurf, Cursor, AWS (paire de clés et région) et Ollama (local) gardent un compte.
+Ollama (local) n'a pas de compte : il n'a pas de clé.
 
 ## Fichiers
 
 - `apps/frontend/src/shared/types/ai-accounts.ts` : types et providers.
 - `apps/frontend/src/main/ai-accounts/ai-accounts.ts` : le stockage.
 - `apps/frontend/src/main/ai-accounts/ai-account-key.ts` : la clé que reçoit un provider.
+- `apps/frontend/src/main/ai-accounts/account-env.ts` : les variables d'AWS, Cursor et Windsurf.
 - `apps/frontend/src/main/ai-accounts/login-specs.ts`, `login-accounts.ts` : les comptes des outils CLI.
 - `apps/backend/foundation/copilot_gh_env.py` : le dossier GitHub CLI du jeton de Copilot.
 - `apps/frontend/src/main/ipc-handlers/ai-accounts-handlers.ts` : l'IPC.
@@ -235,9 +268,10 @@ Windsurf, Cursor, AWS (paire de clés et région) et Ollama (local) gardent un c
 
 ## Quand un compte s'arrête
 
-Chaque compte est une entrée `account-<id>` de la chaîne de basculement. Une tâche arrêtée par
-une limite, un quota épuisé ou une clé refusée passe au compte suivant de son provider, épinglé
-sur elle seule ; le compte par défaut ne bouge pas. Détail : [provider-failover.md](provider-failover.md).
+Chaque compte est une entrée `account-<id>` de la chaîne de basculement, ceux des outils CLI
+compris dès qu'ils sont connectés (un compte Codex CLI sert OpenAI). Une tâche arrêtée par une
+limite, un quota épuisé ou une clé refusée passe au compte suivant de son provider, épinglé sur
+elle seule ; le compte par défaut ne bouge pas. Détail : [provider-failover.md](provider-failover.md).
 
 Voir aussi [forge-accounts.md](forge-accounts.md) (même modèle pour les forges) et
 [provider-failover.md](provider-failover.md) (basculement auto entre comptes).

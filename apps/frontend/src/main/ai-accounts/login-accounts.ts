@@ -1,10 +1,11 @@
 /**
- * The coding-agent CLIs' default accounts, as the rest of the main process
- * uses them: the folder variables the backend receives, the folder Codex's
- * usage is read from, and the sign-in terminal of an account.
+ * The coding-agent CLIs' accounts, as the rest of the main process uses
+ * them: the folder variables the backend receives (the default account's, or
+ * the one a card or a project pins), the folder Codex's usage is read from,
+ * and the sign-in terminal of an account.
  */
 
-import type { AiAccountSignIn } from "../../shared/types/ai-accounts";
+import { type AiAccountSignIn, loginProviderOf } from "../../shared/types/ai-accounts";
 import { appLog } from "../app-logger";
 import { aiAccountStore } from "./ai-accounts";
 import { LOGIN_SPECS } from "./login-specs";
@@ -31,6 +32,46 @@ export function loginAccountEnv(): Record<string, string> {
 		if (home) env[spec.backendEnv] = home;
 	}
 	return env;
+}
+
+/**
+ * The folder of `accountId` when it is a signed-in account of the CLI
+ * `loginProvider`, or undefined: a pin to an account that is gone, of another
+ * CLI or signed out leaves the task on the CLI's default, with a warning.
+ */
+export function pinnedLoginHome(loginProvider: string, accountId: string | undefined): string | undefined {
+	if (!accountId) return undefined;
+	try {
+		const store = aiAccountStore();
+		const account = store.get(accountId);
+		if (account?.provider !== loginProvider || !account.signedIn) {
+			appLog.warn(`[ai-accounts] pinned ${loginProvider} account not signed in, using the default one`);
+			return undefined;
+		}
+		return store.homeOf(accountId);
+	} catch (error) {
+		appLog.warn("[ai-accounts] pinned CLI account unreadable:", (error as Error).message);
+		return undefined;
+	}
+}
+
+/**
+ * Points `provider`'s CLI at the folder of the pinned sign-in `accountId`
+ * (`openai` → Codex CLI, which then runs on that ChatGPT plan rather than an
+ * API key). Answers whether it did; `env` is left untouched otherwise.
+ */
+export function applyPinnedLogin(
+	env: Record<string, string>,
+	provider: string,
+	accountId: string | undefined,
+): boolean {
+	const loginProvider = loginProviderOf(provider);
+	if (!loginProvider) return false;
+	const home = pinnedLoginHome(loginProvider, accountId);
+	if (!home) return false;
+	env[LOGIN_SPECS[loginProvider].backendEnv] = home;
+	if (loginProvider === "codex") env.OPENAI_AUTH_MODE = "codex-cli";
+	return true;
 }
 
 /** What the sign-in terminal of the CLI account `id` runs, or undefined. */

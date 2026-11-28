@@ -15,6 +15,9 @@
  * A coding-agent CLI's account (`login-specs.ts`) holds no key: it is a folder
  * the main process creates under `<userData>/config/ai-account-homes/`, where
  * the CLI keeps its own sign-in. Deleting the account deletes the folder.
+ *
+ * An AWS account is a key pair and a region (`KEY_PAIR_PROVIDERS`): the access
+ * key id is its key, the secret is stored the same way beside it.
  */
 
 import { randomUUID } from "node:crypto";
@@ -25,6 +28,9 @@ import {
 	AI_ACCOUNT_PROVIDERS,
 	type AiAccountInput,
 	type AiAccountView,
+	DEFAULT_AWS_REGION,
+	isAwsRegion,
+	KEY_PAIR_PROVIDERS,
 } from "../../shared/types/ai-accounts";
 import { decryptSecret, encryptSecret } from "../secret-storage";
 import { unmaskSecret } from "../utils/masked-secret";
@@ -42,6 +48,9 @@ interface StoredAccount {
 	apiKey?: string;
 	/** A CLI sign-in account: its folder, created by the main process. */
 	home?: string;
+	/** A key-pair account (AWS): its secret, stored like `apiKey`, and its region. */
+	secretKey?: string;
+	region?: string;
 	createdAt: string;
 	keySetAt?: string;
 }
@@ -71,6 +80,23 @@ function clean(value: unknown, max: number): string {
 	return kept.trim().slice(0, max);
 }
 
+/** A key typed in the renderer: undefined (none, or the mask), else checked. */
+function typedKey(value: unknown): string | undefined {
+	const typed = unmaskSecret(typeof value === "string" ? value : undefined);
+	const key = typed === undefined ? undefined : clean(typed, MAX_KEY + 1);
+	if (key !== undefined && key.length > MAX_KEY) throw new Error("Key too long");
+	if (key !== undefined && /\s/.test(key)) throw new Error("Invalid key");
+	return key || undefined;
+}
+
+/** An AWS region typed in the renderer: undefined when blank, else a region name. */
+function typedRegion(value: unknown): string | undefined {
+	const region = clean(value, 40).toLowerCase();
+	if (!region) return undefined;
+	if (!isAwsRegion(region)) throw new Error("Invalid region");
+	return region;
+}
+
 function isStoredAccount(value: unknown): value is StoredAccount {
 	if (!value || typeof value !== "object") return false;
 	const account = value as Record<string, unknown>;
@@ -81,12 +107,18 @@ function isStoredAccount(value: unknown): value is StoredAccount {
 		typeof account.createdAt === "string" &&
 		(account.apiKey === undefined || typeof account.apiKey === "string") &&
 		(account.home === undefined || typeof account.home === "string") &&
+		(account.secretKey === undefined || typeof account.secretKey === "string") &&
+		(account.region === undefined || isAwsRegion(account.region)) &&
 		(account.keySetAt === undefined || typeof account.keySetAt === "string")
 	);
 }
 
-function viewOf({ apiKey, home, ...account }: StoredAccount): AiAccountView {
+function viewOf({ apiKey, home, secretKey, region, ...account }: StoredAccount): AiAccountView {
 	const spec = LOGIN_SPECS[account.provider];
+	if (KEY_PAIR_PROVIDERS.includes(account.provider)) {
+		const pair = { hasSecret: Boolean(secretKey), region: region ?? DEFAULT_AWS_REGION };
+		return { ...account, hasKey: Boolean(apiKey && secretKey), kind: "key", ...pair };
+	}
 	if (!spec) return { ...account, hasKey: Boolean(apiKey), kind: "key" };
 	return { ...account, hasKey: false, kind: "login", signedIn: home ? spec.signedIn(home) : false };
 }
@@ -161,6 +193,13 @@ export class AiAccountStore {
 		return stored ? decryptSecret(stored) : undefined;
 	}
 
+	/** A key-pair account's secret in clear and its region, or undefined. */
+	pairOf(id: string): { secretKey: string; region: string } | undefined {
+		const account = this.read().accounts.find((candidate) => candidate.id === id);
+		const secretKey = account?.secretKey ? decryptSecret(account.secretKey) : undefined;
+		return account && secretKey ? { secretKey, region: account.region ?? DEFAULT_AWS_REGION } : undefined;
+	}
+
 	/** The default account of `provider`, with its key in clear, or undefined. */
 	defaultOf(provider: string): { account: AiAccountView; apiKey: string } | undefined {
 		const id = this.read().defaults[provider];
@@ -185,21 +224,24 @@ export class AiAccountStore {
 		const name = clean(input.name, MAX_NAME);
 		if (!name) throw new Error("A name is required");
 		if (isLoginProvider(input.provider)) return this.saveLogin(input.provider, name, input.id);
-		const typed = unmaskSecret(typeof input.apiKey === "string" ? input.apiKey : undefined);
-		const apiKey = typed === undefined ? undefined : clean(typed, MAX_KEY + 1);
-		if (apiKey !== undefined && apiKey.length > MAX_KEY) throw new Error("Key too long");
-		if (apiKey !== undefined && /\s/.test(apiKey)) throw new Error("Invalid key");
+		const apiKey = typedKey(input.apiKey);
+		const pair = KEY_PAIR_PROVIDERS.includes(input.provider);
+		const secretKey = pair ? typedKey(input.secretKey) : undefined;
+		const region = pair ? typedRegion(input.region) : undefined;
 
 		const file = this.read();
 		const now = new Date().toISOString();
 		if (input.id === undefined) {
 			if (!apiKey) throw new Error("A key is required");
+			if (pair && !secretKey) throw new Error("A secret key is required");
 			if (file.accounts.length >= MAX_AI_ACCOUNTS) throw new Error("Too many accounts");
 			const created: StoredAccount = {
 				id: randomUUID(),
 				provider: input.provider,
 				name,
 				apiKey: encryptSecret(apiKey),
+				...(secretKey ? { secretKey: encryptSecret(secretKey) } : {}),
+				...(pair ? { region: region ?? DEFAULT_AWS_REGION } : {}),
 				createdAt: now,
 				keySetAt: now,
 			};
@@ -215,6 +257,8 @@ export class AiAccountStore {
 			...existing,
 			name,
 			...(apiKey ? { apiKey: encryptSecret(apiKey), keySetAt: now } : {}),
+			...(secretKey ? { secretKey: encryptSecret(secretKey), keySetAt: now } : {}),
+			...(region ? { region } : {}),
 		};
 		file.accounts[index] = updated;
 		this.write(file);
@@ -265,7 +309,7 @@ export class AiAccountStore {
 			if (!account || account.provider !== provider) throw new Error("Account not found");
 			if (isLoginProvider(provider)) {
 				if (!viewOf(account).signedIn) throw new Error("This account is not signed in");
-			} else if (!account.apiKey) {
+			} else if (!viewOf(account).hasKey) {
 				throw new Error("This account has no key");
 			}
 			file.defaults[provider] = id;

@@ -7,7 +7,7 @@
  * sign-in of this computer.
  */
 
-import type { AiAccountSignIn, AiAccountView } from "@shared/types/ai-accounts";
+import { type AiAccountSignIn, type AiAccountView, LOGIN_CLI_NAMES } from "@shared/types/ai-accounts";
 import { Check, Loader2, LogIn, Pencil, Plus, Star, Trash2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -19,13 +19,6 @@ import { aiAccountsOf, useAiAccountsStore } from "@/stores/ai-accounts-store";
 import { Chip, Notice } from "../../charter";
 import { AuthTerminal } from "../AuthTerminal";
 import { AccountSpend } from "./AccountSpend";
-
-/** The tool each sign-in provider signs in with (product names, never translated). */
-export const LOGIN_CLI_NAMES: Readonly<Record<string, string>> = {
-	copilot: "GitHub CLI",
-	codex: "Codex CLI",
-	"gemini-cli": "Gemini CLI",
-};
 
 interface SignIn extends AiAccountSignIn {
 	name: string;
