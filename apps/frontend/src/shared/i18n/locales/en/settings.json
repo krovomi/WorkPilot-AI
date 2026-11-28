@@ -1639,7 +1639,6 @@
 			"toolChanged": "description changed",
 			"noDescription": "(no description)",
 			"removed": "No longer listed: {{tools}}",
-			"loginChoice": "{{name}} ({{cli}} sign-in)",
 			"finding": {
 				"invisible": "invisible characters",
 				"private-use": "private-use characters",
@@ -3385,6 +3384,7 @@
 			"invalid": "Type an amount in dollars, or leave it empty for no budget."
 		},
 		"pins": {
+			"loginChoice": "{{name}} ({{cli}} sign-in)",
 			"title": "AI account",
 			"projectDescription": "The account each provider runs on for this project's tasks. A card can pick another one.",
 			"cardDescription": "The account each provider of this card runs on. Leave it to follow the project, or the provider's default account.",
