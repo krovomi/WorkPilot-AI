@@ -119,7 +119,8 @@ par `security/agent_safety_settings.py`). Coupée, rien de ce qui précède ne c
 **Ce qui y tourne (lot C1)** : les commandes de la boucle WorkPilot (`run_command`), par
 `sbx exec`. Les appels au modèle restent dans le backend, sur l'hôte : aucun identifiant n'entre
 dans la VM, et seules `LANG`, `LC_ALL`, `TZ`, `CI`, `NO_COLOR` et `FORCE_COLOR` y passent. Un CLI qui
-lance ses propres commandes garde le bac à sable de l'OS (`session_sandbox(…, microvm=False)`).
+lance ses propres commandes garde le bac à sable de l'OS (`session_sandbox(…, microvm=False)`),
+sauf avec le second interrupteur ci-dessous.
 Le modèle est prévenu dans la description de `run_command` que ses commandes tournent en
 `/bin/sh` dans une VM Linux, quel que soit l'hôte.
 
@@ -166,8 +167,38 @@ Limites connues : sous Windows, les dépendances installées dans la VM sont des
 `node_modules` installé par l'hôte n'y tourne pas toujours, et inversement) ; une commande arrêtée
 par le délai l'est côté hôte (`sbx exec`), son processus dans la VM n'est pas encore tué ; sbx
 exige Windows 11 avec la plateforme d'hyperviseur, macOS 14 sur Apple silicon ou Ubuntu 24.04 avec
-KVM. Les CLI d'agents dans la VM et les secrets par le proxy de sbx sont le lot C2 ; la purge avec
-le worktree et l'état de sbx dans Paramètres > Sandbox y sont déjà.
+KVM. La purge avec le worktree et l'état de sbx sont dans Paramètres > Sandbox.
+
+### Un CLI d'agent dans la VM (lot C2, expérimental)
+
+Second interrupteur, coupé par défaut : « Lancer aussi les CLI d'agents dans la microVM »
+(`agentSafety.sandbox.microvm.cliAgents`, lu seulement si la microVM est allumée). Il vaut pour un
+CLI dont le bloc `sandbox:` de `capabilities/providers.yaml` a une entrée `microvm:` (OpenCode
+aujourd'hui) : `command` (son nom dans la VM), `install` (une ligne, jouée une fois par VM) et
+`secrets` (service sbx → variables du CLI). `core/agent_clients/cli_microvm.py` décide (`plan`) et
+ouvre la session (`open_session`).
+
+**Les clés restent dans sbx.** WorkPilot ne copie aucune clé : la personne la range elle-même
+(`sbx secret set openai`…). `secret_services()` lit la liste des services rangés (`sbx secret ls`),
+jamais leur valeur. Dans la VM, les variables du CLI valent `proxy-managed` et le proxy de sbx
+ajoute la vraie clé aux requêtes qui en sortent ; aucune clé de l'hôte n'est passée
+(`sbx exec -e` n'accepte qu'un nom de variable valide et une valeur sur une ligne). Le modèle choisi
+doit être celui d'un service rangé (`anthropic/…` demande `anthropic`).
+
+**Le CLI reste sur l'hôte**, dans le bac à sable de l'OS, et la carte dit pourquoi
+(`fallback_reason`) : pas de profil microVM, pas de clé rangée dans sbx pour ce CLI ou ce modèle
+(une connexion par abonnement, un modèle local), sbx pas prêt, ou installation ratée dans la VM.
+Interrupteur coupé, rien ne change.
+
+**Installation** : `ensure_tool` lance `command -v <cmd> || { <install>; }` dans la VM, sous le
+verrou de la VM, et le note dans son état ; les sessions suivantes ne le refont pas. Les hôtes du
+CLI (`network`) s'ajoutent aux règles de la VM par `sbx policy allow network --sandbox`, sans la
+recréer : les règles d'une VM ne font que grandir.
+
+Limites : le CLI doit aussi être installé sur l'hôte (sa détection reste celle de l'hôte) ; ses
+serveurs MCP ne sont pas lancés dans la VM (ils sont retirés de la session, avec un avertissement) ;
+le format de `sbx secret ls` et la présence de Node dans l'image `shell` restent à vérifier sur une
+machine réelle.
 
 ## Le garde-fou : la carte le dit au lancement
 

@@ -214,6 +214,7 @@ vi.mock("../rate-limit-detector", () => ({
 	detectRateLimit: vi.fn(() => ({ isRateLimited: false })),
 	createSDKRateLimitInfo: vi.fn(),
 	detectAuthFailure: vi.fn(() => ({ isAuthFailure: false })),
+	detectBillingFailure: vi.fn(() => ({ isBillingFailure: false })),
 }));
 
 vi.mock("../python-detector", () => ({
@@ -1320,6 +1321,37 @@ describe("AgentProcessManager - cross-provider failover requests", () => {
 	it("leaves a task it cannot place to the Claude-only path", () => {
 		expect(manager.handleAuthFailureWithAutoSwap("t1", { profileId: "p" })).toBe(false);
 		expect(requests).toHaveLength(0);
+	});
+
+	it("moves a task off Claude whose balance is spent (402) like a limit, when the failover on limits is on", () => {
+		const { detectBillingFailure } = rateLimitDetector;
+		const spender = manager as unknown as { handleSpentBalance: (taskId: string, output: string) => boolean };
+		failover.provider = "deepseek";
+		expect(spender.handleSpentBalance("t1", "402 Insufficient Balance")).toBe(false);
+
+		vi.mocked(detectBillingFailure).mockReturnValue({ isBillingFailure: true } as never);
+		expect(spender.handleSpentBalance("t1", "402 Insufficient Balance")).toBe(true);
+		expect(requests).toEqual([["t1", "rate_limit"]]);
+		// The exit of the process reaches it once no limit was read.
+		const exited = manager as unknown as {
+			handleProcessFailure: (taskId: string, output: string, type: string) => boolean;
+		};
+		expect(exited.handleProcessFailure("t3", "402 Insufficient Balance", "task-execution")).toBe(true);
+		expect(requests).toEqual([
+			["t1", "rate_limit"],
+			["t3", "rate_limit"],
+		]);
+		requests.length = 1;
+
+		vi.mocked(getClaudeProfileManager).mockReturnValue({
+			getAutoSwitchSettings: () => ({ enabled: true, autoSwitchOnRateLimit: false, autoSwitchOnAuthFailure: true }),
+		} as never);
+		expect(spender.handleSpentBalance("t2", "402 Insufficient Balance")).toBe(false);
+		expect(requests).toHaveLength(1);
+		vi.mocked(detectBillingFailure).mockReturnValue({ isBillingFailure: false } as never);
+		// Neither a limit, a spent balance nor a lost sign-in: an ordinary failure.
+		expect(exited.handleProcessFailure("t4", "Build failed", "task-execution")).toBe(false);
+		expect(requests).toHaveLength(1);
 	});
 });
 

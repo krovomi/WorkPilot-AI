@@ -28,6 +28,10 @@ vi.mock("../../services/credential-manager", () => ({
 
 import { ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../../shared/constants/ipc";
+import {
+	AccountBudgetStore,
+	setAccountBudgetStoreForTests,
+} from "../../ai-accounts/account-budgets";
 import { AiAccountStore, setAiAccountStoreForTests } from "../../ai-accounts/ai-accounts";
 import {
 	deleteAiAccount,
@@ -134,9 +138,14 @@ describe("AI accounts IPC", () => {
 		});
 	});
 
-	it("deletes an account", async () => {
+	it("deletes an account, and its budget with it", async () => {
+		const budgets = new AccountBudgetStore(path.join(dir, "budgets.json"));
+		setAccountBudgetStoreForTests(budgets);
 		const saved = await saveAiAccount({ provider: "grok", name: "A", apiKey: KEY });
+		budgets.setBudget(saved.data?.id as string, 20);
 		expect(deleteAiAccount(saved.data?.id)).toEqual({ success: true });
 		expect(listAiAccounts().data?.accounts).toEqual([]);
+		expect(budgets.budgets()).toEqual({});
+		setAccountBudgetStoreForTests(null);
 	});
 });

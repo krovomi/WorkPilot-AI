@@ -248,6 +248,7 @@ vi.mock("../../main/rate-limit-detector", () => ({
 	getProfileEnv: vi.fn(() => ({})),
 	detectRateLimit: vi.fn(() => ({ isRateLimited: false })),
 	detectAuthFailure: vi.fn(() => ({ isAuthFailure: false })),
+	detectBillingFailure: vi.fn(() => ({ isBillingFailure: false })),
 }));
 
 // ``setupTestDirs`` / ``cleanupTestDirs`` are thin wrappers around the

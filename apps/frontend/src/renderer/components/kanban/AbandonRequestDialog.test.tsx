@@ -34,6 +34,13 @@ beforeEach(() => {
 	});
 });
 
+/** Picks in the app's Select (Radix): focus, open with the keyboard, click. */
+async function pick(user: ReturnType<typeof userEvent.setup>, field: string, option: string) {
+	screen.getByRole("combobox", { name: field }).focus();
+	await user.keyboard("[ArrowDown]");
+	await user.click(await screen.findByRole("option", { name: option }));
+}
+
 function ask(ids: string[]) {
 	act(() => useAbandonRequestStore.getState().request(ids));
 }
@@ -49,7 +56,7 @@ describe("AbandonRequestDialog", () => {
 		render(<AbandonRequestDialog />);
 		ask(["a"]);
 		expect(screen.getByText(/"Login page"/)).toBeInTheDocument();
-		await user.selectOptions(screen.getByLabelText("Why"), "obsolete");
+		await pick(user, "Why", "Obsolete");
 		expect(screen.queryByLabelText("Duplicate of")).toBeNull();
 		await user.type(screen.getByLabelText("Note"), "design changed");
 		await user.click(screen.getByRole("button", { name: "Abandon" }));
@@ -66,11 +73,12 @@ describe("AbandonRequestDialog", () => {
 		render(<AbandonRequestDialog />);
 		ask(["a", "b"]);
 		expect(screen.getByRole("heading", { name: "Abandon 2 tasks" })).toBeInTheDocument();
-		await user.selectOptions(screen.getByLabelText("Why"), "duplicate");
-		const link = screen.getByLabelText("Duplicate of");
-		const offered = [...link.querySelectorAll("option")].map((o) => o.textContent);
+		await pick(user, "Why", "Duplicate");
+		screen.getByRole("combobox", { name: "Duplicate of" }).focus();
+		await user.keyboard("[ArrowDown]");
+		const offered = (await screen.findAllByRole("option")).map((o) => o.textContent);
 		expect(offered).toEqual(["Not on the board", "Auth rewrite"]);
-		await user.selectOptions(link, "c");
+		await user.click(screen.getByRole("option", { name: "Auth rewrite" }));
 		await user.click(screen.getByRole("button", { name: "Abandon" }));
 		expect(abandonTask).toHaveBeenCalledTimes(2);
 		expect(abandonTask).toHaveBeenCalledWith("b", {

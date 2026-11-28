@@ -21,7 +21,7 @@ const warn = vi.fn();
 vi.mock("../../app-logger", () => ({ appLog: { warn: (...args: unknown[]) => warn(...args) } }));
 
 import { AiAccountStore, setAiAccountStoreForTests } from "../ai-accounts";
-import { applyPinnedAccount, pinnedAccountKey } from "../pinned-account-env";
+import { applyPinnedAccount, pinnedAccountKey, servedAccountPins } from "../pinned-account-env";
 
 const CLIENT_KEY = "sk-test-client-0000";
 const PERSO_KEY = "sk-test-perso-0000";
@@ -111,5 +111,24 @@ describe("applyPinnedAccount", () => {
 		const env: Record<string, string> = {};
 		expect(applyPinnedAccount(env, "openrouter", account.id)).toBe(true);
 		expect(Object.values(env)).toContain(CLIENT_KEY);
+	});
+});
+
+describe("servedAccountPins", () => {
+	it("keeps the pins a process runs on: an account of that provider, with a key", () => {
+		const client = store.save({ provider: "openai", name: "Client", apiKey: CLIENT_KEY });
+		const work = store.save({ provider: "google", name: "Work", apiKey: PERSO_KEY });
+		expect(
+			servedAccountPins({ openai: client.id, gemini: work.id, mistral: client.id, deepseek: "gone", claude: "team" }),
+		).toEqual({ openai: client.id, gemini: work.id });
+		expect(servedAccountPins(undefined)).toEqual({});
+	});
+
+	it("charges no pin when the store cannot be read", () => {
+		vi.spyOn(store, "get").mockImplementation(() => {
+			throw new Error("locked keychain");
+		});
+		expect(servedAccountPins({ openai: "any" })).toEqual({});
+		expect(warn).toHaveBeenCalledWith("[AiAccounts] pinned accounts unreadable:", "locked keychain");
 	});
 });

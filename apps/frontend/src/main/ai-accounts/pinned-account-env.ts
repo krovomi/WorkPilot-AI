@@ -70,3 +70,26 @@ export function applyPinnedAccount(
 	if (accountProvider === "openai") env.OPENAI_AUTH_MODE = "api-key";
 	return true;
 }
+
+/**
+ * The API-key pins of `pins` that a process actually runs on: an account of
+ * the provider it is pinned for, with a key. For the spend per account
+ * (`account-attribution.ts`): a pin that fell back to the default is not
+ * charged. Claude's pin is left out; its caller names the profile it used.
+ */
+export function servedAccountPins(
+	pins: Readonly<Record<string, string>> | undefined,
+): Record<string, string> {
+	const served: Record<string, string> = {};
+	if (!pins) return served;
+	try {
+		const store = aiAccountStore();
+		for (const [provider, id] of Object.entries(pins)) {
+			const account = store.get(id);
+			if (account?.hasKey && account.provider === accountProviderOf(provider)) served[provider] = id;
+		}
+	} catch (error) {
+		appLog.warn("[AiAccounts] pinned accounts unreadable:", (error as Error).message);
+	}
+	return served;
+}

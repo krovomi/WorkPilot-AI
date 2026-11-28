@@ -62,6 +62,32 @@ describe("buildFailoverAccounts", () => {
 	});
 });
 
+describe("buildFailoverAccounts with several accounts per provider", () => {
+	const view = (id: string, provider: string, hasKey = true) => ({
+		id,
+		provider,
+		name: `Account ${id}`,
+		hasKey,
+		createdAt: "2026-11-28T00:00:00.000Z",
+	});
+
+	it("lists each AI account with a key, marks the default, and drops the provider's generic entry", () => {
+		const accounts = buildFailoverAccounts({
+			claudeProfiles: [],
+			apiProfiles: [],
+			providers: PROVIDERS,
+			connected: { openai: true, mistral: true },
+			aiAccounts: [view("o1", "openai"), view("o2", "openai"), view("nokey", "openai", false)],
+			aiAccountDefaults: { openai: "o2" },
+		});
+		expect(accounts.map((a) => [a.id, a.kind, a.provider, a.label, a.isActive])).toEqual([
+			["account-o1", "account", "openai", "Account o1", false],
+			["account-o2", "account", "openai", "Account o2", true],
+			["provider-mistral", "provider", "mistral", "Mistral", false],
+		]);
+	});
+});
+
 describe("orderFailoverAccounts", () => {
 	it("follows the saved order, older bare names included, and puts new accounts after", () => {
 		const accounts = buildFailoverAccounts({

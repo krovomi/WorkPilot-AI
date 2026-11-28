@@ -420,6 +420,12 @@ export interface ClaudeAutoSwitchSettings {
 
 	/** Whether to automatically switch on authentication failure (vs. prompting user) */
 	autoSwitchOnAuthFailure: boolean;
+
+	/**
+	 * Try the other accounts of the stopped provider before another provider
+	 * (absent = on). Read by main/provider-failover.
+	 */
+	sameProviderFirst?: boolean;
 }
 
 export interface ClaudeAuthResult {

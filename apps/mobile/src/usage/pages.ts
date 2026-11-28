@@ -9,6 +9,7 @@
  */
 export const MOBILE_PAGES = [
 	"home",
+	"ai-accounts",
 	"inbox",
 	"needs-you",
 	"admin",

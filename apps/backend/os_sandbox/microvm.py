@@ -37,12 +37,14 @@ import hashlib
 import json
 import logging
 import os
+import re
 import shutil
 import subprocess
 import threading
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath, PureWindowsPath
+from typing import Any
 
 from foundation.platform import find_executable, is_linux, is_macos, is_windows
 from security.path_guard import WRITE_ROOTS_ENV_VAR, workpilot_scratch_dir
@@ -71,6 +73,14 @@ VM_HOSTS: tuple[str, ...] = (
     "security.ubuntu.com",
     "ports.ubuntu.com",
 )
+
+#: The services sbx stores a key for (`sbx secret set <service>`), whose
+#: requests its proxy signs; the VM only ever holds `SECRET_PLACEHOLDER`.
+SBX_SERVICES = frozenset(
+    {"anthropic", "openai", "google", "mistral", "groq", "openrouter", "xai", "github"}
+)
+SECRET_PLACEHOLDER = "proxy-managed"
+_ENV_NAME = re.compile(r"^[A-Z][A-Z0-9_]*$")
 
 #: Host variables a command inside the VM receives. The host's environment
 #: holds the backend's keys: nothing else crosses.
@@ -413,11 +423,10 @@ class TaskVm:
 
         Not its size: sized from the free memory of the moment, it would
         differ from one session to the next and recreate the VM each time.
+        Nor its network: rules are added to a running VM (`ensure_vm`), so
+        an agent CLI's hosts join the loop's without a new VM.
         """
-        data = {
-            "mounts": [m.spec() for m in self.mounts],
-            "network": list(self.network),
-        }
+        data = {"mounts": [m.spec() for m in self.mounts]}
         return hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()
 
     def target_of(self, path: Path | str) -> str:
@@ -437,11 +446,14 @@ class TaskVm:
         cwd: Path | str | None,
         *,
         stdin: bool = False,
+        vm_env: dict[str, str] | None = None,
     ) -> list[str]:
         """``sbx exec`` of `command`; `stdin` for a command that reads it.
 
         Without `stdin`, the caller gives the process no stdin (DEVNULL): sbx
-        waits on an open pipe that the command never reads.
+        waits on an open pipe that the command never reads. `vm_env`: values
+        set inside the VM by WorkPilot itself (a key's placeholder, never a
+        key), on top of the few host variables of `FORWARDED_ENV`.
         """
         argv = [sbx_executable() or "sbx", "--no-input", "exec"]
         if stdin:
@@ -450,6 +462,10 @@ class TaskVm:
         for name in FORWARDED_ENV:
             if env.get(name):
                 argv += ["-e", f"{name}={env[name]}"]
+        for name, value in (vm_env or {}).items():
+            if not _ENV_NAME.match(name) or "\0" in value or "\n" in value:
+                raise MicrovmError(f"not a variable for the microVM: {name}")
+            argv += ["-e", f"{name}={value}"]
         return [*argv, self.name, *command]
 
 
@@ -521,19 +537,46 @@ def ensure_vm(vm: TaskVm) -> bool:
         return _ensure_vm(vm)
 
 
+def _read_state(name: str) -> dict:
+    try:
+        data = json.loads(_state_file(name).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _write_state(name: str, data: dict) -> None:
+    _state_file(name).write_text(json.dumps(data, sort_keys=True), encoding="utf-8")
+
+
 def _ensure_vm(vm: TaskVm) -> bool:
-    state = _state_file(vm.name)
     fingerprint = vm.fingerprint()
+    state: dict[str, Any] = _read_state(vm.name)
+    created = False
     present = vm.name in existing_vms()
+    if not present or state.get("fingerprint") != fingerprint:
+        _create(vm, present=present)
+        state = {"fingerprint": fingerprint, "worktree": str(vm.worktree)}
+        created = True
+    applied = [r for r in state.get("network") or () if isinstance(r, str)]
+    missing = [rule for rule in vm.network if rule not in applied]
+    if missing:
+        # Rules only grow: a rule cannot be taken back from a running VM
+        # here, and the VM never holds a key (the sbx proxy adds it).
+        _check(
+            run_sbx(
+                ["policy", "allow", "network", "--sandbox", vm.name, ",".join(missing)]
+            ),
+            "`sbx policy allow network`",
+        )
+        state["network"] = applied + missing
+    if created or missing:
+        _write_state(vm.name, state)
+    return created
+
+
+def _create(vm: TaskVm, *, present: bool) -> None:
     if present:
-        try:
-            if (
-                json.loads(state.read_text(encoding="utf-8")).get("fingerprint")
-                == fingerprint
-            ):
-                return False
-        except (OSError, ValueError):
-            pass
         logger.info("[microvm] %s changed: created again", vm.name)
         _check(run_sbx(["rm", "--force", vm.name]), f"`sbx rm {vm.name}`")
     primary, *others = vm.mounts
@@ -552,26 +595,59 @@ def _ensure_vm(vm: TaskVm) -> bool:
         "--no-progress",
     ]
     _check(run_sbx(args, timeout=_CREATE_TIMEOUT), "`sbx create`")
-    if vm.network:
-        _check(
-            run_sbx(
-                [
-                    "policy",
-                    "allow",
-                    "network",
-                    "--sandbox",
-                    vm.name,
-                    ",".join(vm.network),
-                ]
-            ),
-            "`sbx policy allow network`",
-        )
     _prepare_git(vm)
-    state.write_text(
-        json.dumps({"fingerprint": fingerprint, "worktree": str(vm.worktree)}),
-        encoding="utf-8",
-    )
-    return True
+
+
+def ensure_tool(vm: TaskVm, command: str, install: str) -> None:
+    """Put an agent CLI in the VM once: `install` unless `command` is there.
+
+    Both come from ``capabilities/providers.yaml`` (`MicrovmSpec`), never
+    from a repository or a model. Raises `MicrovmError` when it fails.
+    """
+    with _locks_mutex:
+        lock = _locks.setdefault(vm.name, threading.Lock())
+    with lock:
+        state = _read_state(vm.name)
+        tools = [t for t in state.get("tools") or () if isinstance(t, str)]
+        if command in tools:
+            return
+        script = f"command -v {command} >/dev/null 2>&1 || {{ {install}; }}"
+        result = run_sbx(["exec", vm.name, "sh", "-c", script], timeout=_CREATE_TIMEOUT)
+        _check(result, f"installing {command} in the microVM")
+        state["tools"] = [*tools, command]
+        _write_state(vm.name, state)
+
+
+def secret_services() -> frozenset[str]:
+    """The services sbx holds a key for (`sbx secret ls`): names, never keys.
+
+    Read from JSON when sbx gives it, else from the words of its table; an
+    error reads as none, so the CLI stays on the host.
+    """
+    result = run_sbx(["secret", "ls", "--json"])
+    if result.returncode != 0:
+        result = run_sbx(["secret", "ls"])
+    if result.returncode != 0:
+        logger.info("[microvm] `sbx secret ls`: %s", _detail(result))
+        return frozenset()
+    text = result.stdout or ""
+    try:
+        data = json.loads(text)
+    except ValueError:
+        words = set(re.findall(r"[a-z]+", text.lower()))
+        return frozenset(words & SBX_SERVICES)
+    if isinstance(data, dict):
+        data = data.get("secrets", [])
+    names: set[str] = set()
+    for entry in data if isinstance(data, list) else ():
+        if isinstance(entry, str):
+            names.add(entry.lower())
+        elif isinstance(entry, dict):
+            for key in ("service", "name", "id"):
+                value = entry.get(key)
+                if isinstance(value, str):
+                    names.add(value.lower())
+    return frozenset(names & SBX_SERVICES)
 
 
 def _host_git(worktree: Path, key: str) -> str | None:

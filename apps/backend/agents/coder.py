@@ -115,7 +115,7 @@ from .base import (
 from .iteration_guards import guard_iteration
 from .manual_verification import skip_manual_verification, take_human_unblock
 from .memory_manager import debug_memory_system_status, get_memory_context
-from .rate_limit_time import parse_rate_limit_reset_time
+from .rate_limit_time import parse_rate_limit_reset_time, quota_pause
 from .session import (
     is_prompt_too_long_error,
     post_session_processing,
@@ -848,7 +848,7 @@ async def _on_rate_limit(
 ) -> _Next:
     """Wait for the reset when it is known and not too far away."""
     # Rate limit error - intelligent wait for reset
-    reset_timestamp = parse_rate_limit_reset_time(error_info)
+    reset_timestamp = parse_rate_limit_reset_time(error_info) or quota_pause(error_info)
     if reset_timestamp:
         wait_seconds = reset_timestamp - datetime.now().timestamp()
 

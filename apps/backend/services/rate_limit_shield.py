@@ -52,13 +52,15 @@ async def handle_rate_limit_pause(
     """
     from agents.base import MAX_RATE_LIMIT_WAIT_SECONDS, RATE_LIMIT_PAUSE_FILE
     from agents.coder import parse_rate_limit_reset_time, wait_for_rate_limit_reset
+    from agents.rate_limit_time import quota_pause
     from agents.session import is_rate_limit_error
 
     if not is_rate_limit_error(error):
         return False
 
     error_info = {"message": str(error), "type": "rate_limit"}
-    reset_timestamp = parse_rate_limit_reset_time(error_info)
+    # A spent quota names no reset: pause anyway, retrying cannot get past it.
+    reset_timestamp = parse_rate_limit_reset_time(error_info) or quota_pause(error_info)
 
     if not reset_timestamp:
         logger.warning(

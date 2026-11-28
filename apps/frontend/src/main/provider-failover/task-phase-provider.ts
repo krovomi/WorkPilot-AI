@@ -5,6 +5,7 @@
  * the resume machinery it is itself started by.
  */
 import { getProvider as getRegistryProvider } from "../../shared/services/providerRegistry";
+import { accountProviderOf } from "../../shared/types/ai-accounts";
 import {
 	isFailoverEntryExcluded,
 	normalizeFailoverOrder,
@@ -37,6 +38,26 @@ export interface StoppedTask {
 	readonly provider: string;
 	readonly projectId: string;
 	readonly specDirs: string[];
+	/**
+	 * The key of the task's account pins for its provider: the provider whose
+	 * AI accounts it uses (`google` for gemini), `claude` for a Claude profile,
+	 * or undefined when the provider has no accounts here.
+	 */
+	readonly pinKey?: string;
+	/** The account pinned for that key, on the task first, then its project. */
+	readonly pinnedAccount?: string;
+}
+
+/** The key of the account pins (`aiAccounts`) a provider reads. */
+export function accountPinKey(provider: string): string | undefined {
+	return isClaudeProvider(provider) ? "claude" : accountProviderOf(provider);
+}
+
+/** The account id `pins[key]`, when `pins` is an object holding text there. */
+export function pinnedAccountOf(pins: unknown, key: string): string | undefined {
+	if (!pins || typeof pins !== "object" || Array.isArray(pins)) return undefined;
+	const value = (pins as Record<string, unknown>)[key];
+	return typeof value === "string" && value ? value : undefined;
 }
 
 export function stoppedTask(taskId: string, projectId?: string): StoppedTask | null {
@@ -48,10 +69,18 @@ export function stoppedTask(taskId: string, projectId?: string): StoppedTask | n
 	const phase = enginePhaseForPause(
 		task.metadata?.paused?.paused_phase ?? currentPausePhase(task, specPaths),
 	);
+	const provider = engine[phase].provider.trim().toLowerCase();
+	const pinKey = accountPinKey(provider);
+	const pinnedAccount = pinKey
+		? (pinnedAccountOf((task.metadata as { aiAccounts?: unknown } | undefined)?.aiAccounts, pinKey) ??
+			pinnedAccountOf((project.settings as { aiAccounts?: unknown } | undefined)?.aiAccounts, pinKey))
+		: undefined;
 	return {
-		provider: engine[phase].provider.trim().toLowerCase(),
+		provider,
 		projectId: project.id,
 		specDirs: allSpecDirs(specPaths),
+		pinKey,
+		pinnedAccount,
 	};
 }
 

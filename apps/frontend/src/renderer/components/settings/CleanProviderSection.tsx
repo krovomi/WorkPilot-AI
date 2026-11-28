@@ -217,8 +217,20 @@ export function CleanProviderSection({
 				connected: providerStatus,
 				usage: claudeUsage,
 				copilotLogin,
+				aiAccounts: aiAccounts.accounts,
+				aiAccountDefaults: aiAccounts.defaults,
 			}),
-		[claudeProfiles, activeClaudeProfileId, profiles, activeApiProfileId, staticProviders, providerStatus, claudeUsage, copilotLogin],
+		[
+			claudeProfiles,
+			activeClaudeProfileId,
+			profiles,
+			activeApiProfileId,
+			staticProviders,
+			providerStatus,
+			claudeUsage,
+			copilotLogin,
+			aiAccounts,
+		],
 	);
 	const excluded = useMemo(() => settings.disabledAutoSwitchProviders ?? [], [settings]);
 	const chainLength = failoverAccounts.filter((account) => !isAccountExcluded(account, excluded)).length;

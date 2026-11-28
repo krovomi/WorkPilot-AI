@@ -7,6 +7,8 @@
  *
  * - `oauth-<id>`: a Claude account signed in with OAuth (Claude profile);
  * - `api-<id>`: an API profile (a key and an endpoint, profiles.json);
+ * - `account-<id>`: an account of Settings → AI accounts (an API key on its
+ *   provider's own endpoint, ai-accounts.json);
  * - `provider-<name>`: a provider with no account of its own here (Copilot
  *   through `gh`, a key in Settings, Ollama, a coding-agent CLI...).
  *
@@ -18,12 +20,12 @@
 import type { ClaudeAutoSwitchSettings } from "../types/agent";
 import { detectProvider } from "./provider-detection";
 
-export type FailoverEntryKind = "oauth" | "api" | "provider";
+export type FailoverEntryKind = "oauth" | "api" | "account" | "provider";
 
 export interface FailoverEntryRef {
 	readonly id: string;
 	readonly kind: FailoverEntryKind;
-	/** The Claude profile id, the API profile id or the provider name. */
+	/** The Claude profile id, the API profile id, the AI account id or the provider name. */
 	readonly key: string;
 }
 
@@ -35,7 +37,7 @@ export interface FailoverCandidate extends FailoverEntryRef {
 /** More entries than any real setup has; a longer list is refused. */
 export const MAX_FAILOVER_ENTRIES = 64;
 
-const ENTRY = /^(oauth|api|provider)-([A-Za-z0-9][A-Za-z0-9._:@-]{0,119})$/;
+const ENTRY = /^(oauth|api|account|provider)-([A-Za-z0-9][A-Za-z0-9._:@-]{0,119})$/;
 // An order saved before the chain had kinds named a provider alone ("copilot").
 const BARE_PROVIDER = /^(?=.{2,40}$)[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 
@@ -98,6 +100,11 @@ export interface FailoverContext {
 	readonly excluded: readonly string[];
 	/** Whether an entry can take the task now (signed in, not limited). */
 	readonly isUsable: (candidate: FailoverCandidate) => boolean;
+	/**
+	 * Try the other accounts of the stopped provider before any other
+	 * provider, in the chain's order (on unless switched off).
+	 */
+	readonly sameProviderFirst?: boolean;
 }
 
 /**
@@ -114,15 +121,18 @@ export function pickNextFailover(
 	const sameProvider = (candidate: FailoverCandidate): boolean =>
 		candidate.provider === context.provider ||
 		(isClaude(candidate.provider) && isClaude(context.provider));
-	for (const candidate of chain) {
-		if (candidate.id === context.currentEntryId) continue;
-		if (context.tried.has(candidate.id)) continue;
-		if (isFailoverEntryExcluded(candidate, context.excluded)) continue;
-		if (candidate.kind === "provider" && sameProvider(candidate)) continue;
-		if (!context.isUsable(candidate)) continue;
-		return candidate;
-	}
-	return null;
+	const eligible = chain.filter(
+		(candidate) =>
+			candidate.id !== context.currentEntryId &&
+			!context.tried.has(candidate.id) &&
+			!isFailoverEntryExcluded(candidate, context.excluded) &&
+			!(candidate.kind === "provider" && sameProvider(candidate)),
+	);
+	const ordered =
+		context.sameProviderFirst === false
+			? eligible
+			: [...eligible.filter(sameProvider), ...eligible.filter((c) => !sameProvider(c))];
+	return ordered.find((candidate) => context.isUsable(candidate)) ?? null;
 }
 
 const SWITCHES = [
@@ -130,6 +140,7 @@ const SWITCHES = [
 	"proactiveSwapEnabled",
 	"autoSwitchOnRateLimit",
 	"autoSwitchOnAuthFailure",
+	"sameProviderFirst",
 ] as const;
 const PERCENTS = ["sessionThreshold", "weeklyThreshold"] as const;
 

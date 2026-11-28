@@ -35,6 +35,8 @@ export interface AgentSafetySettings {
 			memoryGb: number;
 			/** CPUs of each task's VM; 0 sizes it from the machine. */
 			cpus: number;
+			/** Agent CLIs (OpenCode…) run in the VM too, with the keys stored in sbx. */
+			cliAgents: boolean;
 		};
 	};
 	anomaly: {
