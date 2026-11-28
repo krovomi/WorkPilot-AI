@@ -288,8 +288,9 @@ async def test_the_agent_process_is_started_through_its_sandbox(
     # The process the card reports on is the one started.
     assert agent.argv == ("SANDBOX", "--", "gemini", "--acp")
     assert agent.env["SANDBOXED"] == "1"
-    # Gemini's profile from providers.yaml: its state, and Google's hosts only.
-    assert captured["state_dirs"] == ("~/.gemini",)
+    # Gemini's profile from providers.yaml: its state (this computer's sign-in
+    # and an account's folder of Settings → AI accounts), and Google's hosts only.
+    assert captured["state_dirs"] == ("~/.gemini", "$GEMINI_CLI_HOME/.gemini")
     # Compared as the whole host list, not a substring of a URL.
     assert captured["provider_hosts"] == (
         "generativelanguage.googleapis.com",
