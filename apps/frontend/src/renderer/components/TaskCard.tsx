@@ -78,6 +78,8 @@ import { SessionCompactionBadge } from "./SessionCompactionBadge";
 import { StreamingSessionButton } from "./streaming/StreamingSessionButton";
 import { CardLabels } from "./kanban/labels/CardLabels";
 import { CardTypeChip } from "./kanban/CardTypeChip";
+import { InterruptedBadge } from "./interrupted-tasks/InterruptedBadge";
+import { cardInterruption } from "../lib/interrupted-task";
 import { TaskCardPreview } from "./kanban/TaskCardPreview";
 import { sameRunFacts, TaskRunFactsRow } from "./kanban/TaskRunFacts";
 import { sameCaptures } from "./task-captures/captures-state";
@@ -308,6 +310,8 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 	// actually holds the task back; neutral elsewhere, where it is context.
 	const blockers = useKanbanBlockerStore((s) => s.blockers[task.id]);
 	const cardType = resolveCardType(task.metadata);
+	// Closed or crashed mid-build: « Interrompue » replaces the status.
+	const interruption = cardInterruption(task);
 
 	// Extract status badge variant and label for non-done tasks
 	let statusBadgeVariant:
@@ -344,6 +348,7 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 		!!blockers && (blockers.pending.length > 0 || blockers.missing.length > 0);
 	if (
 		!task.metadata &&
+		!interruption &&
 		!isStuck &&
 		!isIncomplete &&
 		!hasActiveExecution &&
@@ -527,6 +532,8 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 				</Badge>
 			)}
 
+			{interruption && <InterruptedBadge task={task} origin={interruption} />}
+
 			{/* Execution phase badge - shown when actively running */}
 			{hasActiveExecution && executionPhase && !isStuck && !isIncomplete && (
 				<Badge
@@ -543,6 +550,7 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 
 			{/* Status badge - hide when execution phase badge is showing */}
 			{!hasActiveExecution &&
+				!interruption &&
 				(task.status === "done" ? (
 					<Badge
 						variant={getStatusBadgeVariant(task.status)}
@@ -765,6 +773,22 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
 	const prUrl = task.metadata?.prUrl;
 	// A cooperatively-paused task (flag on disk) shows Reprendre instead of Pause.
 	const isPaused = task.metadata?.paused?.enabled === true;
+	// A build the app interrupted (closed, crashed) gets a labelled Reprendre:
+	// nothing else on the card applies until it runs again.
+	if (cardInterruption(task)) {
+		return (
+			<Button
+				variant="default"
+				size="sm"
+				className="h-7 px-2.5"
+				onClick={handleResume}
+				data-testid="task-interrupted-resume"
+			>
+				<Play className="mr-1.5 h-3 w-3" />
+				{t("actions.resume")}
+			</Button>
+		);
+	}
 	// Compact Pause / Reprendre toggle reused by the active-task branches below.
 	const pauseResumeButton = (
 		<Button
@@ -1175,6 +1199,10 @@ function taskCardPropsAreEqual(
 		prevTask.metadata?.flaggedReason === nextTask.metadata?.flaggedReason &&
 		// Pause / Reprendre on the card and in its menu.
 		prevTask.metadata?.paused?.enabled === nextTask.metadata?.paused?.enabled &&
+		// « Interrompue » and its tooltip (closed or crashed, and when).
+		prevTask.metadata?.paused?.reason === nextTask.metadata?.paused?.reason &&
+		prevTask.metadata?.paused?.crashed === nextTask.metadata?.paused?.crashed &&
+		prevTask.metadata?.paused?.paused_at === nextTask.metadata?.paused?.paused_at &&
 		// The engine chip: a resume on another LLM changes only these.
 		sameEngineFields(prevTask.metadata, nextTask.metadata) &&
 		prevTask.verification?.status === nextTask.verification?.status &&
@@ -1256,10 +1284,9 @@ export const TaskCard = memo(function TaskCard({
 	// active que lorsque la tâche tourne réellement (in_progress / ai_review).
 	// Sans ce garde-fou, une tâche terminée conservant une phase obsolète
 	// (ex. "qa_review") afficherait à tort le badge "AI Review" animé.
-	const hasActiveExecution = isExecutionPhaseActive(
-		task.status,
-		executionPhase,
-	);
+	const hasActiveExecution =
+		isExecutionPhaseActive(task.status, executionPhase) &&
+		cardInterruption(task) === null;
 
 	// Check if task is in human_review but has no completed subtasks (crashed/incomplete)
 	const isIncomplete = isIncompleteHumanReview(task);
@@ -1312,8 +1339,12 @@ export const TaskCard = memo(function TaskCard({
 	// Catastrophic stuck detection — last-resort safety net.
 	// XState handles all normal transitions via PROCESS_EXITED events.
 	// This only fires if XState somehow fails to transition after 60s with no activity.
+	// A paused build has no process by design (the Pause button, a close of
+	// the app, « Arrêter tous les agents »): it waits for Reprendre, it is never
+	// stuck, and the stuck recovery would reset the subtask it stopped on.
+	const isPausedOnDisk = task.metadata?.paused?.enabled === true;
 	useEffect(() => {
-		if (!isRunning) {
+		if (!isRunning || isPausedOnDisk) {
 			setIsStuck(false);
 			return;
 		}
@@ -1337,7 +1368,7 @@ export const TaskCard = memo(function TaskCard({
 		}, STUCK_CHECK_INTERVAL_MS);
 
 		return () => clearInterval(stuckInterval);
-	}, [task.id, isRunning]);
+	}, [task.id, isRunning, isPausedOnDisk]);
 
 	const handleStartStop = (e: React.MouseEvent) => {
 		e.stopPropagation();

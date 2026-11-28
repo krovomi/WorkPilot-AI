@@ -748,8 +748,9 @@ export interface TaskMetadata {
 		model?: string | null;
 		/**
 		 * Why the build is paused. Absent for the Pause button; "app_shutdown"
-		 * when WorkPilot was closed while it ran — the next launch resumes those
-		 * on its own, and only those. "budget" / "budget_stall" when the
+		 * when WorkPilot was closed (or, with `crashed`, stopped) while it ran —
+		 * the next launch offers to resume it (interrupted-prompt.ts) and the
+		 * card reads « Interrompue » meanwhile. "budget" / "budget_stall" when the
 		 * backend paused it for its cost budget (`cost_budget`), with `budget`.
 		 * "tool_loop" when the circuit breaker stopped an agent repeating the
 		 * same call (`agents/tool_breaker.py`), with `breaker`. "kill_switch"
@@ -1030,8 +1031,9 @@ export interface ImplementationPlan {
 		model?: string | null;
 		/**
 		 * Why the build is paused. Absent for the Pause button; "app_shutdown"
-		 * when WorkPilot was closed while it ran — the next launch resumes those
-		 * on its own, and only those. "budget" / "budget_stall" when the
+		 * when WorkPilot was closed (or, with `crashed`, stopped) while it ran —
+		 * the next launch offers to resume it (interrupted-prompt.ts) and the
+		 * card reads « Interrompue » meanwhile. "budget" / "budget_stall" when the
 		 * backend paused it for its cost budget (`cost_budget`), with `budget`.
 		 * "tool_loop" when the circuit breaker stopped an agent repeating the
 		 * same call (`agents/tool_breaker.py`), with `breaker`. "kill_switch"
