@@ -147,9 +147,11 @@ class Source:
 class VectorSource(Protocol):
     """What `rank` needs of an embedder: vectors, and saving them."""
 
-    def vectors(self, texts: list[str]) -> list[list[float] | None]: ...
+    def vectors(self, texts: list[str]) -> list[list[float] | None]:
+        """One vector per text, or None for a text that could not be read."""
 
-    def save(self) -> None: ...
+    def save(self) -> None:
+        """Keep the vectors computed so far for the next question."""
 
 
 @dataclass
