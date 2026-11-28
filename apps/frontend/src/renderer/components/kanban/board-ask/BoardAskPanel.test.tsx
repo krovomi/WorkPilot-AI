@@ -3,12 +3,13 @@
  * conversation so far, shows the answer with its cited tickets, opens a ticket,
  * and says when only the keyword search answered.
  */
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { installRendererApi, type RendererApi } from "../../../../__tests__/helpers/renderer-api";
 import type { BoardAskResult, Task } from "../../../../shared/types";
 import { turnAnswer, useBoardAskStore } from "../../../stores/board-ask-store";
+import { useSettingsStore } from "../../../stores/settings-store";
 import { useTaskStore } from "../../../stores/task-store";
 import { BoardAskButton } from "./BoardAskButton";
 
@@ -28,7 +29,7 @@ let askBoard: ReturnType<typeof vi.fn>;
 beforeEach(() => {
 	askBoard = vi.fn(async () => ({ success: true, data: aiResult }));
 	api = installRendererApi({ askBoard });
-	useBoardAskStore.setState({ open: false, conversations: {} });
+	useBoardAskStore.setState({ open: false, tab: "ask", conversations: {}, ideas: {} });
 	useTaskStore.setState({ tasks: [{ id: "t1", title: "Refonte de la page d'administration" } as Task] });
 });
 afterEach(() => api.restore());
@@ -78,7 +79,7 @@ describe("BoardAskPanel", () => {
 				data: { answer: "", matches: [{ taskId: "t1", title: "Admin", state: "in_progress" }], mode: "keywords", searched: 1 },
 			})
 			.mockResolvedValueOnce({ success: true, data: { answer: "", matches: [], mode: "keywords", searched: 3 } })
-			.mockResolvedValueOnce({ success: false, error: "server_project" })
+			.mockResolvedValueOnce({ success: false, error: "server_unreachable" })
 			.mockRejectedValueOnce(new Error("boom"));
 		useBoardAskStore.setState({ open: true });
 		render(<BoardAskButton projectId="p1" />);
@@ -89,7 +90,7 @@ describe("BoardAskPanel", () => {
 		await userEvent.type(box, "nothing{Enter}");
 		expect(await screen.findByText("No ticket relates to this question.")).toBeInTheDocument();
 		await userEvent.type(box, "server{Enter}");
-		expect(await screen.findByText("A server board cannot be asked yet.")).toBeInTheDocument();
+		expect(await screen.findByText(/The server's cards could not be read/)).toBeInTheDocument();
 		await userEvent.type(box, "boom{Enter}");
 		expect(await screen.findByText(/could not be answered/)).toBeInTheDocument();
 	});
@@ -109,11 +110,114 @@ describe("BoardAskPanel", () => {
 		expect(rows[1]).toHaveAttribute("aria-current", "true");
 	});
 
+	it("names the embeddings model that ranked the tickets, and how much of the board it read", async () => {
+		askBoard
+			.mockResolvedValueOnce({
+				success: true,
+				data: {
+					answer: "",
+					matches: [{ taskId: "t1", title: "Revisión del panel", state: "done" }],
+					mode: "semantic",
+					searched: 40,
+					semantic: { kind: "local", provider: "ollama", model: "bge-m3", indexed: 30, total: 40 },
+				},
+			})
+			.mockResolvedValueOnce({
+				success: true,
+				data: { ...aiResult, semantic: { kind: "cloud", provider: "openai", model: "text-embedding-3-small", indexed: 12, total: 12 } },
+			});
+		useBoardAskStore.setState({ open: true });
+		render(<BoardAskButton projectId="p1" />);
+		const box = screen.getByRole("textbox", { name: /Ask a question/ });
+		await userEvent.type(box, "admin{Enter}");
+		expect(await screen.findByText("Ranked by meaning")).toBeInTheDocument();
+		expect(screen.getByText("Meaning: bge-m3, on this computer")).toBeInTheDocument();
+		expect(screen.getByText(/30 of 40 tickets read by meaning so far/)).toBeInTheDocument();
+		expect(screen.getByText(/closest to the question in meaning/)).toBeInTheDocument();
+		await userEvent.type(box, "again{Enter}");
+		expect(await screen.findByText("Meaning: text-embedding-3-small (openai API)")).toBeInTheDocument();
+		expect(screen.queryAllByText(/tickets read by meaning so far/)).toHaveLength(1);
+	});
+
+	it("saves whether to rank by meaning", async () => {
+		useSettingsStore.setState({ settings: { ...useSettingsStore.getState().settings, boardAskSemantic: undefined } });
+		useBoardAskStore.setState({ open: true });
+		render(<BoardAskButton projectId="p1" />);
+		const select = screen.getByRole("combobox", { name: /By meaning/ });
+		expect(select).toHaveValue("auto");
+		await userEvent.selectOptions(select, "local");
+		await waitFor(() => expect(api.fn("saveSettings")).toHaveBeenCalledWith({ boardAskSemantic: "local" }));
+		await waitFor(() => expect(select).toHaveValue("local"));
+	});
+
+	it("says which tickets are not cards, and saves the sources read", async () => {
+		askBoard.mockResolvedValueOnce({
+			success: true,
+			data: {
+				answer: "",
+				matches: [{ taskId: "change:abc", title: "Export users", state: "done", kind: "change", ref: "#42" }],
+				mode: "keywords",
+				searched: 3,
+			},
+		});
+		useSettingsStore.setState({ settings: { ...useSettingsStore.getState().settings, boardAskSources: undefined } });
+		useBoardAskStore.setState({ open: true });
+		render(<BoardAskButton projectId="p1" />);
+		await userEvent.type(screen.getByRole("textbox", { name: /Ask a question/ }), "export{Enter}");
+		expect(await screen.findByText("Merged change")).toBeInTheDocument();
+		expect(screen.getByText("#42")).toBeInTheDocument();
+		// Not a card: nothing to open.
+		expect(screen.getByRole("button", { name: /Export users/ })).toBeDisabled();
+
+		await userEvent.click(screen.getByRole("button", { name: "4 sources" }));
+		expect(screen.getByRole("menuitemcheckbox", { name: "Board cards" })).toHaveAttribute("aria-checked", "true");
+		await userEvent.click(screen.getByRole("menuitemcheckbox", { name: /Changes merged/ }));
+		await waitFor(() =>
+			expect(api.fn("saveSettings")).toHaveBeenCalledWith({ boardAskSources: ["roadmap", "ideas"] }),
+		);
+		await waitFor(() =>
+			expect(screen.getByRole("menuitemcheckbox", { name: /Changes merged/ })).toHaveAttribute("aria-checked", "false"),
+		);
+		expect(screen.getByRole("button", { name: "3 sources", hidden: true })).toBeInTheDocument();
+		await userEvent.click(screen.getByRole("menuitemcheckbox", { name: /Changes merged/ }));
+		await waitFor(() =>
+			expect(api.fn("saveSettings")).toHaveBeenLastCalledWith({ boardAskSources: ["roadmap", "ideas", "history"] }),
+		);
+	});
+
+	it("says on a server board that only its cards are read, with the person's rights", async () => {
+		useBoardAskStore.setState({ open: true });
+		render(<BoardAskButton projectId="s1" serverBoard />);
+		expect(screen.getByText("The server's cards, with your rights")).toBeInTheDocument();
+		expect(screen.queryByRole("button", { name: /sources/ })).not.toBeInTheDocument();
+		await userEvent.click(screen.getByRole("tab", { name: "Check an idea" }));
+		expect(screen.getByText("The server's cards, with your rights")).toBeInTheDocument();
+	});
+
 	it("asks an example question from the empty state", async () => {
 		useBoardAskStore.setState({ open: true });
 		render(<BoardAskButton projectId="p1" />);
 		await userEvent.click(screen.getByRole("button", { name: "How was the admin page reworked?" }));
 		await waitFor(() => expect(askBoard).toHaveBeenCalled());
+	});
+
+	it("waits for the answer before the next question, and keeps each tab's work", async () => {
+		let answer: (value: unknown) => void = () => undefined;
+		askBoard.mockImplementationOnce(() => new Promise((resolve) => (answer = resolve)));
+		useBoardAskStore.setState({ open: true });
+		render(<BoardAskButton projectId="p1" />);
+		await userEvent.type(screen.getByRole("textbox", { name: /Ask a question/ }), "Admin page?{Enter}Exports");
+		expect(within(screen.getByRole("dialog")).getByRole("button", { name: "Ask" })).toBeDisabled();
+
+		await userEvent.click(screen.getByRole("tab", { name: "Check an idea" }));
+		expect(screen.getByRole("tab", { name: "Check an idea" })).toHaveAttribute("aria-selected", "true");
+		expect(screen.getByText(/Paste a feature you plan/)).toBeInTheDocument();
+		await userEvent.click(screen.getByRole("tab", { name: "Ask a question" }));
+		await act(async () => answer({ success: true, data: aiResult }));
+		expect(await screen.findByText("Answered by AI")).toBeInTheDocument();
+		await userEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Ask" }));
+		await waitFor(() => expect(askBoard).toHaveBeenCalledTimes(2));
+		expect(askBoard.mock.calls[1]?.[0]).toMatchObject({ question: "Exports" });
 	});
 });
 

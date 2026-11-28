@@ -12,6 +12,7 @@ import type {
 	TaskCategory,
 	TaskPriority,
 } from "../../shared/types";
+import { taskLabels } from "../../shared/utils/task-labels";
 import { splitGroupId } from "../../shared/utils/task-split";
 import { extractTextFromHtml } from "./utils";
 
@@ -51,7 +52,22 @@ export interface KanbanFilters {
 	priorities: TaskPriority[];
 	/** One split group (the split task's spec id): only its parts are shown. */
 	group?: string;
+	/** One sprint's cards (its id), or "none" for the cards in no sprint (the backlog). */
+	sprint?: string;
+	/** Cards carrying at least one of these labels (compared without case). */
+	labels?: string[];
+	/** One-click filters, all of which a card must meet. */
+	quick?: QuickFilter[];
 }
+
+/** Jira's quick filters: the cards flagged « Bloquée », and those changed in the last week. */
+export type QuickFilter = "flagged" | "recent";
+export const QUICK_FILTERS: readonly QuickFilter[] = ["flagged", "recent"];
+/** How far back « Modifiées cette semaine » looks. */
+export const RECENT_DAYS = 7;
+
+/** The sprint filter value for the cards in no sprint. */
+export const NO_SPRINT = "none";
 
 export interface KanbanSort {
 	field: TaskSortField;
@@ -122,7 +138,10 @@ export function hasActiveFilters(filters: KanbanFilters): boolean {
 		filters.sources.length > 0 ||
 		filters.categories.length > 0 ||
 		filters.priorities.length > 0 ||
-		Boolean(filters.group)
+		Boolean(filters.group) ||
+		Boolean(filters.sprint) ||
+		(filters.labels?.length ?? 0) > 0 ||
+		(filters.quick?.length ?? 0) > 0
 	);
 }
 
@@ -134,6 +153,9 @@ export function activeFilterCount(filters: KanbanFilters): number {
 	count += filters.categories.length;
 	count += filters.priorities.length;
 	if (filters.group) count++;
+	if (filters.sprint) count++;
+	count += filters.labels?.length ?? 0;
+	count += filters.quick?.length ?? 0;
 	return count;
 }
 
@@ -141,8 +163,20 @@ export function activeFilterCount(filters: KanbanFilters): number {
 export function taskMatchesFilters(
 	task: Task,
 	filters: KanbanFilters,
+	now = Date.now(),
 ): boolean {
+	if (filters.labels?.length) {
+		const wanted = new Set(filters.labels.map((label) => label.toLocaleLowerCase()));
+		if (!taskLabels(task).some((label) => wanted.has(label.toLocaleLowerCase()))) return false;
+	}
+	const quick = filters.quick ?? [];
+	if (quick.includes("flagged") && !task.metadata?.flagged) return false;
+	if (quick.includes("recent") && !(now - new Date(task.updatedAt).getTime() <= RECENT_DAYS * 86_400_000)) return false;
 	if (filters.group && splitGroupId(task) !== filters.group) return false;
+	if (filters.sprint) {
+		const sprintId = task.metadata?.sprintId;
+		if (filters.sprint === NO_SPRINT ? Boolean(sprintId) : sprintId !== filters.sprint) return false;
+	}
 
 	if (filters.sources.length > 0) {
 		if (!filters.sources.includes(getTaskSource(task))) return false;

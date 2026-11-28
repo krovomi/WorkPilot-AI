@@ -904,6 +904,10 @@
 				"title": "Leaderboard",
 				"hint": "The season's points of those who show their name, and your badges"
 			},
+			"ask": {
+				"title": "Ask the board",
+				"hint": "A question in any language, answered with the tickets that relate to it"
+			},
 			"roadmap": {
 				"title": "Roadmap",
 				"hint": "The features planned for the project, by phase and priority"
@@ -1112,6 +1116,37 @@
 		"revoke": "End the link",
 		"revokeTitle": "End this link?",
 		"revokeBody": "“{{title}}” will no longer open for anyone who has the link."
+	},
+	"ask": {
+		"intro": "Ask about the board in any language, for instance « Was the admin page reviewed? ». The answer cites every related card, roadmap feature and idea, whatever language they are written in. Only you see your questions.",
+		"question": "Your question",
+		"followUp": "A follow-up question",
+		"send": "Ask",
+		"stop": "Stop",
+		"answering": "Looking for « {{question}} »…",
+		"noAnswer": "The server gave no answer. Try again.",
+		"keywords": "No model answered: these tickets share words with the question.",
+		"nothing": "No ticket relates to this question.",
+		"searched_one": "{{count}} ticket searched",
+		"searched_other": "{{count}} tickets searched",
+		"archived": "Archived",
+		"state": {
+			"done": "Done",
+			"in_review": "In review",
+			"in_progress": "In progress",
+			"planned": "Planned",
+			"failed": "Failed",
+			"abandoned": "Abandoned"
+		},
+		"coverage": {
+			"full": "Already done",
+			"partial": "Partly",
+			"related": "Related"
+		},
+		"kind": {
+			"roadmap": "Roadmap",
+			"idea": "Idea"
+		}
 	},
 	"myUsage": {
 		"title": "My usage",
