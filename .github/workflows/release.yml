@@ -751,6 +751,8 @@ jobs:
 
           # Save to file first (more reliable for multiline)
           echo "$CHANGELOG_CONTENT" > changelog-body.md
+          # GitHub refuses a release text over 125 000 characters.
+          python3 scripts/release_notes_cap.py changelog-body.md "$VERSION" "${{ github.repository }}"
 
           # Use file-based output for multiline content
           {
