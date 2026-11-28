@@ -25,6 +25,27 @@ export const AI_ACCOUNT_PROVIDERS: readonly string[] = [
 	...GATEWAY_PROVIDERS.map((gateway) => gateway.id),
 ];
 
+/**
+ * Coding-agent CLIs whose accounts are sign-ins, each in a folder of its own
+ * that the CLI reads from an environment variable (`main/ai-accounts/
+ * login-accounts.ts`): GitHub CLI for Copilot, Codex CLI (ChatGPT plan),
+ * Gemini CLI. No key is stored: the CLI keeps its own sign-in there.
+ */
+export const AI_LOGIN_PROVIDERS: readonly string[] = ["copilot", "codex", "gemini-cli"];
+
+/** The sign-in accounts a provider card offers: OpenAI's are Codex CLI's. */
+const LOGIN_PROVIDER_OF_CARD: Readonly<Record<string, string>> = {
+	copilot: "copilot",
+	openai: "codex",
+	codex: "codex",
+	"gemini-cli": "gemini-cli",
+};
+
+/** The sign-in provider whose accounts `provider` uses, or undefined. */
+export function loginProviderOf(provider: string | undefined | null): string | undefined {
+	return provider ? LOGIN_PROVIDER_OF_CARD[provider.trim().toLowerCase()] : undefined;
+}
+
 /** Aliases a task or a page may name for a provider of `AI_ACCOUNT_PROVIDERS`. */
 const ACCOUNT_PROVIDER_ALIASES: Readonly<Record<string, string>> = {
 	gemini: "google",
@@ -45,6 +66,10 @@ export interface AiAccountView {
 	/** The name the person gave it ("Perso", "Client X"). */
 	name: string;
 	hasKey: boolean;
+	/** "login" for a CLI sign-in account (`AI_LOGIN_PROVIDERS`), else an API key. */
+	kind?: "key" | "login";
+	/** A sign-in account: whether its CLI has signed in there. */
+	signedIn?: boolean;
 	createdAt: string;
 	/** When the key got its current value. */
 	keySetAt?: string;
@@ -60,6 +85,15 @@ export interface AiAccountsSnapshot {
 	defaults: Record<string, string>;
 	/** Providers whose own page holds a key (the main key). */
 	mainKeys: string[];
+}
+
+/** What the renderer needs to open a sign-in terminal for a CLI account. */
+export interface AiAccountSignIn {
+	terminalId: string;
+	/** Typed in the terminal, built by the main process. */
+	command: string;
+	/** The CLI's folder variable, pointing at the account's own folder. */
+	env: Record<string, string>;
 }
 
 /** What the renderer sends to create (no id) or update an account. */

@@ -616,6 +616,7 @@ export const IPC_CHANNELS = {
 	AI_ACCOUNTS_DELETE: "aiAccounts:delete",
 	AI_ACCOUNTS_TEST: "aiAccounts:test",
 	AI_ACCOUNTS_SET_DEFAULT: "aiAccounts:setDefault",
+	AI_ACCOUNTS_SIGN_IN: "aiAccounts:signIn",
 	// Spend and monthly budget per AI account (main/ai-accounts/account-usage.ts)
 	AI_ACCOUNTS_USAGE: "aiAccounts:usage",
 	AI_ACCOUNTS_SET_BUDGET: "aiAccounts:setBudget",

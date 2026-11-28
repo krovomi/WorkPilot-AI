@@ -28,7 +28,11 @@ const store = vi.hoisted(() => ({
 	claudeManager: null as unknown,
 	/** Default account key per provider (Settings → AI accounts). */
 	accountKeys: {} as Record<string, string>,
+	/** The CLIs' default accounts' folders (Settings → AI accounts). */
+	loginEnv: {} as Record<string, string>,
 }));
+
+vi.mock("../../ai-accounts/login-accounts", () => ({ loginAccountEnv: () => store.loginEnv }));
 
 vi.mock("../../ai-accounts/ai-account-key", async (importOriginal) => ({
 	...(await importOriginal<typeof import("../../ai-accounts/ai-account-key")>()),
@@ -963,6 +967,20 @@ describe("environment for the Python backend", () => {
 		expect(new CredentialManager().getEnvironmentVariables()).toEqual({
 			SELECTED_LLM_PROVIDER: "copilot",
 		});
+	});
+
+	it("adds the folder of each CLI's default account, whatever the provider asked", () => {
+		store.loginEnv = { COPILOT_GH_CONFIG_DIR: "/accounts/copilot/a" };
+		store.settings = { selectedProvider: "copilot" };
+		const manager = new CredentialManager();
+		expect(manager.getEnvironmentVariables()).toEqual({
+			SELECTED_LLM_PROVIDER: "copilot",
+			COPILOT_GH_CONFIG_DIR: "/accounts/copilot/a",
+		});
+		expect(manager.getEnvironmentVariables("copilot")).toMatchObject({
+			COPILOT_GH_CONFIG_DIR: "/accounts/copilot/a",
+		});
+		store.loginEnv = {};
 	});
 
 	it("takes a provider's key and base URL from a matching profile first", async () => {

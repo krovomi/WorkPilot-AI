@@ -339,7 +339,7 @@ describe("CleanProviderSection", () => {
 		expect(card("mistral").isConfigured).toBe(true);
 		expect(card("openai").accounts).toEqual({ count: 1, defaultName: undefined });
 		expect(card("anthropic").accounts).toEqual({ count: 2, defaultName: "Me" });
-		expect(card("copilot").accounts).toBeUndefined();
+		expect(card("copilot").accounts).toEqual({ count: 0, defaultName: undefined });
 
 		act(() => {
 			callStub("CleanProviderGrid", "onManageAccounts", "nope");
@@ -351,6 +351,28 @@ describe("CleanProviderSection", () => {
 		expect(await screen.findByRole("dialog", { name: "Mistral accounts" })).toBeInTheDocument();
 		await userEvent.keyboard("{Escape}");
 		await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+	});
+
+	it("counts a CLI's sign-ins on its card, and names the default one", async () => {
+		const login = (id: string, provider: string, name: string) => ({
+			id,
+			provider,
+			name,
+			hasKey: false,
+			kind: "login" as const,
+			signedIn: true,
+			createdAt: "",
+		});
+		const snapshot = {
+			accounts: [login("c1", "copilot", "Work"), login("c2", "copilot", "Client"), login("x1", "codex", "Plus")],
+			defaults: { copilot: "c2" },
+			mainKeys: ["openai"],
+		};
+		useApi({ listAiAccounts: vi.fn(async () => ({ success: true, data: snapshot })) });
+		renderSection();
+		await settle();
+		await waitFor(() => expect(card("copilot").accounts).toEqual({ count: 2, defaultName: "Client" }));
+		expect(card("openai").accounts).toEqual({ count: 2, defaultName: "Main key" });
 	});
 
 	it("names the main key when it runs beside other accounts", async () => {
