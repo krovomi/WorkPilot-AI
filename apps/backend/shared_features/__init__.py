@@ -38,6 +38,7 @@ def mount_all(mount: Callable[[APIRouter, str], None]) -> None:
     from shared_board.approvals import router as board_approvals
     from shared_board.engines import router as board_engines
     from shared_board.mcp_http import router as board_mcp_http
+    from shared_board.sprints import router as board_sprints
     from shared_features.analyses import router as analyses
     from shared_features.api import feature_router
     from shared_features.automations.api import router as automations
@@ -64,6 +65,7 @@ def mount_all(mount: Callable[[APIRouter, str], None]) -> None:
     mount(board_approvals, "board")
     mount(board_engines, "board")
     mount(board_mcp_http, "board")
+    mount(board_sprints, "board")
     mount(automations, "board")
     for feature in FEATURES.values():
         mount(feature_router(feature), feature.key)

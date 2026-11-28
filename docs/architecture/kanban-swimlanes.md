@@ -11,7 +11,7 @@ summary: >-
 
 Demandé le 22 novembre 2026 (« répartir le kanban par sprint, par sous-projets ou autres vues »),
 lot 3 de l'étude « Kanban agile ». Jira, Linear, Azure Boards et GitHub Projects coupent tous le
-tableau en lignes par un champ ; le sprint (lot 4) viendra s'ajouter à la liste.
+tableau en lignes par un champ ; le sprint (lot 4) s'est ajouté à la liste.
 
 ## Le choix du regroupement
 
@@ -23,6 +23,7 @@ Le bouton « Couloirs » de la barre d'outils (`kanban/LaneGroupingMenu.tsx`) of
 | Priorité | `metadata.priority` | écrit la priorité ; « Sans priorité » l'efface |
 | Type | `resolveCardType` (les 14 types de carte) | écrit le type (`cardTypeChoiceMetadata`) ; « Pas encore de type » refuse |
 | Sous-projet | `metadata.area` | écrit ou efface le sous-projet |
+| Sprint | `metadata.sprintId` ([kanban-sprints.md](kanban-sprints.md)) | écrit le sprint s'il est en cours ou planifié ; « Backlog » l'efface ; un sprint terminé refuse |
 | Origine | `getTaskSource` (manuelle, Jira, GitHub…) | refusé : l'origine ne se choisit pas |
 | Tâche découpée | `splitGroupId` | refusé : le découpage décide |
 

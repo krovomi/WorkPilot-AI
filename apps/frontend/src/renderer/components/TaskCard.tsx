@@ -76,6 +76,7 @@ import { PhaseProgressIndicator } from "./PhaseProgressIndicator";
 import { TaskSandboxNotice } from "./task-sandbox/TaskSandboxNotice";
 import { SessionCompactionBadge } from "./SessionCompactionBadge";
 import { StreamingSessionButton } from "./streaming/StreamingSessionButton";
+import { CardLabels } from "./kanban/labels/CardLabels";
 import { CardTypeChip } from "./kanban/CardTypeChip";
 import { TaskCardPreview } from "./kanban/TaskCardPreview";
 import { sameRunFacts, TaskRunFactsRow } from "./kanban/TaskRunFacts";
@@ -1605,6 +1606,7 @@ export const TaskCard = memo(function TaskCard({
 							</p>
 						)}
 
+						<CardLabels task={task} />
 						{/* Metadata badges */}
 						<MetadataBadges
 							task={task}

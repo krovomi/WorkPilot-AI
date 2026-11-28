@@ -50,3 +50,10 @@ describe("settingsFromMetadata, flag", () => {
 		expect(settingsFromMetadata({ flagged: undefined })).toEqual({ flagged: null });
 	});
 });
+
+describe("settingsFromMetadata, labels", () => {
+	it("sends the labels, and clears them when none is left", () => {
+		expect(settingsFromMetadata({ labels: ["front", "release"] })).toEqual({ labels: ["front", "release"] });
+		expect(settingsFromMetadata({ labels: [] })).toEqual({ labels: null });
+	});
+});
