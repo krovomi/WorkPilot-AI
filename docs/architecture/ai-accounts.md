@@ -92,5 +92,11 @@ un dossier de connexion par compte, comme Claude (`CLAUDE_CONFIG_DIR`).
 - `apps/frontend/src/renderer/components/settings/ai-accounts/` : le dialogue des comptes.
 - `apps/frontend/src/renderer/components/usage/ProviderAccountSwitcher.tsx` : la bascule de la popin.
 
+## Quand un compte s'arrête
+
+Chaque compte est une entrée `account-<id>` de la chaîne de basculement. Une tâche arrêtée par
+une limite, un quota épuisé ou une clé refusée passe au compte suivant de son provider, épinglé
+sur elle seule ; le compte par défaut ne bouge pas. Détail : [provider-failover.md](provider-failover.md).
+
 Voir aussi [forge-accounts.md](forge-accounts.md) (même modèle pour les forges) et
 [provider-failover.md](provider-failover.md) (basculement auto entre comptes).

@@ -76,6 +76,8 @@ describe("GlobalAutoSwitching", () => {
 		expect(screen.getByText(t("aiAccounts.failover.masterOn"))).toBeInTheDocument();
 		expect(toggle("rateLimit")).toBeChecked();
 		expect(toggle("authFailure")).not.toBeChecked();
+		// Not saved yet: on, as the main reads it.
+		expect(toggle("sameProviderFirst")).toBeChecked();
 		expect(order()).toEqual(["provider-copilot", "oauth-a", "oauth-b"]);
 		expect(onSummaryChange).toHaveBeenLastCalledWith({ enabled: true, chainLength: 3 });
 		expect(api.fn("setAccountPriorityOrder")).not.toHaveBeenCalled();
@@ -89,6 +91,8 @@ describe("GlobalAutoSwitching", () => {
 		expect(api.fn("updateAutoSwitchSettings")).toHaveBeenCalledWith({ autoSwitchOnAuthFailure: true });
 		await user.click(toggle("rateLimit"));
 		expect(api.fn("updateAutoSwitchSettings")).toHaveBeenCalledWith({ autoSwitchOnRateLimit: false });
+		await user.click(toggle("sameProviderFirst"));
+		expect(api.fn("updateAutoSwitchSettings")).toHaveBeenCalledWith({ sameProviderFirst: false });
 		await waitFor(() => expect(toggle("authFailure")).toBeChecked());
 
 		const error = vi.spyOn(console, "error").mockImplementation(() => undefined);

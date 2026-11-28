@@ -7,7 +7,6 @@ memory updates, recovery tracking, and Linear integration.
 """
 
 import logging
-import re
 from pathlib import Path
 from typing import Any, Union
 
@@ -61,6 +60,7 @@ from ui import (
 from .base import sanitize_error_message
 from .manual_verification import settle_block
 from .memory_manager import save_session_memory
+from .provider_errors import is_authentication_error, is_rate_limit_error
 from .session_guards import SessionGuards
 from .session_recording import SessionRecording, client_usage
 from .tool_display import (
@@ -446,50 +446,6 @@ def is_tool_concurrency_error(error: Exception) -> bool:
     )
 
 
-def is_rate_limit_error(error: Exception) -> bool:
-    """
-    Check if an error is a rate limit error (429 or similar).
-
-    Rate limit errors occur when the API usage quota is exceeded,
-    either for session limits or weekly limits.
-
-    Args:
-        error: The exception to check
-
-    Returns:
-        True if this is a rate limit error, False otherwise
-    """
-    error_str = str(error).lower()
-
-    # Check for HTTP 429 with word boundaries to avoid false positives
-    if re.search(r"\b429\b", error_str):
-        return True
-
-    # Check for other rate limit indicators. The "hit your" patterns cover
-    # the Claude CLI shapes "You've hit your limit · resets …" AND the newer
-    # "You've hit your session limit · resets …" / "weekly limit" variants —
-    # missing the session/weekly word here caused the orchestration loop to
-    # treat the error as a generic failure and retry, which in turn polluted
-    # the conversation summary until the prompt itself blew the context window
-    # ("Prompt is too long").
-    return any(
-        p in error_str
-        for p in [
-            "limit reached",
-            "rate limit",
-            "rate_limit",  # SDK may use underscore variant (e.g., "rate_limit_event")
-            "hit your limit",
-            "hit your session limit",
-            "hit your weekly limit",
-            "session limit",
-            "weekly limit",
-            "too many requests",
-            "usage limit",
-            "quota exceeded",
-        ]
-    )
-
-
 def _response_text_indicates_prompt_too_long(response_text: str) -> bool:
     """Return True if the LLM's *response text* (not exception) signals that
     the prompt was rejected for being too long.
@@ -595,61 +551,6 @@ def is_prompt_too_long_error(error: Exception) -> bool:
         "exceeds context",
     ]
     return any(p in error_str for p in patterns)
-
-
-def is_authentication_error(error: Exception) -> bool:
-    """
-    Check if an error is an authentication error (401, token expired, etc.).
-
-    Authentication errors occur when OAuth tokens are invalid, expired,
-    or have been revoked (e.g., after token refresh on another process).
-
-    Validation approach:
-    - HTTP 401 status code is checked with word boundaries to minimize false positives
-    - Additional string patterns are validated against lowercase error messages
-    - Patterns are designed to match known Claude API and OAuth error formats
-
-    Known false positive risks:
-    - Generic error messages containing "unauthorized" or "access denied" may match
-      even if not related to authentication (e.g., file permission errors)
-    - Error messages containing these keywords in user-provided content could match
-    - Mitigation: HTTP 401 check provides strong signal; string patterns are secondary
-
-    Real-world validation:
-    - Pattern matching has been tested against actual Claude API error responses
-    - False positive rate is acceptable given the recovery mechanism (prompt user to re-auth)
-    - If false positive occurs, user can simply resume without re-authenticating
-
-    Args:
-        error: The exception to check
-
-    Returns:
-        True if this is an authentication error, False otherwise
-    """
-    error_str = str(error).lower()
-
-    # Check for HTTP 401 with word boundaries to avoid false positives
-    if re.search(r"\b401\b", error_str):
-        return True
-
-    # Check for other authentication indicators
-    # NOTE: "authentication failed" and "authentication error" are more specific patterns
-    # to reduce false positives from generic "authentication" mentions
-    return any(
-        p in error_str
-        for p in [
-            "authentication failed",
-            "authentication error",
-            "unauthorized",
-            "invalid token",
-            "token expired",
-            "authentication_error",
-            "invalid_token",
-            "token_expired",
-            "not authenticated",
-            "http 401",
-        ]
-    )
 
 
 def _persist_subtask_changed_files(

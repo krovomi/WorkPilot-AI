@@ -11,7 +11,13 @@ from __future__ import annotations
 import re
 from datetime import datetime, timedelta
 
-__all__ = ["parse_rate_limit_reset_time"]
+from .provider_errors import is_quota_exhausted
+
+__all__ = ["QUOTA_PAUSE_SECONDS", "parse_rate_limit_reset_time", "quota_pause"]
+
+# A spent quota names no reset time: the task pauses this long, which hands it
+# to the automatic failover (next account) or, without one, retries after.
+QUOTA_PAUSE_SECONDS = 60 * 60
 
 
 def _parse_relative_time(message: str) -> int | None:
@@ -137,3 +143,16 @@ def parse_rate_limit_reset_time(error_info: dict | None) -> int | None:
 
     # No pattern matched
     return None
+
+
+def quota_pause(error_info: dict | None) -> int | None:
+    """When to resume after a spent quota, which names no reset time and which
+    a plain retry cannot get past: an hour from now. None for any other error.
+
+    Asked after ``parse_rate_limit_reset_time``: a reset time the provider
+    gives always wins. A short rate limit with no time is retried as before.
+    """
+    message = str((error_info or {}).get("message", ""))
+    if not is_quota_exhausted(message):
+        return None
+    return int(datetime.now().timestamp()) + QUOTA_PAUSE_SECONDS

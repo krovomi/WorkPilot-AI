@@ -35,6 +35,27 @@ export interface EngineChoice {
 	 * False when the account changed: another account has no such session.
 	 */
 	readonly keepClaudeSession?: boolean;
+	/**
+	 * The account this task runs on from now on, written into its
+	 * `aiAccounts` pins (`provider` → account id; `claude` for a Claude
+	 * profile). Set by the automatic failover only, never from the renderer.
+	 */
+	readonly accountPin?: { readonly key: string; readonly id: string };
+}
+
+/** The task's pins with `pin` set, keeping the other providers' pins. */
+export function withAccountPin(
+	existing: unknown,
+	pin: { readonly key: string; readonly id: string },
+): Record<string, string> {
+	const pins: Record<string, string> = {};
+	if (existing && typeof existing === "object" && !Array.isArray(existing)) {
+		for (const [key, value] of Object.entries(existing)) {
+			if (typeof value === "string") pins[key] = value;
+		}
+	}
+	pins[pin.key] = pin.id;
+	return pins;
 }
 
 /**
@@ -62,7 +83,7 @@ export async function resumeTaskWithProvider(
 	agentManager: AgentManager,
 	taskId: string,
 	providerName: string,
-	{ model, effort, scope, keepClaudeSession = true }: EngineChoice = {},
+	{ model, effort, scope, keepClaudeSession = true, accountPin }: EngineChoice = {},
 ): Promise<IPCResult> {
 	const { task, project } = findTaskAndProject(taskId);
 	if (!task || !project) {
@@ -144,6 +165,7 @@ export async function resumeTaskWithProvider(
 					: {};
 				Object.assign(existing, update);
 				if (!formulaStillTrue) delete existing.appliedFormula;
+				if (accountPin) existing.aiAccounts = withAccountPin(existing.aiAccounts, accountPin);
 				atomicWriteFileSync(
 					metadataPath,
 					JSON.stringify(existing, null, 2),
@@ -163,6 +185,10 @@ export async function resumeTaskWithProvider(
 		if (!task.metadata) task.metadata = {};
 		Object.assign(task.metadata, update);
 		if (!formulaStillTrue) task.metadata.appliedFormula = undefined;
+		if (accountPin) {
+			const memory = task.metadata as { aiAccounts?: unknown };
+			memory.aiAccounts = withAccountPin(memory.aiAccounts, accountPin);
+		}
 
 		appLog.info(
 			`[TASK_RESUME_WITH_PROVIDER] Resuming task ${taskId} from ${fromPhase} ` +

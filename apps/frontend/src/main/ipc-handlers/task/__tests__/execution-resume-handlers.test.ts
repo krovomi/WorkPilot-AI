@@ -225,6 +225,30 @@ describe("TASK_RESUME_WITH_PROVIDER", () => {
 		expect(state.resume).toHaveBeenCalledWith(agent, "t1", "p1", { keepSession: false });
 	});
 
+	it("pins the account the failover chose on the task, in every copy, keeping its other pins", async () => {
+		const task = setTask({
+			metadata: { provider: "openai", paused: { enabled: true, paused_phase: "coding" } } as Task["metadata"],
+		});
+		addWorktree();
+		write(path.join(specDir, "task_metadata.json"), { aiAccounts: { mistral: "m1", openai: "o1", broken: 3 } });
+		write(path.join(wtSpecDir, "task_metadata.json"), { aiAccounts: ["not", "pins"] });
+		expect(
+			await resumeTaskWithProvider(agent as never, "t1", "openai", {
+				keepClaudeSession: false,
+				accountPin: { key: "openai", id: "o2" },
+			}),
+		).toEqual({ success: true });
+		expect(read(path.join(specDir, "task_metadata.json")).aiAccounts).toEqual({ mistral: "m1", openai: "o2" });
+		expect(read(path.join(wtSpecDir, "task_metadata.json")).aiAccounts).toEqual({ openai: "o2" });
+		expect((task.metadata as { aiAccounts?: unknown }).aiAccounts).toEqual({ openai: "o2" });
+	});
+
+	it("never pins an account from the renderer's « Reprendre avec… »", async () => {
+		setTask();
+		expect((await resume("openai", "", "", "remaining", { key: "openai", id: "x" })).success).toBe(true);
+		expect(read(path.join(specDir, "task_metadata.json")).aiAccounts).toBeUndefined();
+	});
+
 	it("fills an empty metadata copy", async () => {
 		setTask();
 		write(path.join(specDir, "task_metadata.json"), "");
