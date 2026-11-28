@@ -3,7 +3,7 @@
  * one field of the cards, each row holding every column.
  *
  * Moving a card to another lane writes that field (priority, type,
- * sub-project), as Jira does for an assignee or an epic; the lanes of a
+ * sub-project, sprint), as Jira does for an assignee or an epic; the lanes of a
  * field the board does not own (origin, split task) refuse it. Cards
  * flagged « Bloquée » can be pinned in a lane of their own, first.
  *
@@ -17,13 +17,14 @@ import {
 } from "../../shared/constants/card-types";
 import type { TaskStatusColumn } from "../../shared/constants/task";
 import type { Task, TaskPriority } from "../../shared/types";
+import { isSprintId } from "../../shared/utils/sprints";
 import { splitGroupId } from "../../shared/utils/task-split";
 import type { CardChoice } from "./card-edits";
 import { getTaskSource, TASK_SOURCES } from "./kanban-filter";
 
-export type LaneGrouping = "none" | "priority" | "type" | "area" | "source" | "parent";
+export type LaneGrouping = "none" | "priority" | "type" | "area" | "sprint" | "source" | "parent";
 
-export const LANE_GROUPINGS: readonly LaneGrouping[] = ["none", "priority", "type", "area", "source", "parent"];
+export const LANE_GROUPINGS: readonly LaneGrouping[] = ["none", "priority", "type", "area", "sprint", "source", "parent"];
 
 /** The lane of the cards that have no value for the field. */
 export const NO_VALUE_LANE = "__none__";
@@ -41,6 +42,11 @@ export interface LaneOptions {
 	pinFlagged: boolean;
 	/** Sub-projects known without a card (project index, added by hand). */
 	knownAreas?: readonly string[];
+	/**
+	 * The project's sprints in reading order (active, planned, closed): the
+	 * active and planned ones are shown even empty, to plan by dragging.
+	 */
+	knownSprints?: readonly { id: string; state: string }[];
 }
 
 export interface Lane {
@@ -74,6 +80,8 @@ function fieldValue(task: Task, grouping: LaneGrouping): string | null {
 			return resolveCardType(metadata)?.type ?? null;
 		case "area":
 			return cleanArea(metadata?.area);
+		case "sprint":
+			return isSprintId(metadata?.sprintId) ? metadata.sprintId : null;
 		case "source":
 			return getTaskSource(task);
 		case "parent":
@@ -91,7 +99,7 @@ export function laneKeyOf(task: Task, options: Pick<LaneOptions, "grouping" | "p
 
 /** True when moving a card to another lane of this grouping writes its field. */
 export function isEditableGrouping(grouping: LaneGrouping): boolean {
-	return grouping === "priority" || grouping === "type" || grouping === "area";
+	return grouping === "priority" || grouping === "type" || grouping === "area" || grouping === "sprint";
 }
 
 /** The lanes shown even empty: they are where a card is moved to. */
@@ -100,10 +108,13 @@ function fixedValues(options: LaneOptions): string[] {
 	if (options.grouping === "area") {
 		return (options.knownAreas ?? []).map(cleanArea).filter((area): area is string => !!area);
 	}
+	if (options.grouping === "sprint") {
+		return (options.knownSprints ?? []).filter((sprint) => sprint.state !== "closed").map((sprint) => sprint.id);
+	}
 	return [];
 }
 
-function ordered(grouping: LaneGrouping, values: string[]): string[] {
+function ordered(grouping: LaneGrouping, values: string[], options: LaneOptions): string[] {
 	const rank = (order: readonly string[], value: string) => {
 		const index = order.indexOf(value);
 		return index === -1 ? order.length : index;
@@ -112,6 +123,7 @@ function ordered(grouping: LaneGrouping, values: string[]): string[] {
 	if (grouping === "priority") return byOrder(PRIORITY_ORDER);
 	if (grouping === "type") return byOrder(CARD_TYPE_IDS);
 	if (grouping === "source") return byOrder(TASK_SOURCES);
+	if (grouping === "sprint") return byOrder((options.knownSprints ?? []).map((sprint) => sprint.id));
 	return values.sort((a, b) => a.localeCompare(b));
 }
 
@@ -148,13 +160,14 @@ export function buildLanes(
 	const values = ordered(
 		options.grouping,
 		[...lanes.keys()].filter((key) => key !== FLAGGED_LANE && key !== NO_VALUE_LANE),
+		options,
 	);
 	const result: Lane[] = [];
 	const flagged = lanes.get(FLAGGED_LANE);
 	if (flagged) result.push(flagged);
 	for (const value of values) result.push(laneOf(value));
 	// Where a card goes when its field is cleared: shown even empty for a field the board writes.
-	if (lanes.has(NO_VALUE_LANE) || options.grouping === "priority" || options.grouping === "area") {
+	if (lanes.has(NO_VALUE_LANE) || ["priority", "area", "sprint"].includes(options.grouping)) {
 		result.push(laneOf(NO_VALUE_LANE));
 	}
 	return result;
@@ -163,9 +176,14 @@ export function buildLanes(
 /**
  * What a card moved into a lane gets written; null when the grouping's
  * field is not the board's to change, or for the flagged lane (reached by
- * flagging) and the no-type lane (a type is chosen, never cleared).
+ * flagging), the no-type lane (a type is chosen, never cleared) and a
+ * sprint that is not open (`openSprints`: closed or unknown).
  */
-export function laneMetadata(grouping: LaneGrouping, laneKey: string): CardChoice | null {
+export function laneMetadata(
+	grouping: LaneGrouping,
+	laneKey: string,
+	openSprints: readonly string[] = [],
+): CardChoice | null {
 	if (!isEditableGrouping(grouping) || laneKey === FLAGGED_LANE) return null;
 	const value = laneKey === NO_VALUE_LANE ? undefined : laneKey;
 	if (grouping === "priority") {
@@ -175,6 +193,10 @@ export function laneMetadata(grouping: LaneGrouping, laneKey: string): CardChoic
 	if (grouping === "type") {
 		if (value === undefined || !CARD_TYPE_IDS.includes(value as CardType)) return null;
 		return cardTypeChoiceMetadata(value as CardType);
+	}
+	if (grouping === "sprint") {
+		if (value === undefined) return { sprintId: undefined };
+		return isSprintId(value) && openSprints.includes(value) ? { sprintId: value } : null;
 	}
 	if (value === undefined) return { area: undefined };
 	const area = cleanArea(value);

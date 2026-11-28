@@ -13,6 +13,7 @@ import {
 	DropdownMenuContent,
 	DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
+import { useSprintStore } from "../../stores/sprint-store";
 import { TaskCardMenuItems } from "./TaskCardMenuItems";
 
 beforeAll(() => {
@@ -46,6 +47,15 @@ describe("TaskCardMenuItems", () => {
 		renderItems({ onUnflag });
 		await user.click(screen.getByRole("menuitem", { name: "Remove flag" }));
 		expect(onUnflag).toHaveBeenCalled();
+	});
+
+	it("opens the labels of a task from the edit group", async () => {
+		const user = userEvent.setup();
+		const onEditLabels = vi.fn();
+		renderItems({ onEditLabels, onDelete: vi.fn() });
+		await user.click(screen.getByRole("menuitem", { name: "Labels…" }));
+		expect(onEditLabels).toHaveBeenCalled();
+		expect(separators()).toBe(1);
 	});
 
 	it("sets a task aside, or resumes it, from the work group", async () => {
@@ -111,5 +121,20 @@ describe("TaskCardMenuItems", () => {
 		expect(
 			screen.getByRole("menuitem", { name: "Bug" }).querySelectorAll("svg"),
 		).toHaveLength(1);
+	});
+
+	it("offers the sprints of the project, or says none is open", async () => {
+		const user = userEvent.setup();
+		useSprintStore.setState({ sprints: [] });
+		const onSetSprint = vi.fn();
+		const { unmount } = renderItems({ onSetSprint });
+		await pickSubmenuItem(user, "Sprint", "Backlog (no sprint)");
+		expect(onSetSprint).toHaveBeenCalledWith(null);
+		unmount();
+		renderItems({ onSetSprint, currentSprint: "sp-0000000a" });
+		const trigger = await screen.findByRole("menuitem", { name: "Sprint" });
+		trigger.focus();
+		await user.keyboard("{ArrowRight}");
+		expect(await screen.findByRole("menuitem", { name: "No open sprint" })).toHaveAttribute("aria-disabled", "true");
 	});
 });

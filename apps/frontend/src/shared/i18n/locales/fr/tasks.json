@@ -327,10 +327,11 @@
 		"views": {
 			"button": "Vues",
 			"title": "Vues sauvegardées",
-			"empty": "Aucune vue sauvegardée. Configure tes filtres puis enregistre-les ici.",
+			"empty": "Aucune vue sauvegardée. Choisis tes filtres, l'affichage et les couloirs, puis enregistre-les ici.",
 			"namePlaceholder": "Nom de la vue…",
 			"save": "Enregistrer la vue actuelle",
-			"delete": "Supprimer la vue"
+			"delete": "Supprimer la vue",
+			"summary": "{{layout}} · couloirs par {{lanes}}"
 		},
 		"wipLimit": {
 			"label": "Limite WIP",
@@ -372,6 +373,12 @@
 				"insights": "Insights",
 				"generated": "Générée par une page",
 				"manual": "Manuelle"
+			},
+			"quickLabel": "Filtres rapides",
+			"labelsLabel": "Étiquettes",
+			"quick": {
+				"flagged": "Bloquées",
+				"recent": "Modifiées cette semaine"
 			}
 		},
 		"sort": {
@@ -714,6 +721,7 @@
 				"priority": "Priorité",
 				"type": "Type",
 				"area": "Sous-projet",
+				"sprint": "Sprint",
 				"source": "Origine",
 				"parent": "Tâche découpée"
 			},
@@ -725,6 +733,7 @@
 				"priority": "Sans priorité",
 				"type": "Pas encore de type",
 				"area": "Sans sous-projet",
+				"sprint": "Backlog (sans sprint)",
 				"source": "Sans origine",
 				"parent": "Non découpées"
 			},
@@ -738,6 +747,149 @@
 			"undoLabel": "changement de couloir",
 			"saveFailed_one": "{{count}} carte n'a pas pu passer dans ce couloir.",
 			"saveFailed_other": "{{count}} cartes n'ont pas pu passer dans ce couloir."
+		},
+		"sprints": {
+			"title": "Sprints",
+			"button": "Sprints",
+			"allCards": "Toutes les tâches",
+			"backlog": "Backlog (sans sprint)",
+			"empty": "Aucun sprint pour l'instant. Créez-en un, puis ajoutez-y des tâches depuis leur menu ou en les glissant dans son couloir (Couloirs : Sprint).",
+			"unknown": "Sprint inconnu",
+			"states": {
+				"planned": "Planifié",
+				"active": "En cours",
+				"closed": "Terminé"
+			},
+			"progress": "{{done}}/{{cards}} tâches · {{donePoints}}/{{points}} pts",
+			"unestimated_one": "{{count}} non estimée",
+			"unestimated_other": "{{count}} non estimées",
+			"pointsHint": "Les points sont le score de l'estimation intelligente de la tâche (de 1 à 13). Une tâche non estimée compte 0.",
+			"velocity": "Vélocité : {{points}} pts",
+			"velocityHint": "Moyenne des points terminés par les derniers sprints clos (jusqu'à trois).",
+			"report": "Terminées : {{done}} tâches ({{donePoints}} pts) · reportées : {{carried}}",
+			"new": "Nouveau sprint",
+			"newTitle": "Nouveau sprint",
+			"editTitle": "Modifier le sprint",
+			"dialogHint": "Un sprint regroupe des tâches, avec un objectif et des dates facultatifs. Un seul sprint est en cours à la fois.",
+			"name": "Nom",
+			"namePlaceholder": "Sprint 12",
+			"goal": "Objectif",
+			"goalPlaceholder": "Ce que l'équipe s'engage à livrer",
+			"startDate": "Début",
+			"endDate": "Fin",
+			"endBeforeStart": "Le sprint ne peut pas finir avant de commencer.",
+			"create": "Créer",
+			"save": "Enregistrer",
+			"edit": "Modifier",
+			"start": "Démarrer",
+			"complete": "Terminer le sprint",
+			"delete": "Supprimer",
+			"oneActive": "Un autre sprint est en cours : terminez-le d'abord.",
+			"completeTitle": "Terminer « {{name}} »",
+			"completeSummary": "{{done}} tâches terminées ({{donePoints}} pts), {{carried}} non terminées.",
+			"carryTo": "Déplacer les tâches non terminées vers",
+			"deleteTitle": "Supprimer « {{name}} » ?",
+			"deleteHint": "Ses tâches retournent au backlog. Seul un sprint planifié peut être supprimé.",
+			"saveFailed": "Le sprint n'a pas pu être enregistré.",
+			"cardsNotMoved_one": "{{count}} tâche n'a pas pu être déplacée : le sprint n'a pas été modifié.",
+			"cardsNotMoved_other": "{{count}} tâches n'ont pas pu être déplacées : le sprint n'a pas été modifié.",
+			"cardMenu": "Sprint",
+			"noneToJoin": "Aucun sprint ouvert",
+			"undoLabel": "changement de sprint"
+		},
+		"layout": {
+			"label": "Affichage",
+			"board": "Tableau",
+			"list": "Liste",
+			"timeline": "Frise"
+		},
+		"list": {
+			"caption": "Les cartes du tableau, en liste",
+			"empty": "Aucune carte ne correspond aux filtres.",
+			"columns": {
+				"title": "Carte",
+				"status": "Statut",
+				"priority": "Priorité",
+				"sprint": "Sprint",
+				"area": "Sous-projet",
+				"points": "Points",
+				"updated": "Modifiée"
+			}
+		},
+		"reports": {
+			"button": "Rapports",
+			"title": "Rapports",
+			"description": "Mesurés sur les tâches et les sprints du projet, quels que soient les filtres du tableau. Les points sont le score de l'estimation intelligente, jamais une durée.",
+			"day": "Jour",
+			"sprint": "Sprint",
+			"cards": "Tâches",
+			"tabs": {
+				"burndown": "Burndown",
+				"velocity": "Vélocité",
+				"flow": "Flux cumulé",
+				"cycle": "Temps de cycle",
+				"throughput": "Débit",
+				"ends": "Fins non abouties"
+			},
+			"burndown": {
+				"empty": "Aucun sprint en cours. Démarre-en un depuis le menu « Sprints » pour suivre son burndown.",
+				"chart": "Burndown de {{name}}",
+				"summary": "{{name}} : {{left}} points restants sur {{scope}}.",
+				"ideal": "Idéal",
+				"remaining": "Points restants"
+			},
+			"velocity": {
+				"empty": "Aucun sprint terminé : la vélocité apparaît avec le premier.",
+				"chart": "Points engagés et terminés par sprint",
+				"summary": "Moyenne des 3 derniers sprints : {{points}} points.",
+				"committed": "Engagés",
+				"done": "Terminés"
+			},
+			"flow": {
+				"chart": "Tâches par étape, 30 derniers jours",
+				"summary": "Tâches par étape à la fin de chaque jour des 30 derniers jours. Une bande qui s'élargit, c'est du travail qui s'accumule.",
+				"bands": {
+					"todo": "À faire",
+					"doing": "En cours",
+					"review": "En revue",
+					"done": "Terminées"
+				}
+			},
+			"cycle": {
+				"empty": "Aucune tâche terminée ces 90 derniers jours avec un début connu.",
+				"chart": "Temps de cycle des tâches terminées ces 90 derniers jours",
+				"summary_one": "{{count}} tâche terminée : {{median}} jours entre le début et la fin.",
+				"summary_other": "{{count}} tâches terminées : médiane de {{median}} jours entre le début et la fin, 85 % en {{p85}} jours ou moins.",
+				"span": "Du début à la fin",
+				"bins": {
+					"lt1": "< 1 jour",
+					"d1to3": "1 à 3 jours",
+					"d3to7": "3 à 7 jours",
+					"d7to14": "1 à 2 semaines",
+					"gt14": "> 2 semaines"
+				}
+			},
+			"throughput": {
+				"chart": "Tâches terminées par semaine",
+				"summary_one": "{{count}} tâche terminée ces {{weeks}} dernières semaines.",
+				"summary_other": "{{count}} tâches terminées ces {{weeks}} dernières semaines.",
+				"week": "Semaine du"
+			},
+			"ends": {
+				"empty": "Aucune tâche terminée sans succès.",
+				"failed": "En échec",
+				"abandoned": "Abandonnées",
+				"reasons": {
+					"errors": "Erreurs de build",
+					"prompt_too_long": "Prompt trop long",
+					"qa_rejected": "Refusée par la QA"
+				}
+			}
+		},
+		"timeline": {
+			"card": "Tâche",
+			"span": "{{status}} : du {{start}} au {{end}}",
+			"running": "{{status}} : depuis le {{start}}, en cours"
 		}
 	},
 	"queue": {
@@ -3241,5 +3393,22 @@
 			"unsandboxed": "lancée sans bac à sable",
 			"blocked_hosts": "a tenté un hôte refusé"
 		}
+	},
+	"cardLabels": {
+		"cardMenu": "Étiquettes…",
+		"dialogTitle": "Étiquettes",
+		"dialogDescription": "Des mots courts pour retrouver « {{title}} » et filtrer le tableau.",
+		"listLabel": "Étiquettes",
+		"none": "Aucune étiquette pour l'instant.",
+		"remove": "Retirer l'étiquette {{label}}",
+		"placeholder": "Nouvelle étiquette",
+		"inputLabel": "Étiquette à ajouter",
+		"add": "Ajouter",
+		"full": "Une tâche porte {{count}} étiquettes au plus.",
+		"suggestions": "Déjà sur le tableau",
+		"suggest": "+ {{label}}",
+		"filterBy": "Voir les tâches étiquetées {{label}}",
+		"failedTitle": "Étiquettes non enregistrées",
+		"failedDescription": "La tâche n'a pas pu être enregistrée. Réessaie."
 	}
 }

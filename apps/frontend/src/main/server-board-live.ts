@@ -29,6 +29,7 @@ export const BOARD_EVENTS = new Set([
 	"spec_claimed",
 	"spec_released",
 	"spec_status_changed",
+	"sprints_updated",
 ]);
 const CHANGE_DEBOUNCE_MS = 300;
 

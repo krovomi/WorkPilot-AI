@@ -15,6 +15,7 @@ import { FLAGGED_LANE, laneDropId, NO_VALUE_LANE } from "../../lib/kanban-lanes"
 import { useFlagRequestStore } from "../../stores/flag-request-store";
 import { DEFAULT_LANE_PREFERENCES, useKanbanLanesStore } from "../../stores/kanban-lanes-store";
 import { unflagTask } from "../../stores/task-flag-actions";
+import { useSprintStore } from "../../stores/sprint-store";
 import { useTaskStore } from "../../stores/task-store";
 import { toast } from "../use-toast";
 import { useLaneDrag, useLaneOverStore, withPlainColumn } from "../useLaneDrag";
@@ -134,5 +135,22 @@ describe("useLaneDrag", () => {
 		expect(onDragOver).toHaveBeenCalledTimes(1);
 		expect(onDragEnd.mock.calls[0][0].over.id).toBe("queue");
 		expect(applyCardChoice).not.toHaveBeenCalled();
+	});
+
+	it("puts a card in an open sprint's lane, and refuses a closed sprint", async () => {
+		useKanbanLanesStore.setState({ grouping: "sprint" });
+		useSprintStore.setState({
+			sprints: [
+				{ id: "sp-0000000a", name: "A", state: "active", createdAt: "t" },
+				{ id: "sp-0000000c", name: "C", state: "closed", createdAt: "t" },
+			],
+		});
+		const { drag } = setup();
+		await act(() => drag.onDragEnd(end("low", laneDropId("sp-0000000a", "backlog"))));
+		expect(applyCardChoice).toHaveBeenCalledWith([low], { sprintId: "sp-0000000a" }, "lane move");
+		vi.mocked(applyCardChoice).mockClear();
+		await act(() => drag.onDragEnd(end("low", laneDropId("sp-0000000c", "backlog"))));
+		expect(applyCardChoice).not.toHaveBeenCalled();
+		expect(toast).toHaveBeenCalled();
 	});
 });
