@@ -610,6 +610,7 @@
 		"serverAccount": "The server's account",
 		"serverAccountDetail": "What the server's administrator set up",
 		"edit": "Edit {{name}}",
+		"editShort": "Edit",
 		"removeOne": "Remove {{name}}",
 		"remove": "Remove",
 		"removeTitle": "Remove the account {{name}}?",

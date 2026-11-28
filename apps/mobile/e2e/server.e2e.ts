@@ -391,6 +391,38 @@ test("the project's context, and a personal token kept on the server", async () 
 	expect(await bob.content()).not.toContain(token);
 });
 
+test("Bob keeps two OpenAI accounts on the server and picks the one his runs use", async () => {
+	// Bob is on his tokens, where the previous scenario left him.
+	const bob = signedInPage("bob");
+	await bob.goBack();
+	await bob.getByRole("button", { name: "My AI accounts" }).click({ timeout: 30_000 });
+	await expect(bob.getByText("No account yet: your runs use the server's accounts.")).toBeVisible({
+		timeout: 30_000,
+	});
+	const keys = [`sk-test-${randomBytes(12).toString("hex")}`, `sk-test-${randomBytes(12).toString("hex")}`];
+	for (const [name, key] of [
+		["Personal", keys[0]],
+		["Client X", keys[1]],
+	] as const) {
+		await bob.getByRole("radio", { name: "OpenAI", exact: true }).click();
+		await bob.getByLabel("Name", { exact: true }).fill(name);
+		await bob.getByLabel("API key", { exact: true }).fill(key);
+		await bob.getByRole("button", { name: "Add the account" }).click();
+		await expect(bob.getByRole("radio", { name, exact: true })).toBeVisible({ timeout: 30_000 });
+	}
+	// The first account of a provider is its default (checked); the second waits.
+	const personal = bob.getByRole("radio", { name: "Personal", exact: true });
+	const client = bob.getByRole("radio", { name: "Client X", exact: true });
+	await expect(personal).toContainText("✓");
+	await expect(client).not.toContainText("✓");
+	await client.click();
+	await expect(client).toContainText("✓", { timeout: 30_000 });
+	await expect(personal).not.toContainText("✓");
+	await shot(bob, "11b-ai-accounts");
+	const page = await bob.content();
+	for (const key of keys) expect(page).not.toContain(key);
+});
+
 test("an organization admin runs members, invitations and groups from the phone", async () => {
 	// Alice, an admin of the team's organization, is still on the context.
 	const alice = signedInPage("alice");
