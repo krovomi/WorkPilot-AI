@@ -211,6 +211,15 @@ describe("an AWS account (key pair and region)", () => {
 		expect(store.pairOf(view.id)).toBeUndefined();
 	});
 
+	it("reads a stored pair without a region as us-east-1", () => {
+		const created = store.save({ provider: "aws", name: "Prod", apiKey: ID, secretKey: SECRET });
+		const content = JSON.parse(readFileSync(file, "utf-8"));
+		delete content.accounts[0].region;
+		writeFileSync(file, JSON.stringify(content));
+		expect(store.get(created.id)?.region).toBe("us-east-1");
+		expect(store.pairOf(created.id)).toEqual({ secretKey: SECRET, region: "us-east-1" });
+	});
+
 	it("reads a stored account with a broken region as no account", () => {
 		store.save({ provider: "aws", name: "Prod", apiKey: ID, secretKey: SECRET });
 		const content = JSON.parse(readFileSync(file, "utf-8"));

@@ -207,6 +207,7 @@ describe("ApiKeyAccounts", () => {
 			"Leave empty to keep the saved secret",
 		);
 		expect(screen.getByLabelText("Region")).toHaveValue("eu-west-3");
+		fireEvent.change(screen.getByLabelText("Region"), { target: { value: " " } });
 		fireEvent.click(screen.getByRole("button", { name: "Save" }));
 		await waitFor(() =>
 			expect(bridge.saveAiAccount).toHaveBeenCalledWith({
@@ -215,7 +216,7 @@ describe("ApiKeyAccounts", () => {
 				name: "Prod",
 				apiKey: undefined,
 				secretKey: undefined,
-				region: "eu-west-3",
+				region: undefined,
 			}),
 		);
 	});
