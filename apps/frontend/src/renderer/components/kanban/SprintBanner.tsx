@@ -150,7 +150,7 @@ export function SprintBanner() {
 					<Button
 						size="sm"
 						variant="outline"
-						className="h-7 gap-1.5 border-violet-500/40 px-2 text-xs text-[color-mix(in_oklab,var(--color-violet-500)_70%,var(--color-foreground))] hover:bg-violet-500/10"
+						className="h-7 gap-1.5 border-violet-500/40 px-2 text-xs text-violet-700 dark:text-violet-300 hover:bg-violet-500/10"
 						onClick={() => {
 							openSettings(sprint.id);
 							openPlanning(sprint.id);
