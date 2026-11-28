@@ -122,6 +122,28 @@ function scenario(s: { stdout?: string[]; code?: number }): void {
 	writeFileSync(path.join(state.base, "backend", "scenario.json"), JSON.stringify(s), "utf-8");
 }
 
+/** A publication with one screen in the worktree's spec copy: the task has captures. */
+function withCaptures(): void {
+	const dir = path.join(worktreeSpecDir(), "captures");
+	mkdirSync(dir, { recursive: true });
+	const side = {
+		file: "captures/published/task/web--home.png",
+		signature: "1:1",
+		privacy: { status: "clean" },
+		publishable: true,
+	};
+	writeFileSync(
+		path.join(dir, "publication.json"),
+		JSON.stringify({
+			version: 1,
+			decision: { needed: true, reason: "ui-files" },
+			settings: { publish: "auto" },
+			items: [{ key: "web|home", label: "Home", platform: "web", after: side }],
+		}),
+		"utf-8",
+	);
+}
+
 beforeEach(() => {
 	state.base = mkdtempSync(path.join(tmpdir(), "wt-proof-"));
 	state.root = path.join(state.base, "repo");
@@ -206,6 +228,17 @@ describe("TASK_VISUAL_PROOF_RUN", () => {
 		warn.mockRestore();
 	});
 
+	it("keeps the run on the task when the task has captures for its PR", async () => {
+		state.tasks = [{ id: "task-1", specId: SPEC, metadata: { prUrl: "https://github.com/o/r/pull/1" } }];
+		const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+		await invoke(IPC_CHANNELS.TASK_VISUAL_PROOF_RUN, "task-1");
+		expect(service.runs[0]).toMatchObject({ keepOnTask: false });
+		withCaptures();
+		await invoke(IPC_CHANNELS.TASK_VISUAL_PROOF_RUN, "task-1");
+		expect(service.runs[1]).toMatchObject({ keepOnTask: true });
+		warn.mockRestore();
+	});
+
 	it("runs without a PR or a worktree or a window, and passes on a failure", async () => {
 		windowShown = null;
 		state.project = { ...state.project, autoBuildPath: undefined };
@@ -263,6 +296,19 @@ describe("TASK_VISUAL_PROOF_SYNC", () => {
 			expect(metadata.visualProof.prUrl).toBe("https://github.com/o/r/pull/5");
 		}
 		warn.mockRestore();
+	});
+
+	it("links the PR but posts no proof when the PR shows the task's captures", async () => {
+		const proof = { status: "passed", screenshots: ["a.png"] };
+		state.tasks = [{ id: "task-1", specId: SPEC, metadata: { visualProof: proof } }];
+		withCaptures();
+		scenario({ stdout: [`${JSON.stringify({ success: true, pr_url: "https://github.com/o/r/pull/5" })}\n`] });
+		const result = await sync();
+		expect(result).toEqual({
+			success: true,
+			data: { prUrl: "https://github.com/o/r/pull/5", visualProof: undefined },
+		});
+		expect(service.published).toEqual([]);
 	});
 
 	it("links the PR without publishing when nothing was captured, and without a worktree", async () => {

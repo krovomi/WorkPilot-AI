@@ -19,6 +19,11 @@ import {
 	parseCustomMcpServers,
 	unmaskCustomMcpServers,
 } from "../custom-mcp-secrets";
+import {
+	applyCapturesToEnv,
+	capturesFromEnv,
+	capturesTemplateLines,
+} from "../task-captures/captures-env";
 import { unmaskSecret } from "../utils/masked-secret";
 import {
 	getClaudeCliInvocation,
@@ -639,6 +644,10 @@ export function registerEnvHandlers(
 			}
 		}
 
+		// Captures of a task for its PR (`pr_captures/settings.py`), shaped
+		// for the backend before they reach the file (`task-captures/captures-env.ts`).
+		applyCapturesToEnv(existingVars, config.captures);
+
 		// Per-agent MCP overrides (add/remove MCPs from specific agents)
 		if (config.agentMcpOverrides) {
 			// First, clear any existing AGENT_MCP_* entries
@@ -811,6 +820,12 @@ ${existingVars.RTK_MODEL_FACING ? `RTK_MODEL_FACING=${existingVars.RTK_MODEL_FAC
 # =============================================================================
 ${existingVars.UIUX_ENABLED ? `UIUX_ENABLED=${existingVars.UIUX_ENABLED}` : "# UIUX_ENABLED=true"}
 ${existingVars.UIUX_PERSIST_MASTER ? `UIUX_PERSIST_MASTER=${existingVars.UIUX_PERSIST_MASTER}` : "# UIUX_PERSIST_MASTER=true"}
+
+# =============================================================================
+# TASK CAPTURES FOR THE PULL REQUEST
+# Before/after screenshots, personal data replaced by fakes (default: auto)
+# =============================================================================
+${capturesTemplateLines(existingVars)}
 
 # =============================================================================
 # PER-AGENT MCP OVERRIDES
@@ -1140,6 +1155,9 @@ ${otherLines.join("\n")}
 				enabled: vars.UIUX_ENABLED?.toLowerCase() !== "false",
 				persistMaster: vars.UIUX_PERSIST_MASTER?.toLowerCase() !== "false",
 			};
+
+			// Task captures for the PR: the defaults of `pr_captures/settings.py`.
+			config.captures = capturesFromEnv(vars);
 
 			// Parse per-agent MCP overrides (AGENT_MCP_<agent>_ADD/REMOVE)
 			const agentMcpOverrides: Record<

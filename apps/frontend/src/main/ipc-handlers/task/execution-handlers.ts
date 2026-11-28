@@ -123,6 +123,7 @@ export function registerTaskExecutionHandlers(
 			useLocalBranch: task.metadata?.useLocalBranch,
 			tddMode: task.metadata?.tddMode,
 			verifyLoop: task.metadata?.verifyLoop,
+			captures: task.metadata?.captures,
 			mobileTargets: task.metadata?.mobileTargets,
 			enableStreaming: options?.enableStreaming ?? true,
 			streamingSessionId: options?.streamingSessionId ?? taskId,

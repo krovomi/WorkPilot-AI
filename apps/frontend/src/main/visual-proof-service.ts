@@ -2617,7 +2617,7 @@ export class VisualProofService extends EventEmitter {
 			// The scenario's GIF, only when the person asked for it in the PR dialog.
 			const walkthrough = options.includeWalkthrough === true ? copyWalkthrough({ ...context, ...options, specsBaseDir }) : undefined;
 			const published = walkthrough ? [...providerResult.screenshots, walkthrough] : providerResult.screenshots;
-			if (options.worktreePath && published.length > 0) {
+			if (options.worktreePath && published.length > 0 && !options.keepOnTask) {
 				branch = await getCurrentBranch(options.worktreePath);
 				try {
 					commitSha = await commitAndPushArtifacts(
@@ -2662,7 +2662,7 @@ export class VisualProofService extends EventEmitter {
 
 			try {
 				const commentUrl = await postGitHubComment(
-					options.prUrl,
+					options.keepOnTask ? undefined : options.prUrl,
 					buildProofComment(completedRun, branch ?? undefined),
 				);
 				return { ...completedRun, commentUrl };
@@ -2680,7 +2680,7 @@ export class VisualProofService extends EventEmitter {
 			};
 			try {
 				const commentUrl = await postGitHubComment(
-					options.prUrl,
+					options.keepOnTask ? undefined : options.prUrl,
 					buildProofComment(failedRun),
 				);
 				return { ...failedRun, commentUrl };

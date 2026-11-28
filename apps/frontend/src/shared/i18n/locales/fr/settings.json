@@ -3552,5 +3552,51 @@
 		"visibleTo": "Lisible par : {{roles}}, et les administrateurs de la plateforme du serveur.",
 		"rights": "Vous pouvez les consulter et télécharger tout ce qui est conservé sur vous dans Paramètres, Mon usage. Pour faire effacer votre compte, demandez à un administrateur de la plateforme.",
 		"understood": "J'ai compris"
+	},
+	"captures": {
+		"navLabel": "Captures des PR",
+		"title": "Captures pour les pull requests",
+		"description": "Les écrans qu'une tâche prend avant et après ses changements, montrés dans sa pull request avec les données personnelles remplacées par des fausses.",
+		"groups": {
+			"when": {
+				"title": "Quand",
+				"description": "Une carte peut toujours choisir « toujours » ou « jamais » pour elle-même, dans son onglet Captures."
+			},
+			"privacy": {
+				"title": "Données personnelles",
+				"description": "Vérifiées sur cet ordinateur avant qu'une capture le quitte."
+			},
+			"publish": {
+				"title": "Dans la pull request",
+				"description": "GitHub, GitLab et Bitbucket gardent les images sur une branche à part ; Azure DevOps en pièces jointes de la PR."
+			}
+		},
+		"modeLabel": "Prendre des captures",
+		"modeHint": "Automatique : seulement pour une tâche dont les changements touchent un écran (toutes piles).",
+		"mode": {
+			"auto": "Automatique",
+			"always": "Toujours",
+			"never": "Jamais"
+		},
+		"compare": "Prendre l'« avant » sur la branche de base",
+		"compareHint": "Rejoue les pages capturées sur la branche de base, pour une paire avant/après.",
+		"mask": "Remplacer les données personnelles par des fausses",
+		"maskHint": "E-mail, téléphone, IBAN, carte, nom, adresse : une fausse du même type et du même format. Coupé : l'image est publiée telle quelle.",
+		"selectors": "Éléments privés en plus",
+		"selectorsHint": "Sélecteurs CSS séparés par des virgules (30 au plus), en plus de [data-private], [data-pii] et [data-sensitive].",
+		"selectorsPlaceholder": ".nom-client, #compte",
+		"publishUnchecked": "Publier les captures que rien n'a pu vérifier",
+		"publishUncheckedHint": "Une fenêtre ou un écran de téléphone sans OCR local. Coupé : elles restent sur la tâche.",
+		"publishLabel": "Publication",
+		"publishHint": "Automatique : dans la PR dès qu'elle existe. Après relecture : quelqu'un appuie sur « Publier » dans la tâche.",
+		"publish": {
+			"auto": "Automatique",
+			"review": "Après relecture",
+			"never": "Jamais (garder sur la tâche)"
+		},
+		"retention": "Jours de conservation",
+		"retentionHint": "Après leur dernière mise à jour, sur la branche des captures. 0 : sans limite.",
+		"branch": "Branche des captures",
+		"branchHint": "Jamais fusionnée, sans historique commun avec le code."
 	}
 }

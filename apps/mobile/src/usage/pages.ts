@@ -28,6 +28,7 @@ export const MOBILE_PAGES = [
 	"projects/analyses",
 	"projects/analyses/detail",
 	"projects/ask",
+	"projects/cards/captures",
 	"projects/cards/detail",
 	"projects/cards/files",
 	"projects/cards/logs",

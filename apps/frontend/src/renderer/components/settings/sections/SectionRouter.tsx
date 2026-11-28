@@ -11,6 +11,7 @@ import type {
 	ProjectSettings as ProjectSettingsType,
 } from "../../../../shared/types";
 import { GeneralSettings } from "../../project-settings/GeneralSettings";
+import { CapturesSettings } from "../CapturesSettings";
 import { InitializationGuard } from "../common/InitializationGuard";
 import { AutomationsIntegration } from "../integrations/AutomationsIntegration";
 import { BoardMcpIntegration } from "../integrations/BoardMcpIntegration";
@@ -126,6 +127,25 @@ export function SectionRouter({
 						handleInitialize={handleInitialize}
 						handleRepairGit={handleRepairGit}
 					/>
+				</SettingsSection>
+			);
+
+		case "captures":
+			return (
+				<SettingsSection
+					title={t("captures.title")}
+					description={t("captures.description")}
+				>
+					<InitializationGuard
+						initialized={!!project.autoBuildPath}
+						title={t("captures.title")}
+						description={t("captures.description")}
+					>
+						<CapturesSettings
+							envConfig={envConfig}
+							updateEnvConfig={updateEnvConfig}
+						/>
+					</InitializationGuard>
 				</SettingsSection>
 			);
 

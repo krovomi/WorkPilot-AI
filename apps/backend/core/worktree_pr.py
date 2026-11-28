@@ -1893,6 +1893,19 @@ class WorktreePRMixin:
             linked, note = link_after_pr(self, stack, spec_name, get_gh_executable())
             stack_fields = {"stack_linked": linked, "stack_note": note}
 
+        # The task's before/after captures go into the body once the PR
+        # exists (`core.capture_hosting`); a refusal never undoes the PR.
+        if pr_result.get("success") and pr_result.get("pr_url"):
+            from core.capture_hosting import sync_after_pr
+
+            sync_after_pr(
+                self,
+                spec_name,
+                provider,
+                pr_result.get("pr_url"),
+                push_result.get("remote"),
+            )
+
         # Combine results
         return PushAndCreatePRResult(
             **stack_fields,

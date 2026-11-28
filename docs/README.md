@@ -20,6 +20,7 @@ fichiers y renvoient.
 | [`server-guide.md`](server-guide.md) | paramétrer, configurer et utiliser le serveur d'équipe, avec exemples et formats : `.env.server`, rôles, projets, quotas, app, téléphone, MCP, API | guide |
 | [`server-operations.md`](server-operations.md) | exploiter le serveur multi-utilisateurs d'une équipe : déploiement, TLS, sauvegarde, mise à jour, quotas, audit | guide |
 | [`server-usage-data.md`](server-usage-data.md) | ce que le serveur garde sur l'usage de ses membres (consommation, présence, connexions), combien de temps, pour le registre RGPD de l'équipe | référence |
+| [`pr-captures-data.md`](pr-captures-data.md) | les captures qu'une tâche montre dans sa PR : faux à la place des données personnelles, où vont les images, combien de temps, pour le registre RGPD de l'équipe | référence |
 | [`MODEL_CATALOG.md`](MODEL_CATALOG.md) | mettre à jour le catalogue de modèles livré | guide |
 | [`RELEASE.md`](RELEASE.md) | publier une version | mainteneurs |
 | [`linux.md`](linux.md), [`windows-development.md`](windows-development.md) | notes par plateforme | guide |

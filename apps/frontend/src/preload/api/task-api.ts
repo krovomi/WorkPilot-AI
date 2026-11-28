@@ -35,6 +35,10 @@ import type {
 	TaskStartOptions,
 	TaskStatus,
 	VisualProofRun,
+	TaskCaptureImage,
+	TaskCapturesAction,
+	TaskCapturesActionResult,
+	TaskCapturesSummary,
 	WorktreeAnalyzeImpactResult,
 	WorktreeCreatePROptions,
 	WorktreeCreatePRResult,
@@ -327,6 +331,18 @@ export interface TaskAPI {
 	getVisualProofStatus: (
 		taskId: string,
 	) => Promise<IPCResult<{ running: boolean }>>;
+	/** The captures the task prepared for its PR (`main/task-captures/`); null when none. */
+	getTaskCaptures: (taskId: string) => Promise<IPCResult<TaskCapturesSummary | null>>;
+	/** One published copy the task's publication lists. */
+	getTaskCaptureImage: (
+		taskId: string,
+		file: string,
+	) => Promise<IPCResult<TaskCaptureImage>>;
+	/** Publish (review mode), withdraw or update the PR's « Captures » section. */
+	runTaskCapturesAction: (
+		taskId: string,
+		action: TaskCapturesAction,
+	) => Promise<IPCResult<TaskCapturesActionResult>>;
 	/** Drive the task's PR to merge: fix red checks and review threads, push. */
 	startPrFollowup: (
 		taskId: string,
@@ -924,6 +940,21 @@ export const createTaskAPI = (): TaskAPI => ({
 		taskId: string,
 	): Promise<IPCResult<{ running: boolean }>> =>
 		ipcRenderer.invoke(IPC_CHANNELS.TASK_VISUAL_PROOF_STATUS, taskId),
+
+	getTaskCaptures: (taskId: string): Promise<IPCResult<TaskCapturesSummary | null>> =>
+		ipcRenderer.invoke(IPC_CHANNELS.TASK_CAPTURES_GET, taskId),
+
+	getTaskCaptureImage: (
+		taskId: string,
+		file: string,
+	): Promise<IPCResult<TaskCaptureImage>> =>
+		ipcRenderer.invoke(IPC_CHANNELS.TASK_CAPTURES_IMAGE, taskId, file),
+
+	runTaskCapturesAction: (
+		taskId: string,
+		action: TaskCapturesAction,
+	): Promise<IPCResult<TaskCapturesActionResult>> =>
+		ipcRenderer.invoke(IPC_CHANNELS.TASK_CAPTURES_ACTION, taskId, action),
 
 	startPrFollowup: (
 		taskId: string,
