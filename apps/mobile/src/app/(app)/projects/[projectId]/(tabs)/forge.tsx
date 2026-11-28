@@ -44,7 +44,7 @@ function Tabs({ forge, tab, onTab }: { forge: Forge; tab: Tab; onTab: (tab: Tab)
 					<Pressable
 						key={key}
 						accessibilityRole="tab"
-						accessibilityState={{ selected }}
+						aria-selected={selected}
 						onPress={() => onTab(key)}
 						style={[styles.tab, selected ? { backgroundColor: theme.surface } : null]}
 					>

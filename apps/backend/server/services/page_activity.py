@@ -134,6 +134,8 @@ MOBILE_PAGES: frozenset[str] = frozenset(
         "projects/analyses",
         "projects/analyses/detail",
         "projects/cards/detail",
+        "projects/cards/files",
+        "projects/cards/logs",
         "projects/chat",
         "projects/context",
         "projects/dashboard",

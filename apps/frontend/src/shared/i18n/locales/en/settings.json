@@ -444,7 +444,7 @@
 				"title": "Each call of a script is checked like a direct call",
 				"description": "The script itself reads no file, starts no process and reaches no network. Each of its calls goes through the agent's rights, the protected paths, the guardrails, the command allowlist and the OS sandbox, and the anomaly watch scores every one."
 			},
-			"providers": "Works with every provider whose tools WorkPilot runs: OpenAI, Google, Mistral, Copilot, Windsurf, Ollama, LM Studio and the compatible providers and gateways. A task can choose its own mode per phase."
+			"providers": "Works with every provider whose tools WorkPilot runs: OpenAI, Google, Mistral, Copilot, Windsurf, Ollama, LM Studio and the compatible providers and gateways. Claude tasks use Claude Code's own code mode in their worktree, on the Anthropic API with Opus or Sonnet 5.5 and later, and terminals get it too. A task can choose its own mode per phase."
 		},
 		"anomaly-detection": {
 			"title": "Anomaly Detection",
@@ -507,6 +507,13 @@
 					"label": "Enforce",
 					"description": "A green N0, or N1 agreed by the cross-review, merges by itself. N2 and N3 wait for a person."
 				}
+			},
+			"express": {
+				"title": "Express lane for dependency PRs",
+				"description": "The Dependabot and Renovate pull requests of your projects merge by themselves when their tier is N0 and every check passed. Only when the tiers enforce.",
+				"toggle": "Merge the bots' green N0 pull requests",
+				"toggleDescription": "About every half hour, for each local project on GitHub. A major bump, a change to code or CI files, a red or running check, a draft or a fork is left to a person.",
+				"needsEnforce": "Off while the mode is not Enforce."
 			},
 			"tiers": {
 				"title": "The four tiers",

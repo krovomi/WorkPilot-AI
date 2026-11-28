@@ -359,6 +359,17 @@ describe("AUTOBUILD_SOURCE_ENV handlers", () => {
 		});
 	});
 
+	it("turns the express lane on only for a true boolean", async () => {
+		const { saveSettings } = await register();
+		const { readSettingsFile } = await import("../settings-utils");
+		await saveSettings({ expressLane: true });
+		expect(readSettingsFile()?.expressLane).toBe(true);
+		for (const odd of ["true", 1, { on: true }, null]) {
+			await saveSettings({ expressLane: odd });
+			expect(readSettingsFile()?.expressLane).toBe(false);
+		}
+	});
+
 	it("refuses a backend folder in the temporary folder, and writes nothing", async () => {
 		const { saveSettings } = await register();
 		const settingsFile = path.join(env.userData, "settings.json");
