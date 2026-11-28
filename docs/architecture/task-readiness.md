@@ -59,6 +59,9 @@ aide, elle ne bloque jamais. « Pas prête » sans question compte comme prête.
 première carte retenue (`stores/task-readiness-store.ts`) et, s'il y en a plusieurs, combien
 attendent. Elle commence par **ce que l'agent lira** (la description, ou « rien de plus que le
 titre » quand elle ne fait que le répéter, `cardBody`) : la personne voit que son texte est lu.
+Une description en texte riche (fenêtre d'édition, ticket importé) est lue sans ses balises, pour
+dire si la carte est courte comme pour la revue ; les réponses s'y ajoutent en HTML, une
+description en texte simple les reçoit en Markdown.
 
 Les questions sont numérotées, chacune avec un champ **vide**. La suggestion du modèle est une
 pastille « Suggestion : … » qui remplit le champ d'un clic ; elle n'est jamais écrite d'office.

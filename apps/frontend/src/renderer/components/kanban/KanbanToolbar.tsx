@@ -37,6 +37,7 @@ import { TeamRoomBar } from "../collaboration";
 import { useKanbanFilterStore } from "../../stores/kanban-filter-store";
 import { useCollaborationStore } from "../../stores/collaboration-store";
 import { useProjectStore } from "../../stores/project-store";
+import { InterruptedTasksBanner } from "../interrupted-tasks/InterruptedTasksBanner";
 import { useTaskStore } from "../../stores/task-store";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -518,6 +519,10 @@ export function KanbanToolbar({ projectPath, onOpenTask }: KanbanToolbarProps) {
 			>
 				<Keyboard className="h-4 w-4" />
 			</Button>
+			{/* Builds the app interrupted on this computer (a server board has its own runs). */}
+			{!serverProject && (
+				<InterruptedTasksBanner projectId={projectId ?? undefined} tasks={tasks} />
+			)}
 		</div>
 	);
 }

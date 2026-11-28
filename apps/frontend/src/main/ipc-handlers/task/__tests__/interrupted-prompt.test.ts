@@ -384,6 +384,30 @@ describe("the person's answer", () => {
 		expect(handlers.get(IPC_CHANNELS.TASK_INTERRUPTED_GET)?.()).toBeNull();
 	});
 
+	it("offers one project's builds again from the board, put off ones included", async () => {
+		const project = createProject();
+		const otherProject = createProject({ id: "proj-2", path: path.join(root, "other") });
+		const putOff = createTask(paused("app_shutdown", { deferred_at: "2026-11-28T18:05:00.000Z" }));
+		const elsewhere = createTask({ id: "task-3", specId: "003-else", projectId: "proj-2", ...paused("app_shutdown") });
+		register(project, putOff);
+		register(otherProject, elsewhere);
+		const manager = fakeAgentManager();
+		registerInterruptedTaskHandlers(asManager(manager));
+		const list = handlers.get(IPC_CHANNELS.TASK_INTERRUPTED_LIST);
+
+		// A launch does not offer what the person put off; the board's chip does.
+		expect(collectInterruptedTasks(asManager(manager)).map((t) => t.taskId)).toEqual([elsewhere.id]);
+		const listed = (await list?.({}, project.id)) as { taskId: string }[];
+		expect(listed.map((t) => t.taskId)).toEqual([putOff.id]);
+		// Only a registered project, named by its id.
+		expect(await list?.({}, "proj-unknown")).toEqual([]);
+		expect(await list?.({}, { id: project.id })).toEqual([]);
+
+		// The answer goes through RESOLVE, which now knows the listed build.
+		const result = await handlers.get(IPC_CHANNELS.TASK_INTERRUPTED_RESOLVE)?.({}, [putOff.id]);
+		expect(result).toEqual({ resumed: [putOff.id], waiting: [], failed: [] });
+	});
+
 	it("ignores ids the launch did not offer, and answers that are not a list of ids", async () => {
 		const project = createProject();
 		const other = createTask({ id: "task-9", specId: "009-other", status: "backlog" });

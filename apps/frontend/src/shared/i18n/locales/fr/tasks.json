@@ -67,6 +67,17 @@
 			"failed_other": "{{count}} n'ont pas pu redémarrer : ouvre leurs cartes.",
 			"autoResumed_one": "{{count}} tâche interrompue reprise",
 			"autoResumed_other": "{{count}} tâches interrompues reprises"
+		},
+		"card": {
+			"app_exit": "WorkPilot a été fermé pendant que cette tâche tournait. « Reprendre » la relance là où elle s'est arrêtée.",
+			"app_exitWithTime": "WorkPilot a été fermé pendant que cette tâche tournait ({{when}}). « Reprendre » la relance là où elle s'est arrêtée.",
+			"crash": "WorkPilot s'est arrêté sans se fermer (plantage, arrêt forcé ou extinction) pendant que cette tâche tournait. « Reprendre » la relance là où elle s'est arrêtée.",
+			"crashWithTime": "WorkPilot s'est arrêté sans se fermer (plantage, arrêt forcé ou extinction) pendant que cette tâche tournait ({{when}}). « Reprendre » la relance là où elle s'est arrêtée."
+		},
+		"banner": {
+			"chip_one": "{{count}} tâche interrompue · Reprendre…",
+			"chip_other": "{{count}} tâches interrompues · Reprendre…",
+			"none": "Plus aucune tâche interrompue à reprendre"
 		}
 	},
 	"readiness": {
@@ -184,6 +195,7 @@
 		"pending": "En attente",
 		"stuck": "Bloqué",
 		"incomplete": "Incomplet",
+		"interrupted": "Interrompue",
 		"recovering": "Récupération...",
 		"recoverFailed": "Impossible de récupérer la tâche",
 		"needsRecovery": "Récupération requise",
@@ -552,7 +564,7 @@
 			"addStarted": "Ajouter et démarrer",
 			"addTooltip": "Ajouter une tâche (N)",
 			"ariaLabel": "Décrire la nouvelle tâche",
-			"placeholder": "Décrivez la tâche… Collez une liste pour créer une tâche par ligne.",
+			"placeholder": "Titre de la tâche, puis Maj+Entrée pour sa description. Collez une liste pour créer une tâche par ligne.",
 			"type": "Type",
 			"noType": "Sans type (déduit automatiquement)",
 			"priority": "Priorité",

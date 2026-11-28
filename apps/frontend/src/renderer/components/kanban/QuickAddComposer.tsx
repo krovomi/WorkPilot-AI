@@ -105,6 +105,8 @@ export function QuickAddComposer({
 	const [unsent] = useState(() => unsentCards.get(draftKey));
 	const [text, setText] = useState(unsent?.text ?? "");
 	const [splitChoice, setSplitChoice] = useState<boolean | null>(null);
+	// A list arrives by paste; lines typed with Maj+Entrée are one card's description.
+	const [pastedList, setPastedList] = useState(false);
 	const [type, setType] = useState<CardType | null>(unsent?.type ?? null);
 	const [priority, setPriority] = useState<TaskPriority | null>(unsent?.priority ?? null);
 	const [busy, setBusy] = useState(false);
@@ -113,7 +115,7 @@ export function QuickAddComposer({
 	const rootRef = useRef<HTMLDivElement>(null);
 
 	const lineCount = quickAddLines(text).length;
-	const split = lineCount > 1 && (splitChoice ?? splitsByDefault(text));
+	const split = lineCount > 1 && (splitChoice ?? splitsByDefault(text, pastedList));
 	const cardCount = split ? lineCount : text.trim() ? 1 : 0;
 
 	useEffect(() => {
@@ -177,6 +179,7 @@ export function QuickAddComposer({
 		if (created === items.length) {
 			setText("");
 			setSplitChoice(null);
+			setPastedList(false);
 			toast({
 				title: t("tasks:kanban.quickAdd.created", {
 					count: created,
@@ -277,7 +280,11 @@ export function QuickAddComposer({
 				value={text}
 				onChange={(e) => {
 					setText(e.target.value);
+					if (!e.target.value.trim()) setPastedList(false);
 					setError(null);
+				}}
+				onPaste={(e) => {
+					if (/\r?\n/.test(e.clipboardData.getData("text").trim())) setPastedList(true);
 				}}
 				onKeyDown={handleKeyDown}
 				rows={2}

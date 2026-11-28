@@ -40,20 +40,29 @@ export function quickAddLines(text: string): string[] {
 }
 
 /**
- * Whether one card per line is the right default: at least two lines, all
- * short enough to be titles. A multi-line description (long lines) stays one
- * card unless the person asks otherwise.
+ * Whether one card per line is the right default: a pasted list of at least
+ * two lines, all short enough to be titles. Typed lines (Maj+Entrée) are a
+ * title and its description, one card; so is a pasted multi-line description
+ * (long lines). The person can still switch either way.
  */
-export function splitsByDefault(text: string): boolean {
+export function splitsByDefault(text: string, pasted = true): boolean {
+	if (!pasted) return false;
 	const lines = quickAddLines(text);
 	return (
 		lines.length > 1 && lines.every((line) => line.length <= QUICK_ADD_TITLE_MAX)
 	);
 }
 
+/**
+ * One card from `text`. Its first line is the title when it is short enough
+ * (a typed "title, then Maj+Entrée, then the description"); the whole text
+ * stays the description, title first, so the agent reads both. A first line
+ * too long to be a title leaves the title to the generator.
+ */
 function itemFrom(text: string): QuickAddItem {
-	const isTitle = !text.includes("\n") && text.length <= QUICK_ADD_TITLE_MAX;
-	return { title: isTitle ? text : "", description: text };
+	const firstLine = text.split(/\r?\n/, 1)[0].trim();
+	const isTitle = firstLine.length > 0 && firstLine.length <= QUICK_ADD_TITLE_MAX;
+	return { title: isTitle ? firstLine : "", description: text };
 }
 
 /** The cards `text` creates: one per line when `split`, else one. */

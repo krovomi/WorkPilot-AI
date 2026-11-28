@@ -119,6 +119,19 @@ Settings › Agents (`interruptedTasksOnLaunch`) decides what happens:
   and the builds a check says would fail; a toast lists what restarted.
 - `never`: nothing starts; each card keeps its pause and its Reprendre.
 
+On the board, a build the app interrupted reads « Interrompue »
+(`renderer/lib/interrupted-task.ts`, `InterruptedBadge`): the shutdown pause,
+told apart by `crashed` in its tooltip with the time, in place of the status and
+of the last execution phase, which would still spin. Its only action is a
+labelled Reprendre. No paused card runs the stuck watch: a pause has no process
+by design, and the stuck recovery would reset the subtask it stopped on. The
+toolbar's « N tâches interrompues · Reprendre… » chip (`InterruptedTasksBanner`,
+local projects only) reopens the dialog on that project's interrupted builds,
+put off ones included (`TASK_INTERRUPTED_LIST`, a registered project id only);
+the answer goes through `TASK_INTERRUPTED_RESOLVE` as at launch. The renderer
+rereads the board when an offer arrives and when it is answered, since the
+launch settles crashes and the answer lifts or defers pauses on disk.
+
 Every resume is `resumePausedTask` (`resume-task.ts`), the Reprendre button's
 path, which sends a task with no `spec.md` back to the spec pipeline (it skips
 every artefact it already wrote) — `run.py` refuses that directory. Resumes keep

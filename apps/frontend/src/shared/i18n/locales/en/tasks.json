@@ -67,6 +67,17 @@
 			"failed_other": "{{count}} could not restart: open their cards.",
 			"autoResumed_one": "{{count}} interrupted task resumed",
 			"autoResumed_other": "{{count}} interrupted tasks resumed"
+		},
+		"card": {
+			"app_exit": "WorkPilot was closed while this build ran. “Resume” picks it back up where it stopped.",
+			"app_exitWithTime": "WorkPilot was closed while this build ran ({{when}}). “Resume” picks it back up where it stopped.",
+			"crash": "WorkPilot stopped without closing (crash, forced quit or shutdown) while this build ran. “Resume” picks it back up where it stopped.",
+			"crashWithTime": "WorkPilot stopped without closing (crash, forced quit or shutdown) while this build ran ({{when}}). “Resume” picks it back up where it stopped."
+		},
+		"banner": {
+			"chip_one": "{{count}} interrupted task · Resume…",
+			"chip_other": "{{count}} interrupted tasks · Resume…",
+			"none": "No interrupted task left to resume"
 		}
 	},
 	"readiness": {
@@ -184,6 +195,7 @@
 		"pending": "Pending",
 		"stuck": "Stuck",
 		"incomplete": "Incomplete",
+		"interrupted": "Interrupted",
 		"recovering": "Recovering...",
 		"recoverFailed": "Could not recover the task",
 		"needsRecovery": "Needs Recovery",
@@ -552,7 +564,7 @@
 			"addStarted": "Add and start",
 			"addTooltip": "Add a task (N)",
 			"ariaLabel": "Describe the new task",
-			"placeholder": "Describe the task… Paste a list to create one task per line.",
+			"placeholder": "Task title, then Shift+Enter for its description. Paste a list to create one task per line.",
 			"type": "Type",
 			"noType": "No type (detected automatically)",
 			"priority": "Priority",
