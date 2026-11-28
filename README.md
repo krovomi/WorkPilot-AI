@@ -99,6 +99,8 @@ Step-by-step installation, provider setup, Windows notes and troubleshooting: [d
 
 **Resume what a close or a crash interrupted** ([pause and resume](docs/architecture/pause-resume.md)): closing WorkPilot pauses the builds that run, and the next launch asks which to resume. Each one shows its project, its provider and model, how it stopped (closed, crashed, or stopped by you with « Stop all agents ») and where it picks up: the phase, and while coding the next subtask. What the app interrupted is ticked; what you stopped is not; a build whose resume would fail at once (Claude sign-in expired for a Claude build, spec folder gone) is unticked with the reason. Resumes keep each project's In Progress limit, the others start when a slot frees up. « Later » leaves them paused: their card reads **Interrupted**, never « Stuck », with a Resume button, and the toolbar's « N interrupted tasks · Resume… » brings the list back. Settings > Agent Settings chooses Ask me (default), Resume all or Resume none.
 
+**With a team server.** A run that was going when the team server restarted reads **Interrupted**, not failed, and the same prompt lists it: in the desktop app at launch or at sign-in, and in the mobile app once signed in. Your own runs are ticked; a project owner also sees the team's, unticked, with who started them. Resume starts the same phase with the same model and the same rights as Start (a build that started approved keeps its approval); Later sets them aside on the server, so no other device offers them again.
+
 <table>
 <tr>
 <td width="50%" valign="top">
