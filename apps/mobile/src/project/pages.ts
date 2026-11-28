@@ -12,6 +12,7 @@ export type TabPage = "insights" | "forge" | "dashboard";
 export type MorePage =
 	| "chat"
 	| "leaderboard"
+	| "ask"
 	| "roadmap" 	| "ideas"
 	| "context"
 	| "sessions"
@@ -28,6 +29,7 @@ export const PAGE_ICONS: Record<TabPage | MorePage | "board" | "more", IconName>
 	more: "grid",
 	chat: "message-square",
 	leaderboard: "award",
+	ask: "search",
 	roadmap: "map",
 	ideas: "zap",
 	context: "book-open",
@@ -41,6 +43,8 @@ export const PAGE_ICONS: Record<TabPage | MorePage | "board" | "more", IconName>
 const MORE_PERMISSIONS: Record<MorePage, string> = {
 	chat: "task.read",
 	leaderboard: "analytics.read",
+	// Asking reads the board: the board's read right, the server checks it.
+	ask: "task.read",
 	roadmap: "insight.read",
 	ideas: "insight.read",
 	context: "insight.read",

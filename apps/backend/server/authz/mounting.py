@@ -69,6 +69,10 @@ ROUTE_OVERRIDES: dict[tuple[str, str], str] = {
     ("PUT", "/api/board/cards/{card_id}/criticality"): "review.approve",
     ("POST", "/api/board/delegations"): "review.approve",
     ("DELETE", "/api/board/delegations/{delegation_id}"): "review.approve",
+    # Asking the board a question (« Interroger le tableau ») reads it: who
+    # may see the cards may ask about them, and stop their own question.
+    ("POST", "/api/board/ask"): "task.read",
+    ("POST", "/api/board/ask/jobs/{job_id}/cancel"): "task.read",
     # A message to a running card's agent changes what the agent does.
     ("POST", "/api/board/cards/{card_id}/steering"): "agent.execute",
     # A shared feature's job runs its agent on the project's clone; stopping

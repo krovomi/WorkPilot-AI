@@ -32,6 +32,7 @@ import type { ThemePrefs } from "../ui/theme-ids";
 import type { Leaderboard, LeaderboardPeriod, LeaderboardScope, ReplayShare } from "../team/types";
 import type { Channel, ChannelSettings, Moment, NeedsYouOverview, TestResult } from "../needs-you/types";
 import type { Memory } from "../context/index-file";
+import type { AskAnswer } from "../board-ask/types";
 import type { EngineOption, SettingsPayload } from "../new-card/engine";
 import type { AnalysisKind, CostSummary, DashboardSnapshot, WorkSession } from "../insights/types";
 import type {
@@ -96,6 +97,13 @@ export function api(client: ServerClient) {
 				...(card.settings ? { settings: card.settings } : {}),
 				...(card.attachments?.length ? { attachments: card.attachments } : {}),
 			}),
+		/** A question about the board, answered by the server as a job (`shared_board/ask.py`). */
+		askBoard: (projectId: string, body: { question: string; language: string; history: { question: string; answer: string }[] }) =>
+			client.request<{ job: FeatureJob }>("POST", `/api/board/ask?project_id=${enc(projectId)}`, body),
+		boardAnswer: (projectId: string, jobId: string) =>
+			client.request<AskAnswer>("GET", `/api/board/ask/jobs/${enc(jobId)}?project_id=${enc(projectId)}`),
+		cancelBoardAsk: (projectId: string, jobId: string) =>
+			client.request<{ cancelled: boolean }>("POST", `/api/board/ask/jobs/${enc(jobId)}/cancel?project_id=${enc(projectId)}`),
 		/** The providers and models a card may be created with (`shared_board/engines.py`). */
 		engines: async (projectId: string) =>
 			(await client.request<{ engines: EngineOption[] }>("GET", `/api/board/engines?project_id=${enc(projectId)}`))

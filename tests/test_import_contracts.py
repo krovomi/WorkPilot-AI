@@ -110,8 +110,10 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     "mcp_tasks": set(),
     # « Interroger le tableau », ranking by meaning (docs/architecture/board-ask.md):
     # the brain's local embeddings model, secret masking and atomic writes
-    # through foundation, the strict offline policy. A leaf its runner calls.
-    "board_ask": {"brain", "foundation", "offline_policy"},
+    # through foundation, the strict offline policy; and, for a server
+    # project's question (lot 4c), the quoting of ticket text as data
+    # (security.untrusted, S2). Its model is handed in by the runner. A leaf.
+    "board_ask": {"brain", "foundation", "offline_policy", "security"},
     # The board as an MCP server: the spec numbering lock and the MCP layer,
     # nothing that runs an agent (docs/architecture/board-mcp.md).
     "board_mcp": {"core", "mcp_tasks"},

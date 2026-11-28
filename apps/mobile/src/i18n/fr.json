@@ -779,6 +779,10 @@
 				"title": "Classement",
 				"hint": "Les points de la saison de qui montre son nom, et vos badges"
 			},
+			"ask": {
+				"title": "Interroger le tableau",
+				"hint": "Une question dans n'importe quelle langue, et les tickets qui s'y rapportent"
+			},
 			"roadmap": {
 				"title": "Roadmap",
 				"hint": "Les fonctionnalités prévues pour le projet, par phase et priorité"
@@ -987,5 +991,36 @@
 		"revoke": "Arrêter le lien",
 		"revokeTitle": "Arrêter ce lien ?",
 		"revokeBody": "« {{title}} » ne s'ouvrira plus pour qui a le lien."
+	},
+	"ask": {
+		"intro": "Posez une question sur le tableau dans n'importe quelle langue, par exemple « Comment a été revue la page d'admin ? ». La réponse cite chaque carte, fonctionnalité de la roadmap et idée liée, quelle que soit la langue dans laquelle elle est écrite. Vous seul voyez vos questions.",
+		"question": "Votre question",
+		"followUp": "Une question de suite",
+		"send": "Demander",
+		"stop": "Arrêter",
+		"answering": "Recherche de « {{question}} »…",
+		"noAnswer": "Le serveur n'a pas répondu. Réessayez.",
+		"keywords": "Aucun modèle n'a répondu : ces tickets partagent des mots avec la question.",
+		"nothing": "Aucun ticket ne se rapporte à cette question.",
+		"searched_one": "{{count}} ticket parcouru",
+		"searched_other": "{{count}} tickets parcourus",
+		"archived": "Archivée",
+		"state": {
+			"done": "Terminée",
+			"in_review": "En revue",
+			"in_progress": "En cours",
+			"planned": "Prévue",
+			"failed": "Échec",
+			"abandoned": "Abandonnée"
+		},
+		"coverage": {
+			"full": "Déjà fait",
+			"partial": "En partie",
+			"related": "Lié"
+		},
+		"kind": {
+			"roadmap": "Roadmap",
+			"idea": "Idée"
+		}
 	}
 }

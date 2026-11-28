@@ -20,7 +20,7 @@ déjà été développée, même en partie. Leub a retenu quatre lots.
 | 1 | le panneau, la recherche par mots-clés, le modèle pour comprendre et juger |
 | 2 | des embeddings multilingues quand un modèle est là (Ollama, LM Studio, API du provider) : [le sens](#le-sens-lot-2) |
 | 3 | « Vérifier une idée » : une fonctionnalité collée, sa couverture exigence par exigence : [l'idée](#vérifier-une-idée-lot-3) |
-| 4 | d'autres sources (roadmap, idées, PR et commits) : [les sources](#les-autres-sources-lot-4) ; les tableaux du serveur dans l'app de bureau ; puis l'app mobile |
+| 4 | d'autres sources (roadmap, idées, PR et commits) : [les sources](#les-autres-sources-lot-4) ; les tableaux du serveur dans l'app de bureau ; l'app mobile : [sur le téléphone](#sur-le-téléphone-lot-4) |
 
 ## Pourquoi pas seulement des embeddings
 
@@ -176,7 +176,35 @@ dans les prompts cités, comme les cartes (S2).
   jugement et le sens se font ensuite sur cette machine, avec le provider de la personne, comme
   pour un tableau local ; la roadmap, les idées et l'historique du serveur ne sont pas lus (le
   pied du panneau le dit à la place du menu Sources). Sans réponse du serveur, le handler répond
-  `server_unreachable`. L'app mobile, qui n'a pas de modèle à elle, attend une route du serveur.
+  `server_unreachable`. Sur le téléphone, c'est le serveur qui répond : voir plus bas.
+
+## Sur le téléphone (lot 4)
+
+L'app mobile n'a pas de modèle à elle : le serveur répond. Une page **Interroger le tableau**
+(onglet *Plus*, `apps/mobile/src/app/(app)/projects/[projectId]/ask.tsx`) envoie la question à
+`POST /api/board/ask` (`shared_board/ask.py`), qui lance un job du projet
+(`server/services/project_jobs.py`) : `runners/board_ask_runner.py` sur le clone, avec le provider
+du projet par `core.oneshot` (tous les providers, un tour, aucun outil). L'app relit
+`GET /api/board/ask/jobs/<id>` toutes les 3 s jusqu'à la réponse ; *Arrêter* annule le job.
+
+- **Les mêmes étapes.** `board_ask/answer.py` reprend celles du bureau (comprendre, chercher,
+  juger) et les mêmes prompts ; `board_ask/search.py` le même BM25 ; `board_ask/tickets.py` lit
+  les cartes dans `.workpilot/specs/` du clone (toutes, terminées et abandonnées comprises), et la
+  roadmap et les idées qui ne sont pas encore des cartes. Pas de classement par le sens sur le
+  serveur (pas de modèle d'embeddings supposé), pas d'historique git : le modèle traduit la
+  question vers les langues du tableau, comme au lot 1.
+- **Le droit de lecture du tableau.** Poser une question, et arrêter la sienne, demandent
+  `task.read` (`ROUTE_OVERRIDES` de `server/authz/mounting.py`) : qui voit les cartes peut
+  demander ce qu'elles contiennent. La page n'apparaît qu'avec ce droit ; le serveur revérifie.
+  La route ne prend qu'un `project_id`.
+- **La réponse est à qui a posé la question.** Elle n'est servie qu'à lui (un autre reçoit 404,
+  comme un job d'un autre projet), gardée en mémoire du processus pour les 100 dernières, jamais
+  écrite en base ni dans le clone, et masquée comme toute sortie de job (`redact_text`). Une seule
+  question à la fois par personne et par projet. La conversation vit sur l'écran ; une question de
+  suite envoie les 4 derniers tours, bornés, que le runner lit dans un fichier du dossier du job.
+- **Contenu externe (S2).** La question, la conversation et les tickets entrent dans les prompts par
+  `quote_untrusted` ; la réponse du modèle est relue en listes fermées et textes bornés, comme sur
+  le bureau.
 
 ## Fichiers
 
@@ -193,6 +221,9 @@ dans les prompts cités, comme les cartes (S2).
 | `main/ipc-handlers/board-ask-handlers.ts` | canaux `boardAsk:ask` et `boardAsk:checkIdea`, revalidation |
 | `renderer/stores/board-ask-store.ts` | panneau ouvert, onglet, une conversation et une idée par projet |
 | `renderer/components/kanban/board-ask/` | bouton de la barre, panneau, onglet `IdeaCheckView.tsx`, carte `idea-card.ts` |
+| `apps/backend/board_ask/{search,tickets,answer}.py`, `runners/board_ask_runner.py` | la question d'un projet du serveur : BM25, tickets du clone, étapes |
+| `apps/backend/shared_board/ask.py` | routes `/api/board/ask` : job, réponse gardée pour qui l'a posée |
+| `apps/mobile/src/app/(app)/projects/[projectId]/ask.tsx`, `apps/mobile/src/board-ask/` | la page du téléphone |
 
 Tests : `shared/utils/__tests__/board-ask-search.test.ts`,
 `main/board-ask/__tests__/board-ask-service.test.ts`,
@@ -200,4 +231,5 @@ Tests : `shared/utils/__tests__/board-ask-search.test.ts`,
 `main/board-ask/__tests__/sources.test.ts`,
 `tests/board_ask/`, `main/ipc-handlers/__tests__/board-ask-handlers.test.ts`,
 `renderer/components/kanban/board-ask/BoardAskPanel.test.tsx`, `IdeaCheckView.test.tsx`,
-`idea-card.test.ts`.
+`idea-card.test.ts`, `tests/backend/test_shared_board_ask.py`,
+`apps/mobile/src/__tests__/app/board-ask.test.tsx`.
