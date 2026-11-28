@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 from test_placement import machine as machine_module
@@ -36,25 +37,29 @@ def test_another_build_is_counted_but_not_this_one(monkeypatch, tmp_path):
     fake_backend = tmp_path / "backend"
     fake_backend.mkdir()
     entry = fake_backend / "run.py"
-    entry.write_text("import time\ntime.sleep(30)\n", encoding="utf-8")
+    # Killed below: it only has to outlive the wait, however slow the machine.
+    entry.write_text("import time\ntime.sleep(600)\n", encoding="utf-8")
     monkeypatch.setattr(machine_module, "_BACKEND_DIR", fake_backend.resolve())
     before = machine_module.count_builds()
     child = subprocess.Popen([sys.executable, str(entry), "--spec", "002"])
+    started = time.monotonic()
     try:
-        for _ in range(50):
+        while time.monotonic() - started < 60:
             if machine_module.count_builds() == before + 1:
                 break
             subprocess.run(
                 [sys.executable, "-c", "import time; time.sleep(0.05)"], check=True
             )
-        assert machine_module.count_builds() == before + 1, _what_runs(entry)
+        assert machine_module.count_builds() == before + 1, _what_runs(
+            entry, child, time.monotonic() - started
+        )
     finally:
         child.kill()
         child.wait()
 
 
-def _what_runs(entry: Path) -> str:
-    """The command lines that name the entry point, to say why none was counted."""
+def _what_runs(entry: Path, child: subprocess.Popen, waited: float) -> str:
+    """What psutil saw of the build, to say why it was not counted."""
     import psutil
 
     seen = []
@@ -62,7 +67,15 @@ def _what_runs(entry: Path) -> str:
         cmdline = process.info.get("cmdline") or []
         if any(entry.name in str(arg) for arg in cmdline):
             seen.append(f"{process.info['pid']}<{process.info['ppid']}: {cmdline}")
-    return f"backend dir {machine_module._BACKEND_DIR}; seen: {seen}"
+    try:
+        direct = psutil.Process(child.pid)
+        own = f"{direct.cmdline()}, children {[c.cmdline() for c in direct.children()]}"
+    except psutil.Error as error:
+        own = repr(error)
+    return (
+        f"after {waited:.1f} s, exit code {child.poll()}, backend dir "
+        f"{machine_module._BACKEND_DIR}; the child: {own}; seen: {seen}"
+    )
 
 
 def _smi(monkeypatch, stdout: str, returncode: int = 0) -> None:
