@@ -144,6 +144,13 @@ AUTO_CLAUDE_PROVIDER=claude                    # moteur par défaut d'une carte 
 La liste complète, fournisseur par fournisseur : [`CONFIGURATION.md`](CONFIGURATION.md). En mode
 serveur, les écrans qui configurent les fournisseurs dans l'app répondent 403 : tout se règle ici.
 
+Chaque membre peut aussi apporter **ses propres comptes** (sa clé OpenAI, celle d'un client, un
+jeton Claude Code de `claude setup-token`) : ses runs utilisent alors son compte par défaut de ce
+fournisseur à la place de celui du serveur. Les clés sont chiffrées avec
+`WORKPILOT_SECRETS_MASTER_KEY` et ne sont jamais réaffichées ; il faut le droit
+`settings.account.write` (Contributor, Operator et au-dessus). Routes :
+[`architecture/ai-accounts.md`](architecture/ai-accounts.md#en-mode-serveur).
+
 ### Toutes les variables
 
 La table de référence (défaut et effet de chaque variable) est dans

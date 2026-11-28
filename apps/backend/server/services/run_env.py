@@ -12,7 +12,9 @@ the API environment minus every variable the server reads for itself, plus
 what the run needs (its streaming token, its user, that user's own
 integration secrets). Provider credentials the operator set for builds
 (``CLAUDE_CODE_OAUTH_TOKEN`` and the like) stay: the run needs them, and they
-are the deployment's, not a tenant's.
+are the deployment's, not a tenant's. A provider for which the starter chose
+a default AI account of their own gets that key instead
+(``services/ai_accounts.py``).
 
 ``tests/backend/test_run_env.py`` reads every ``WORKPILOT_*`` name the
 ``server`` package uses and fails when one is neither stripped here nor listed

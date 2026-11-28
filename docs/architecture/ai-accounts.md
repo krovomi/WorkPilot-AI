@@ -3,8 +3,8 @@ feature: Plusieurs comptes par provider IA
 summary: >-
   Plusieurs comptes par provider à clé API (OpenAI, Google, Mistral, DeepSeek, Grok, Meta,
   OpenRouter, Hugging Face), clés chiffrées dans le main, un compte par défaut par provider que le
-  gestionnaire d'identifiants donne aux tâches, aux tests et aux vues ; les comptes Claude sont ses
-  profils OAuth ; bascule en un clic depuis la popin d'utilisation.
+  gestionnaire d'identifiants donne aux tâches, aux tests et aux vues ; comptes Claude = ses
+  profils OAuth ; bascule depuis la popin d'utilisation ; en mode serveur, chaque membre a les siens.
 ---
 
 # Plusieurs comptes par provider IA
@@ -76,6 +76,39 @@ dans le profil), `api` pour un compte à clé, `unknown` sinon ; plus `isDefault
 Enterprise : une feature réservée à ces plans s'allume d'elle-même dessus. Le renderer lit le même
 `subscriptionType` dans `getClaudeProfiles`.
 
+## En mode serveur
+
+Sur un serveur d'équipe, les runs tournent sur le serveur, pas sur le poste : les comptes du
+bureau n'y vont pas. Chaque membre y enregistre donc les siens (`server/services/ai_accounts.py`,
+table `user_ai_accounts`, révision `0049`), sur le même modèle : plusieurs clés par provider, la
+première d'un provider devient son défaut, une par défaut au plus.
+
+| Route | Permission | Ce qu'elle fait |
+|---|---|---|
+| `GET /users/me/ai-accounts` | `settings.account.read` | les comptes (sans clé : `has_key`, dates), le défaut de chaque provider, les providers connus |
+| `POST /users/me/ai-accounts` | `settings.account.write` | ajoute un compte (`provider`, `name`, `key`) |
+| `PATCH /users/me/ai-accounts/{id}` | `settings.account.write` | renomme, remplace la clé, ou les deux |
+| `DELETE /users/me/ai-accounts/{id}` | `settings.account.write` | supprime ; un défaut supprimé n'est remplacé par aucun autre compte |
+| `PUT /users/me/ai-accounts/defaults/{provider}` | `settings.account.write` | `{"account_id": id}` ou `null` (retour aux identifiants du déploiement) |
+
+- **La clé** est chiffrée par le coffre des secrets (Fernet, `WORKPILOT_SECRETS_MASTER_KEY`) et
+  ne revient jamais : ni dans une réponse, ni dans un refus, ni dans l'audit, qui note
+  `ai_account.created|updated|deleted|default` par id de compte et provider.
+- **Chacun les siens** : les routes ne nomment personne ; l'id du compte d'un autre répond 404,
+  quel que soit le rôle. `settings.account.read` est une lecture ordinaire (tous les rôles) ;
+  `settings.account.write` va à Contributor, Operator et au-dessus, qui lancent des agents.
+  Un rôle propre à l'organisation qui ne l'a pas interdit les clés personnelles.
+- **Le run** (`run_manager._build_env`, donc aussi les jobs de `project_jobs`) reçoit la clé du
+  défaut de chaque provider de la personne qui l'a lancé, à la place de celle du déploiement
+  (`PROVIDER_ENV` : `OPENAI_API_KEY`, `GOOGLE_API_KEY`, `MISTRAL_API_KEY`, `DEEPSEEK_API_KEY`,
+  `GROK_API_KEY`, `META_API_KEY`, `OPENROUTER_API_KEY`, `HUGGINGFACE_API_KEY` et `HF_TOKEN`). Un
+  provider sans défaut garde ce que l'opérateur a posé. `claude` prend un jeton longue durée de
+  Claude Code (`claude setup-token`) dans `CLAUDE_CODE_OAUTH_TOKEN`, que `core.auth` lit en premier.
+  Une clé que le coffre ne sait plus déchiffrer (clé maîtresse changée) laisse le run sur les
+  identifiants du déploiement, avec un avertissement sans valeur dans le journal.
+- **RGPD** : supprimer le compte de la personne supprime ses comptes IA (`CASCADE`,
+  `account_erasure.py`).
+
 ## Pas encore
 
 Les providers qui se connectent par leur propre outil gardent un compte : Copilot (`gh`), Codex
@@ -91,6 +124,8 @@ un dossier de connexion par compte, comme Claude (`CLAUDE_CONFIG_DIR`).
 - `apps/frontend/src/renderer/stores/ai-accounts-store.ts` : le store du renderer.
 - `apps/frontend/src/renderer/components/settings/ai-accounts/` : le dialogue des comptes.
 - `apps/frontend/src/renderer/components/usage/ProviderAccountSwitcher.tsx` : la bascule de la popin.
+- `apps/backend/server/services/ai_accounts.py`, `apps/backend/server/routers/ai_accounts.py` : les
+  comptes d'un membre en mode serveur.
 
 Voir aussi [forge-accounts.md](forge-accounts.md) (même modèle pour les forges) et
 [provider-failover.md](provider-failover.md) (basculement auto entre comptes).
