@@ -329,3 +329,103 @@ def test_a_selector_the_browser_refuses_only_drops_itself():
     finally:
         browser.close()
         playwright.stop()
+
+
+# -- what the edges of a capture must survive -----------------------------------
+
+
+def test_an_answer_that_is_not_utf8_is_unreadable():
+    garbled = base64.b64encode(b"\xff\xfe\xfa").decode("ascii")
+    assert page_mapping(f"WPPAGE:{garbled}:WPPAGE", KEY) is None
+    assert page_mapping(_answer(["a list"]), KEY) is None
+
+
+def test_a_field_whose_value_is_not_text_is_left_out():
+    mapping, kinds = page_mapping(
+        _answer(
+            {"fields": [["email", 42], ["email", None], ["name", "Jeanne Martin"]]}
+        ),
+        KEY,
+    )
+    assert set(mapping) == {"Jeanne Martin"} and kinds == ["name"]
+
+
+def test_a_page_check_that_cannot_be_written_says_so(tmp_path):
+    assert not write_page_check(tmp_path / "gone" / "shot.png", PageCheck(1))
+
+
+def test_a_secret_beside_personal_data_is_repainted_too(tmp_path, monkeypatch):
+    from docintel.redact import SecretFinding
+
+    line = "jeanne@acme.fr key-abcdefghij"
+    secret_at = line.index("key-")
+
+    def secrets(text):
+        return [SecretFinding("api_key", 0, secret_at, len(line))] + [
+            # One that overlaps the e-mail is the e-mail's span already.
+            SecretFinding("api_key", 0, 0, 5)
+        ]
+
+    monkeypatch.setattr("docintel.redact.find_secrets", secrets)
+    assert privacy._line_spans(line) == [
+        (0, len("jeanne@acme.fr"), "email"),
+        (secret_at, len(line), "api_key"),
+    ]
+
+
+def test_a_word_the_ocr_misread_is_skipped_when_placing_the_others(
+    tmp_path, monkeypatch
+):
+    source = _screen(tmp_path / "shot.png")
+    _ocr(
+        monkeypatch,
+        OcrOutcome(
+            text="Contact jeanne@acme.fr",
+            engine="tesseract",
+            boxes=(
+                OcrBox("Cont4ct", 10, 10, 60, 20, line=0),
+                OcrBox("", 70, 10, 5, 20, line=0),
+                OcrBox("jeanne@acme.fr", 80, 10, 120, 20, line=0),
+            ),
+        ),
+    )
+    result = protect_capture(source, tmp_path / "o.png", key=KEY, env={})
+    assert result.status == "pseudonymized" and result.replaced == 1
+
+
+def test_an_older_pillow_gets_its_single_bitmap_font(monkeypatch):
+    from PIL import ImageFont
+
+    real = ImageFont.load_default
+    sizes: list = []
+
+    def load_default(*args, **kwargs):
+        sizes.append(kwargs.get("size"))
+        if "size" in kwargs:
+            raise TypeError("load_default() got an unexpected keyword argument 'size'")
+        return real()
+
+    monkeypatch.setattr(ImageFont, "load_default", load_default)
+    assert privacy._font(14) is not None
+    assert sizes == [14, None]
+
+
+def test_a_value_without_a_fake_is_covered_by_a_plain_bar():
+    picture = Image.new("RGB", (60, 30), (255, 255, 255))
+    privacy._repaint(picture, [privacy._Patch(10, 10, 20, 10, "")])
+    assert picture.getpixel((20, 15)) == (88, 94, 106)
+    assert picture.getpixel((55, 25)) == (255, 255, 255)
+
+
+def test_a_copy_that_cannot_be_saved_is_failed_not_published(tmp_path, monkeypatch):
+    source = _screen(tmp_path / "shot.png")
+    blocker = tmp_path / "blocker"
+    blocker.write_text("a file where the folder should be", encoding="utf-8")
+    target = blocker / "out" / "shot.png"
+    off = protect_capture(source, target, key=KEY, env={}, enabled=False)
+    assert (off.status, off.notes) == ("failed", ["protect:off"])
+    write_page_check(source, PageCheck(1, ["email"], []))
+    _ocr(monkeypatch, OcrOutcome(reason="empty", engine="tesseract"))
+    checked = protect_capture(source, target, key=KEY, env={})
+    assert checked.status == "failed"
+    assert not target.exists()

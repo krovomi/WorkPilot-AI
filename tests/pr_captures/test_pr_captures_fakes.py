@@ -105,3 +105,17 @@ def test_a_key_that_cannot_be_kept_is_still_drawn(tmp_path):
     blocker = tmp_path / "file"
     blocker.write_text("x", encoding="utf-8")
     assert len(load_key(blocker / "inside")) == 32
+
+
+def test_a_card_number_of_no_known_length_keeps_its_shape():
+    fake = Faker(KEY).card("12-34")
+    assert re.fullmatch(r"\d\d-\d\d", fake)
+
+
+def test_a_fake_that_cannot_be_made_falls_back_to_the_value_s_shape(monkeypatch):
+    def broken(self, value):
+        raise IndexError("no candidate")
+
+    monkeypatch.setattr(Faker, "email", broken)
+    fake = Faker(KEY).fake("email", "ab@cd.fr")
+    assert fake != "ab@cd.fr" and len(fake) == len("ab@cd.fr")

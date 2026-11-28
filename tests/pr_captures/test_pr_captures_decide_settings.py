@@ -125,3 +125,23 @@ def test_the_decision_follows_the_files_and_the_setting():
     verdict = decide(never, ["web/App.vue"])
     assert (verdict.needed, verdict.reason) == (False, "turned-off")
     assert verdict.ui_files == ["web/App.vue"]
+
+
+def test_a_team_s_own_captures_branch_is_kept_and_reported(tmp_path):
+    settings = load_settings(tmp_path, env={"CAPTURES_BRANCH": "team/captures"})
+    assert settings.branch == "team/captures"
+    assert settings.to_dict()["branch"] == "team/captures"
+    assert set(settings.to_dict()) == {
+        "mode",
+        "decidedBy",
+        "compare",
+        "mask",
+        "maskSelectors",
+        "publish",
+        "publishUnchecked",
+        "retentionDays",
+        "branch",
+    }
+    assert load_settings(tmp_path, env={"CAPTURES_BRANCH": "../x"}).branch == (
+        "workpilot-captures"
+    )

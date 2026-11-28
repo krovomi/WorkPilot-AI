@@ -216,3 +216,73 @@ async def test_nothing_happens_without_a_spec_and_nothing_raises(tmp_path, monke
     monkeypatch.setattr("pr_captures.publication.build_publication", broken)
     assert await after_verify(tmp_path, tmp_path / "s", {"status": "x"}, []) is None
     assert captures_step  # the module stays importable on its own
+
+
+class _BreakingBrowser(FakeBrowser):
+    """A page that breaks while it is read, or while it is put back."""
+
+    def __init__(self, *, breaks_on: str):
+        super().__init__()
+        self.breaks_on = breaks_on
+
+    async def evaluate(self, function: str) -> str:
+        answer = await super().evaluate(function)
+        if self.calls[-1] == self.breaks_on:
+            raise RuntimeError("page closed")
+        return answer
+
+
+async def test_a_page_that_breaks_while_read_leaves_the_capture_to_ocr(tmp_path):
+    browser = _BreakingBrowser(breaks_on="collect")
+    shot = tmp_path / "s.png"
+    assert await protected_screenshot(
+        browser, shot, project_dir=tmp_path, spec_dir=None, base=tmp_path
+    )
+    assert browser.calls == ["collect", "screenshot"]
+    assert read_page_check(shot) is None
+
+
+async def test_a_page_that_cannot_be_put_back_still_gives_its_capture(tmp_path):
+    browser = _BreakingBrowser(breaks_on="restore")
+    shot = tmp_path / "s.png"
+    assert await protected_screenshot(
+        browser, shot, project_dir=tmp_path, spec_dir=None, base=tmp_path
+    )
+    assert browser.calls == ["collect", "apply", "screenshot", "restore"]
+    assert read_page_check(shot).replaced == 1
+
+
+def test_a_page_check_that_cannot_travel_is_dropped_not_kept_stale(
+    tmp_path, monkeypatch
+):
+    from pr_captures.privacy import PageCheck, write_page_check
+
+    spec = tmp_path / "001-x"
+    shot = tmp_path / "s.png"
+    Image.new("RGB", (30, 20), (240, 240, 240)).save(shot)
+    write_page_check(shot, PageCheck(1, ["email"], ["a@exemple.fr"]))
+    assert captures_step.file_with_check(
+        spec, shot, side="task", platform="web", url="http://x/a", label="a"
+    )
+    (filed,) = spec_captures(spec)
+    assert read_page_check(spec / filed.path) is not None
+
+    def refuse(*args, **kwargs):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(captures_step.shutil, "copyfile", refuse)
+    assert captures_step.file_with_check(
+        spec, shot, side="task", platform="web", url="http://x/a", label="a"
+    )
+    assert read_page_check(spec / filed.path) is None
+
+
+async def test_a_side_without_an_address_or_a_browser_files_nothing(tmp_path):
+    spec = tmp_path / "001-x"
+    no_origin = FakeToolbox(tmp_path, FakeBrowser(), origin="")
+    assert await capture_side(no_origin, RECORD, "base", spec, tmp_path / "shots") == 0
+    browser = FakeBrowser()
+    browser.available = False
+    no_browser = FakeToolbox(tmp_path, browser)
+    assert await capture_side(no_browser, RECORD, "base", spec, tmp_path / "shots") == 0
+    assert browser.calls == []
