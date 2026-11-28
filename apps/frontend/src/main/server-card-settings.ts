@@ -49,6 +49,8 @@ export interface ServerCardSettings {
 	area?: string | null;
 	/** The sprint the card is planned in (`shared/types/sprint.ts`). */
 	sprintId?: string | null;
+	/** The closed sprint that carried the card into `sprintId`. */
+	carriedFrom?: string | null;
 	/** The card's labels (`shared/utils/task-labels.ts`). */
 	labels?: string[] | null;
 }
@@ -65,6 +67,7 @@ const OPTIONAL_TEXT_KEYS = [
 	"flaggedAt",
 	"area",
 	"sprintId",
+	"carriedFrom",
 ] as const;
 
 interface CardRef {

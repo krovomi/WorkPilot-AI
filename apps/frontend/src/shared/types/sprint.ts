@@ -40,6 +40,12 @@ export interface Sprint {
 	/** Calendar days `YYYY-MM-DD`, as the person set them. */
 	startDate?: string;
 	endDate?: string;
+	/**
+	 * The points the team means to take in this sprint, when it set them
+	 * (fewer people around, a first sprint with no velocity yet). Absent, the
+	 * capacity is the velocity of the last sprints. Points, never a duration.
+	 */
+	capacity?: number;
 	createdAt: string;
 	startedAt?: string;
 	closedAt?: string;
@@ -54,4 +60,6 @@ export interface SprintDraft {
 	goal?: string;
 	startDate?: string;
 	endDate?: string;
+	/** Points, 1 to 999 (`MAX_CAPACITY`); null clears it, back to the velocity. */
+	capacity?: number | null;
 }

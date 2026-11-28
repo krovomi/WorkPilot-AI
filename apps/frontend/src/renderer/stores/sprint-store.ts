@@ -49,11 +49,15 @@ function tasksOf(sprintId: string): Task[] {
 	return useTaskStore.getState().tasks.filter((task) => task.metadata?.sprintId === sprintId);
 }
 
-/** Moves cards to another sprint (or none); resolves how many could not be saved. */
-async function moveCards(tasks: readonly Task[], sprintId: string | undefined): Promise<number> {
+/**
+ * Moves cards to another sprint (or none); resolves how many could not be
+ * saved. `carriedFrom` names the closing sprint that carries them; a person's
+ * own move leaves it out, which clears it.
+ */
+async function moveCards(tasks: readonly Task[], sprintId: string | undefined, carriedFrom?: string): Promise<number> {
 	let failed = 0;
 	for (const task of tasks) {
-		if (!(await persistUpdateTask(task.id, { metadata: { sprintId } }))) failed++;
+		if (!(await persistUpdateTask(task.id, { metadata: { sprintId, carriedFrom } }))) failed++;
 	}
 	return failed;
 }
@@ -123,7 +127,7 @@ export const useSprintStore = create<SprintState>((set, get) => {
 			const tasks = useTaskStore.getState().tasks;
 			const report = sprintReport(tasks, sprintId, carryTo);
 			const unfinished = tasksOf(sprintId).filter((task) => !isTaskDone(task));
-			const failedCards = await moveCards(unfinished, carryTo ?? undefined);
+			const failedCards = await moveCards(unfinished, carryTo ?? undefined, carryTo ? sprintId : undefined);
 			if (failedCards > 0) return { ok: false, error: "cards_not_moved", failedCards };
 			return answer((projectId) => api()?.completeSprint?.(projectId, sprintId, report));
 		},

@@ -3,7 +3,7 @@
  * named above the board, its cards shown on demand, and cards moved between
  * the backlog and the sprint.
  */
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Project, Sprint, Task } from "../../../shared/types";
@@ -52,7 +52,10 @@ const updateTask = vi.fn(async (id: string, updates: { metadata?: object }) => {
 	const task = useTaskStore.getState().tasks.find((t) => t.id === id);
 	return { success: true, data: { ...task, metadata: { ...task?.metadata, ...updates.metadata } } };
 });
-const saveSprint = vi.fn();
+const saveSprint = vi.fn(async (_projectId: string, draft: Sprint) => ({
+	success: true,
+	data: useSprintStore.getState().sprints.map((sprint) => (sprint.id === draft.id ? { ...sprint, ...draft } : sprint)),
+}));
 
 function project(role?: "viewer" | "member"): Project {
 	return { id: "p1", name: "P", path: "/p", remote: role ? { role } : undefined } as unknown as Project;
@@ -61,6 +64,7 @@ function project(role?: "viewer" | "member"): Project {
 beforeEach(() => {
 	vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-11-28T12:00:00") });
 	updateTask.mockClear();
+	saveSprint.mockClear();
 	toast.mockClear();
 	(globalThis as { electronAPI?: unknown }).electronAPI = { updateTask, saveSprint };
 	useProjectStore.setState({ projects: [project()], selectedProjectId: "p1" });
@@ -158,7 +162,9 @@ describe("SprintPlanningDialog", () => {
 		expect(within(backlog).queryByText("Card d")).toBeNull();
 		expect(within(sprint).getByText("Card a")).toBeInTheDocument();
 		// The velocity of the closed sprint is 5 pts; the sprint holds 3.
-		expect(within(sprint).getByText("3 pts planned · velocity 5 pts")).toBeInTheDocument();
+		const gauge = screen.getByTestId("sprint-capacity");
+		expect(within(gauge).getByText("/ 5 pts")).toBeInTheDocument();
+		expect(within(gauge).getByTestId("sprint-capacity-verdict")).toHaveTextContent("2 pts of room");
 	});
 
 	it("adds ticked cards to the sprint, warns past the velocity, and sends one back", async () => {
@@ -174,7 +180,8 @@ describe("SprintPlanningDialog", () => {
 		expect(updateTask).toHaveBeenCalledWith("b", { metadata: { sprintId: ACTIVE.id } });
 		const sprint = screen.getByTestId("sprint-planning-sprint");
 		await waitFor(() => expect(within(sprint).getByText("Card b")).toBeInTheDocument());
-		expect(within(sprint).getByText("11 pts planned: more than the velocity (5 pts)")).toBeInTheDocument();
+		expect(screen.getByTestId("sprint-capacity-verdict")).toHaveTextContent("6 pts over");
+		expect(screen.getByRole("status")).toHaveTextContent("2 cards added to the sprint");
 
 		const row = within(sprint).getByText("Card c").closest("li") as HTMLElement;
 		await user.click(within(row).getByRole("button", { name: "Back to the backlog" }));
@@ -234,5 +241,118 @@ describe("SprintPlanningDialog", () => {
 		await user.click(screen.getByRole("button", { name: "Create" }));
 		await waitFor(() => expect(useSprintStore.getState().planningId).toBe(created.id));
 		expect(await screen.findByRole("heading", { name: "Plan « Sprint-03 »" })).toBeInTheDocument();
+	});
+});
+
+describe("SprintPlanningDialog, planning helps", () => {
+	it("moves the ticked cards together by dragging them to the sprint, then undoes the move", async () => {
+		vi.useRealTimers();
+		const user = userEvent.setup();
+		useSprintStore.setState({ planningId: ACTIVE.id });
+		board();
+		const backlog = screen.getByTestId("sprint-planning-backlog");
+		const sprint = screen.getByTestId("sprint-planning-sprint");
+		await user.click(within(backlog).getByRole("checkbox", { name: "Card b" }));
+		await user.click(within(backlog).getByRole("checkbox", { name: "Card c" }));
+		const data = new Map<string, string>();
+		const dataTransfer = {
+			setData: (type: string, value: string) => data.set(type, value),
+			getData: (type: string) => data.get(type) ?? "",
+			get types() {
+				return [...data.keys()];
+			},
+			effectAllowed: "",
+			dropEffect: "",
+		};
+		const row = within(backlog).getByText("Card b").closest("li") as HTMLElement;
+		fireEvent.dragStart(row, { dataTransfer });
+		fireEvent.dragOver(sprint, { dataTransfer });
+		expect(sprint).toHaveAttribute("data-drop-over", "true");
+		fireEvent.drop(sprint, { dataTransfer });
+		await waitFor(() => expect(within(sprint).getByText("Card c")).toBeInTheDocument());
+		expect(within(sprint).getByText("Card b")).toBeInTheDocument();
+
+		await user.click(screen.getByRole("button", { name: "Undo" }));
+		await waitFor(() => expect(within(backlog).getByText("Card b")).toBeInTheDocument());
+		expect(within(backlog).getByText("Card c")).toBeInTheDocument();
+	});
+
+	it("sends a card across with the arrow key", async () => {
+		vi.useRealTimers();
+		useSprintStore.setState({ planningId: ACTIVE.id });
+		board();
+		const backlog = screen.getByTestId("sprint-planning-backlog");
+		fireEvent.keyDown(within(backlog).getByRole("button", { name: "Card b" }), { key: "ArrowRight" });
+		await waitFor(() => expect(updateTask).toHaveBeenCalledWith("b", { metadata: { sprintId: ACTIVE.id } }));
+	});
+
+	it("filters the backlog to the cards without an estimate, which offer « Estimate »", async () => {
+		vi.useRealTimers();
+		const user = userEvent.setup();
+		useSprintStore.setState({ planningId: ACTIVE.id });
+		board();
+		const backlog = screen.getByTestId("sprint-planning-backlog");
+		await user.click(within(backlog).getByRole("button", { name: "Not estimated · 1" }));
+		expect(within(backlog).queryByText("Card b")).toBeNull();
+		const row = within(backlog).getByText("Card c").closest("li") as HTMLElement;
+		expect(within(row).getByRole("button", { name: "Estimate" })).toBeInTheDocument();
+	});
+
+	it("marks a card carried over and one waiting on a backlog card, and adds the missing one", async () => {
+		vi.useRealTimers();
+		const user = userEvent.setup();
+		const closing: Sprint = { ...CLOSED, report: { ...(CLOSED.report as NonNullable<Sprint["report"]>), carriedTo: ACTIVE.id } };
+		useSprintStore.setState({ sprints: [ACTIVE, PLANNED, closing], planningId: ACTIVE.id });
+		const carried = card("e", "in_progress", ACTIVE.id, 2);
+		carried.metadata = { ...carried.metadata, carriedFrom: CLOSED.id, blockedBy: ["b"] };
+		useTaskStore.setState({ tasks: [...useTaskStore.getState().tasks, carried] });
+		board();
+		const sprint = screen.getByTestId("sprint-planning-sprint");
+		expect(within(sprint).getByText("Carried over from Sprint-00")).toBeInTheDocument();
+		expect(within(sprint).getByText("Waits on « Card b »")).toBeInTheDocument();
+		const missing = screen.getByTestId("sprint-planning-missing");
+		await user.click(within(missing).getByRole("button", { name: "Add it too" }));
+		await waitFor(() => expect(within(sprint).getByText("Card b")).toBeInTheDocument());
+		expect(screen.queryByTestId("sprint-planning-missing")).toBeNull();
+	});
+
+	it("lowers the capacity below the velocity, then goes back to it", async () => {
+		vi.useRealTimers();
+		const user = userEvent.setup();
+		useSprintStore.setState({ planningId: ACTIVE.id });
+		board();
+		const gauge = screen.getByTestId("sprint-capacity");
+		expect(within(gauge).getByText("100 %")).toBeInTheDocument();
+		await user.click(within(gauge).getByRole("button", { name: "Lower the capacity" }));
+		await waitFor(() => expect(saveSprint).toHaveBeenCalledWith("p1", expect.objectContaining({ id: ACTIVE.id, capacity: 4 })));
+		expect(await within(gauge).findByText("80 %")).toBeInTheDocument();
+		await user.click(within(gauge).getByRole("button", { name: "Back to the velocity" }));
+		await waitFor(() => expect(saveSprint).toHaveBeenLastCalledWith("p1", expect.objectContaining({ capacity: null })));
+	});
+
+	it("gives a first sprint a target instead of a velocity, and starts a planned sprint from the view", async () => {
+		vi.useRealTimers();
+		const user = userEvent.setup();
+		const startSprint = vi.fn(async () => ({ success: true, data: [{ ...PLANNED, state: "active" }] }));
+		(globalThis as { electronAPI?: unknown }).electronAPI = { updateTask, saveSprint, startSprint };
+		useSprintStore.setState({ sprints: [PLANNED], planningId: PLANNED.id });
+		useTaskStore.setState({ tasks: [card("f", "backlog", PLANNED.id, 5)] });
+		board();
+		const gauge = screen.getByTestId("sprint-capacity");
+		expect(within(gauge).getByText(/No sprint finished yet: the target is 20 pts/)).toBeInTheDocument();
+		expect(within(gauge).getAllByText("Target").length).toBeGreaterThan(0);
+		await user.click(screen.getByRole("button", { name: "Start the sprint" }));
+		await waitFor(() => expect(startSprint).toHaveBeenCalledWith("p1", PLANNED.id, { cards: 1, points: 5 }));
+	});
+
+	it("lets a viewer of a server project read the plan without moving anything", () => {
+		useProjectStore.setState({ projects: [project("viewer")] });
+		useSprintStore.setState({ planningId: ACTIVE.id });
+		board();
+		const backlog = screen.getByTestId("sprint-planning-backlog");
+		expect(within(backlog).getByText("Card b")).toBeInTheDocument();
+		expect(within(backlog).queryByRole("checkbox")).toBeNull();
+		expect(screen.queryByRole("button", { name: "Lower the capacity" })).toBeNull();
+		expect(screen.queryByRole("button", { name: "Start the sprint" })).toBeNull();
 	});
 });

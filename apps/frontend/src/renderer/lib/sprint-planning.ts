@@ -99,3 +99,67 @@ export function daysLeft(sprint: Pick<Sprint, "endDate">, now: number): number |
 	const todayDay = Date.UTC(Number(today[1]), Number(today[2]) - 1, Number(today[3]));
 	return Math.round((endDay - todayDay) / DAY_MS);
 }
+
+/** The quick filters of the planning view's backlog. */
+export type PlanningQuick = "all" | "urgent" | "bugs" | "unestimated";
+export const PLANNING_QUICKS: readonly PlanningQuick[] = ["all", "urgent", "bugs", "unestimated"];
+
+/** True when a card passes one of the backlog's quick filters. */
+export function matchesQuick(task: Task, quick: PlanningQuick): boolean {
+	switch (quick) {
+		case "urgent":
+			return task.metadata?.priority === "urgent" || task.metadata?.priority === "high";
+		case "bugs":
+			return task.metadata?.category === "bug_fix";
+		case "unestimated":
+			return taskPoints(task) === 0;
+		default:
+			return true;
+	}
+}
+
+/**
+ * The closed sprint that carried this unfinished card into the sprint it is
+ * in now; undefined once a person moved it (the closing sprint must name
+ * the card's sprint as where its unfinished cards went).
+ */
+export function carriedFromSprint(task: Task, sprints: readonly Sprint[]): Sprint | undefined {
+	const from = task.metadata?.carriedFrom;
+	const into = task.metadata?.sprintId;
+	if (!from || !into) return undefined;
+	return sprints.find((sprint) => sprint.id === from && sprint.state === "closed" && sprint.report?.carriedTo === into);
+}
+
+function findCard(tasks: readonly Task[], ref: string): Task | undefined {
+	return tasks.find((task) => task.id === ref || task.specId === ref);
+}
+
+/**
+ * The cards this one waits on (`metadata.blockedBy`) that are neither
+ * finished, abandoned nor planned in the same sprint: the sprint would take
+ * a card it cannot finish. A reference to a card no longer on the board
+ * blocks nothing, as for the queue.
+ */
+export function waitingOn(task: Task, tasks: readonly Task[]): Task[] {
+	const sprintId = task.metadata?.sprintId;
+	const waiting: Task[] = [];
+	for (const ref of task.metadata?.blockedBy ?? []) {
+		const blocker = findCard(tasks, ref);
+		if (!blocker || blocker.id === task.id || isTaskDone(blocker) || blocker.metadata?.abandoned) continue;
+		if (sprintId && blocker.metadata?.sprintId === sprintId) continue;
+		if (!waiting.includes(blocker)) waiting.push(blocker);
+	}
+	return waiting;
+}
+
+/** What the sprint's cards wait on that is still in the backlog: « Add these too ». */
+export function missingBlockers(sprintCards: readonly Task[], tasks: readonly Task[]): Task[] {
+	const missing: Task[] = [];
+	for (const card of sprintCards) {
+		if (isTaskDone(card)) continue;
+		for (const blocker of waitingOn(card, tasks)) {
+			if (!blocker.metadata?.sprintId && isPlannable(blocker) && !missing.includes(blocker)) missing.push(blocker);
+		}
+	}
+	return missing;
+}

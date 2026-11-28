@@ -57,3 +57,16 @@ describe("settingsFromMetadata, labels", () => {
 		expect(settingsFromMetadata({ labels: [] })).toEqual({ labels: null });
 	});
 });
+
+describe("settingsFromMetadata, sprint", () => {
+	it("sends the sprint a card was carried from, and clears it when a person moves the card", () => {
+		expect(settingsFromMetadata({ sprintId: "sp-0000000a", carriedFrom: "sp-0000000c" })).toEqual({
+			sprintId: "sp-0000000a",
+			carriedFrom: "sp-0000000c",
+		});
+		expect(settingsFromMetadata({ sprintId: "sp-0000000b", carriedFrom: undefined })).toEqual({
+			sprintId: "sp-0000000b",
+			carriedFrom: null,
+		});
+	});
+});

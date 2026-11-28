@@ -42,6 +42,8 @@ router = APIRouter(prefix="/api/board", tags=["board"])
 
 MAX_SPRINTS = 200
 MAX_COUNT = 100_000
+#: The most points a sprint's capacity may be set to (``MAX_CAPACITY`` in the app).
+MAX_CAPACITY = 999
 SPRINT_ID_PATTERN = r"^sp-[0-9a-f]{8}$"
 #: One line of text without a control character.
 NAME_PATTERN = r"^[^\x00-\x1f\x7f]+$"
@@ -75,6 +77,8 @@ class SprintDraft(BaseModel):
     goal: str | None = Field(default=None, max_length=500, pattern=GOAL_PATTERN)
     startDate: Day | None = None
     endDate: Day | None = None
+    #: Points the team means to take; absent, the velocity is the capacity.
+    capacity: int | None = Field(default=None, ge=1, le=MAX_CAPACITY)
 
     @model_validator(mode="after")
     def _days(self) -> SprintDraft:
@@ -208,10 +212,13 @@ async def save_sprint(
     request: Request,
     scope: ProjectScope = Depends(resolve_project_scope),
 ) -> dict[str, Any]:
-    """Create a planned sprint, or change the name, goal and days of one not closed."""
+    """Create a planned sprint, or change the name, goal, days and capacity of one not closed."""
 
     def apply(sprints: list[Sprint]) -> list[Sprint]:
         fields = body.model_dump(exclude={"id"})
+        # Left out, the capacity is kept; null clears it (back to the velocity).
+        if "capacity" not in body.model_fields_set:
+            fields.pop("capacity")
         if body.id is None:
             if len(sprints) >= MAX_SPRINTS:
                 raise HTTPException(status_code=409, detail="Too many sprints")

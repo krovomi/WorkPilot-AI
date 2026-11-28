@@ -90,6 +90,8 @@ describe("sprint store", () => {
 		expect(await useSprintStore.getState().complete(A, B)).toEqual({ ok: true });
 		expect(sprintOf("open")).toBe(B);
 		expect(sprintOf("done")).toBe(A);
+		// The carried card says which sprint carried it.
+		expect(useTaskStore.getState().tasks.find((task) => task.id === "open")?.metadata?.carriedFrom).toBe(A);
 		expect(answer).toHaveBeenLastCalledWith("p1", A, expect.objectContaining({ carried: 1, carriedTo: B }));
 	});
 

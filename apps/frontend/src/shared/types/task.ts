@@ -786,6 +786,8 @@ export interface TaskMetadata {
 	area?: string;
 	/** The sprint the card is planned in (`shared/types/sprint.ts`). */
 	sprintId?: string;
+	/** The closed sprint that carried this unfinished card into `sprintId`; a person moving it clears it. */
+	carriedFrom?: string;
 	/** Labels a person put on the card (`shared/utils/task-labels.ts`). */
 	labels?: string[];
 

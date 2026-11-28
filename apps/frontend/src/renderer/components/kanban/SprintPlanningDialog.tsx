@@ -1,9 +1,15 @@
 /**
  * The sprint planning view: the backlog on one side, the sprint's cards on
- * the other. Ticking cards and pressing « Add to the sprint » (or the arrow
- * of one card) moves them; the sprint's points are shown next to the
- * velocity of the last sprints, so the person sees when it holds more than
- * the team usually finishes.
+ * the other, and above them the capacity gauge (the sprint's points against
+ * the velocity of the last sprints, or the capacity the team set). Cards
+ * move by their arrow, by ticking several then « Add to the sprint », by
+ * dragging them across, or by the keyboard; the last move is undone with
+ * « Undo » or Ctrl+Z.
+ *
+ * The backlog has quick filters (urgent, bugs, not estimated) and a card
+ * without points offers « Estimate ». The sprint side marks a card carried
+ * over from the last sprint and one waiting on a card left out, with « Add
+ * these too ». A planned sprint starts from here.
  *
  * Opened from the board's sprint banner, the « Sprints » menu, and right
  * after a sprint is created; one is open at a time (`planningId` of the
@@ -11,136 +17,40 @@
  *
  * Design: docs/architecture/kanban-sprints.md.
  */
-import { ArrowLeft, ArrowRight, Search } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { ArrowLeft, ArrowRight, CornerDownRight, Link2, Play, Search, Undo2 } from "lucide-react";
+import { type KeyboardEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { Sprint, Task } from "../../../shared/types";
-import { orderedSprints, taskPoints, velocity } from "../../../shared/utils/sprints";
-import { matchesSearch, planningPools } from "../../lib/sprint-planning";
-import { cn } from "../../lib/utils";
+import { activeSprint, orderedSprints, sprintProgress, taskPoints } from "../../../shared/utils/sprints";
+import {
+	carriedFromSprint,
+	matchesQuick,
+	matchesSearch,
+	missingBlockers,
+	PLANNING_QUICKS,
+	type PlanningQuick,
+	planningPools,
+	waitingOn,
+} from "../../lib/sprint-planning";
+import { cn, extractTextFromHtml } from "../../lib/utils";
+import { openSmartEstimation } from "../../stores/smart-estimation-store";
 import { useSprintStore } from "../../stores/sprint-store";
 import { useTaskStore } from "../../stores/task-store";
 import { Button } from "../ui/button";
-import { Checkbox } from "../ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../ui/dialog";
 import { Input } from "../ui/input";
+import { useSelectedServerProject } from "./ServerBoardNotice";
+import { SprintCapacity } from "./SprintCapacity";
 import { useSprintFailure } from "./SprintDialogs";
+import { PlanningPane } from "./SprintPlanningPane";
 
 const NO_IDS: ReadonlySet<string> = new Set();
 
-interface PaneProps {
-	testId: string;
-	title: string;
-	summary: string;
-	empty: string;
-	tasks: readonly Task[];
-	selected: ReadonlySet<string>;
-	onToggle: (taskId: string) => void;
-	onToggleAll: (checked: boolean) => void;
-	/** Moves one card to the other side. */
-	onMove: (taskId: string) => void;
-	moveLabel: string;
-	direction: "right" | "left";
-	busy: boolean;
-	header?: React.ReactNode;
-	footer: React.ReactNode;
-}
-
-function Pane({
-	testId,
-	title,
-	summary,
-	empty,
-	tasks,
-	selected,
-	onToggle,
-	onToggleAll,
-	onMove,
-	moveLabel,
-	direction,
-	busy,
-	header,
-	footer,
-}: PaneProps) {
-	const { t } = useTranslation(["tasks"]);
-	const all = tasks.length > 0 && tasks.every((task) => selected.has(task.id));
-	const some = !all && tasks.some((task) => selected.has(task.id));
-	const Arrow = direction === "right" ? ArrowRight : ArrowLeft;
-	return (
-		<section
-			data-testid={testId}
-			aria-label={title}
-			className="flex min-h-0 flex-col rounded-xl border border-border/60 bg-muted/10"
-		>
-			<div className="flex items-center gap-2 border-b border-border/50 px-3 py-2">
-				<Checkbox
-					checked={all ? true : some ? "indeterminate" : false}
-					onCheckedChange={(checked) => onToggleAll(checked === true)}
-					disabled={tasks.length === 0 || busy}
-					aria-label={t("tasks:kanban.sprints.planning.selectAll")}
-				/>
-				<span className="flex-1 truncate text-sm font-semibold">{title}</span>
-				<span className="text-xs tabular-nums text-muted-foreground">{summary}</span>
-			</div>
-			{header}
-			<ul className="min-h-[14rem] flex-1 space-y-0.5 overflow-y-auto p-1.5">
-				{tasks.length === 0 && <li className="px-2 py-6 text-center text-xs text-muted-foreground">{empty}</li>}
-				{tasks.map((task) => {
-					const points = taskPoints(task);
-					const priority = task.metadata?.priority;
-					return (
-						<li
-							key={task.id}
-							data-task={task.id}
-							className={cn(
-								"group flex items-center gap-2 rounded-md px-2 py-1.5 text-sm",
-								selected.has(task.id) ? "bg-primary/10" : "hover:bg-muted/50",
-							)}
-						>
-							<Checkbox
-								checked={selected.has(task.id)}
-								onCheckedChange={() => onToggle(task.id)}
-								disabled={busy}
-								aria-label={task.title}
-							/>
-							<button
-								type="button"
-								onClick={() => onToggle(task.id)}
-								disabled={busy}
-								className={cn("min-w-0 flex-1 truncate text-left", task.status === "done" && "text-muted-foreground line-through")}
-							>
-								{task.title}
-							</button>
-							{priority && (
-								<span className="rounded bg-muted px-1.5 text-2xs text-muted-foreground">
-									{t(`tasks:form.classification.values.priority.${priority}`)}
-								</span>
-							)}
-							<span
-								className="w-12 text-right text-2xs tabular-nums text-muted-foreground"
-								title={t("tasks:kanban.sprints.pointsHint")}
-							>
-								{points > 0 ? t("tasks:kanban.sprints.planning.points", { count: points }) : "–"}
-							</span>
-							<Button
-								type="button"
-								size="icon"
-								variant="ghost"
-								className="h-6 w-6 opacity-60 group-hover:opacity-100"
-								onClick={() => onMove(task.id)}
-								disabled={busy}
-								aria-label={moveLabel}
-								title={moveLabel}
-							>
-								<Arrow className="h-3.5 w-3.5" />
-							</Button>
-						</li>
-					);
-				})}
-			</ul>
-			<div className="border-t border-border/50 p-2">{footer}</div>
-		</section>
-	);
+/** The last move, to undo it: the cards and the sprint they came from (null: the backlog). */
+interface LastMove {
+	ids: readonly string[];
+	from: string | null;
+	to: string | null;
 }
 
 function toggled(ids: ReadonlySet<string>, id: string): Set<string> {
@@ -198,47 +108,116 @@ function PlanningView({ sprint }: { sprint: Sprint }) {
 	const openPlanning = useSprintStore((s) => s.openPlanning);
 	const closePlanning = useSprintStore((s) => s.closePlanning);
 	const assign = useSprintStore((s) => s.assign);
+	const start = useSprintStore((s) => s.start);
 	const tasks = useTaskStore((s) => s.tasks);
+	const serverProject = useSelectedServerProject();
+	const canEdit = !serverProject || (serverProject.remote?.role ?? "viewer") !== "viewer";
 	const failed = useSprintFailure();
 	const [search, setSearch] = useState("");
+	const [quick, setQuick] = useState<PlanningQuick>("all");
 	const [fromBacklog, setFromBacklog] = useState<ReadonlySet<string>>(NO_IDS);
 	const [fromSprint, setFromSprint] = useState<ReadonlySet<string>>(NO_IDS);
 	const [busy, setBusy] = useState(false);
+	const [lastMove, setLastMove] = useState<LastMove | null>(null);
 	const pools = useMemo(() => planningPools(tasks, sprint.id), [tasks, sprint.id]);
-	const speed = velocity(sprints);
 
-	const backlog = pools.backlog.filter((task) => matchesSearch(task, search));
+	const searched = pools.backlog.filter((task) => matchesSearch(task, search));
+	const backlog = searched.filter((task) => matchesQuick(task, quick));
 	const backlogPoints = backlog.reduce((sum, task) => sum + taskPoints(task), 0);
-	const over = speed !== null && pools.points > speed;
+	const missing = useMemo(() => missingBlockers(pools.sprint, tasks), [pools.sprint, tasks]);
+	const otherActive = sprint.state === "planned" && !!activeSprint(sprints);
 
-	const move = async (ids: readonly string[], to: string | null) => {
-		if (ids.length === 0 || busy) return;
-		setBusy(true);
-		const outcome = await assign(ids, to);
-		setBusy(false);
-		if (failed(outcome)) {
+	const move = useCallback(
+		async (ids: readonly string[], to: string | null, remember = true) => {
+			if (ids.length === 0 || busy || !canEdit) return false;
+			setBusy(true);
+			const outcome = await assign(ids, to);
+			setBusy(false);
 			const moved = new Set(ids);
 			const keep = (set: ReadonlySet<string>) => new Set([...set].filter((id) => !moved.has(id)));
 			setFromBacklog(keep);
 			setFromSprint(keep);
+			if (!failed(outcome)) return false;
+			setLastMove(remember ? { ids, from: to ? null : sprint.id, to } : null);
+			return true;
+		},
+		[assign, busy, canEdit, failed, sprint.id],
+	);
+
+	const undo = () => {
+		if (lastMove) void move(lastMove.ids, lastMove.from, false);
+	};
+	const onKeyDown = (event: KeyboardEvent) => {
+		const target = event.target as HTMLElement;
+		if (target.closest("input, textarea")) return;
+		if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z" && lastMove) {
+			event.preventDefault();
+			undo();
 		}
 	};
 
+	const chips = (task: Task) => {
+		const from = carriedFromSprint(task, sprints);
+		const waits = task.status === "done" ? [] : waitingOn(task, tasks);
+		if (!from && waits.length === 0) return null;
+		return (
+			<>
+				{from && (
+					<span className="inline-flex items-center gap-1 rounded-full bg-info/10 px-1.5 text-2xs font-medium text-info">
+						<CornerDownRight className="h-3 w-3" aria-hidden="true" />
+						{t("tasks:kanban.sprints.planning.carriedFrom", { name: from.name })}
+					</span>
+				)}
+				{waits.length > 0 && (
+					<span
+						className="inline-flex min-w-0 items-center gap-1 rounded-full bg-warning/10 px-1.5 text-2xs font-medium text-warning"
+						title={waits.map((blocker) => blocker.title).join("\n")}
+					>
+						<Link2 className="h-3 w-3 shrink-0" aria-hidden="true" />
+						<span className="truncate">
+							{t("tasks:kanban.sprints.planning.waitingOn", { count: waits.length, title: waits[0].title })}
+						</span>
+					</span>
+				)}
+			</>
+		);
+	};
+	const estimate = (task: Task) =>
+		canEdit ? (
+			<Button
+				type="button"
+				size="sm"
+				variant="outline"
+				className="h-6 px-2 text-2xs"
+				onClick={() => openSmartEstimation(extractTextFromHtml(task.description ?? "") || task.title, task.id)}
+				title={t("tasks:kanban.sprints.planning.estimateHint")}
+			>
+				{t("tasks:kanban.sprints.planning.estimate")}
+			</Button>
+		) : undefined;
+
+	const quickCount = (value: PlanningQuick) => searched.filter((task) => matchesQuick(task, value)).length;
+
 	return (
 		<Dialog open onOpenChange={(open) => !open && closePlanning()}>
-			<DialogContent className="sm:max-w-4xl" data-testid="sprint-planning">
+			<DialogContent className="sm:max-w-5xl" data-testid="sprint-planning" onKeyDown={onKeyDown}>
 				<DialogHeader>
 					<DialogTitle>{t("tasks:kanban.sprints.planning.title", { name: sprint.name })}</DialogTitle>
-					<DialogDescription>{t("tasks:kanban.sprints.planning.hint")}</DialogDescription>
+					<DialogDescription>
+						{sprint.goal
+							? t("tasks:kanban.sprints.planning.goal", { goal: sprint.goal })
+							: t("tasks:kanban.sprints.planning.hint")}
+					</DialogDescription>
 				</DialogHeader>
 				<SprintPicker current={sprint} onPick={openPlanning} />
-				<div className="grid max-h-[60vh] min-h-0 gap-3 md:grid-cols-2">
-					<Pane
+				<SprintCapacity sprint={sprint} points={pools.points} canEdit={canEdit} />
+				<div className="grid max-h-[56vh] min-h-0 gap-3 md:grid-cols-2">
+					<PlanningPane
 						testId="sprint-planning-backlog"
 						title={t("tasks:kanban.sprints.backlog")}
 						summary={t("tasks:kanban.sprints.planning.summary", { count: backlog.length, points: backlogPoints })}
 						empty={
-							search.trim()
+							search.trim() || quick !== "all"
 								? t("tasks:kanban.sprints.planning.noMatch")
 								: t("tasks:kanban.sprints.planning.backlogEmpty")
 						}
@@ -246,36 +225,64 @@ function PlanningView({ sprint }: { sprint: Sprint }) {
 						selected={fromBacklog}
 						onToggle={(id) => setFromBacklog((set) => toggled(set, id))}
 						onToggleAll={(checked) => setFromBacklog(checked ? new Set(backlog.map((task) => task.id)) : NO_IDS)}
-						onMove={(id) => void move([id], sprint.id)}
+						onMove={(ids) => void move(ids, sprint.id)}
+						onReceive={(ids) => void move(ids, null)}
 						moveLabel={t("tasks:kanban.sprints.planning.addOne")}
 						direction="right"
 						busy={busy}
+						canEdit={canEdit}
+						renderUnestimated={estimate}
 						header={
-							<div className="relative border-b border-border/50 px-2 py-1.5">
-								<Search className="absolute left-4 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-								<Input
-									value={search}
-									onChange={(event) => setSearch(event.target.value)}
-									placeholder={t("tasks:kanban.sprints.planning.search")}
-									aria-label={t("tasks:kanban.sprints.planning.search")}
-									className="h-8 pl-8 text-sm"
-								/>
+							<div className="grid gap-1.5 border-b border-border/50 px-2 py-1.5">
+								<div className="relative">
+									<Search
+										className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
+										aria-hidden="true"
+									/>
+									<Input
+										value={search}
+										onChange={(event) => setSearch(event.target.value)}
+										placeholder={t("tasks:kanban.sprints.planning.search")}
+										aria-label={t("tasks:kanban.sprints.planning.search")}
+										className="h-8 pl-7 text-sm"
+									/>
+								</div>
+								<fieldset className="m-0 flex flex-wrap gap-1 border-0 p-0" aria-label={t("tasks:kanban.sprints.planning.quickLabel")}>
+									{PLANNING_QUICKS.map((value) => (
+										<button
+											key={value}
+											type="button"
+											aria-pressed={quick === value}
+											onClick={() => setQuick(value)}
+											className={cn(
+												"rounded-full border px-2 py-0.5 text-2xs transition-colors",
+												quick === value
+													? "border-primary bg-primary/10 font-semibold text-foreground"
+													: "border-border/60 text-muted-foreground hover:text-foreground",
+											)}
+										>
+											{t(`tasks:kanban.sprints.planning.quick.${value}`, { count: quickCount(value) })}
+										</button>
+									))}
+								</fieldset>
 							</div>
 						}
 						footer={
-							<Button
-								type="button"
-								size="sm"
-								className="w-full gap-2"
-								disabled={fromBacklog.size === 0 || busy}
-								onClick={() => void move([...fromBacklog], sprint.id)}
-							>
-								{t("tasks:kanban.sprints.planning.add", { count: fromBacklog.size })}
-								<ArrowRight className="h-4 w-4" />
-							</Button>
+							canEdit ? (
+								<Button
+									type="button"
+									size="sm"
+									className="w-full gap-2"
+									disabled={fromBacklog.size === 0 || busy}
+									onClick={() => void move([...fromBacklog], sprint.id)}
+								>
+									{t("tasks:kanban.sprints.planning.add", { count: fromBacklog.size })}
+									<ArrowRight className="h-4 w-4" />
+								</Button>
+							) : null
 						}
 					/>
-					<Pane
+					<PlanningPane
 						testId="sprint-planning-sprint"
 						title={sprint.name}
 						summary={t("tasks:kanban.sprints.planning.summary", { count: pools.sprint.length, points: pools.points })}
@@ -284,44 +291,90 @@ function PlanningView({ sprint }: { sprint: Sprint }) {
 						selected={fromSprint}
 						onToggle={(id) => setFromSprint((set) => toggled(set, id))}
 						onToggleAll={(checked) => setFromSprint(checked ? new Set(pools.sprint.map((task) => task.id)) : NO_IDS)}
-						onMove={(id) => void move([id], null)}
+						onMove={(ids) => void move(ids, null)}
+						onReceive={(ids) => void move(ids, sprint.id)}
 						moveLabel={t("tasks:kanban.sprints.planning.removeOne")}
 						direction="left"
 						busy={busy}
-						header={
-							speed !== null ? (
-								<p
-									className={cn(
-										"border-b border-border/50 px-3 py-1.5 text-xs",
-										over ? "text-warning" : "text-muted-foreground",
-									)}
-									title={t("tasks:kanban.sprints.velocityHint")}
-								>
-									{over
-										? t("tasks:kanban.sprints.planning.overVelocity", { points: pools.points, velocity: speed })
-										: t("tasks:kanban.sprints.planning.underVelocity", { points: pools.points, velocity: speed })}
-								</p>
-							) : undefined
-						}
+						canEdit={canEdit}
+						renderChips={chips}
+						renderUnestimated={estimate}
 						footer={
-							<Button
-								type="button"
-								size="sm"
-								variant="outline"
-								className="w-full gap-2"
-								disabled={fromSprint.size === 0 || busy}
-								onClick={() => void move([...fromSprint], null)}
-							>
-								<ArrowLeft className="h-4 w-4" />
-								{t("tasks:kanban.sprints.planning.remove", { count: fromSprint.size })}
-							</Button>
+							canEdit ? (
+								<div className="grid gap-2">
+									{missing.length > 0 && (
+										<div
+											data-testid="sprint-planning-missing"
+											className="flex flex-wrap items-center gap-2 rounded-md bg-warning/10 px-2 py-1.5 text-xs text-warning"
+										>
+											<Link2 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+											<span className="min-w-0 flex-1">
+												{t("tasks:kanban.sprints.planning.missing", { count: missing.length })}
+											</span>
+											<Button
+												type="button"
+												size="sm"
+												variant="outline"
+												className="h-6 px-2 text-2xs"
+												disabled={busy}
+												onClick={() => void move(missing.map((task) => task.id), sprint.id)}
+											>
+												{t("tasks:kanban.sprints.planning.addMissing", { count: missing.length })}
+											</Button>
+										</div>
+									)}
+									<Button
+										type="button"
+										size="sm"
+										variant="outline"
+										className="w-full gap-2"
+										disabled={fromSprint.size === 0 || busy}
+										onClick={() => void move([...fromSprint], null)}
+									>
+										<ArrowLeft className="h-4 w-4" />
+										{t("tasks:kanban.sprints.planning.remove", { count: fromSprint.size })}
+									</Button>
+								</div>
+							) : null
 						}
 					/>
 				</div>
-				<DialogFooter>
-					<Button type="button" variant="ghost" onClick={closePlanning}>
-						{t("common:buttons.close")}
-					</Button>
+				<DialogFooter className="items-center gap-2 sm:justify-between">
+					<output className="flex min-h-7 items-center gap-2 text-xs text-muted-foreground">
+						{lastMove && (
+							<>
+								<span>
+									{lastMove.to
+										? t("tasks:kanban.sprints.planning.added", { count: lastMove.ids.length })
+										: t("tasks:kanban.sprints.planning.removed", { count: lastMove.ids.length })}
+								</span>
+								<Button type="button" size="sm" variant="ghost" className="h-7 gap-1.5 px-2" onClick={undo} disabled={busy}>
+									<Undo2 className="h-3.5 w-3.5" />
+									{t("tasks:kanban.sprints.planning.undo")}
+								</Button>
+							</>
+						)}
+					</output>
+					<div className="flex items-center gap-2">
+						<Button type="button" variant="ghost" onClick={closePlanning}>
+							{t("common:buttons.close")}
+						</Button>
+						{canEdit && sprint.state === "planned" && (
+							<Button
+								type="button"
+								className="gap-2"
+								disabled={otherActive || busy}
+								title={otherActive ? t("tasks:kanban.sprints.oneActive") : undefined}
+								onClick={async () => {
+									if (sprintProgress(tasks, sprint.id).cards === 0) return;
+									failed(await start(sprint.id));
+								}}
+							>
+								<Play className="h-4 w-4" />
+								{t("tasks:kanban.sprints.planning.start")}
+							</Button>
+						)}
+					</div>
 				</DialogFooter>
 			</DialogContent>
 		</Dialog>
