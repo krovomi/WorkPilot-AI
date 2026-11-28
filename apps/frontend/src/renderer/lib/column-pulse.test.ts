@@ -76,6 +76,17 @@ describe("columnPulse", () => {
 		expect(columnPulse("in_progress", [task()])).toEqual([]);
 	});
 
+	it("counts the builds the app closed on as interrupted, not by their last phase", () => {
+		const closedOn = task({
+			executionProgress: { phase: "coding", phaseProgress: 40, overallProgress: 30 },
+			metadata: { paused: { enabled: true, reason: "app_shutdown", paused_at: null, paused_subtask_id: null } },
+		} as Partial<Task>);
+		expect(columnPulse("in_progress", [phase("coding"), closedOn])).toEqual([
+			{ key: "coding", values: { count: 1 } },
+			{ key: "interrupted", values: { count: 1 }, warn: true },
+		]);
+	});
+
 	it("splits the review column into plans, reads and fixes", () => {
 		expect(
 			columnPulse("human_review", [

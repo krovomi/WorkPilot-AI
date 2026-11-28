@@ -644,6 +644,8 @@
 			"qa_other": "{{count}} in QA",
 			"paused_one": "{{count}} paused",
 			"paused_other": "{{count}} paused",
+			"interrupted_one": "{{count}} interrupted",
+			"interrupted_other": "{{count}} interrupted",
 			"failedErrors_one": "{{count}} run failed",
 			"failedErrors_other": "{{count}} runs failed",
 			"failedQa_one": "{{count}} rejected by QA",

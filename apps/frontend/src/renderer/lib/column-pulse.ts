@@ -8,6 +8,7 @@
  */
 import type { TaskStatusColumn } from "../../shared/constants/task";
 import { ABANDON_RESOLUTIONS, type Task } from "../../shared/types";
+import { cardInterruption } from "./interrupted-task";
 
 export interface PulseItem {
 	key: string;
@@ -54,10 +55,14 @@ const PHASE_ITEMS: ReadonlyArray<{ key: string; phases: string[]; warn?: boolean
 
 function inProgress(tasks: Task[]): PulseItem[] {
 	const items: PulseItem[] = [];
+	// A build the app closed on keeps its last phase, but nothing runs it.
+	const interrupted = countIf(tasks, (t) => cardInterruption(t) !== null);
+	const live = tasks.filter((t) => cardInterruption(t) === null);
 	for (const { key, phases, warn } of PHASE_ITEMS) {
-		const count = countIf(tasks, (t) => phases.includes(t.executionProgress?.phase ?? ""));
+		const count = countIf(live, (t) => phases.includes(t.executionProgress?.phase ?? ""));
 		if (count) items.push({ key, values: { count }, ...(warn ? { warn } : {}) });
 	}
+	if (interrupted) items.push({ key: "interrupted", values: { count: interrupted }, warn: true });
 	return items;
 }
 

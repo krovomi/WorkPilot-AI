@@ -123,7 +123,8 @@ On the board, a build the app interrupted reads « Interrompue »
 (`renderer/lib/interrupted-task.ts`, `InterruptedBadge`): the shutdown pause,
 told apart by `crashed` in its tooltip with the time, in place of the status and
 of the last execution phase, which would still spin. Its only action is a
-labelled Reprendre. No paused card runs the stuck watch: a pause has no process
+labelled Reprendre, and the In Progress band counts it as « N interrompues » rather
+than by its last phase. No paused card runs the stuck watch: a pause has no process
 by design, and the stuck recovery would reset the subtask it stopped on. The
 toolbar's « N tâches interrompues · Reprendre… » chip (`InterruptedTasksBanner`,
 local projects only) reopens the dialog on that project's interrupted builds,
