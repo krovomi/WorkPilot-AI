@@ -147,6 +147,9 @@ const serverUsage = {
 	exportUsage: vi.fn(),
 	eraseAccount: vi.fn(),
 	getUsageSettings: vi.fn(),
+	getReportSettings: vi.fn(),
+	getReport: vi.fn(),
+	getBudgets: vi.fn(),
 };
 let world = RICH;
 const setUserActive = vi.fn(async () => true);
@@ -173,6 +176,9 @@ beforeEach(() => {
 	serverUsage.getUsageView.mockImplementation(async (view: string) => ({ ok: true, data: world[view] }));
 	serverUsage.getUsagePerson.mockResolvedValue({ ok: true, data: SHEET });
 	serverUsage.getUsageSettings.mockResolvedValue({ ok: false, error: "nope" });
+	serverUsage.getReportSettings.mockResolvedValue({ ok: false, error: "no report" });
+	serverUsage.getReport.mockResolvedValue({ ok: false, error: "no preview" });
+	serverUsage.getBudgets.mockResolvedValue({ ok: false, error: "no budgets" });
 	setUserActive.mockClear();
 	(globalThis as { electronAPI?: unknown }).electronAPI = { serverUsage };
 	useAdminStore.setState({
@@ -410,11 +416,15 @@ describe("PersonSheet", () => {
 });
 
 describe("UsageTab", () => {
-	it("switches between the figures and the collection settings", async () => {
+	it("switches between the figures, the report, the budgets and the collection settings", async () => {
 		render(<UsageTab />);
 		expect(await screen.findByText("Partly estimated")).toBeInTheDocument();
 		fireEvent.click(screen.getByRole("tab", { name: "Collection and retention" }));
 		expect(await screen.findByText("The server refused: nope")).toBeInTheDocument();
 		expect(screen.getByRole("tab", { name: "Collection and retention" })).toHaveAttribute("aria-selected", "true");
+		fireEvent.click(screen.getByRole("tab", { name: "Report" }));
+		expect(await screen.findByText("The server refused: no report")).toBeInTheDocument();
+		fireEvent.click(screen.getByRole("tab", { name: "Budgets" }));
+		expect(await screen.findByText("The server refused: no budgets")).toBeInTheDocument();
 	});
 });

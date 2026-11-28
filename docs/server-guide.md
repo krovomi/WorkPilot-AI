@@ -279,7 +279,8 @@ WORKPILOT_APPROVAL_ESCALATION_ROLES=owner+admin         # prévenus quand l'atte
 ## 5. Configurer l'équipe
 
 Tout se fait dans l'app de bureau, menu **Administration**, onglets Vue d'ensemble, Membres,
-Groupes, Rôles et permissions, Organisations, Invitations, Audit et Quotas. Chaque action
+Groupes, Rôles et permissions, Organisations, Invitations, Audit, Quotas et Usage (chiffres,
+rapport, budgets, collecte). Chaque action
 demande une permission, vérifiée par le serveur (masquer un bouton n'est pas un contrôle).
 
 ### Les organisations
@@ -402,7 +403,8 @@ coché.
 avec ou sans blocage ; chaque budget (celui de l'organisation compris) alerte une fois à 80 % et
 une fois à 100 % par mois, par e-mail aux destinataires du rapport d'usage. Exemple : 2 000 000
 tokens par mois au projet « Site », bloquant, et 500 000 au groupe « Stagiaires », en alerte
-seulement.
+seulement. L'écran montre la consommation du mois de chaque budget et les dernières alertes ; un
+nom de la liste remplit le formulaire pour changer ce budget.
 
 ### Le rapport d'usage par e-mail
 
@@ -411,7 +413,10 @@ seulement.
 administrateurs. L'heure se règle à la minute, dans n'importe quel fuseau ; les jours (tous, les
 jours ouvrés ou ceux choisis) ; jusqu'à 20 adresses, une adresse hors de l'organisation étant
 signalée ; la langue ; un rapport sans noms ; un rapport hebdomadaire le lundi et mensuel le 1er.
-Il faut le SMTP (section 3) ; sans lui, le rapport se lit dans l'app et l'écran le dit. Le
+Il faut le SMTP (section 3) ; sans lui, le rapport se lit dans l'app et l'écran le dit. Le même
+écran montre les derniers envois, l'aperçu du rapport d'un jour, d'une semaine ou d'un mois tel
+que l'e-mail le porte, et **Envoyer maintenant**, qui envoie le dernier rapport quotidien sans
+remplacer l'envoi prévu. Le
 contenu exact et ce qui est gardé : [server-usage-data.md](server-usage-data.md#le-rapport-par-e-mail).
 
 Exemple : chaque jour ouvré à 8 h 30, heure de Montréal, en anglais, à la direction et à la

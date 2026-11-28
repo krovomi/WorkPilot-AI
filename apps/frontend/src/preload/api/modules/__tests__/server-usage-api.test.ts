@@ -21,4 +21,34 @@ describe("createServerUsageAPI", () => {
 		await api.setUsageSettings(body);
 		expect(ipc.invoke).toHaveBeenCalledWith(IPC_CHANNELS.SERVER_USAGE_SET_SETTINGS, body);
 	});
+
+	it("reads, changes and sends the report, and reads, sets and removes budgets", async () => {
+		const api = createServerUsageAPI();
+		const settings = {
+			enabled: true,
+			time: "09:00",
+			timezone: "Europe/Paris",
+			days: [0],
+			recipients: [],
+			language: "fr" as const,
+			names: true,
+			weekly: false,
+			monthly: false,
+		};
+		const budget = { scope: "group" as const, target_id: "g1", monthly_tokens: 10, block: false };
+		await api.getReportSettings();
+		expect(ipc.invoke).toHaveBeenLastCalledWith(IPC_CHANNELS.SERVER_USAGE_GET_REPORT_SETTINGS);
+		await api.setReportSettings(settings);
+		expect(ipc.invoke).toHaveBeenLastCalledWith(IPC_CHANNELS.SERVER_USAGE_SET_REPORT_SETTINGS, settings);
+		await api.getReport("weekly", "2026-11-20");
+		expect(ipc.invoke).toHaveBeenLastCalledWith(IPC_CHANNELS.SERVER_USAGE_REPORT, "weekly", "2026-11-20");
+		await api.sendReportNow();
+		expect(ipc.invoke).toHaveBeenLastCalledWith(IPC_CHANNELS.SERVER_USAGE_SEND_REPORT);
+		await api.getBudgets();
+		expect(ipc.invoke).toHaveBeenLastCalledWith(IPC_CHANNELS.SERVER_USAGE_BUDGETS);
+		await api.setBudget(budget);
+		expect(ipc.invoke).toHaveBeenLastCalledWith(IPC_CHANNELS.SERVER_USAGE_SET_BUDGET, budget);
+		await api.removeBudget("b1");
+		expect(ipc.invoke).toHaveBeenLastCalledWith(IPC_CHANNELS.SERVER_USAGE_REMOVE_BUDGET, "b1");
+	});
 });
